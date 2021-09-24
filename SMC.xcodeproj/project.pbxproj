@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		2286C5AA26FE3596001BF8AA /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2286C5A926FE3596001BF8AA /* main.cpp */; };
+		2286C5B026FE3B40001BF8AA /* clade.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 2286C5AF26FE3B40001BF8AA /* clade.hpp */; };
+		2286C5B226FE3B9D001BF8AA /* particle.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 2286C5B126FE3B9D001BF8AA /* particle.hpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -26,6 +28,9 @@
 		2286C59526FE2D6C001BF8AA /* SMC */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SMC; sourceTree = BUILT_PRODUCTS_DIR; };
 		2286C5A826FE3596001BF8AA /* split.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = split.hpp; path = src/split.hpp; sourceTree = SOURCE_ROOT; };
 		2286C5A926FE3596001BF8AA /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = main.cpp; path = src/main.cpp; sourceTree = SOURCE_ROOT; };
+		2286C5AC26FE380C001BF8AA /* forest.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = forest.hpp; sourceTree = "<group>"; };
+		2286C5AF26FE3B40001BF8AA /* clade.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = clade.hpp; sourceTree = "<group>"; };
+		2286C5B126FE3B9D001BF8AA /* particle.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = particle.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,7 +64,10 @@
 			isa = PBXGroup;
 			children = (
 				2286C5A926FE3596001BF8AA /* main.cpp */,
+				2286C5B126FE3B9D001BF8AA /* particle.hpp */,
 				2286C5A826FE3596001BF8AA /* split.hpp */,
+				2286C5AC26FE380C001BF8AA /* forest.hpp */,
+				2286C5AF26FE3B40001BF8AA /* clade.hpp */,
 			);
 			path = SMC;
 			sourceTree = "<group>";
@@ -122,6 +130,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				2286C5AA26FE3596001BF8AA /* main.cpp in Sources */,
+				2286C5B026FE3B40001BF8AA /* clade.hpp in Sources */,
+				2286C5B226FE3B9D001BF8AA /* particle.hpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
