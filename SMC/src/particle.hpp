@@ -11,14 +11,11 @@
 #include "forest.hpp"
 using namespace std;
 
-#if defined(POLSUGGESTION)
 #include "lot.hpp"
 using namespace strom;
 extern Lot rng;
-#endif
 
 class Particle {
-#if defined(POLSUGGESTION)
     // You probably don't need to declare Forest to be a friend of Particle
     // because Forest objects will never need to mess with private members of Particle
     // We will need to make Particle a friend of Forest, however, so that Particle 
@@ -40,14 +37,8 @@ class Particle {
         Forest _forest;
         double _weight;
         
-#else
-    friend class forest;
-    double weight;
-    //Forest forest;
-#endif
 };
 
-#if defined(POLSUGGESTION)
 // Constructor assigns a random weight
 inline Particle::Particle() {
     // You can just let the Forest constructor automatically initialize the _forest object
@@ -55,21 +46,6 @@ inline Particle::Particle() {
     // Lot is a global variable created in main.cpp, so it can be used anywhere.
     _weight = rng.uniform();
 };
-#else
-vector<int> assignWeight (vector<int> vec) {
-    //multiply each particle by a random weight
-    for (int particle : vec) {
-        particle = particle*(((double) rand() / (RAND_MAX))); //chooses random value btw 0 and 1
-        return vec;
-    };
-    
-vector<int> assignForest (vector<int> vec) {
-    for (int particle : vec) {
-        particle = particle*forest; //???
-        return vec;
-    }
-};
-#endif
     
 
 //return particle population containing complete states

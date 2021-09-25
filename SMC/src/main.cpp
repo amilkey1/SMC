@@ -25,12 +25,8 @@ using namespace std;
 
 int main(int argc, const char * argv[]) {
     //initialize vector of particles
-#if defined(POLSUGGESTION)
     unsigned nparticles = 10;
-    vector<Particle> my_vec(nparticles); 
-#else
-    vector<int> my_vec = {10,10,10,10,10,10,10,10,10,10};
-#endif
+    vector<Particle> my_vec(nparticles);
     
     return 0;
 }

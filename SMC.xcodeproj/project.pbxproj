@@ -31,6 +31,9 @@
 		2286C5AC26FE380C001BF8AA /* forest.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = forest.hpp; sourceTree = "<group>"; };
 		2286C5AF26FE3B40001BF8AA /* clade.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = clade.hpp; sourceTree = "<group>"; };
 		2286C5B126FE3B9D001BF8AA /* particle.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = particle.hpp; sourceTree = "<group>"; };
+		2286C5B426FFA8ED001BF8AA /* conditionals.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = conditionals.hpp; sourceTree = "<group>"; };
+		2286C5B526FFA8FC001BF8AA /* split.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = split.hpp; sourceTree = "<group>"; };
+		2286C5B626FFABCF001BF8AA /* lot.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = lot.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,7 +76,10 @@
 			children = (
 				2286C5A826FE3596001BF8AA /* split.hpp */,
 				2286C5A926FE3596001BF8AA /* main.cpp */,
+				2286C5B626FFABCF001BF8AA /* lot.hpp */,
+				2286C5B426FFA8ED001BF8AA /* conditionals.hpp */,
 				2286C5B126FE3B9D001BF8AA /* particle.hpp */,
+				2286C5B526FFA8FC001BF8AA /* split.hpp */,
 				2286C5AC26FE380C001BF8AA /* forest.hpp */,
 				2286C5AF26FE3B40001BF8AA /* clade.hpp */,
 			);

@@ -28,17 +28,3 @@ inline Clade::Clade() {
     // For now, just assign the edge length an arbitrary exponential random value
     _edge_length = rng.gamma(1,1);
 }
-#else
-class Clade {
-    friend class split;
-};
-
-inline Clade::assignSplit() {
-    //split is type const
-}
-
-inline Clade::assignEdgeLength() {
-    //
-    double EdgeLength;
-}
-#endif
