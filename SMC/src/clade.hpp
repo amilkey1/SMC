@@ -7,7 +7,7 @@
 
 #include "conditionals.hpp"
 
-#if defined(POLSUGGESTION)
+
 #include "lot.hpp"
 #include "split.hpp"
 using namespace strom;

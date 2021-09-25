@@ -11,7 +11,6 @@
 #include "conditionals.hpp"
 #include "particle.hpp"
 
-#if defined(POLSUGGESTION)
 // Initialize our random number generator here so it will be a global variable
 #include "lot.hpp"
 Lot rng;
@@ -19,7 +18,6 @@ Lot rng;
 // Must initialize _nspecies here because it is a static data member of Forest
 #include "forest.hpp"
 unsigned Forest::_nspecies = 5;
-#endif
 
 using namespace std;
 
