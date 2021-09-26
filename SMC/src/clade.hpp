@@ -11,6 +11,7 @@
 #include "lot.hpp"
 #include "split.hpp"
 using namespace strom;
+using namespace std;
 extern Lot rng;
 
 class Clade {
@@ -18,6 +19,7 @@ class Clade {
     
     public:
         Clade();
+        void printEdgeLengths();
         
     private:
         Split  _split;
@@ -27,4 +29,10 @@ class Clade {
 inline Clade::Clade() {
     // For now, just assign the edge length an arbitrary exponential random value
     _edge_length = rng.gamma(1,1);
+    printEdgeLengths();
+}
+
+inline void Clade::printEdgeLengths() {
+    //print out edge lengths associated with all the clades in each forest in each particle
+    cout << "Clade edge length: " << _edge_length << "\n";
 }

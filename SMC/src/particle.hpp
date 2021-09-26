@@ -9,6 +9,7 @@
 #include <vector>
 #include "conditionals.hpp"
 #include "forest.hpp"
+#include "boost/format.hpp"
 using namespace std;
 
 #include "lot.hpp"
@@ -27,16 +28,16 @@ class Particle {
         // Although a default constructor will be provided for you, it is not
         // a bad idea to create your own constructor. That would allow you to 
         // assign a random weight as it is being constructed
-        Particle(); 
+        Particle();
     
         // member functions of Particle class
-        
+        void printWeights();
+    
     private:
         // data members of Particle class
         // I suggest using the underscore convention for data members
         Forest _forest;
         double _weight;
-        
 };
 
 // Constructor assigns a random weight
@@ -45,7 +46,15 @@ inline Particle::Particle() {
     // I recommend using the Lot class for choosing the random weight.
     // Lot is a global variable created in main.cpp, so it can be used anywhere.
     _weight = rng.uniform();
+    
+    //call print weight function
+    printWeights();
 };
+
+inline void Particle::printWeights() {
+    //print out weight of each particle
+    cout << "Particle weight: " << _weight << "\n" ;
+}
     
 
 //return particle population containing complete states
