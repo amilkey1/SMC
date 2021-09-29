@@ -38,7 +38,6 @@ class Particle {
         // I suggest using the underscore convention for data members
         Forest _forest;
         double _weight;
-        
 };
 
 // Constructor assigns a random weight
@@ -48,7 +47,7 @@ inline Particle::Particle() {
     // Lot is a global variable created in main.cpp, so it can be used anywhere.
     _weight = rng.uniform();
     
-
+    
 };
 
 inline void Particle::showParticle() {
@@ -58,8 +57,6 @@ inline void Particle::showParticle() {
     _forest.showForest();
 }
 }
-
-
 
 //importance sampling:
 //0) create proposal distribution q_imp (use prior as proposal?)

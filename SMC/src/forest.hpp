@@ -33,8 +33,6 @@ class Forest {
     private:
         static unsigned _nspecies;
         std::list<strom::Tree::SharedPtr> _trees;
-//        std::list<Clade> _clades;
-        
 };
 
 inline Forest::Forest() {
@@ -57,17 +55,8 @@ inline Forest::Forest() {
         tree->_preorder.push_back(tree->_root);
         _trees.push_back(tree);
         
-        
-//        TreeManip tm(tree);
-//
-//        clade._split.resize(_nspecies);
-//        clade._split.setBitAt(i);
-//        _clades.push_back(clade);
     }
-    
-//    createTrivialForest();
 }
-
 
 inline void Forest::showForest() {
     unsigned i = 0;
