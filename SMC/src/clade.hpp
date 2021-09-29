@@ -19,11 +19,12 @@ class Clade {
     
     public:
         Clade();
-        void printEdgeLengths();
+        void printSplits();
         
     private:
         Split  _split;
         double _edge_length;
+        void printEdgeLengths();
 };
 
 inline Clade::Clade() {

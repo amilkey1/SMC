@@ -13,18 +13,22 @@
 
 // Initialize our random number generator here so it will be a global variable
 #include "lot.hpp"
-Lot rng;
+strom::Lot rng;
 
 // Must initialize _nspecies here because it is a static data member of Forest
 #include "forest.hpp"
-unsigned Forest::_nspecies = 5;
+unsigned strom::Forest::_nspecies = 4;
+const double strom::Node::_smallest_edge_length=1.0e-12;
 
 using namespace std;
 
 int main(int argc, const char * argv[]) {
     //initialize vector of particles
     unsigned nparticles = 10;
-    vector<Particle> my_vec(nparticles);
+    vector<strom::Particle> my_vec(nparticles);
     
+    for (auto p:my_vec ) {
+        p.showParticle();
+    }
     return 0;
 }
