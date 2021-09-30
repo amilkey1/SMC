@@ -46,8 +46,6 @@ inline Particle::Particle() {
     // I recommend using the Lot class for choosing the random weight.
     // Lot is a global variable created in main.cpp, so it can be used anywhere.
     _weight = rng.uniform();
-    
-    
 };
 
 inline void Particle::showParticle() {
@@ -55,26 +53,6 @@ inline void Particle::showParticle() {
     cout << "Particle weight: " << _weight << "\n" ;
     cout << "Forest: " << "\n";
     _forest.showForest();
+    _forest.chooseTrees();
 }
 }
-
-//importance sampling:
-//0) create proposal distribution q_imp (use prior as proposal?)
-//1) sample from proposal distribution with density q_imp to obtain tree t_k
-//2) correct discrepancy between proposal and posterior distribution by assigning weight w_k to proposed tree
-    //weight = (prior*likelihood) / (proposal distribution) ?
-    //to form particle population
-
-//sequential importance sampling:
-//compute particles in stages
-//proposal is a conditional density ?
-//weight proposal is more complex
-//to form particle population
-
-//SMC:
-//0) create particle pop
-//1) resampling
-//  prune particles using randomized scheme
-//  throw K darts on one-dimensional target, then modify weight of each particle
-//2) proposal
-//3) weighting

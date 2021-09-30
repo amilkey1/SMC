@@ -18,6 +18,9 @@
 #include "tree_manip.hpp"
 #include "tree.hpp"
 
+#include "lot.hpp"
+extern strom::Lot rng;
+
 using namespace std;
 //using namespace strom;
 
@@ -30,8 +33,11 @@ class Forest {
     public:
         Forest();
         void showForest();
+        void chooseTrees();
     private:
         static unsigned _nspecies;
+        int t1;
+        int t2;
         std::list<strom::Tree::SharedPtr> _trees;
 };
 
@@ -54,7 +60,6 @@ inline Forest::Forest() {
         tree->_ninternals=0;
         tree->_preorder.push_back(tree->_root);
         _trees.push_back(tree);
-        
     }
 }
 
@@ -65,5 +70,26 @@ inline void Forest::showForest() {
         cout << i << " " << tm.makeNewick(3, true) << "\n";
         i++;
     }
+}
+
+inline void Forest::chooseTrees() {
+    //choose 2 trees to join
+    t1 = rng.randint(0, _trees.size()-1);
+    t2 = rng.randint(0, _trees.size()-1);
+    
+    //keep calling t2 until it doesn't equal t1
+    while (t2 == t1) {
+        t2 = rng.randint(0, _trees.size()-1);
+    }
+    
+    //don't use this when there's only one choice
+        //i.e. # of trees = 2
+    if (_trees.size() == 2) {
+        //then choose t1 = 0 and t2 = 1
+        t1 = 0;
+        t2 = 1;
+    }
+    cout << "join taxon " << t1 << " with taxon " << t2 << endl;
+//    cout <<"tree size is " << _trees.size() << endl;
 }
 }

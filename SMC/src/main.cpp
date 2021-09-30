@@ -26,7 +26,7 @@ int main(int argc, const char * argv[]) {
     //initialize vector of particles
     unsigned nparticles = 10;
     vector<strom::Particle> my_vec(nparticles);
-    
+
     for (auto p:my_vec ) {
         p.showParticle();
     }
