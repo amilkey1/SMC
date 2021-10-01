@@ -74,12 +74,12 @@ inline void Forest::showForest() {
 
 inline void Forest::chooseTrees() {
     //choose 2 trees to join
-    t1 = rng.randint(0, _trees.size()-1);
-    t2 = rng.randint(0, _trees.size()-1);
+    t1 = rng.randint(0, (int) _trees.size()-1);
+    t2 = rng.randint(0, (int) _trees.size()-1);
     
     //keep calling t2 until it doesn't equal t1
     while (t2 == t1) {
-        t2 = rng.randint(0, _trees.size()-1);
+        t2 = rng.randint(0, (int) _trees.size()-1);
     }
     
     //don't use this when there's only one choice
