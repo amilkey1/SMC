@@ -5,6 +5,9 @@
 #include <iostream>
 #include <boost/format.hpp>
 
+#include "lot.hpp"
+extern Lot rng;
+
 #include "node.hpp"
 #include "forest.hpp"
 using namespace std;
@@ -15,7 +18,7 @@ using namespace std;
     class Updater;
     class TreeUpdater;
     class PolytomyUpdater;
-//    class Forest;
+    class Particle;
 
 
     class Forest {
@@ -25,7 +28,8 @@ using namespace std;
             friend class Updater;
             friend class TreeUpdater;
             friend class PolytomyUpdater;
-            friend class Forest;
+            friend class Particle;
+            
 
         public:
 
@@ -36,6 +40,8 @@ using namespace std;
             unsigned                    numInternals() const;
             unsigned                    numNodes() const;
             void                        showForest();
+            static void                 setNumSpecies(unsigned n);
+            
         
         private:
 
@@ -51,7 +57,13 @@ using namespace std;
             static unsigned             _nspecies;
             void                        refreshPreorder();
             Node *                      findNextPreorder(Node * nd);
-        std::string                      makeNewick(unsigned precision, bool use_names) const;
+            std::string                 makeNewick(unsigned precision, bool use_names) const;
+            void                        nextStep();
+             void                 detachSubtree(Node * s);
+             void                 insertSubtreeOnLeft(Node * s, Node * u);
+             Node *               findLeftSib(Node * nd);
+             Node *               getSubtreeAt(unsigned i);
+             unsigned         getNumSubtrees();
 
         public:
 
@@ -250,4 +262,111 @@ inline std::string Forest::makeNewick(unsigned precision, bool use_names) const 
     }
 
     return newick;
+}
+
+inline void Forest::setNumSpecies(unsigned n){
+    _nspecies=n;
+}
+
+inline void Forest::nextStep(){
+    unsigned t1=0;
+    unsigned t2=1;
+    unsigned nsubtrees = getNumSubtrees();
+    //don't use this when there's only one choice
+        //i.e. # of trees = 2
+    if (nsubtrees > 2) {
+        t1 = ::rng.randint(0, nsubtrees-1);
+        t2 = ::rng.randint(0, nsubtrees-1);
+        
+        //keep calling t2 until it doesn't equal t1
+        while (t2 == t1) {
+            t2 = ::rng.randint(0, nsubtrees-1);
+        }
+    }
+    
+    cout << "join taxon " << t1 << " with taxon " << t2 << endl;
+    
+    Node * subtree1=getSubtreeAt(t1);
+    Node * subtree2 = getSubtreeAt(t2);
+    
+    detachSubtree(subtree1);
+    detachSubtree(subtree2);
+    
+    //creating new node
+    Node* new_nd=&_nodes[_nleaves+_ninternals];
+    new_nd->_name=" ";
+    new_nd->_left_child=subtree1;
+    new_nd->_right_sib=0;
+    new_nd->_parent=_root->_left_child;
+    new_nd->_number=_nleaves+_ninternals;
+    new_nd->_edge_length=0.0;
+    _ninternals++;
+    subtree1 -> _right_sib=subtree2;
+    subtree1->_parent=new_nd;
+    subtree2->_parent=new_nd;
+    
+    insertSubtreeOnLeft(new_nd, _root->_left_child);
+    
+    refreshPreorder();
+}
+
+inline void Forest::detachSubtree(Node * s) {
+    assert(s);
+    assert(s->_parent);
+    
+    // Save pointers to relevant nodes
+    Node * s_leftsib  = findLeftSib(s);
+    Node * s_rightsib = s->_right_sib;
+    Node * s_parent   = s->_parent;
+
+    // Completely detach s and seal up the wound
+    s->_parent = 0;
+    s->_right_sib = 0;
+    if (s_leftsib)
+        s_leftsib->_right_sib = s_rightsib;
+    else
+        s_parent->_left_child = s_rightsib;
+}
+
+inline void Forest::insertSubtreeOnLeft(Node * s, Node * u) {
+    assert(u);
+    assert(s);
+    s->_right_sib  = u->_left_child;
+    s->_parent     = u;
+    u->_left_child = s;
+}
+
+inline Node * Forest::findLeftSib(Node * nd) {
+    assert(nd);
+    assert(nd->_parent);
+    Node * child = nd->_parent->_left_child;
+    while (child && child->_right_sib != nd)
+        child = child->_right_sib;
+    return child;
+}
+
+inline Node * Forest::getSubtreeAt(unsigned i) {
+    unsigned nsubtrees = 0;
+    Node * the_nd = 0;
+    for (auto nd : _preorder) {
+        if (nd->_parent == _root->_left_child) {
+            if (nsubtrees == i) {
+                the_nd = nd;
+                break;
+            }
+            nsubtrees++;
+        }
+    }
+    assert(the_nd);
+    return the_nd;
+}
+
+inline unsigned Forest::getNumSubtrees() {
+    unsigned nsubtrees = 0;
+    for (auto nd : _preorder) {
+        if (nd->_parent == _root->_left_child) {
+            nsubtrees++;
+        }
+    }
+    return nsubtrees;
 }

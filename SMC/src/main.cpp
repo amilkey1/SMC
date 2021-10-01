@@ -23,12 +23,25 @@ const double Node::_smallest_edge_length=1.0e-12;
 using namespace std;
 
 int main(int argc, const char * argv[]) {
+    rng.setSeed(12345);
+    unsigned nspecies=4;
+    Forest::setNumSpecies(nspecies);
     //initialize vector of particles
-    unsigned nparticles = 10;
+    unsigned nparticles = 1;
     vector<Particle> my_vec(nparticles);
-
+    
+    cout << "\n Particles at the start: " << endl;
+    
     for (auto p:my_vec ) {
         p.showParticle();
+    }
+
+    for (unsigned g=0; g<nspecies-2; g++){
+        cout << "\n Particles after generation " << g << endl;
+        for (auto p:my_vec ) {
+            p.advance();
+            p.showParticle();
+        }
     }
     return 0;
 }

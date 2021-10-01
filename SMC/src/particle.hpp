@@ -33,6 +33,7 @@ class Particle {
     
         // member functions of Particle class
         void showParticle();
+        void advance();
     private:
         // data members of Particle class
         // I suggest using the underscore convention for data members
@@ -54,4 +55,8 @@ inline void Particle::showParticle() {
     cout << "Forest: " << "\n";
     _forest.showForest();
 //    _forest.chooseTrees();
+}
+
+inline void Particle::advance() {
+    _forest.nextStep();
 }
