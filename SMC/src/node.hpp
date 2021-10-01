@@ -5,7 +5,7 @@
 #include  <iostream>
 #include "split.hpp"
 
-namespace strom {
+
 
     class Tree;
     class TreeManip;
@@ -111,4 +111,3 @@ namespace strom {
         _edge_length = (v < _smallest_edge_length ? _smallest_edge_length : v);
     }
 
-}

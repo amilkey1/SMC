@@ -7,7 +7,7 @@
 #include <climits>
 #include <cassert>
 
-namespace strom {
+
 
     class Split {
         public:
@@ -219,5 +219,3 @@ namespace strom {
     inline bool Split::conflictsWith(const Split & other) const {
         return !isCompatible(other);
     }
-
-}

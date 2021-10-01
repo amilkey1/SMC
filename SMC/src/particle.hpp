@@ -13,10 +13,10 @@
 using namespace std;
 
 #include "lot.hpp"
-//using namespace strom;
-extern strom::Lot rng;
 
-namespace strom {
+extern Lot rng;
+
+
 class Particle {
     // You probably don't need to declare Forest to be a friend of Particle
     // because Forest objects will never need to mess with private members of Particle
@@ -53,6 +53,5 @@ inline void Particle::showParticle() {
     cout << "Particle weight: " << _weight << "\n" ;
     cout << "Forest: " << "\n";
     _forest.showForest();
-    _forest.chooseTrees();
-}
+//    _forest.chooseTrees();
 }

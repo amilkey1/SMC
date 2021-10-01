@@ -2,7 +2,7 @@
 
 #include <boost/format.hpp>
 
-namespace strom {
+
 
     class XStrom : public std::exception {
         public:
@@ -17,4 +17,3 @@ namespace strom {
             std::string         _msg;
     };
 
-}
