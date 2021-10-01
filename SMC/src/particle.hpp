@@ -16,7 +16,6 @@ using namespace std;
 
 extern Lot rng;
 
-
 class Particle {
     // You probably don't need to declare Forest to be a friend of Particle
     // because Forest objects will never need to mess with private members of Particle
@@ -39,6 +38,7 @@ class Particle {
         // I suggest using the underscore convention for data members
         Forest _forest;
         double _weight;
+        Particle(const Particle & other);
 };
 
 // Constructor assigns a random weight
@@ -59,4 +59,8 @@ inline void Particle::showParticle() {
 
 inline void Particle::advance() {
     _forest.nextStep();
+}
+
+inline Particle::Particle(const Particle & other) {
+    assert(false);
 }
