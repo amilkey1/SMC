@@ -13,131 +13,131 @@ extern Lot rng;
 using namespace std;
 
 
-    class TreeManip;
-    class Likelihood;
-    class Updater;
-    class TreeUpdater;
-    class PolytomyUpdater;
-    class Particle;
+class TreeManip;
+class Likelihood;
+class Updater;
+class TreeUpdater;
+class PolytomyUpdater;
+class Particle;
 
 
-    class Forest {
+class Forest {
 
-            friend class TreeManip;
-            friend class Likelihood;
-            friend class Updater;
-            friend class TreeUpdater;
-            friend class PolytomyUpdater;
-            friend class Particle;
-            
-
-        public:
-
-                                        Forest();
-                                        ~Forest();
-
-            unsigned                    numLeaves() const;
-            unsigned                    numInternals() const;
-            unsigned                    numNodes() const;
-            void                        showForest();
-            static void                 setNumSpecies(unsigned n);
-            
+        friend class TreeManip;
+        friend class Likelihood;
+        friend class Updater;
+        friend class TreeUpdater;
+        friend class PolytomyUpdater;
+        friend class Particle;
         
-        private:
 
-            void                        clear();
+    public:
 
-            Node *                      _root;
-            unsigned                    _nleaves;
-            unsigned                    _ninternals;
-            std::vector<Node *>         _preorder;
-            std::vector<Node *>          _levelorder;
-            std::vector<Node>            _nodes;
-            std::vector<Node *>         _unused_nodes;
-            static unsigned             _nspecies;
-            void                        refreshPreorder();
-            Node *                      findNextPreorder(Node * nd);
-            std::string                 makeNewick(unsigned precision, bool use_names) const;
-            void                        nextStep();
-             void                 detachSubtree(Node * s);
-             void                 insertSubtreeOnLeft(Node * s, Node * u);
-             Node *               findLeftSib(Node * nd);
-             Node *               getSubtreeAt(unsigned i);
-             unsigned         getNumSubtrees();
+                                    Forest();
+                                    ~Forest();
 
-        public:
+        unsigned                    numLeaves() const;
+        unsigned                    numInternals() const;
+        unsigned                    numNodes() const;
+        void                        showForest();
+        static void                 setNumSpecies(unsigned n);
+        
+    
+    private:
 
-            typedef std::shared_ptr<Forest> SharedPtr;
-    };
+        void                        clear();
+
+        Node *                      _root;
+        unsigned                    _nleaves;
+        unsigned                    _ninternals;
+        std::vector<Node *>         _preorder;
+        std::vector<Node *>         _levelorder;
+        std::vector<Node>           _nodes;
+        std::vector<Node *>         _unused_nodes;
+        static unsigned             _nspecies;
+        void                        refreshPreorder();
+        Node *                      findNextPreorder(Node * nd);
+        std::string                 makeNewick(unsigned precision, bool use_names) const;
+        void                        nextStep();
+        void                        detachSubtree(Node * s);
+        void                        insertSubtreeOnLeft(Node * s, Node * u);
+        Node *                      findLeftSib(Node * nd);
+        Node *                      getSubtreeAt(unsigned i);
+        unsigned                    getNumSubtrees();
+        void                        setEdgeLength(Node * nd);
+
+    public:
+
+        typedef std::shared_ptr<Forest> SharedPtr;
+};
     
 
-    inline Forest::Forest() {
-        //std::cout << "Constructing a forest" << std::endl;
-        clear();
-    }
+inline Forest::Forest() {
+    //std::cout << "Constructing a forest" << std::endl;
+    clear();
+}
 
-    inline Forest::~Forest() {
-        //std::cout << "Destroying a Forest" << std::endl;
-    }
+inline Forest::~Forest() {
+    //std::cout << "Destroying a Forest" << std::endl;
+}
 
-    inline void Forest::clear() {
-        _nodes.clear();
-        _preorder.clear();
-        _levelorder.clear();
-        _nodes.resize(2*_nspecies);
-        //creating root node
-        _root = &_nodes[_nspecies];
-        _root->_name="root";
-        _root->_left_child=0;
-        _root->_right_sib=0;
-        _root->_parent=0;
-        _root->_number=_nspecies;
-        _root->_edge_length=0.0;
-        
-        //creating subroot node
-        Node* subroot=&_nodes[_nspecies+1];
-        subroot->_name="subroot";
-        subroot->_left_child=0;
-        subroot->_right_sib=0;
-        subroot->_parent=_root;
-        subroot->_number=_nspecies;
-        subroot->_edge_length=0.0;
-        _root->_left_child=subroot;
-        
-        //create species
-        for (unsigned i = 0; i < _nspecies; i++) {
-            Node* nd=&_nodes[i];
-            if (i==0) {
-                subroot->_left_child=nd;
-            }
-            else {
-                _nodes[i-1]._right_sib=nd;
-            }
-            nd->_name=(char)('A'+i);
-            nd->_left_child=0;
-            nd->_right_sib=0;
-            nd->_parent=subroot;
-            nd->_number=i;
-            nd->_edge_length=0.0;
-            }
-        _nleaves=_nspecies;
-        _ninternals=2;
-        refreshPreorder();
+inline void Forest::clear() {
+    _nodes.clear();
+    _preorder.clear();
+    _levelorder.clear();
+    _nodes.resize(2*_nspecies);
+    //creating root node
+    _root = &_nodes[_nspecies];
+    _root->_name="root";
+    _root->_left_child=0;
+    _root->_right_sib=0;
+    _root->_parent=0;
+    _root->_number=_nspecies;
+    _root->_edge_length=0.0;
+    
+    //creating subroot node
+    Node* subroot=&_nodes[_nspecies+1];
+    subroot->_name="subroot";
+    subroot->_left_child=0;
+    subroot->_right_sib=0;
+    subroot->_parent=_root;
+    subroot->_number=_nspecies;
+    subroot->_edge_length=0.0;
+    _root->_left_child=subroot;
+    
+    //create species
+    for (unsigned i = 0; i < _nspecies; i++) {
+        Node* nd=&_nodes[i];
+        if (i==0) {
+            subroot->_left_child=nd;
         }
-        
+        else {
+            _nodes[i-1]._right_sib=nd;
+        }
+        nd->_name=(char)('A'+i);
+        nd->_left_child=0;
+        nd->_right_sib=0;
+        nd->_parent=subroot;
+        nd->_number=i;
+        nd->_edge_length=0.0;
+        }
+    _nleaves=_nspecies;
+    _ninternals=2;
+    refreshPreorder();
+    }
     
 
-    inline unsigned Forest::numLeaves() const {
-        return _nleaves;
-    }
+inline unsigned Forest::numLeaves() const {
+    return _nleaves;
+}
 
-    inline unsigned Forest::numInternals() const {
-        return _ninternals;
-    }
+inline unsigned Forest::numInternals() const {
+    return _ninternals;
+}
 
-    inline unsigned Forest::numNodes() const {
-        return (unsigned)_nodes.size();
-    }
+inline unsigned Forest::numNodes() const {
+    return (unsigned)_nodes.size();
+}
 
 inline void Forest::refreshPreorder() {
     // Create vector of node pointers in preorder sequence
@@ -213,19 +213,6 @@ inline std::string Forest::makeNewick(unsigned precision, bool use_names) const 
         if (nd->_left_child) {
             newick += "(";
             node_stack.push(nd);
-//            if (root_tip) {
-//                if (use_names) {
-//                    newick += boost::str(boost::format(tip_node_name_format)
-//                        % root_tip->_name
-//                        % nd->_edge_length);
-//                } else {
-//                    newick += boost::str(boost::format(tip_node_number_format)
-//                        % (root_tip->_number + 1)
-//                        % nd->_edge_length);
-//                }
-//                newick += ",";
-//                root_tip = 0;
-//            }
         }
         else {
             if (use_names) {
@@ -299,7 +286,10 @@ inline void Forest::nextStep(){
     new_nd->_right_sib=0;
     new_nd->_parent=_root->_left_child;
     new_nd->_number=_nleaves+_ninternals;
-    new_nd->_edge_length=0.0;
+    new_nd->_edge_length=rng.gamma(1.0, 1.0/nsubtrees);
+    
+    cout << "New node branch length is: " << new_nd->_edge_length << endl;
+    
     _ninternals++;
     subtree1 -> _right_sib=subtree2;
     subtree1->_parent=new_nd;
@@ -368,5 +358,6 @@ inline unsigned Forest::getNumSubtrees() {
             nsubtrees++;
         }
     }
+    cout << "Number of subtrees is: " << nsubtrees << endl;
     return nsubtrees;
 }
