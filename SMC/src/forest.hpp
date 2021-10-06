@@ -317,6 +317,7 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtree
     new_nd->_edge_length=rng.gamma(1.0, 1.0/nsubtrees);
 //    new_nd->_edge_length=0;
 
+
     cout << "New node branch length is: " << new_nd->_edge_length << endl;
 
     _ninternals++;
