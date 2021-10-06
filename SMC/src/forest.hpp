@@ -65,7 +65,8 @@ class Forest {
         Node *                      getSubtreeAt(unsigned i);
         unsigned                    getNumSubtrees();
         void                        setEdgeLength(Node * nd);
-
+        void                        createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtrees);
+    
     public:
 
         typedef std::shared_ptr<Forest> SharedPtr;
@@ -125,7 +126,6 @@ inline void Forest::clear() {
     _ninternals=2;
     refreshPreorder();
     }
-    
 
 inline unsigned Forest::numLeaves() const {
     return _nleaves;
@@ -264,21 +264,49 @@ inline void Forest::nextStep(){
     if (nsubtrees > 2) {
         t1 = ::rng.randint(0, nsubtrees-1);
         t2 = ::rng.randint(0, nsubtrees-1);
-        
+
         //keep calling t2 until it doesn't equal t1
         while (t2 == t1) {
             t2 = ::rng.randint(0, nsubtrees-1);
         }
     }
-    
-    cout << "join taxon " << t1 << " with taxon " << t2 << endl;
-    
+
+    cout << "joining taxon " << t1 << " with taxon " << t2 << endl;
+    createNewSubtree(t1, t2, nsubtrees);
+
+//    Node * subtree1=getSubtreeAt(t1);
+//    Node * subtree2 = getSubtreeAt(t2);
+//
+//    detachSubtree(subtree1);
+//    detachSubtree(subtree2);
+//
+//    //creating new node
+//    Node* new_nd=&_nodes[_nleaves+_ninternals];
+//    new_nd->_name=" ";
+//    new_nd->_left_child=subtree1;
+//    new_nd->_right_sib=0;
+//    new_nd->_parent=_root->_left_child;
+//    new_nd->_number=_nleaves+_ninternals;
+//    new_nd->_edge_length=rng.gamma(1.0, 1.0/nsubtrees);
+//
+//    cout << "New node branch length is: " << new_nd->_edge_length << endl;
+//
+//    _ninternals++;
+//    subtree1 -> _right_sib=subtree2;
+//    subtree1->_parent=new_nd;
+//    subtree2->_parent=new_nd;
+//
+//    insertSubtreeOnLeft(new_nd, _root->_left_child);
+//
+//    refreshPreorder();
+}
+
+inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtrees) {
     Node * subtree1=getSubtreeAt(t1);
     Node * subtree2 = getSubtreeAt(t2);
-    
+
     detachSubtree(subtree1);
     detachSubtree(subtree2);
-    
     //creating new node
     Node* new_nd=&_nodes[_nleaves+_ninternals];
     new_nd->_name=" ";
@@ -287,16 +315,17 @@ inline void Forest::nextStep(){
     new_nd->_parent=_root->_left_child;
     new_nd->_number=_nleaves+_ninternals;
     new_nd->_edge_length=rng.gamma(1.0, 1.0/nsubtrees);
-    
+//    new_nd->_edge_length=0;
+
     cout << "New node branch length is: " << new_nd->_edge_length << endl;
-    
+
     _ninternals++;
     subtree1 -> _right_sib=subtree2;
     subtree1->_parent=new_nd;
     subtree2->_parent=new_nd;
-    
+
     insertSubtreeOnLeft(new_nd, _root->_left_child);
-    
+
     refreshPreorder();
 }
 
