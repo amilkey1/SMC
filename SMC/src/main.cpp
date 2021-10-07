@@ -24,7 +24,7 @@ using namespace std;
 
 int main(int argc, const char * argv[]) {
     rng.setSeed(1234);
-    unsigned nspecies=4;
+    unsigned nspecies=26;
     Forest::setNumSpecies(nspecies);
     //initialize vector of particles
     unsigned nparticles = 1;

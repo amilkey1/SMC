@@ -302,6 +302,14 @@ inline void Forest::nextStep(){
 }
 
 inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtrees) {
+    double edge_length=rng.gamma(1.0, 1.0/nsubtrees);
+    for (auto nd:_preorder){
+        if (nd->_parent == _root->_left_child){
+            nd->_edge_length+= edge_length;
+        }
+    }
+    
+    assert(nsubtrees>1);
     Node * subtree1=getSubtreeAt(t1);
     Node * subtree2 = getSubtreeAt(t2);
 
@@ -314,7 +322,8 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtree
     new_nd->_right_sib=0;
     new_nd->_parent=_root->_left_child;
     new_nd->_number=_nleaves+_ninternals;
-    new_nd->_edge_length=rng.gamma(1.0, 1.0/nsubtrees);
+//    new_nd->_edge_length=rng.gamma(1.0, 1.0/(nsubtrees-1));
+    
 //    new_nd->_edge_length=0;
 
 
