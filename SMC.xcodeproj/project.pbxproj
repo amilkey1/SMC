@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		2286C5AA26FE3596001BF8AA /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2286C5A926FE3596001BF8AA /* main.cpp */; };
 		2286C5B226FE3B9D001BF8AA /* particle.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 2286C5B126FE3B9D001BF8AA /* particle.hpp */; };
+		22A40D6A2710986000DFFCA0 /* libboost_program_options.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A40D692710986000DFFCA0 /* libboost_program_options.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -31,8 +32,10 @@
 		2286C5B526FFA8FC001BF8AA /* split.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = split.hpp; sourceTree = "<group>"; };
 		2286C5B626FFABCF001BF8AA /* lot.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = lot.hpp; sourceTree = "<group>"; };
 		2286C5B72704B42A001BF8AA /* node.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = node.hpp; sourceTree = "<group>"; };
-		2286C5BA2704BE49001BF8AA /* xstrom.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = xstrom.hpp; sourceTree = "<group>"; };
+		2286C5BA2704BE49001BF8AA /* xproj.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = xproj.hpp; sourceTree = "<group>"; };
+		22A40D692710986000DFFCA0 /* libboost_program_options.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libboost_program_options.a; path = ../libraries/static/libboost_program_options.a; sourceTree = "<group>"; };
 		22BD6F8F2707555A00DEB698 /* forest.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = forest.hpp; sourceTree = "<group>"; };
+		22BD6F902710806700DEB698 /* proj.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = proj.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -40,6 +43,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				22A40D6A2710986000DFFCA0 /* libboost_program_options.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -51,6 +55,7 @@
 			children = (
 				2286C59726FE2D6C001BF8AA /* SMC */,
 				2286C59626FE2D6C001BF8AA /* Products */,
+				22A40D682710986000DFFCA0 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -74,7 +79,8 @@
 			isa = PBXGroup;
 			children = (
 				22BD6F8F2707555A00DEB698 /* forest.hpp */,
-				2286C5BA2704BE49001BF8AA /* xstrom.hpp */,
+				22BD6F902710806700DEB698 /* proj.hpp */,
+				2286C5BA2704BE49001BF8AA /* xproj.hpp */,
 				2286C5B72704B42A001BF8AA /* node.hpp */,
 				2286C5A926FE3596001BF8AA /* main.cpp */,
 				2286C5B626FFABCF001BF8AA /* lot.hpp */,
@@ -83,6 +89,14 @@
 				2286C5B526FFA8FC001BF8AA /* split.hpp */,
 			);
 			path = src;
+			sourceTree = "<group>";
+		};
+		22A40D682710986000DFFCA0 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				22A40D692710986000DFFCA0 /* libboost_program_options.a */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -156,7 +170,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -202,6 +216,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = /Users/analisamilkey/Documents/projects/libraries/boost_1_77_0;
+				LIBRARY_SEARCH_PATHS = /Users/analisamilkey/Documents/projects/libraries/static;
 				MACOSX_DEPLOYMENT_TARGET = 11.3;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -216,7 +231,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -256,6 +271,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = /Users/analisamilkey/Documents/projects/libraries/boost_1_77_0;
+				LIBRARY_SEARCH_PATHS = /Users/analisamilkey/Documents/projects/libraries/static;
 				MACOSX_DEPLOYMENT_TARGET = 11.3;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;

@@ -7,6 +7,7 @@
 #include <boost/random/gamma_distribution.hpp>
 #include <boost/random/variate_generator.hpp>
 
+namespace proj {
 
     class Lot {
         public:
@@ -102,4 +103,4 @@
         }
         return (*_uniform_int_generator)();
     }
-
+}

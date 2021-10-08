@@ -5,7 +5,7 @@
 #include  <iostream>
 #include "split.hpp"
 
-
+namespace proj {
 
     class Tree;
     class TreeManip;
@@ -111,3 +111,4 @@
         _edge_length = (v < _smallest_edge_length ? _smallest_edge_length : v);
     }
 
+}

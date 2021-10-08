@@ -6,11 +6,15 @@
 #include <boost/format.hpp>
 
 #include "lot.hpp"
-extern Lot rng;
+extern proj::Lot rng;
 
 #include "node.hpp"
 #include "forest.hpp"
+
+namespace proj {
+
 using namespace std;
+
 
 
 class TreeManip;
@@ -273,32 +277,6 @@ inline void Forest::nextStep(){
 
     cout << "joining taxon " << t1 << " with taxon " << t2 << endl;
     createNewSubtree(t1, t2, nsubtrees);
-
-//    Node * subtree1=getSubtreeAt(t1);
-//    Node * subtree2 = getSubtreeAt(t2);
-//
-//    detachSubtree(subtree1);
-//    detachSubtree(subtree2);
-//
-//    //creating new node
-//    Node* new_nd=&_nodes[_nleaves+_ninternals];
-//    new_nd->_name=" ";
-//    new_nd->_left_child=subtree1;
-//    new_nd->_right_sib=0;
-//    new_nd->_parent=_root->_left_child;
-//    new_nd->_number=_nleaves+_ninternals;
-//    new_nd->_edge_length=rng.gamma(1.0, 1.0/nsubtrees);
-//
-//    cout << "New node branch length is: " << new_nd->_edge_length << endl;
-//
-//    _ninternals++;
-//    subtree1 -> _right_sib=subtree2;
-//    subtree1->_parent=new_nd;
-//    subtree2->_parent=new_nd;
-//
-//    insertSubtreeOnLeft(new_nd, _root->_left_child);
-//
-//    refreshPreorder();
 }
 
 inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtrees) {
@@ -399,4 +377,6 @@ inline unsigned Forest::getNumSubtrees() {
     }
     cout << "Number of subtrees is: " << nsubtrees << endl;
     return nsubtrees;
+}
+
 }

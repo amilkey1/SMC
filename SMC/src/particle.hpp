@@ -14,7 +14,9 @@ using namespace std;
 
 #include "lot.hpp"
 
-extern Lot rng;
+extern proj::Lot rng;
+
+namespace proj {
 
 class Particle {
     // You probably don't need to declare Forest to be a friend of Particle
@@ -88,3 +90,4 @@ inline Particle::Particle(const Particle & other) {
 ////    delete &_forest;
 ////    delete &_weight;
 //}
+}

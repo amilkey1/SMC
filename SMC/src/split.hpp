@@ -7,7 +7,7 @@
 #include <climits>
 #include <cassert>
 
-
+namespace proj {
 
     class Split {
         public:
@@ -219,3 +219,4 @@
     inline bool Split::conflictsWith(const Split & other) const {
         return !isCompatible(other);
     }
+}
