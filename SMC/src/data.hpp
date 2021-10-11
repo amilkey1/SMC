@@ -18,6 +18,9 @@
 namespace proj {
 
     class Data {
+        
+        friend class Forest;
+        
         public:
             typedef std::vector<std::string>            taxon_names_t;
             typedef unsigned long long                  state_t;
@@ -58,7 +61,6 @@ namespace proj {
             const pattern_counts_t &                    getPatternCounts() const;
             const monomorphic_vect_t &                  getMonomorphic() const;
             const partition_key_t &                     getPartitionKey() const;
-
 
             void                                        clear();
 

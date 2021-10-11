@@ -22,6 +22,7 @@ using namespace std;
 
 // Must initialize _nspecies here because it is a static data member of Forest
 #include "forest.hpp"
+#include "data.hpp"
 std::string  Proj::_program_name        = "proj";
 unsigned     Proj::_major_version       = 1;
 unsigned     Proj::_minor_version       = 0;
@@ -64,25 +65,5 @@ int main(int argc, const char * argv[]) {
         std::cerr << "Exception of unknown type!\n";
     }
     
-    rng.setSeed(1234);
-    unsigned nspecies=26;
-    Forest::setNumSpecies(nspecies);
-    //initialize vector of particles
-    unsigned nparticles = 1;
-    vector<Particle> my_vec(nparticles);
-    
-    cout << "\n Particles at the start: " << endl;
-    
-    for (auto & p:my_vec ) {
-        p.showParticle();
-    }
-
-    for (unsigned g=0; g<nspecies-2; g++){
-        cout << "\n Particles after generation " << g << endl;
-        for (auto & p:my_vec ) {
-            p.advance();
-            p.showParticle();
-        }
-    }
     return 0;
 }

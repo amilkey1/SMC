@@ -7,6 +7,8 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include "xproj.hpp"
+#include "forest.hpp"
+#include "particle.hpp"
 
 
 namespace proj {
@@ -19,6 +21,7 @@ namespace proj {
             void                clear();
             void                processCommandLineOptions(int argc, const char * argv[]);
             void                run();
+//            void                getNumSpecies(unsigned n);
 
         private:
 
@@ -61,7 +64,6 @@ namespace proj {
         ("help,h", "produce help message")
         ("version,v", "show program version")
         ("datafile,d",  boost::program_options::value(&_data_file_name)->required(), "name of a data file in NEXUS format")
-//        ("treefile,t",  boost::program_options::value(&_tree_file_name)->required(), "name of a tree file in NEXUS format") ///!treefilerequired
         ("subset",  boost::program_options::value(&partition_subsets), "a string defining a partition subset, e.g. 'first:1-1234\3' or 'default[codon:standard]:1-3702'")
         ;
         
@@ -107,11 +109,11 @@ namespace proj {
             _data = Data::SharedPtr(new Data());
             _data->setPartition(_partition);
             _data->getDataFromFile(_data_file_name);
-
-
+            
             // Report information about data partition subsets
             unsigned nsubsets = _data->getNumSubsets();
             std::cout << "\nNumber of taxa: " << _data->getNumTaxa() << std::endl;
+            
             std::cout << "Number of partition subsets: " << nsubsets << std::endl;
             for (unsigned subset = 0; subset < nsubsets; subset++) {
                 DataType dt = _partition->getDataTypeForSubset(subset);
@@ -120,6 +122,31 @@ namespace proj {
                 std::cout << "    sites:     " << _data->calcSeqLenInSubset(subset) << std::endl;
                 std::cout << "    patterns:  " << _data->getNumPatternsInSubset(subset) << std::endl;
                 }
+            
+            //set number of species to number in data file
+            rng.setSeed(1234);
+            unsigned nspecies;
+            nspecies = _data->getNumTaxa();
+            Forest::setNumSpecies(nspecies);
+            
+            //create vector of particles
+            unsigned nparticles = 1;
+            vector<Particle> my_vec(nparticles);
+
+            cout << "\n Particles at the start: " << endl;
+
+            for (auto & p:my_vec ) {
+                p.showParticle();
+            }
+            
+            for (unsigned g=0; g<nspecies-2; g++){
+                cout << "\n Particles after generation " << g << endl;
+                for (auto & p:my_vec ) {
+                    p.advance();
+                    p.showParticle();
+                }
+            }
+            
             }
         catch (XProj & x) {
             std::cerr << "Proj encountered a problem:\n  " << x.what() << std::endl;
