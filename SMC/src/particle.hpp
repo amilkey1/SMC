@@ -7,7 +7,7 @@
 
 #pragma once
 #include <vector>
-#include "conditionals.hpp"
+//#include "conditionals.hpp"
 #include "forest.hpp"
 #include "boost/format.hpp"
 using namespace std;
@@ -36,12 +36,17 @@ class Particle {
         void showParticle();
         void advance();
 //        ~Particle();
+        void    setData(Data::SharedPtr d) {
+            _data = d;
+            _forest.setData(d);
+            }
     private:
         // data members of Particle class
         // I suggest using the underscore convention for data members
         Forest _forest;
         double _weight;
         Particle(const Particle & other);
+        Data::SharedPtr     _data;
 //        void pruneParticles();
 //        void resampleParticles();
 };
@@ -70,24 +75,4 @@ inline Particle::Particle(const Particle & other) {
     assert(false);
 }
 
-//inline void Particle::resampleParticles(){
-//    //prune particles with low weight
-//    //expected number of times each particle is resampled is proportional to particle weight
-//
-//    //so let's say # times resampled = particle weight
-//
-//    //prune lower half?
-//    //not sure when this step happens
-//    if (_weight < 0.5) {
-////        _weight = 0;
-//        Particle::~Particle();
-//    }
-//}
-//
-//inline Particle::~Particle() {
-//    std::cout << "Destroying a Particle" << std::endl;
-//
-////    delete &_forest;
-////    delete &_weight;
-//}
 }

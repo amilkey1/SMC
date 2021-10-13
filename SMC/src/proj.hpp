@@ -2,12 +2,12 @@
 
 #include <iostream>
 #include "data.hpp"
-//#include "tree_summary.hpp"
+#include "likelihood.hpp"
 #include "partition.hpp"
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include "xproj.hpp"
-#include "forest.hpp"
+//#include "forest.hpp"
 #include "particle.hpp"
 
 
@@ -21,16 +21,17 @@ namespace proj {
             void                clear();
             void                processCommandLineOptions(int argc, const char * argv[]);
             void                run();
-//            void                getNumSpecies(unsigned n);
 
         private:
 
-            std::string            _data_file_name;
-//            std::string            _tree_file_name;
+            std::string                 _data_file_name;
             Partition::SharedPtr        _partition;
             Data::SharedPtr             _data;
+            Likelihood::SharedPtr       _likelihood;
+        
+            bool                        _use_gpu;
+            bool                        _ambig_missing;
 
-//            TreeSummary::SharedPtr _tree_summary;
 
             static std::string     _program_name;
             static unsigned        _major_version;
@@ -50,10 +51,11 @@ namespace proj {
 
     inline void Proj::clear() {    ///begin_clear
         _data_file_name = "";
-//        _tree_file_name = "";
-//        _tree_summary   = nullptr;
         _partition.reset(new Partition());
+        _use_gpu        = true;
+        _ambig_missing  = true;
         _data = nullptr;
+        _likelihood = nullptr;
     }   ///end_clear
 
     inline void Proj::processCommandLineOptions(int argc, const char * argv[]) {   ///begin_processCommandLineOptions
@@ -65,6 +67,8 @@ namespace proj {
         ("version,v", "show program version")
         ("datafile,d",  boost::program_options::value(&_data_file_name)->required(), "name of a data file in NEXUS format")
         ("subset",  boost::program_options::value(&partition_subsets), "a string defining a partition subset, e.g. 'first:1-1234\3' or 'default[codon:standard]:1-3702'")
+        ("gpu",           boost::program_options::value(&_use_gpu)->default_value(true),                "use GPU if available")
+        ("ambigmissing",  boost::program_options::value(&_ambig_missing)->default_value(true),          "treat all ambiguities as missing data")
         ;
         
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -110,18 +114,47 @@ namespace proj {
             _data->setPartition(_partition);
             _data->getDataFromFile(_data_file_name);
             
+//            for (auto i: _data->getTaxonNames()) { //prints out taxon names
+//                std::cout << i << std::endl;
+//            }
+            
             // Report information about data partition subsets
             unsigned nsubsets = _data->getNumSubsets();
             std::cout << "\nNumber of taxa: " << _data->getNumTaxa() << std::endl;
             
             std::cout << "Number of partition subsets: " << nsubsets << std::endl;
+            
             for (unsigned subset = 0; subset < nsubsets; subset++) {
                 DataType dt = _partition->getDataTypeForSubset(subset);
                 std::cout << "  Subset " << (subset+1) << " (" << _data->getSubsetName(subset) << ")" << std::endl;
                 std::cout << "    data type: " << dt.getDataTypeAsString() << std::endl;
                 std::cout << "    sites:     " << _data->calcSeqLenInSubset(subset) << std::endl;
                 std::cout << "    patterns:  " << _data->getNumPatternsInSubset(subset) << std::endl;
+                std::cout << "    ambiguity: " << (_ambig_missing || dt.isCodon() ? "treated as missing data (faster)" : "handled appropriately (slower)") << std::endl;
                 }
+            
+            std::cout << "\n*** Resources available to BeagleLib " << _likelihood->beagleLibVersion() << ":\n"; std::cout << _likelihood->availableResources() << std::endl;
+            
+            std::cout << "\n*** Creating the likelihood calculator" << std::endl;
+                   _likelihood = Likelihood::SharedPtr(new Likelihood());
+                   _likelihood->setPreferGPU(_use_gpu);
+                   _likelihood->setAmbiguityEqualsMissing(_ambig_missing);
+                   _likelihood->setData(_data);
+                   _likelihood->initBeagleLib();
+            
+//            std::cout << "\n*** Reading and storing the first tree in the file " << _data_file_name << std::endl;
+//                   _tree_summary = TreeSummary::SharedPtr(new TreeSummary());
+//                   _tree_summary->readTreefile(_tree_file_name, 0);
+//                   Tree::SharedPtr tree = _tree_summary->getTree(0);
+//
+//                   if (tree->numLeaves() != _data->getNumTaxa())
+//                       throw XStrom(boost::format("Number of taxa in tree (%d) does not equal the number of taxa in the data matrix (%d)") % tree->numLeaves() % _data->getNumTaxa());
+//
+//                   std::cout << "\n*** Calculating the likelihood of the tree" << std::endl;
+//                   double lnL = _likelihood->calcLogLikelihood(Forest::_);
+//                   std::cout << boost::str(boost::format("log likelihood = %.5f") % lnL) << std::endl;
+//                   std::cout << "      (expecting -278.83767)" << std::endl;
+
             
             //set number of species to number in data file
             rng.setSeed(1234);
@@ -129,21 +162,33 @@ namespace proj {
             nspecies = _data->getNumTaxa();
             Forest::setNumSpecies(nspecies);
             
+//            Forest::setSpeciesNames(_data->getTaxonNames());
+            
             //create vector of particles
             unsigned nparticles = 1;
             vector<Particle> my_vec(nparticles);
+            
+            for (auto & p:my_vec ) {
+                p.setData(_data);
+            }
 
+            //print out particles at the start
             cout << "\n Particles at the start: " << endl;
-
             for (auto & p:my_vec ) {
                 p.showParticle();
             }
             
+            //run through each generation of particles
             for (unsigned g=0; g<nspecies-2; g++){
                 cout << "\n Particles after generation " << g << endl;
                 for (auto & p:my_vec ) {
                     p.advance();
                     p.showParticle();
+                    
+//                   std::cout << "\n*** Calculating the likelihood of the Forest" << std::endl;
+//                   double lnL = _likelihood->calcLogLikelihood(Forest::subtree1); //get likelihood subtree1 x subtree2
+//                   std::cout << boost::str(boost::format("log likelihood = %.5f") % lnL) << std::endl;
+//                   std::cout << "      (expecting -278.83767)" << std::endl;
                 }
             }
             

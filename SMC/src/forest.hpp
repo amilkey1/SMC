@@ -4,18 +4,18 @@
 #include <memory>
 #include <iostream>
 #include <boost/format.hpp>
+#include <vector>
 
 #include "lot.hpp"
 extern proj::Lot rng;
 
 #include "node.hpp"
-#include "forest.hpp"
+//#include "likelihood.hpp"
 
 namespace proj {
 
 using namespace std;
 
-class TreeManip;
 class Likelihood;
 class Updater;
 class TreeUpdater;
@@ -24,7 +24,6 @@ class Particle;
 
 class Forest {
 
-        friend class TreeManip;
         friend class Likelihood;
         friend class Updater;
         friend class TreeUpdater;
@@ -42,11 +41,15 @@ class Forest {
         unsigned                    numNodes() const;
         void                        showForest();
         static void                 setNumSpecies(unsigned n);
+        void                        setSpeciesNames(vector<Data>);
+        
+    Node *            subtree1;
         
     
     private:
 
         void                        clear();
+        void                        setData(Data::SharedPtr d);
 
         Node *                      _root;
         unsigned                    _nleaves;
@@ -66,7 +69,14 @@ class Forest {
         Node *                      getSubtreeAt(unsigned i);
         unsigned                    getNumSubtrees();
         void                        setEdgeLength(Node * nd);
-        void                        createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtrees);
+        void                       createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtrees);
+        Data::SharedPtr     _data;
+    
+    Node*      getSubtree1(Node * s);
+        
+//    Node *            _subtree1;
+//    subtree2;
+//    Likelihood::SharedPtr       _likelihood;
     
     public:
 
@@ -108,6 +118,8 @@ inline void Forest::clear() {
     _root->_left_child=subroot;
     
     //create species
+//    assert(_data);
+//    const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
     for (unsigned i = 0; i < _nspecies; i++) {
         Node* nd=&_nodes[i];
         if (i==0) {
@@ -116,7 +128,9 @@ inline void Forest::clear() {
         else {
             _nodes[i-1]._right_sib=nd;
         }
-        nd->_name=(char)('A'+i);
+//        nd->_name=(char)('A'+i);
+//        nd->_name=taxon_names[i];
+        nd->_name=" ";
         nd->_left_child=0;
         nd->_right_sib=0;
         nd->_parent=subroot;
@@ -127,6 +141,20 @@ inline void Forest::clear() {
     _ninternals=2;
     refreshPreorder();
     }
+
+inline void Forest::setData(Data::SharedPtr d) {
+    _data = d;
+    const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
+    unsigned i = 0;
+    for (auto nd:_preorder) {
+        if (!nd->_left_child) {
+            nd->_name=taxon_names[i++];
+        }
+    }
+}
+//inline void Forest::setSpeciesNames(vector<Data>) {
+//
+//}
 
 inline unsigned Forest::numLeaves() const {
     return _nleaves;
@@ -253,6 +281,7 @@ inline std::string Forest::makeNewick(unsigned precision, bool use_names) const 
 }
 
 inline void Forest::setNumSpecies(unsigned n){
+    //TODO be careful, this function should not be called after forests have already been created
     _nspecies=n;
 }
 
@@ -310,7 +339,19 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtree
     insertSubtreeOnLeft(new_nd, _root->_left_child);
 
     refreshPreorder();
+    
+//    getSubtree1(subtree1);
 }
+    
+inline Node* Forest::getSubtree1(Node * s) {
+    subtree1 = s;
+    return subtree1;
+}
+    
+//    Likelihood::SharedPtr->calcLogLikelihood(subtree1);
+//    double lnL = _likelihood->calcLogLikelihood(subtree1); //get likelihood subtree1 x subtree2
+//    std::cout << boost::str(boost::format("log likelihood subtree1 = %.5f") % lnL) << std::endl;
+
 
 inline void Forest::detachSubtree(Node * s) {
     assert(s);

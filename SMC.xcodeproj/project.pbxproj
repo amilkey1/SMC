@@ -8,12 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		2286C5AA26FE3596001BF8AA /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2286C5A926FE3596001BF8AA /* main.cpp */; };
-		2286C5B226FE3B9D001BF8AA /* particle.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 2286C5B126FE3B9D001BF8AA /* particle.hpp */; };
 		22A40D6A2710986000DFFCA0 /* libboost_program_options.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A40D692710986000DFFCA0 /* libboost_program_options.a */; };
 		22A40D732710AE5900DFFCA0 /* libncl.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A40D712710AE4700DFFCA0 /* libncl.a */; };
 		22A40D762710AE5900DFFCA0 /* libboost_filesystem.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A40D742710AE5900DFFCA0 /* libboost_filesystem.a */; };
 		22A40D772710AE5900DFFCA0 /* libboost_system.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A40D752710AE5900DFFCA0 /* libboost_system.a */; };
-		22A40D792710B11F00DFFCA0 /* libboost_atomic.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A40D782710B11F00DFFCA0 /* libboost_atomic.a */; };
+		22A40D8827160CD900DFFCA0 /* libhmsbeagle.1.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A40D7A2710B14D00DFFCA0 /* libhmsbeagle.1.dylib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -52,6 +51,7 @@
 		22A40D8427134F9100DFFCA0 /* proj.conf */ = {isa = PBXFileReference; lastKnownFileType = text; path = proj.conf; sourceTree = "<group>"; };
 		22A40D852713541300DFFCA0 /* rbcl10.nex */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = rbcl10.nex; sourceTree = "<group>"; };
 		22A40D8627136B4F00DFFCA0 /* rbcl10.tre */ = {isa = PBXFileReference; lastKnownFileType = text; path = rbcl10.tre; sourceTree = "<group>"; };
+		22A40D872715F29100DFFCA0 /* likelihood.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = likelihood.hpp; sourceTree = "<group>"; };
 		22BD6F8F2707555A00DEB698 /* forest.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = forest.hpp; sourceTree = "<group>"; };
 		22BD6F902710806700DEB698 /* proj.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = proj.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -61,7 +61,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				22A40D792710B11F00DFFCA0 /* libboost_atomic.a in Frameworks */,
+				22A40D8827160CD900DFFCA0 /* libhmsbeagle.1.dylib in Frameworks */,
 				22A40D762710AE5900DFFCA0 /* libboost_filesystem.a in Frameworks */,
 				22A40D772710AE5900DFFCA0 /* libboost_system.a in Frameworks */,
 				22A40D732710AE5900DFFCA0 /* libncl.a in Frameworks */,
@@ -116,6 +116,7 @@
 				22A40D6E2710AD5500DFFCA0 /* data.hpp */,
 				22A40D8427134F9100DFFCA0 /* proj.conf */,
 				22A40D8627136B4F00DFFCA0 /* rbcl10.tre */,
+				22A40D872715F29100DFFCA0 /* likelihood.hpp */,
 			);
 			path = src;
 			sourceTree = "<group>";
@@ -193,7 +194,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				2286C5AA26FE3596001BF8AA /* main.cpp in Sources */,
-				2286C5B226FE3B9D001BF8AA /* particle.hpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -254,8 +254,12 @@
 				HEADER_SEARCH_PATHS = (
 					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",
+					"/Users/analisamilkey/Documents/projects/libraries/beagle-lib-master",
 				);
-				LIBRARY_SEARCH_PATHS = /Users/analisamilkey/Documents/projects/libraries/static;
+				LIBRARY_SEARCH_PATHS = (
+					$HOME/lib,
+					/Users/analisamilkey/Documents/projects/libraries/static,
+				);
 				MACOSX_DEPLOYMENT_TARGET = 11.3;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -313,8 +317,12 @@
 				HEADER_SEARCH_PATHS = (
 					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",
+					"/Users/analisamilkey/Documents/projects/libraries/beagle-lib-master",
 				);
-				LIBRARY_SEARCH_PATHS = /Users/analisamilkey/Documents/projects/libraries/static;
+				LIBRARY_SEARCH_PATHS = (
+					$HOME/lib,
+					/Users/analisamilkey/Documents/projects/libraries/static,
+				);
 				MACOSX_DEPLOYMENT_TARGET = 11.3;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -330,6 +338,7 @@
 				HEADER_SEARCH_PATHS = (
 					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",
+					"/Users/analisamilkey/Documents/projects/libraries/beagle-lib-master",
 				);
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_LDFLAGS = "";
@@ -344,6 +353,7 @@
 				HEADER_SEARCH_PATHS = (
 					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",
+					"/Users/analisamilkey/Documents/projects/libraries/beagle-lib-master",
 				);
 				ONLY_ACTIVE_ARCH = NO;
 				OTHER_LDFLAGS = "";

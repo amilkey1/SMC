@@ -122,6 +122,10 @@ namespace proj {
     }
 
     inline const Data::taxon_names_t & Data::getTaxonNames() const {
+//        std::cout << &_taxon_names;
+//        for (auto i: _taxon_names) {
+//            std::cout << i << std::endl;
+//        }
         return _taxon_names;
     }
 
