@@ -114,10 +114,6 @@ namespace proj {
             _data->setPartition(_partition);
             _data->getDataFromFile(_data_file_name);
             
-//            for (auto i: _data->getTaxonNames()) { //prints out taxon names
-//                std::cout << i << std::endl;
-//            }
-            
             // Report information about data partition subsets
             unsigned nsubsets = _data->getNumSubsets();
             std::cout << "\nNumber of taxa: " << _data->getNumTaxa() << std::endl;
@@ -130,39 +126,13 @@ namespace proj {
                 std::cout << "    data type: " << dt.getDataTypeAsString() << std::endl;
                 std::cout << "    sites:     " << _data->calcSeqLenInSubset(subset) << std::endl;
                 std::cout << "    patterns:  " << _data->getNumPatternsInSubset(subset) << std::endl;
-                std::cout << "    ambiguity: " << (_ambig_missing || dt.isCodon() ? "treated as missing data (faster)" : "handled appropriately (slower)") << std::endl;
                 }
             
-            std::cout << "\n*** Resources available to BeagleLib " << _likelihood->beagleLibVersion() << ":\n"; std::cout << _likelihood->availableResources() << std::endl;
-            
-            std::cout << "\n*** Creating the likelihood calculator" << std::endl;
-                   _likelihood = Likelihood::SharedPtr(new Likelihood());
-                   _likelihood->setPreferGPU(_use_gpu);
-                   _likelihood->setAmbiguityEqualsMissing(_ambig_missing);
-                   _likelihood->setData(_data);
-                   _likelihood->initBeagleLib();
-            
-//            std::cout << "\n*** Reading and storing the first tree in the file " << _data_file_name << std::endl;
-//                   _tree_summary = TreeSummary::SharedPtr(new TreeSummary());
-//                   _tree_summary->readTreefile(_tree_file_name, 0);
-//                   Tree::SharedPtr tree = _tree_summary->getTree(0);
-//
-//                   if (tree->numLeaves() != _data->getNumTaxa())
-//                       throw XStrom(boost::format("Number of taxa in tree (%d) does not equal the number of taxa in the data matrix (%d)") % tree->numLeaves() % _data->getNumTaxa());
-//
-//                   std::cout << "\n*** Calculating the likelihood of the tree" << std::endl;
-//                   double lnL = _likelihood->calcLogLikelihood(Forest::_);
-//                   std::cout << boost::str(boost::format("log likelihood = %.5f") % lnL) << std::endl;
-//                   std::cout << "      (expecting -278.83767)" << std::endl;
-
-            
             //set number of species to number in data file
-            rng.setSeed(1234);
+            rng.setSeed(12345);
             unsigned nspecies;
             nspecies = _data->getNumTaxa();
             Forest::setNumSpecies(nspecies);
-            
-//            Forest::setSpeciesNames(_data->getTaxonNames());
             
             //create vector of particles
             unsigned nparticles = 1;
@@ -184,11 +154,6 @@ namespace proj {
                 for (auto & p:my_vec ) {
                     p.advance();
                     p.showParticle();
-                    
-//                   std::cout << "\n*** Calculating the likelihood of the Forest" << std::endl;
-//                   double lnL = _likelihood->calcLogLikelihood(Forest::subtree1); //get likelihood subtree1 x subtree2
-//                   std::cout << boost::str(boost::format("log likelihood = %.5f") % lnL) << std::endl;
-//                   std::cout << "      (expecting -278.83767)" << std::endl;
                 }
             }
             

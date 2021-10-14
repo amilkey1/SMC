@@ -872,7 +872,7 @@ namespace proj {
                 NULL);                       // destination for second derivative
         }
         else {
-            code = beagleCalculateEdgeLogLikelihoods( 
+            code = beagleCalculateEdgeLogLikelihoods(
                 info.handle,                 // instance number
                 &parent_partials_index,      // indices of parent partialsBuffers
                 &child_partials_index,       // indices of child partialsBuffers

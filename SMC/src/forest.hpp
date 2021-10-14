@@ -10,7 +10,6 @@
 extern proj::Lot rng;
 
 #include "node.hpp"
-//#include "likelihood.hpp"
 
 namespace proj {
 
@@ -41,9 +40,6 @@ class Forest {
         unsigned                    numNodes() const;
         void                        showForest();
         static void                 setNumSpecies(unsigned n);
-        void                        setSpeciesNames(vector<Data>);
-        
-    Node *            subtree1;
         
     
     private:
@@ -70,13 +66,7 @@ class Forest {
         unsigned                    getNumSubtrees();
         void                        setEdgeLength(Node * nd);
         void                       createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtrees);
-        Data::SharedPtr     _data;
-    
-    Node*      getSubtree1(Node * s);
-        
-//    Node *            _subtree1;
-//    subtree2;
-//    Likelihood::SharedPtr       _likelihood;
+        Data::SharedPtr             _data;
     
     public:
 
@@ -105,7 +95,7 @@ inline void Forest::clear() {
     _root->_right_sib=0;
     _root->_parent=0;
     _root->_number=_nspecies;
-    _root->_edge_length=0.0;
+    _root->_edge_length=double(0.0);
     
     //creating subroot node
     Node* subroot=&_nodes[_nspecies+1];
@@ -114,7 +104,7 @@ inline void Forest::clear() {
     subroot->_right_sib=0;
     subroot->_parent=_root;
     subroot->_number=_nspecies;
-    subroot->_edge_length=0.0;
+    subroot->_edge_length=double(0.0);
     _root->_left_child=subroot;
     
     //create species
@@ -135,7 +125,7 @@ inline void Forest::clear() {
         nd->_right_sib=0;
         nd->_parent=subroot;
         nd->_number=i;
-        nd->_edge_length=0.0;
+        nd->_edge_length=double(0.0);
         }
     _nleaves=_nspecies;
     _ninternals=2;
@@ -152,9 +142,6 @@ inline void Forest::setData(Data::SharedPtr d) {
         }
     }
 }
-//inline void Forest::setSpeciesNames(vector<Data>) {
-//
-//}
 
 inline unsigned Forest::numLeaves() const {
     return _nleaves;
@@ -306,10 +293,15 @@ inline void Forest::nextStep(){
 }
 
 inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtrees) {
+    //before any taxa are joined, assign edge lengths to leaf nodes
+    
     double edge_length=rng.gamma(1.0, 1.0/nsubtrees);
-    for (auto nd:_preorder){
-        if (nd->_parent == _root->_left_child){ //if node's parent is subroot, then assign the node a new edge length
-            nd->_edge_length+= edge_length;
+    if (_nleaves==nsubtrees) {
+        for (auto nd:_preorder){
+            //if node's parent is subroot, it is a leaf at this stage, so assign it a new edge length
+            if (nd->_parent == _root->_left_child){
+                nd->_edge_length+= edge_length;
+            }
         }
     }
     
@@ -326,8 +318,8 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtree
     new_nd->_right_sib=0;
     new_nd->_parent=_root->_left_child;
     new_nd->_number=_nleaves+_ninternals;
-//    new_nd ->_edge_length=new_nd->_left_child->_edge_length;
-//    new_nd->_edge_length=rng.gamma(1.0, 1.0/(nsubtrees));
+    
+    new_nd->_edge_length=double(0.0);
 
     cout << "New node branch length is: " << new_nd->_edge_length << endl;
 
@@ -340,18 +332,15 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtree
 
     refreshPreorder();
     
-//    getSubtree1(subtree1);
+    double new_edge_length = rng.gamma(1.0, 1.0/(nsubtrees-1));
+    for (auto nd:_preorder) {
+//        std::cout << nd->_name << " number is " << nd->_number << std::endl;
+        //if node's parent is subroot add to its existing branch length
+        if (nd->_parent==_root->_left_child){
+            nd->_edge_length += new_edge_length;
+        }
+    }
 }
-    
-inline Node* Forest::getSubtree1(Node * s) {
-    subtree1 = s;
-    return subtree1;
-}
-    
-//    Likelihood::SharedPtr->calcLogLikelihood(subtree1);
-//    double lnL = _likelihood->calcLogLikelihood(subtree1); //get likelihood subtree1 x subtree2
-//    std::cout << boost::str(boost::format("log likelihood subtree1 = %.5f") % lnL) << std::endl;
-
 
 inline void Forest::detachSubtree(Node * s) {
     assert(s);
