@@ -58,7 +58,7 @@ class Forest {
         void                        refreshPreorder();
         Node *                      findNextPreorder(Node * nd);
         std::string                 makeNewick(unsigned precision, bool use_names) const;
-        void                        nextStep();
+        void                        proposeParticles();
         void                        detachSubtree(Node * s);
         void                        insertSubtreeOnLeft(Node * s, Node * u);
         Node *                      findLeftSib(Node * nd);
@@ -108,8 +108,6 @@ inline void Forest::clear() {
     _root->_left_child=subroot;
     
     //create species
-//    assert(_data);
-//    const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
     for (unsigned i = 0; i < _nspecies; i++) {
         Node* nd=&_nodes[i];
         if (i==0) {
@@ -118,8 +116,6 @@ inline void Forest::clear() {
         else {
             _nodes[i-1]._right_sib=nd;
         }
-//        nd->_name=(char)('A'+i);
-//        nd->_name=taxon_names[i];
         nd->_name=" ";
         nd->_left_child=0;
         nd->_right_sib=0;
@@ -272,7 +268,7 @@ inline void Forest::setNumSpecies(unsigned n){
     _nspecies=n;
 }
 
-inline void Forest::nextStep(){
+inline void Forest::proposeParticles(){
     unsigned t1=0;
     unsigned t2=1;
     unsigned nsubtrees = getNumSubtrees();
@@ -321,7 +317,7 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtree
     
     new_nd->_edge_length=double(0.0);
 
-    cout << "New node branch length is: " << new_nd->_edge_length << endl;
+//    cout << "New node branch length is: " << new_nd->_edge_length << endl;
 
     _ninternals++;
     subtree1 -> _right_sib=subtree2;

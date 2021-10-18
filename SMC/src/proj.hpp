@@ -129,13 +129,13 @@ namespace proj {
                 }
             
             //set number of species to number in data file
-            rng.setSeed(12345);
+            rng.setSeed(123);
             unsigned nspecies;
             nspecies = _data->getNumTaxa();
             Forest::setNumSpecies(nspecies);
             
             //create vector of particles
-            unsigned nparticles = 1;
+            unsigned nparticles = 3;
             vector<Particle> my_vec(nparticles);
             
             for (auto & p:my_vec ) {
@@ -150,10 +150,26 @@ namespace proj {
             
             //run through each generation of particles
             for (unsigned g=0; g<nspecies-2; g++){
+                double particle_sum = 0;
                 cout << "\n Particles after generation " << g << endl;
-                for (auto & p:my_vec ) {
-                    p.advance();
-                    p.showParticle();
+                for (auto & p:my_vec) {
+                    p.proposal(); //get proposal for all particles
+                }
+                for (auto & p:my_vec) {
+                    p.reweightParticles(); //reweight all particles
+                }
+                for (auto & p:my_vec) {
+                    particle_sum = p.sumParticleWeights(particle_sum); //keep running total of sum of particle weights
+                }
+                for (auto & p:my_vec) {
+                    p.normalizeParticleWeights(particle_sum); //normalize particle weights
+                }
+                for (auto & p:my_vec){
+                    double n = rng.uniform(); //choose a random number for each particle
+                    p.resampleParticles(n); //resample all particles
+                }
+                for (auto & p:my_vec) {
+                    p.showParticle(); //print all new particles
                 }
             }
             

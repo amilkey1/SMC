@@ -1,13 +1,5 @@
-//
-//  particle.cpp
-//  SMC
-//
-//  Created by Analisa Milkey on 9/24/21.
-// particle class contains a forest + weight
-
 #pragma once
 #include <vector>
-//#include "conditionals.hpp"
 #include "forest.hpp"
 #include "boost/format.hpp"
 using namespace std;
@@ -33,22 +25,25 @@ class Particle {
         Particle();
     
         // member functions of Particle class
-        void showParticle();
-        void advance();
+        void                                    showParticle();
+        void                                    proposal();
+        void                                    reweightParticles();
+        void                                  resampleParticles(int n);
 //        ~Particle();
-        void    setData(Data::SharedPtr d) {
+        void                                    setData(Data::SharedPtr d) {
             _data = d;
             _forest.setData(d);
             }
+        double                                  sumParticleWeights(double particle_sum);
+        void                normalizeParticleWeights(double particle_sum);
     private:
         // data members of Particle class
         // I suggest using the underscore convention for data members
-        Forest _forest;
-        double _weight;
+        Forest                              _forest;
+        double                              _weight;
+//        double                              _sum_particles;
         Particle(const Particle & other);
-        Data::SharedPtr     _data;
-//        void pruneParticles();
-//        void resampleParticles();
+        Data::SharedPtr                     _data;
 };
 
 // Constructor assigns a random weight
@@ -57,7 +52,6 @@ inline Particle::Particle() {
     // I recommend using the Lot class for choosing the random weight.
     // Lot is a global variable created in main.cpp, so it can be used anywhere.
     _weight = rng.uniform();
-//    resampleParticles();
 };
 
 inline void Particle::showParticle() {
@@ -67,12 +61,32 @@ inline void Particle::showParticle() {
     _forest.showForest();
 }
 
-inline void Particle::advance() {
-    _forest.nextStep();
+inline void Particle::proposal() {
+    _forest.proposeParticles(); //proposal step
 }
 
 inline Particle::Particle(const Particle & other) {
     assert(false);
 }
 
+//reweight a particle after proposal
+inline void Particle::reweightParticles() {
+    //this function should assign weight proportional to likelihood of each forest in each particle
+    //for now, assign weights randomly
+    _weight=rng.uniform();
+}
+
+inline double Particle::sumParticleWeights(double particle_sum){
+    particle_sum = particle_sum + _weight;
+    return particle_sum;
+}
+
+inline void Particle::normalizeParticleWeights(double particle_sum){
+    _weight = _weight / particle_sum;
+}
+inline void Particle::resampleParticles(int n){
+    // prune out particles with low weights
+    // draw K uniform random variables between 0 and 1
+    // save particle if n falls within particle interval
+}
 }
