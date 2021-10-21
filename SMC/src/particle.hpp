@@ -28,20 +28,23 @@ class Particle {
         void                                    showParticle();
         void                                    proposal();
         void                                    reweightParticles();
-        void                                  resampleParticles(int n);
+        void                                   resampleParticles(double running_sum);
 //        ~Particle();
         void                                    setData(Data::SharedPtr d) {
             _data = d;
             _forest.setData(d);
             }
         double                                  sumParticleWeights(double particle_sum);
-        void                normalizeParticleWeights(double particle_sum);
+        void                                    normalizeParticleWeights(double particle_sum);
+        void    saveForest(std::string treefilename) const;
+    void savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
+    double calcLogLikelihood();
+
     private:
         // data members of Particle class
         // I suggest using the underscore convention for data members
         Forest                              _forest;
         double                              _weight;
-//        double                              _sum_particles;
         Particle(const Particle & other);
         Data::SharedPtr                     _data;
 };
@@ -61,6 +64,15 @@ inline void Particle::showParticle() {
     _forest.showForest();
 }
 
+inline double Particle::calcLogLikelihood() {
+    double log_likelihood = _forest.calcLogLikelihood();
+    cout << "log likelihood equals " << log_likelihood << endl;
+//    savePaupFile("paup.nex", "green4.nex", "forest.tre", log_likelihood);
+//    saveForest("forest.tre");
+    
+    return log_likelihood;
+}
+
 inline void Particle::proposal() {
     _forest.proposeParticles(); //proposal step
 }
@@ -73,7 +85,7 @@ inline Particle::Particle(const Particle & other) {
 inline void Particle::reweightParticles() {
     //this function should assign weight proportional to likelihood of each forest in each particle
     //for now, assign weights randomly
-    _weight=rng.uniform();
+//    _weight=rng.uniform();
 }
 
 inline double Particle::sumParticleWeights(double particle_sum){
@@ -84,9 +96,30 @@ inline double Particle::sumParticleWeights(double particle_sum){
 inline void Particle::normalizeParticleWeights(double particle_sum){
     _weight = _weight / particle_sum;
 }
-inline void Particle::resampleParticles(int n){
-    // prune out particles with low weights
-    // draw K uniform random variables between 0 and 1
-    // save particle if n falls within particle interval
+inline void Particle::resampleParticles(double running_sum){
+    // save particle if n falls below running_sum
+}
+
+inline void Particle::saveForest(std::string treefilename) const {
+    ofstream treef(treefilename);
+    treef << "#nexus\n\n";
+    treef << "begin trees;\n";
+    treef << "  tree test = [&R] " << _forest.makeNewick(8, true)  << ";\n";
+    treef << "end;\n";
+    treef.close();
+}
+
+inline void Particle::savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const {
+    ofstream paupf(paupfilename);
+    paupf << "#nexus\n\n";
+    paupf << "begin paup;\n";
+    paupf << "exe " << datafilename << ";\n";
+    paupf << "set crit=like forcepoly;\n";
+    paupf << "lset nst=1 basefreq=equal rates=equal pinvar=0;\n";
+    paupf << "gettrees file=" << treefilename << " storebrlen;\n";
+    paupf << "lscores 1 / userbrlen;\n";
+    paupf << "[!expected lnL = " << expected_lnL << "]\n";
+    paupf << "end;\n";
+    paupf.close();
 }
 }

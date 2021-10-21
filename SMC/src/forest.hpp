@@ -5,6 +5,9 @@
 #include <iostream>
 #include <boost/format.hpp>
 #include <vector>
+#include <boost/range/adaptor/reversed.hpp>
+#include <boost/algorithm/string/replace.hpp>
+
 
 #include "lot.hpp"
 extern proj::Lot rng;
@@ -40,6 +43,7 @@ class Forest {
         unsigned                    numNodes() const;
         void                        showForest();
         static void                 setNumSpecies(unsigned n);
+        double                      calcLogLikelihood();
         
     
     private:
@@ -53,8 +57,11 @@ class Forest {
         std::vector<Node *>         _preorder;
         std::vector<Node *>         _levelorder;
         std::vector<Node>           _nodes;
+        std::vector< std::vector <double> > _partials;
         std::vector<Node *>         _unused_nodes;
         static unsigned             _nspecies;
+        unsigned                      _npatterns;
+        unsigned                       _nstates;
         void                        refreshPreorder();
         Node *                      findNextPreorder(Node * nd);
         std::string                 makeNewick(unsigned precision, bool use_names) const;
@@ -67,6 +74,8 @@ class Forest {
         void                        setEdgeLength(Node * nd);
         void                       createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtrees);
         Data::SharedPtr             _data;
+        double                      calcTransitionProbability(unsigned from, unsigned to, double edge_length);
+        
     
     public:
 
@@ -88,6 +97,9 @@ inline void Forest::clear() {
     _preorder.clear();
     _levelorder.clear();
     _nodes.resize(2*_nspecies);
+    _partials.resize(2*_nspecies);
+    _npatterns = 0;
+    _nstates = 4;
     //creating root node
     _root = &_nodes[_nspecies];
     _root->_name="root";
@@ -103,11 +115,12 @@ inline void Forest::clear() {
     subroot->_left_child=0;
     subroot->_right_sib=0;
     subroot->_parent=_root;
-    subroot->_number=_nspecies;
+    subroot->_number=_nspecies+1;
     subroot->_edge_length=double(0.0);
     _root->_left_child=subroot;
     
     //create species
+    double edge_length = rng.gamma(1.0, 1.0/_nspecies);
     for (unsigned i = 0; i < _nspecies; i++) {
         Node* nd=&_nodes[i];
         if (i==0) {
@@ -121,7 +134,7 @@ inline void Forest::clear() {
         nd->_right_sib=0;
         nd->_parent=subroot;
         nd->_number=i;
-        nd->_edge_length=double(0.0);
+        nd->_edge_length=edge_length;
         }
     _nleaves=_nspecies;
     _ninternals=2;
@@ -130,11 +143,20 @@ inline void Forest::clear() {
 
 inline void Forest::setData(Data::SharedPtr d) {
     _data = d;
+    _npatterns = d->getNumPatterns();
     const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
     unsigned i = 0;
+    for (unsigned j=0; j<_nodes.size(); j++) {
+        _partials[j].resize(_npatterns * _nstates);
+    }
     for (auto nd:_preorder) {
+//        _partials[nd->_number].resize(_npatterns * _nstates);
         if (!nd->_left_child) {
-            nd->_name=taxon_names[i++];
+            // replace all spaces with underscores so that other programs do not have
+              // trouble parsing your tree descriptions
+              std::string name = taxon_names[i++];
+              boost::replace_all(name, " ", "_");
+              nd->_name = name;
         }
     }
 }
@@ -291,15 +313,15 @@ inline void Forest::proposeParticles(){
 inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtrees) {
     //before any taxa are joined, assign edge lengths to leaf nodes
     
-    double edge_length=rng.gamma(1.0, 1.0/nsubtrees);
-    if (_nleaves==nsubtrees) {
-        for (auto nd:_preorder){
-            //if node's parent is subroot, it is a leaf at this stage, so assign it a new edge length
-            if (nd->_parent == _root->_left_child){
-                nd->_edge_length+= edge_length;
-            }
-        }
-    }
+//    double edge_length=rng.gamma(1.0, 1.0/nsubtrees);
+//    if (_nleaves==nsubtrees) {
+//        for (auto nd:_preorder){
+//            //if node's parent is subroot, it is a leaf at this stage, so assign it a new edge length
+//            if (nd->_parent == _root->_left_child){
+//                nd->_edge_length+= edge_length;
+//            }
+//        }
+//    }
     
     assert(nsubtrees>1);
     Node * subtree1=getSubtreeAt(t1);
@@ -398,6 +420,73 @@ inline unsigned Forest::getNumSubtrees() {
     }
     cout << "Number of subtrees is: " << nsubtrees << endl;
     return nsubtrees;
+}
+
+inline double Forest::calcTransitionProbability(unsigned from, unsigned to, double edge_length){
+    double transition_prob = 0.0;
+    if (from == to) {
+        transition_prob = 0.25 + 0.75*exp(-4.0*edge_length/3.0);
+    }
+    
+    else {
+        transition_prob = 0.25 - 0.25*exp(-4.0*edge_length/3.0);
+    }
+    return transition_prob;
+}
+
+inline double Forest::calcLogLikelihood() {
+    auto data_matrix=_data->getDataMatrix();
+    for (auto nd : boost::adaptors::reverse(_preorder)) {
+        if (nd->_left_child){
+            //internal node
+            assert(nd->_left_child->_right_sib);
+            for (unsigned p=0; p<_npatterns; p++) {
+                for (unsigned s=0; s<_nstates; s++) {
+                    double partial=1.0;
+                    for (Node * child=nd->_left_child; child; child=child->_right_sib){
+                        double child_sum=0.0;
+                        for (unsigned s_child=0; s_child<_nstates; s_child++) {
+                            double child_transition_prob = calcTransitionProbability(s, s_child, child->_edge_length);
+                            double child_partial = _partials[child->_number][p*_nstates + s_child];
+                            child_sum += child_transition_prob * child_partial;
+                        }
+                        partial *= child_sum;
+                    }
+//                    assert(_partials[nd->_number][0]);
+                    _partials[nd->_number][p*_nstates+s]= partial;
+                }
+            }
+        }
+        else {
+            //leaf node
+            for (unsigned p=0; p<_npatterns; p++) {
+                for (unsigned s=0; s<_nstates; s++) {
+                    Data::state_t state = (Data::state_t)1 << s;
+                    Data::state_t d = data_matrix[nd->_number][p];
+                    double result = state & d;
+                    _partials[nd->_number][p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                }
+            }
+        }
+        if (nd->_parent==_root) {
+            
+            //if subroot is reached
+            break;
+        }
+    }
+    auto counts = _data->getPatternCounts();
+    double log_like = 0.0;
+    for (unsigned p=0; p<_npatterns; p++) {
+        double site_like = 0.0;
+        for (unsigned s=0; s<_nstates; s++) {
+//            cout << p << "  " << s << "   " << _partials[_root->_left_child->_number][p*_nstates+s] << endl;
+            site_like += 0.25*_partials[_root->_left_child->_number][p*_nstates+s];
+            
+        }
+        log_like += log(site_like)*counts[p];
+    }
+    
+    return log_like;
 }
 
 }

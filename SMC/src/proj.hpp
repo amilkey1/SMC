@@ -135,7 +135,7 @@ namespace proj {
             Forest::setNumSpecies(nspecies);
             
             //create vector of particles
-            unsigned nparticles = 3;
+            unsigned nparticles = 1;
             vector<Particle> my_vec(nparticles);
             
             for (auto & p:my_vec ) {
@@ -151,6 +151,7 @@ namespace proj {
             //run through each generation of particles
             for (unsigned g=0; g<nspecies-2; g++){
                 double particle_sum = 0;
+                double running_sum = 0;
                 cout << "\n Particles after generation " << g << endl;
                 for (auto & p:my_vec) {
                     p.proposal(); //get proposal for all particles
@@ -165,14 +166,20 @@ namespace proj {
                     p.normalizeParticleWeights(particle_sum); //normalize particle weights
                 }
                 for (auto & p:my_vec){
-                    double n = rng.uniform(); //choose a random number for each particle
-                    p.resampleParticles(n); //resample all particles
+                    running_sum = p.sumParticleWeights(running_sum);
+                    int n = rng.uniform();
+                    if (running_sum >= n) {
+                        }
+//                    p.resampleParticles(running_sum); //resample all particles with a random number for each particle
                 }
                 for (auto & p:my_vec) {
+                    //construct a vector of the new particles...?
                     p.showParticle(); //print all new particles
+                    double log_likelihood = p.calcLogLikelihood();
+                    p.savePaupFile("paup.nex", _data_file_name, "forest.tre", log_likelihood);
+                    p.saveForest("forest.tre");
                 }
             }
-            
             }
         catch (XProj & x) {
             std::cerr << "Proj encountered a problem:\n  " << x.what() << std::endl;
