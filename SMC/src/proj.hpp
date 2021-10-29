@@ -9,7 +9,7 @@
 #include "xproj.hpp"
 //#include "forest.hpp"
 #include "particle.hpp"
-
+using namespace std;
 
 namespace proj {
 
@@ -129,57 +129,108 @@ namespace proj {
                 }
             
             //set number of species to number in data file
-            rng.setSeed(123);
+            rng.setSeed(12345);
             unsigned nspecies;
             nspecies = _data->getNumTaxa();
             Forest::setNumSpecies(nspecies);
             
             //create vector of particles
-            unsigned nparticles = 1;
+            unsigned nparticles = 100;
             vector<Particle> my_vec(nparticles);
-            
             for (auto & p:my_vec ) {
                 p.setData(_data);
             }
 
             //print out particles at the start
-            cout << "\n Particles at the start: " << endl;
-            for (auto & p:my_vec ) {
-                p.showParticle();
-            }
+//            cout << "\n Particles at the start: " << endl;
+//            for (auto & p:my_vec ) {
+//                p.showParticle();
+//            }
             
             //run through each generation of particles
             for (unsigned g=0; g<nspecies-2; g++){
-                double particle_sum = 0;
-                double running_sum = 0;
+                vector<double> log_weight_vec;
+                double running_sum = 0.0;
+                double log_weight = 0.0;
+                double log_particle_sum = 0.0;
+                
                 cout << "\n Particles after generation " << g << endl;
+                
+                //taxon joining and reweighting step
                 for (auto & p:my_vec) {
-                    p.proposal(); //get proposal for all particles
+                    log_weight = p.proposal();
+                    log_weight_vec.push_back(log_weight);
                 }
+                
+                double log_max_weight = *max_element(log_weight_vec.begin(), log_weight_vec.end());
+                for (auto & i:log_weight_vec) {
+                    running_sum += exp(i - log_max_weight);
+                }
+                log_particle_sum = log(running_sum) + log_max_weight;
+                
+                double ess_inverse = 0.0;
+                
                 for (auto & p:my_vec) {
-                    p.reweightParticles(); //reweight all particles
+                    //normalized weight is weight / particle sum = ln(weight)-ln(particle_sum)
+                    p.setLogWeight(p.getLogWeight() - log_particle_sum);
+//                    log_weight = p.getLogWeight() - log_particle_sum;
+//                    ESS = 1/(weight^2)
+                    ess_inverse += exp(2.0*p.getLogWeight());
                 }
-                for (auto & p:my_vec) {
-                    particle_sum = p.sumParticleWeights(particle_sum); //keep running total of sum of particle weights
-                }
-                for (auto & p:my_vec) {
-                    p.normalizeParticleWeights(particle_sum); //normalize particle weights
-                }
-                for (auto & p:my_vec){
-                    running_sum = p.sumParticleWeights(running_sum);
-                    int n = rng.uniform();
-                    if (running_sum >= n) {
+                double ess = 1.0/ess_inverse;
+                cout << "ESS is " << ess << endl;
+                
+#if 0
+                vector<unsigned> counts(my_vec.size(), 0);
+                if (ess < 2.0) {
+                    //sample particles
+                    for(unsigned i=0; i<my_vec.size(); i++) {
+                        double u = rng.uniform();
+                        double cum_prob = 0.0;
+                        unsigned j = 0;
+                        for(auto & p:my_vec) {
+                            cum_prob += exp(p.getLogWeight());
+                            if (u < cum_prob) {
+                                counts[j]++;
+                                break;
+                            }
+                            j++;
                         }
-//                    p.resampleParticles(running_sum); //resample all particles with a random number for each particle
+                    }
+                    //filter particles
+                    double logNumParticles = log(my_vec.size());
+                    vector<Particle> my_vec2;
+                    for(unsigned i=0; i<my_vec.size(); i++) {
+                        if (counts[i]>0) {
+                            my_vec[i].setLogWeight(log(counts[i])-logNumParticles);
+                            for(unsigned j=0; j<counts[i]; j++) {
+                                my_vec2.push_back(my_vec[i]);
+                            }
+                        }
+                    }
+                    copy(my_vec2.begin(), my_vec2.end(), my_vec.begin());
                 }
-                for (auto & p:my_vec) {
-                    //construct a vector of the new particles...?
-                    p.showParticle(); //print all new particles
-                    double log_likelihood = p.calcLogLikelihood();
-                    p.savePaupFile("paup.nex", _data_file_name, "forest.tre", log_likelihood);
-                    p.saveForest("forest.tre");
-                }
+                
+#endif
+//                for (auto & p:my_vec) {
+//                    p.showParticle(); //print all new particles
+//                    double log_likelihood = p.calcLogLikelihood();
+//                    p.savePaupFile("paup.nex", _data_file_name, "forest.tre", log_likelihood);
+//                    p.saveForest("forest.tre");
+//                }
             }
+            double sum_h = 0.0;
+            for (auto & p:my_vec) {
+//               construct a vector of the new particles...?
+                p.showParticle(); //print all new particles
+                double log_likelihood = p.calcLogLikelihood();
+                p.savePaupFile("paup.nex", _data_file_name, "forest.tre", log_likelihood);
+                p.saveForest("forest.tre");
+                double h = p.calcHeight();
+                sum_h += h;
+                            }
+            sum_h/=my_vec.size();
+            cout << "mean height equals " << sum_h << endl;
             }
         catch (XProj & x) {
             std::cerr << "Proj encountered a problem:\n  " << x.what() << std::endl;

@@ -2,6 +2,7 @@
 #include <vector>
 #include "forest.hpp"
 #include "boost/format.hpp"
+#include "boost/math/special_functions/gamma.hpp"
 using namespace std;
 
 #include "lot.hpp"
@@ -11,93 +12,68 @@ extern proj::Lot rng;
 namespace proj {
 
 class Particle {
-    // You probably don't need to declare Forest to be a friend of Particle
-    // because Forest objects will never need to mess with private members of Particle
-    // We will need to make Particle a friend of Forest, however, so that Particle 
-    // objects can access private members of their Forest data member  
-    //friend class forest;
-
     public:
-    
-        // Although a default constructor will be provided for you, it is not
-        // a bad idea to create your own constructor. That would allow you to 
-        // assign a random weight as it is being constructed
         Particle();
-    
-        // member functions of Particle class
+        Particle(const Particle & other);
+
         void                                    showParticle();
-        void                                    proposal();
-        void                                    reweightParticles();
-        void                                   resampleParticles(double running_sum);
-//        ~Particle();
+        double                                  proposal();
         void                                    setData(Data::SharedPtr d) {
             _data = d;
             _forest.setData(d);
             }
-        double                                  sumParticleWeights(double particle_sum);
-        void                                    normalizeParticleWeights(double particle_sum);
-        void    saveForest(std::string treefilename) const;
-    void savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
-    double calcLogLikelihood();
+        void                                    saveForest(std::string treefilename) const;
+        void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
+        double                                  calcLogLikelihood();
+        double                                  calcHeight();
+        double                                  getLogWeight() const {return _log_weight;}
+        void                                    setLogWeight(double w){_log_weight = w;}
+    
 
     private:
-        // data members of Particle class
-        // I suggest using the underscore convention for data members
-        Forest                              _forest;
-        double                              _weight;
-        Particle(const Particle & other);
-        Data::SharedPtr                     _data;
+        Forest                                  _forest;
+        double                                  _log_weight;
+        Data::SharedPtr                          _data;
+        double                                  _log_likelihood;
+        unsigned                                _n;
 };
 
 // Constructor assigns a random weight
 inline Particle::Particle() {
-    // You can just let the Forest constructor automatically initialize the _forest object
-    // I recommend using the Lot class for choosing the random weight.
-    // Lot is a global variable created in main.cpp, so it can be used anywhere.
-    _weight = rng.uniform();
+    _log_weight = rng.uniform();
+    _n = 0;
+    _log_likelihood = 0.0; //initialize log likelihood so generation 0 is able to calculate log weights
 };
 
 inline void Particle::showParticle() {
     //print out weight of each particle
-    cout << "Particle weight: " << _weight << "\n" ;
+    cout << "Particle weight: " << _log_weight << "\n" ;
     cout << "Forest: " << "\n";
     _forest.showForest();
 }
 
 inline double Particle::calcLogLikelihood() {
     double log_likelihood = _forest.calcLogLikelihood();
-    cout << "log likelihood equals " << log_likelihood << endl;
+//    cout << "log likelihood equals " << log_likelihood << endl;
 //    savePaupFile("paup.nex", "green4.nex", "forest.tre", log_likelihood);
 //    saveForest("forest.tre");
     
     return log_likelihood;
 }
 
-inline void Particle::proposal() {
+inline double Particle::proposal() {
     _forest.proposeParticles(); //proposal step
+    double prev_log_likelihood = _log_likelihood;
+    _log_likelihood = calcLogLikelihood();
+    unsigned n = Forest::_nspecies -_n;
+    double log_q = log(n-1) - (n-1)*_forest._last_edge_length - (boost::math::lgamma(n+1) - log(2) - boost::math::lgamma(n-1));
+    _log_weight = _log_likelihood - prev_log_likelihood - log_q;
+    _n++;
+    return _log_weight;
 }
 
 inline Particle::Particle(const Particle & other) {
     assert(false);
-}
-
-//reweight a particle after proposal
-inline void Particle::reweightParticles() {
-    //this function should assign weight proportional to likelihood of each forest in each particle
-    //for now, assign weights randomly
-//    _weight=rng.uniform();
-}
-
-inline double Particle::sumParticleWeights(double particle_sum){
-    particle_sum = particle_sum + _weight;
-    return particle_sum;
-}
-
-inline void Particle::normalizeParticleWeights(double particle_sum){
-    _weight = _weight / particle_sum;
-}
-inline void Particle::resampleParticles(double running_sum){
-    // save particle if n falls below running_sum
 }
 
 inline void Particle::saveForest(std::string treefilename) const {
@@ -121,5 +97,18 @@ inline void Particle::savePaupFile(std::string paupfilename, std::string datafil
     paupf << "[!expected lnL = " << expected_lnL << "]\n";
     paupf << "end;\n";
     paupf.close();
+}
+
+inline double Particle::calcHeight() {
+    double sum_height = 0.0;
+    for (auto nd : _forest._preorder) {
+        if (nd->getParent()!=_forest._root) {
+            sum_height += nd->getEdgeLength();
+        }
+        if (!nd->getLeftChild()) {
+            break;
+        }
+    }
+    return sum_height;
 }
 }
