@@ -37,6 +37,7 @@ class Forest {
 
                                     Forest();
                                     ~Forest();
+        Forest(const Forest & other);
 
         unsigned                    numLeaves() const;
         unsigned                    numInternals() const;
@@ -44,6 +45,8 @@ class Forest {
         void                        showForest();
         static void                 setNumSpecies(unsigned n);
         double                      calcLogLikelihood();
+        void                        createDefaultTree();
+        void operator=(const Forest & other);
         
     
     private:
@@ -96,6 +99,7 @@ inline void Forest::clear() {
     _nodes.clear();
     _preorder.clear();
     _levelorder.clear();
+    _partials.clear();
     _nodes.resize(2*_nspecies);
     _partials.resize(2*_nspecies);
     _npatterns = 0;
@@ -140,6 +144,11 @@ inline void Forest::clear() {
     _ninternals=2;
     refreshPreorder();
     }
+
+inline Forest::Forest(const Forest & other) {
+    clear();
+    *this = other;
+}
 
 inline void Forest::setData(Data::SharedPtr d) {
     _data = d;
@@ -423,7 +432,7 @@ inline double Forest::calcTransitionProbability(unsigned from, unsigned to, doub
 }
 
 inline double Forest::calcLogLikelihood() {
-    return 0.0;
+//    return 0.0;
     auto data_matrix=_data->getDataMatrix();
     for (auto nd : boost::adaptors::reverse(_preorder)) {
         if (nd->_left_child){
@@ -476,6 +485,106 @@ inline double Forest::calcLogLikelihood() {
     }
     
     return log_like;
+}
+
+inline void Forest::createDefaultTree() {
+    clear();
+    
+    //creating root node
+    _root = &_nodes[_nspecies];
+    _root->_name="root";
+    _root->_left_child=0;
+    _root->_right_sib=0;
+    _root->_parent=0;
+    _root->_number=_nspecies;
+    _root->_edge_length=double(0.0);
+    
+    //creating subroot node
+    Node* subroot=&_nodes[_nspecies+1];
+    subroot->_name="subroot";
+    subroot->_left_child=0;
+    subroot->_right_sib=0;
+    subroot->_parent=_root;
+    subroot->_number=_nspecies + 1;
+    subroot->_edge_length=double(0.0);
+    _root->_left_child=subroot;
+    
+    //create species
+    double edge_length = rng.gamma(1.0, 1.0/_nspecies);
+    for (unsigned i = 0; i < _nspecies; i++) {
+        Node* nd=&_nodes[i];
+        if (i==0) {
+            subroot->_left_child=nd;
+        }
+        else {
+            _nodes[i-1]._right_sib=nd;
+        }
+        nd->_name="";
+        nd->_left_child=0;
+        nd->_right_sib=0;
+        nd->_parent=subroot;
+        nd->_number=i;
+        nd->_edge_length = edge_length;
+        }
+    _nleaves=_nspecies;
+    _ninternals=2;
+    refreshPreorder();
+}
+
+inline void Forest::operator=(const Forest & other) {
+    _nstates = other._nstates;
+    _npatterns = other._npatterns;
+    _nodes.resize(other._nodes.size());
+    _preorder.resize(other._preorder.size());
+    _partials.resize(other._partials.size());
+    copy(other._partials.begin(), other._partials.end(), _partials.begin());
+    
+    // copy tree itself
+    assert(other._root->_number == _nspecies);
+    assert(other._root->_left_child->_number == _nspecies + 1);
+    _root               = &_nodes[_nspecies];
+    _root->_number      = _nspecies;
+    _root->_name        = "root";
+    _root->_edge_length = 0.0;
+    _root->_parent      = 0;
+    _root->_left_child  = &_nodes[_nspecies + 1];
+    _root->_right_sib   = 0;
+
+    unsigned i = 0;
+    for (auto othernd : other._preorder) {
+        // get number of next node in preorder sequence (serves as index of node in _nodes vector)
+        unsigned k = othernd->_number;
+
+        // update preorder vector
+        _preorder[i] = &_nodes[k];
+        
+        // copy parent
+        assert(othernd->_parent);
+        unsigned parent_number = othernd->_parent->_number;
+        _nodes[k]._parent = &_nodes[parent_number];
+
+        // copy left child
+        if (othernd->_left_child) {
+            unsigned left_child_number = othernd->_left_child->_number;
+            _nodes[k]._left_child = &_nodes[left_child_number];
+        }
+        else
+            _nodes[k]._left_child = 0;
+        
+        // copy right sibling
+        if (othernd->_right_sib) {
+            unsigned right_sib_number = othernd->_right_sib->_number;
+            _nodes[k]._right_sib = &_nodes[right_sib_number];
+        }
+        else
+            _nodes[k]._right_sib = 0;
+            
+        _nodes[k]._number      = othernd->_number;
+        _nodes[k]._name        = othernd->_name;
+        _nodes[k]._edge_length = othernd->_edge_length;
+        
+        i++;
+    }
 }
 
 }

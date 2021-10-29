@@ -28,6 +28,7 @@ class Particle {
         double                                  calcHeight();
         double                                  getLogWeight() const {return _log_weight;}
         void                                    setLogWeight(double w){_log_weight = w;}
+        void                                    operator=(const Particle & other);
     
 
     private:
@@ -73,7 +74,7 @@ inline double Particle::proposal() {
 }
 
 inline Particle::Particle(const Particle & other) {
-    assert(false);
+    *this = other;
 }
 
 inline void Particle::saveForest(std::string treefilename) const {
@@ -111,4 +112,11 @@ inline double Particle::calcHeight() {
     }
     return sum_height;
 }
+
+inline void Particle::operator=(const Particle & other) {
+    _log_weight     = other._log_weight;
+    _log_likelihood = other._log_likelihood;
+    _forest         = other._forest;
+    _data           = other._data;
+};
 }

@@ -180,7 +180,6 @@ namespace proj {
                 double ess = 1.0/ess_inverse;
                 cout << "ESS is " << ess << endl;
                 
-#if 0
                 vector<unsigned> counts(my_vec.size(), 0);
                 if (ess < 2.0) {
                     //sample particles
@@ -211,7 +210,6 @@ namespace proj {
                     copy(my_vec2.begin(), my_vec2.end(), my_vec.begin());
                 }
                 
-#endif
 //                for (auto & p:my_vec) {
 //                    p.showParticle(); //print all new particles
 //                    double log_likelihood = p.calcLogLikelihood();
