@@ -79,6 +79,7 @@ class Forest {
         Data::SharedPtr             _data;
         double                      calcTransitionProbability(unsigned from, unsigned to, double edge_length);
         double                      _last_edge_length;
+        double                  _speciation_rate;
         
     
     public:
@@ -104,6 +105,7 @@ inline void Forest::clear() {
     _partials.resize(2*_nspecies);
     _npatterns = 0;
     _nstates = 4;
+    _speciation_rate = 10.9; //temporary
     //creating root node
     _root = &_nodes[_nspecies];
     _root->_name="root";
@@ -124,7 +126,7 @@ inline void Forest::clear() {
     _root->_left_child=subroot;
     
     //create species
-    _last_edge_length = rng.gamma(1.0, 1.0/_nspecies);
+    _last_edge_length = rng.gamma(1.0, 1.0/(_nspecies*_speciation_rate));
     for (unsigned i = 0; i < _nspecies; i++) {
         Node* nd=&_nodes[i];
         if (i==0) {
@@ -347,7 +349,7 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtree
 
     refreshPreorder();
     
-    _last_edge_length = rng.gamma(1.0, 1.0/(nsubtrees-1));
+    _last_edge_length = rng.gamma(1.0, 1.0/((nsubtrees-1)*_speciation_rate));
     for (auto nd:_preorder) {
 //        std::cout << nd->_name << " number is " << nd->_number << std::endl;
         //if node's parent is subroot add to its existing branch length

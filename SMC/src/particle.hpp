@@ -29,6 +29,10 @@ class Particle {
         double                                  getLogWeight() const {return _log_weight;}
         void                                    setLogWeight(double w){_log_weight = w;}
         void                                    operator=(const Particle & other);
+        const Forest &                          getForest() const {return _forest;}
+        std::string                             saveForestNewick() const {
+            return _forest.makeNewick(8, true);
+        }
     
 
     private:
@@ -67,7 +71,7 @@ inline double Particle::proposal() {
     double prev_log_likelihood = _log_likelihood;
     _log_likelihood = calcLogLikelihood();
     unsigned n = Forest::_nspecies -_n;
-    double log_q = log(n-1) - (n-1)*_forest._last_edge_length - (boost::math::lgamma(n+1) - log(2) - boost::math::lgamma(n-1));
+    double log_q = log(_forest._speciation_rate) + log(n-1) - _forest._speciation_rate*(n-1)*_forest._last_edge_length - (boost::math::lgamma(n+1) - log(2) - boost::math::lgamma(n-1));
     _log_weight = _log_likelihood - prev_log_likelihood - log_q;
     _n++;
     return _log_weight;

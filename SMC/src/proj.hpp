@@ -21,6 +21,7 @@ namespace proj {
             void                clear();
             void                processCommandLineOptions(int argc, const char * argv[]);
             void                run();
+            void                saveAllForests(const vector<Particle> &v) const ;
 
         private:
 
@@ -57,6 +58,17 @@ namespace proj {
         _data = nullptr;
         _likelihood = nullptr;
     }   ///end_clear
+///
+    inline void Proj::saveAllForests(const vector<Particle> &v) const {
+        ofstream treef("forest.trees");
+        treef << "#nexus\n\n";
+        treef << "begin trees;\n";
+        for (auto &p:v) {
+            treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
+        }
+        treef << "end;\n";
+        treef.close();
+    }
 
     inline void Proj::processCommandLineOptions(int argc, const char * argv[]) {   ///begin_processCommandLineOptions
         std::vector<std::string> partition_subsets;
@@ -173,9 +185,9 @@ namespace proj {
                 for (auto & p:my_vec) {
                     //normalized weight is weight / particle sum = ln(weight)-ln(particle_sum)
                     p.setLogWeight(p.getLogWeight() - log_particle_sum);
-//                    log_weight = p.getLogWeight() - log_particle_sum;
+                    double log_weight = p.getLogWeight();
 //                    ESS = 1/(weight^2)
-                    ess_inverse += exp(2.0*p.getLogWeight());
+                    ess_inverse += exp(2.0*log_weight);
                 }
                 double ess = 1.0/ess_inverse;
                 cout << "ESS is " << ess << endl;
@@ -226,10 +238,14 @@ namespace proj {
                 p.saveForest("forest.tre");
                 double h = p.calcHeight();
                 sum_h += h;
-                            }
+            }
             sum_h/=my_vec.size();
             cout << "mean height equals " << sum_h << endl;
+            
+            saveAllForests(my_vec);
             }
+        
+        
         catch (XProj & x) {
             std::cerr << "Proj encountered a problem:\n  " << x.what() << std::endl;
         }
