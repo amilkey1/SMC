@@ -332,7 +332,9 @@
 		2286C59D26FE2D6C001BF8AA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				CODE_SIGN_STYLE = Automatic;
+				EXCLUDED_ARCHS = "";
 				HEADER_SEARCH_PATHS = (
 					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",
@@ -347,7 +349,9 @@
 		2286C59E26FE2D6C001BF8AA /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				CODE_SIGN_STYLE = Automatic;
+				EXCLUDED_ARCHS = "";
 				HEADER_SEARCH_PATHS = (
 					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",

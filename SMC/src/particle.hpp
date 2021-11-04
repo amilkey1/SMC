@@ -33,6 +33,7 @@ class Particle {
         std::string                             saveForestNewick() const {
             return _forest.makeNewick(8, true);
         }
+        void                                     firstPair() const;
     
 
     private:
@@ -123,4 +124,22 @@ inline void Particle::operator=(const Particle & other) {
     _forest         = other._forest;
     _data           = other._data;
 };
+
+inline void Particle::firstPair() const {
+    std::string s;
+    for (auto nd:_forest._preorder) {
+        if (!nd->_left_child) {
+            assert(nd->_right_sib);
+            assert(!nd->_right_sib->_right_sib);
+            unsigned a = nd->_number;
+            unsigned b  = nd->_right_sib->_number;
+            if ((a==2 && b==3) || (a==3 && b==2) || (a==8 && b==9) || (a==9 && b==8) || (a==4 && b==5) || (a==5 && b==4)) {
+                s += boost::str(boost::format("-> %s (%d) | %s (%d) | %.5f | (%d) | (%d))")%nd->_name %nd->_number %nd->_right_sib->_name %nd->_right_sib->_number %_log_likelihood %nd->_edge_length %nd->_parent->_edge_length);
+                cout << s << endl;
+            }
+            break;
+        }
+    }
+//    return s;
+}
 }

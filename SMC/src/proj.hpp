@@ -147,7 +147,7 @@ namespace proj {
             Forest::setNumSpecies(nspecies);
             
             //create vector of particles
-            unsigned nparticles = 100;
+            unsigned nparticles = 10;
             vector<Particle> my_vec(nparticles);
             for (auto & p:my_vec ) {
                 p.setData(_data);
@@ -166,7 +166,7 @@ namespace proj {
                 double log_weight = 0.0;
                 double log_particle_sum = 0.0;
                 
-                cout << "\n Particles after generation " << g << endl;
+//                cout << "\n Particles after generation " << g << endl;
                 
                 //taxon joining and reweighting step
                 for (auto & p:my_vec) {
@@ -189,33 +189,51 @@ namespace proj {
 //                    ESS = 1/(weight^2)
                     ess_inverse += exp(2.0*log_weight);
                 }
+                
                 double ess = 1.0/ess_inverse;
                 cout << "ESS is " << ess << endl;
                 
-                vector<unsigned> counts(my_vec.size(), 0);
                 if (ess < 2.0) {
+                    for (auto & p:my_vec) {
+                        p.firstPair();
+                    }
+                    vector<double> cum_probs(my_vec.size(), 0.0);
+                    unsigned ndarts = (unsigned) my_vec.size()*100;
                     //sample particles
-                    for(unsigned i=0; i<my_vec.size(); i++) {
+                    for(unsigned i=0; i<ndarts; i++) {
                         double u = rng.uniform();
                         double cum_prob = 0.0;
                         unsigned j = 0;
                         for(auto & p:my_vec) {
                             cum_prob += exp(p.getLogWeight());
                             if (u < cum_prob) {
-                                counts[j]++;
+                                cum_probs[j]+=1.0;
                                 break;
                             }
                             j++;
                         }
                     }
+                    cum_probs[0]=cum_probs[0]/ndarts;
+                    if (cum_probs[0]>0.0) {
+                        my_vec[0].setLogWeight(log(cum_probs[0]));
+                    }
+                    for(unsigned i=1; i<my_vec.size(); i++) {
+                        double w = cum_probs[i]/ndarts;
+                        if (w>0.0){
+                            my_vec[i].setLogWeight(log(w));
+                        }
+                        cum_probs[i]=cum_probs[i-1]+w;
+                    }
+                    
                     //filter particles
                     double logNumParticles = log(my_vec.size());
                     vector<Particle> my_vec2;
                     for(unsigned i=0; i<my_vec.size(); i++) {
-                        if (counts[i]>0) {
-                            my_vec[i].setLogWeight(log(counts[i])-logNumParticles);
-                            for(unsigned j=0; j<counts[i]; j++) {
-                                my_vec2.push_back(my_vec[i]);
+                        double u = rng.uniform();
+                        for(unsigned j=0; j<my_vec.size(); j++) {
+                            if (u < cum_probs[j]) {
+                                my_vec2.push_back(my_vec[j]);
+                                break;
                             }
                         }
                     }
@@ -232,10 +250,10 @@ namespace proj {
             double sum_h = 0.0;
             for (auto & p:my_vec) {
 //               construct a vector of the new particles...?
-                p.showParticle(); //print all new particles
-                double log_likelihood = p.calcLogLikelihood();
-                p.savePaupFile("paup.nex", _data_file_name, "forest.tre", log_likelihood);
-                p.saveForest("forest.tre");
+//                p.showParticle(); //print all new particles
+//                double log_likelihood = p.calcLogLikelihood();
+//                p.savePaupFile("paup.nex", _data_file_name, "forest.tre", log_likelihood);
+//                p.saveForest("forest.tre");
                 double h = p.calcHeight();
                 sum_h += h;
             }

@@ -7,18 +7,16 @@
 
 namespace proj {
 
-    class Tree;
-    class TreeManip;
     class Likelihood;
     class Updater;
     class Forest;
+    class Particle;
 
     class Node {
-        friend class Tree;
-        friend class TreeManip;
         friend class Likelihood;
         friend class Updater;
         friend class Forest;
+        friend class Particle;
 
         public:
                                         Node();
