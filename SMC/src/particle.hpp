@@ -33,7 +33,7 @@ class Particle {
         std::string                             saveForestNewick() const {
             return _forest.makeNewick(8, true);
         }
-        void                                     firstPair() const;
+        std::string                                     firstPair() const;
     
 
     private:
@@ -68,7 +68,8 @@ inline double Particle::calcLogLikelihood() {
 }
 
 inline double Particle::proposal() {
-    _forest.proposeParticles(); //proposal step
+    auto taxon_pair = _forest.chooseTaxaToJoin(); //proposal step
+    _forest.createNewSubtree(taxon_pair.first, taxon_pair.second);
     double prev_log_likelihood = _log_likelihood;
     _log_likelihood = calcLogLikelihood();
     unsigned n = Forest::_nspecies -_n;
@@ -125,7 +126,7 @@ inline void Particle::operator=(const Particle & other) {
     _data           = other._data;
 };
 
-inline void Particle::firstPair() const {
+inline std::string Particle::firstPair() const {
     std::string s;
     for (auto nd:_forest._preorder) {
         if (!nd->_left_child) {
@@ -135,11 +136,13 @@ inline void Particle::firstPair() const {
             unsigned b  = nd->_right_sib->_number;
             if ((a==2 && b==3) || (a==3 && b==2) || (a==8 && b==9) || (a==9 && b==8) || (a==4 && b==5) || (a==5 && b==4)) {
                 s += boost::str(boost::format("-> %s (%d) | %s (%d) | %.5f | (%d) | (%d))")%nd->_name %nd->_number %nd->_right_sib->_name %nd->_right_sib->_number %_log_likelihood %nd->_edge_length %nd->_parent->_edge_length);
-                cout << s << endl;
+                if (_log_weight)
+//                cout << s << endl;
+                return s;
             }
             break;
         }
     }
-//    return s;
+    return " ";
 }
 }

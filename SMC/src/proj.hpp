@@ -147,7 +147,7 @@ namespace proj {
             Forest::setNumSpecies(nspecies);
             
             //create vector of particles
-            unsigned nparticles = 10;
+            unsigned nparticles = 10000;
             vector<Particle> my_vec(nparticles);
             for (auto & p:my_vec ) {
                 p.setData(_data);
@@ -193,10 +193,7 @@ namespace proj {
                 double ess = 1.0/ess_inverse;
                 cout << "ESS is " << ess << endl;
                 
-                if (ess < 2.0) {
-                    for (auto & p:my_vec) {
-                        p.firstPair();
-                    }
+                if (ess < 1.5) {
                     vector<double> cum_probs(my_vec.size(), 0.0);
                     unsigned ndarts = (unsigned) my_vec.size()*100;
                     //sample particles
@@ -223,6 +220,9 @@ namespace proj {
                             my_vec[i].setLogWeight(log(w));
                         }
                         cum_probs[i]=cum_probs[i-1]+w;
+//                        if (w>0.0) {
+//                            cout << w << " -> " << my_vec[i].firstPair() << endl;
+//                        }
                     }
                     
                     //filter particles

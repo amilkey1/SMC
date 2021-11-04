@@ -65,17 +65,18 @@ class Forest {
         static unsigned             _nspecies;
         unsigned                    _npatterns;
         unsigned                    _nstates;
+        unsigned                    _nsubtrees;
         void                        refreshPreorder();
         Node *                      findNextPreorder(Node * nd);
         std::string                 makeNewick(unsigned precision, bool use_names) const;
-        void                        proposeParticles();
+        pair<unsigned, unsigned>                        chooseTaxaToJoin();
         void                        detachSubtree(Node * s);
         void                        insertSubtreeOnLeft(Node * s, Node * u);
         Node *                      findLeftSib(Node * nd);
         Node *                      getSubtreeAt(unsigned i);
         unsigned                    getNumSubtrees();
         void                        setEdgeLength(Node * nd);
-        void                        createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtrees);
+        void                        createNewSubtree(unsigned t1, unsigned t2);
         Data::SharedPtr             _data;
         double                      calcTransitionProbability(unsigned from, unsigned to, double edge_length);
         double                      _last_edge_length;
@@ -105,6 +106,7 @@ inline void Forest::clear() {
     _partials.resize(2*_nspecies);
     _npatterns = 0;
     _nstates = 4;
+    _nsubtrees = _nspecies;
     _speciation_rate = 10.9; //temporary
     //creating root node
     _root = &_nodes[_nspecies];
@@ -301,7 +303,7 @@ inline void Forest::setNumSpecies(unsigned n){
     _nspecies=n;
 }
 
-inline void Forest::proposeParticles(){
+inline pair<unsigned, unsigned> Forest::chooseTaxaToJoin(){
     unsigned t1=0;
     unsigned t2=1;
     unsigned nsubtrees = getNumSubtrees();
@@ -316,13 +318,22 @@ inline void Forest::proposeParticles(){
             t2 = ::rng.randint(0, nsubtrees-1);
         }
     }
+    return make_pair(t1, t2);
 
 //    cout << "joining taxon " << t1 << " with taxon " << t2 << endl;
-    createNewSubtree(t1, t2, nsubtrees);
+//    createNewSubtree(t1, t2, nsubtrees);
 }
 
-inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtrees) {
-    assert(nsubtrees>1);
+inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
+    _last_edge_length = rng.gamma(1.0, 1.0/(_nsubtrees*_speciation_rate));
+    for (auto nd:_preorder) {
+        //if node's parent is subroot add to its existing branch length
+        if (nd->_parent==_root->_left_child){
+            nd->_edge_length += _last_edge_length;
+        }
+    }
+    assert(_nsubtrees>1);
+    _nsubtrees--;
     Node * subtree1=getSubtreeAt(t1);
     Node * subtree2 = getSubtreeAt(t2);
 
@@ -336,7 +347,7 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtree
     new_nd->_parent=_root->_left_child;
     new_nd->_number=_nleaves+_ninternals;
     
-    new_nd->_edge_length=double(0.0);
+    new_nd->_edge_length=0.0;
 
 //    cout << "New node branch length is: " << new_nd->_edge_length << endl;
 
@@ -349,14 +360,14 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2, unsigned nsubtree
 
     refreshPreorder();
     
-    _last_edge_length = rng.gamma(1.0, 1.0/((nsubtrees-1)*_speciation_rate));
-    for (auto nd:_preorder) {
-//        std::cout << nd->_name << " number is " << nd->_number << std::endl;
-        //if node's parent is subroot add to its existing branch length
-        if (nd->_parent==_root->_left_child){
-            nd->_edge_length += _last_edge_length;
-        }
-    }
+//    _last_edge_length = rng.gamma(1.0, 1.0/((nsubtrees-1)*_speciation_rate));
+//    for (auto nd:_preorder) {
+////        std::cout << nd->_name << " number is " << nd->_number << std::endl;
+//        //if node's parent is subroot add to its existing branch length
+//        if (nd->_parent==_root->_left_child){
+//            nd->_edge_length += _last_edge_length;
+//        }
+//    }
 }
 
 inline void Forest::detachSubtree(Node * s) {
@@ -437,6 +448,11 @@ inline double Forest::calcLogLikelihood() {
 //    return 0.0;
     auto data_matrix=_data->getDataMatrix();
     for (auto nd : boost::adaptors::reverse(_preorder)) {
+        if (nd->_parent==_root) {
+            
+            //if subroot is reached
+            break;
+        }
         if (nd->_left_child){
             //internal node
             assert(nd->_left_child->_right_sib);
@@ -468,25 +484,27 @@ inline double Forest::calcLogLikelihood() {
                 }
             }
         }
-        if (nd->_parent==_root) {
-            
-            //if subroot is reached
-            break;
-        }
     }
+//    compute log likelihood of every subtree whose parent is subroot
     auto counts = _data->getPatternCounts();
-    double log_like = 0.0;
-    for (unsigned p=0; p<_npatterns; p++) {
-        double site_like = 0.0;
-        for (unsigned s=0; s<_nstates; s++) {
-//            cout << p << "  " << s << "   " << _partials[_root->_left_child->_number][p*_nstates+s] << endl;
-            site_like += 0.25*_partials[_root->_left_child->_number][p*_nstates+s];
-            
+    Node* subroot = _root->_left_child;
+    double composite_log_likelihood = 0.0;
+    for (auto nd=subroot->_left_child; nd; nd=nd->_right_sib) {
+        double log_like = 0.0;
+        for (unsigned p=0; p<_npatterns; p++) {
+            double site_like = 0.0;
+            for (unsigned s=0; s<_nstates; s++) {
+                for (unsigned ss=0; ss<_nstates; ss++) {
+                    double child_transition_prob = calcTransitionProbability(s, ss, nd->_edge_length);
+                    site_like += 0.25*child_transition_prob*_partials[nd->_number][p*_nstates+ss];
+                }
+            }
+            log_like += log(site_like)*counts[p];
         }
-        log_like += log(site_like)*counts[p];
+        composite_log_likelihood += log_like;
     }
     
-    return log_like;
+    return composite_log_likelihood;
 }
 
 inline void Forest::createDefaultTree() {
