@@ -33,7 +33,7 @@ class Particle {
         std::string                             saveForestNewick() const {
             return _forest.makeNewick(8, true);
         }
-        std::string                                     firstPair() const;
+        void                              firstPair(pair<unsigned, unsigned>);
     
 
     private:
@@ -76,6 +76,7 @@ inline double Particle::proposal() {
     double log_q = log(_forest._speciation_rate) + log(n-1) - _forest._speciation_rate*(n-1)*_forest._last_edge_length - (boost::math::lgamma(n+1) - log(2) - boost::math::lgamma(n-1));
     _log_weight = _log_likelihood - prev_log_likelihood - log_q;
     _n++;
+//    firstPair(taxon_pair);
     return _log_weight;
 }
 
@@ -126,23 +127,22 @@ inline void Particle::operator=(const Particle & other) {
     _data           = other._data;
 };
 
-inline std::string Particle::firstPair() const {
+
+inline void Particle::firstPair(pair<unsigned, unsigned> p) {
     std::string s;
+    unsigned pair_1 = p.first;
+    unsigned pair_2 = p.second;
+
     for (auto nd:_forest._preorder) {
-        if (!nd->_left_child) {
-            assert(nd->_right_sib);
-            assert(!nd->_right_sib->_right_sib);
-            unsigned a = nd->_number;
-            unsigned b  = nd->_right_sib->_number;
-            if ((a==2 && b==3) || (a==3 && b==2) || (a==8 && b==9) || (a==9 && b==8) || (a==4 && b==5) || (a==5 && b==4)) {
-                s += boost::str(boost::format("-> %s (%d) | %s (%d) | %.5f | (%d) | (%d))")%nd->_name %nd->_number %nd->_right_sib->_name %nd->_right_sib->_number %_log_likelihood %nd->_edge_length %nd->_parent->_edge_length);
-                if (_log_weight)
-//                cout << s << endl;
-                return s;
-            }
-            break;
+        if (nd->_number == pair_1) {
+            s += boost::str(boost::format("%s (%d) || ")%nd->_name %nd->_number);
+        }
+        else if (nd->_number == pair_2) {
+            s += boost::str(boost::format("%s (%d) | log likelihood is %.5f | branch length is %d ||")%nd->_name %nd->_number %_log_likelihood %nd->_edge_length);
         }
     }
-    return " ";
+    cout << s << endl;
+    showParticle();
+
 }
 }

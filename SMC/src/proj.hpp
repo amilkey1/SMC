@@ -141,23 +141,23 @@ namespace proj {
                 }
             
             //set number of species to number in data file
-            rng.setSeed(12345);
+            rng.setSeed(2);
             unsigned nspecies;
             nspecies = _data->getNumTaxa();
             Forest::setNumSpecies(nspecies);
             
             //create vector of particles
-            unsigned nparticles = 10000;
+            unsigned nparticles = 1;
             vector<Particle> my_vec(nparticles);
             for (auto & p:my_vec ) {
                 p.setData(_data);
             }
 
-            //print out particles at the start
+//            print out particles at the start
 //            cout << "\n Particles at the start: " << endl;
-//            for (auto & p:my_vec ) {
-//                p.showParticle();
-//            }
+            for (auto & p:my_vec ) {
+                p.showParticle();
+            }
             
             //run through each generation of particles
             for (unsigned g=0; g<nspecies-2; g++){
@@ -169,6 +169,7 @@ namespace proj {
 //                cout << "\n Particles after generation " << g << endl;
                 
                 //taxon joining and reweighting step
+//                log_weight_vec.reserve(nparticles);
                 for (auto & p:my_vec) {
                     log_weight = p.proposal();
                     log_weight_vec.push_back(log_weight);
@@ -188,12 +189,13 @@ namespace proj {
                     double log_weight = p.getLogWeight();
 //                    ESS = 1/(weight^2)
                     ess_inverse += exp(2.0*log_weight);
+                    p.showParticle();
                 }
                 
                 double ess = 1.0/ess_inverse;
                 cout << "ESS is " << ess << endl;
                 
-                if (ess < 1.5) {
+                if (ess < 100) {
                     vector<double> cum_probs(my_vec.size(), 0.0);
                     unsigned ndarts = (unsigned) my_vec.size()*100;
                     //sample particles
@@ -221,12 +223,13 @@ namespace proj {
                         }
                         cum_probs[i]=cum_probs[i-1]+w;
 //                        if (w>0.0) {
-//                            cout << w << " -> " << my_vec[i].firstPair() << endl;
+//                            cout << w << " | " << my_vec[i].firstPair() << endl;
+//                            my_vec[i].showParticle();
 //                        }
                     }
                     
                     //filter particles
-                    double logNumParticles = log(my_vec.size());
+//                    double logNumParticles = log(my_vec.size());
                     vector<Particle> my_vec2;
                     for(unsigned i=0; i<my_vec.size(); i++) {
                         double u = rng.uniform();
@@ -239,21 +242,9 @@ namespace proj {
                     }
                     copy(my_vec2.begin(), my_vec2.end(), my_vec.begin());
                 }
-                
-//                for (auto & p:my_vec) {
-//                    p.showParticle(); //print all new particles
-//                    double log_likelihood = p.calcLogLikelihood();
-//                    p.savePaupFile("paup.nex", _data_file_name, "forest.tre", log_likelihood);
-//                    p.saveForest("forest.tre");
-//                }
             }
             double sum_h = 0.0;
             for (auto & p:my_vec) {
-//               construct a vector of the new particles...?
-//                p.showParticle(); //print all new particles
-//                double log_likelihood = p.calcLogLikelihood();
-//                p.savePaupFile("paup.nex", _data_file_name, "forest.tre", log_likelihood);
-//                p.saveForest("forest.tre");
                 double h = p.calcHeight();
                 sum_h += h;
             }
