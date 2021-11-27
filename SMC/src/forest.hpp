@@ -83,6 +83,7 @@ class Forest {
         double                      _speciation_rate;
         double                      _x;
         double                      _y;
+        double                      _old_basal_height;
         double                      proposeBasalHeight();
         double                      _new_basal_height;
         
@@ -331,7 +332,8 @@ inline double Forest::proposeBasalHeight() {
     //draw random Uniform(0,1)
     double u = rng.uniform();
     //transform uniform deviate to exponential, number of basal lineages = nspecies - ninternals + 2 (from root & subroot)
-    double _new_basal_height = -log(1-u)/(_speciation_rate*(_nspecies - _ninternals + 2));
+    double k = _nspecies - _ninternals + 2; //TODO don't think this is correct
+    double _new_basal_height = -log(1-u)/(_speciation_rate*k);
     return _new_basal_height;
 }
 
@@ -381,7 +383,7 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
             nd->_edge_length += _y;
             }
     }
-    
+    _old_basal_height = _x; //save previous basal height for use in particle
     _x = _y; //set _x to equal most recently proposed basal height
 }
 

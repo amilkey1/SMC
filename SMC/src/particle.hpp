@@ -33,7 +33,8 @@ class Particle {
         std::string                             saveForestNewick() const {
             return _forest.makeNewick(8, true);
         }
-        void                              firstPair(pair<unsigned, unsigned>);
+        void                                    firstPair(pair<unsigned, unsigned>);
+        void                                     setInitialWeight();
     
 
     private:
@@ -46,10 +47,21 @@ class Particle {
 
 // Constructor assigns a random weight
 inline Particle::Particle() {
-    _log_weight = rng.uniform();
+//    _log_weight = rng.uniform();
+    
+    //initialize starting weight
+//    _log_likelihood = calcLogLikelihood();
+//    _log_weight = (_log_prob_density_s * prev_log_likelihood);
+    
     _n = 0;
     _log_likelihood = 0.0; //initialize log likelihood so generation 0 is able to calculate log weights
 };
+
+inline void Particle::setInitialWeight() {
+    //initalize starting weight
+    _log_likelihood = calcLogLikelihood();
+    _log_weight = (log(_forest._nleaves) + log(_forest._nleaves - 1) - (2*_forest._speciation_rate*_forest._x) + (_forest._nleaves - 2) * log(1-exp(-_forest._speciation_rate*_forest._x))) + _log_likelihood;
+}
 
 inline void Particle::showParticle() {
     //print out weight of each particle
@@ -72,9 +84,12 @@ inline double Particle::proposal() {
     _forest.createNewSubtree(taxon_pair.first, taxon_pair.second);
     double prev_log_likelihood = _log_likelihood;
     _log_likelihood = calcLogLikelihood();
-    unsigned n = Forest::_nspecies -_n;
-    double log_q = log(_forest._speciation_rate) + log(n-1) - _forest._speciation_rate*(n-1)*_forest._last_edge_length - (boost::math::lgamma(n+1) - log(2) - boost::math::lgamma(n-1));
-    _log_weight = _log_likelihood - prev_log_likelihood - log_q;
+//    unsigned n = Forest::_nspecies -_n;
+//    double log_q = log(_forest._speciation_rate) + log(n-1) - _forest._speciation_rate*(n-1)*_forest._last_edge_length - (boost::math::lgamma(n+1) - log(2) - boost::math::lgamma(n-1));
+//    _log_weight = _log_likelihood - prev_log_likelihood - log_q;
+    double _log_prob_density_s = log(_forest._nleaves) + log(_forest._nleaves - 1) - (2*_forest._speciation_rate*_forest._x) + (_forest._nleaves - 2) * log(1-exp(-_forest._speciation_rate*_forest._x));
+    double _log_prob_density_s_1 = log(Forest::_nspecies) + log(Forest::_nspecies - 1) - (2*_forest._speciation_rate*_forest._old_basal_height) + (Forest::_nspecies - 2) * log(1-exp(-_forest._speciation_rate*_forest._old_basal_height));
+    _log_weight = (_log_prob_density_s + prev_log_likelihood) / (_log_prob_density_s_1 * _log_likelihood);
     _n++;
 //    firstPair(taxon_pair);
     return _log_weight;

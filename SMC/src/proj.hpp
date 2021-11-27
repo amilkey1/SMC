@@ -151,13 +151,14 @@ namespace proj {
             vector<Particle> my_vec(nparticles);
             for (auto & p:my_vec ) {
                 p.setData(_data);
+                p.setInitialWeight();
             }
 
 //            print out particles at the start
 //            cout << "\n Particles at the start: " << endl;
-            for (auto & p:my_vec ) {
-                p.showParticle();
-            }
+//            for (auto & p:my_vec ) {
+//                p.showParticle();
+//            }
             
             //run through each generation of particles
             for (unsigned g=0; g<nspecies-2; g++){
@@ -189,7 +190,7 @@ namespace proj {
                     double log_weight = p.getLogWeight();
 //                    ESS = 1/(weight^2)
                     ess_inverse += exp(2.0*log_weight);
-                    p.showParticle();
+//                    p.showParticle();
                 }
                 
                 double ess = 1.0/ess_inverse;
