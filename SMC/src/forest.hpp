@@ -81,11 +81,10 @@ class Forest {
         double                      calcTransitionProbability(unsigned from, unsigned to, double edge_length);
         double                      _last_edge_length;
         double                      _speciation_rate;
-        double                      _x;
-        double                      _y;
-        double                      _old_basal_height;
-        double                      proposeBasalHeight();
-        double                      _new_basal_height;
+    pair <double, double> _new_basal_height;
+    pair <double, double> _old_basal_height;
+    pair<double, double>                      proposeBasalHeight();
+    unsigned countNumberTrees() const;
         
     
     public:
@@ -133,9 +132,6 @@ inline void Forest::clear() {
     _root->_left_child=subroot;
     
     //create species
-    
-    //initialize basal edge lengths
-    _x = proposeBasalHeight();
     for (unsigned i = 0; i < _nspecies; i++) {
         Node* nd=&_nodes[i];
         if (i==0) {
@@ -149,11 +145,23 @@ inline void Forest::clear() {
         nd->_right_sib=0;
         nd->_parent=subroot;
         nd->_number=i;
-        nd->_edge_length=_x; //initialize all leaf nodes to have basal height of _x
+        nd->_edge_length=_new_basal_height.first; //initialize all leaf nodes to have basal height
         }
     _nleaves=_nspecies;
     _ninternals=2;
     refreshPreorder();
+    
+    //initialize basal edge lengths
+    _new_basal_height = proposeBasalHeight();
+    _old_basal_height = _new_basal_height;
+    
+    //initialize species nodes with basal height
+    for (auto nd:_preorder) {
+        if (nd->_parent==_root->_left_child) {
+//        nd->_edge_length=_new_basal_height.first;
+          nd->_edge_length=_old_basal_height.first;
+        }
+    }
     }
 
 inline Forest::Forest(const Forest & other) {
@@ -328,13 +336,30 @@ inline pair<unsigned, unsigned> Forest::chooseTaxaToJoin(){
     return make_pair(t1, t2);
 }
 
-inline double Forest::proposeBasalHeight() {
+inline unsigned Forest::countNumberTrees() const{
+    Node* subroot = _root->_left_child;
+    assert (subroot);
+    unsigned n = 0;
+    for (Node* child=subroot->_left_child; child; child=child->_right_sib) {
+        n++;
+    }
+    return n;
+}
+
+inline pair<double, double> Forest::proposeBasalHeight() {
     //draw random Uniform(0,1)
-    double u = rng.uniform();
-    //transform uniform deviate to exponential, number of basal lineages = nspecies - ninternals + 2 (from root & subroot)
-    double k = _nspecies - _ninternals + 2; //TODO don't think this is correct
-    double _new_basal_height = -log(1-u)/(_speciation_rate*k);
-    return _new_basal_height;
+    double new_basal_height = 0.0;
+    double log_prob_basal_height = 0.0;
+    unsigned s = countNumberTrees();
+    for (unsigned k=2; k<s; k++) {
+        double u = rng.uniform();
+        //transform uniform deviate to exponential, number of basal lineages = nspecies - ninternals + 2 (from root & subroot)
+        double t = -log(1-u)/(_speciation_rate*k);
+        new_basal_height += t;
+        log_prob_basal_height += log(k*_speciation_rate)-(k*_speciation_rate*t);
+    }
+    
+    return make_pair(new_basal_height, log_prob_basal_height);
 }
 
 inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
@@ -342,8 +367,8 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
     for (auto nd:_preorder) {
         //if node's parent is subroot, subtract basal height and add new branch length
         if (nd->_parent==_root->_left_child){
-            nd->_edge_length -= _x; //subtract old basal height from each node whose parent is subroot
-            nd->_edge_length += _last_edge_length;
+            nd->_edge_length -= _old_basal_height.first; //subtract old basal height from each node whose parent is subroot
+            nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each node whose parent is subroot
         }
     }
     
@@ -376,15 +401,16 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
     refreshPreorder();
     
     //once new taxa have been joined, add new basal height to finish off tree
-    _y = proposeBasalHeight();
+//    _old_basal_height = _new_basal_height;
+    _new_basal_height = proposeBasalHeight();
     
     for (auto nd:_preorder) {
         if (nd->_parent==_root->_left_child){
-            nd->_edge_length += _y;
+            nd->_edge_length += _new_basal_height.first;
             }
     }
-    _old_basal_height = _x; //save previous basal height for use in particle
-    _x = _y; //set _x to equal most recently proposed basal height
+    
+    _old_basal_height = _new_basal_height;
 }
 
 inline void Forest::detachSubtree(Node * s) {
@@ -576,6 +602,8 @@ inline void Forest::operator=(const Forest & other) {
     _partials.resize(other._partials.size());
     copy(other._partials.begin(), other._partials.end(), _partials.begin());
     
+    _old_basal_height = other._old_basal_height;
+    _new_basal_height = other._new_basal_height;
     // copy tree itself
     assert(other._root->_number == _nspecies);
     assert(other._root->_left_child->_number == _nspecies + 1);

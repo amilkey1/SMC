@@ -147,18 +147,20 @@ namespace proj {
             Forest::setNumSpecies(nspecies);
             
             //create vector of particles
-            unsigned nparticles = 1;
+            unsigned nparticles = 1000;
             vector<Particle> my_vec(nparticles);
             for (auto & p:my_vec ) {
                 p.setData(_data);
                 p.setInitialWeight();
             }
+            
+            
 
 //            print out particles at the start
-//            cout << "\n Particles at the start: " << endl;
-//            for (auto & p:my_vec ) {
-//                p.showParticle();
-//            }
+            cout << "\n Particles at the start: " << endl;
+            for (auto & p:my_vec ) {
+                p.showParticle();
+            }
             
             //run through each generation of particles
             for (unsigned g=0; g<nspecies-2; g++){
@@ -174,6 +176,7 @@ namespace proj {
                 for (auto & p:my_vec) {
                     log_weight = p.proposal();
                     log_weight_vec.push_back(log_weight);
+                    p.showParticle();
                 }
                 
                 double log_max_weight = *max_element(log_weight_vec.begin(), log_weight_vec.end());
@@ -190,11 +193,13 @@ namespace proj {
                     double log_weight = p.getLogWeight();
 //                    ESS = 1/(weight^2)
                     ess_inverse += exp(2.0*log_weight);
+                    
+//                    assert(ess_inverse > 0);
 //                    p.showParticle();
                 }
                 
                 double ess = 1.0/ess_inverse;
-                cout << "ESS is " << ess << endl;
+                cout << "ESS is " << ess << "  " << "g = " << g << endl;
                 
                 if (ess < 100) {
                     vector<double> cum_probs(my_vec.size(), 0.0);
@@ -262,5 +267,39 @@ namespace proj {
 
         std::cout << "\nFinished!" << std::endl;
     }
+
+//inline double Proj::calcLogSum(vector<double> & log_values) {
+//    double max_logv = *max_element(log_values.begin(), log_values.end());
+//
+//    double factored_sum = 0.0;
+//    for (auto & logv : log_values) {
+//        factored_sum += exp(logv - max_logv);
+//    }
+//    double log_sum_values = max_logv + log(factored_sum);
+//    return log_sum_values;
+//}
+//
+//inline void Proj::normalizeWeights() {
+//    // Store log weights in vector
+//    unsigned i = 0;
+//    vector<double> log_weights(_nparticles, 0.0);
+//    for (auto & p : *_particles)
+//        log_weights[i++] = p.getLogWeight();
+//
+//    // Calculate log of the sum of the weights
+//    double log_sum_weights = calcLogSum(log_weights);
+//
+//    // Normalize each weight by dividing by the sum of weights (but keep it all on log scale)
+//    i = 0;
+//    vector<double> debug_check_log_weights(_nparticles);
+//    for (auto & p : *_particles) {
+//        p.setLogWeight(log_weights[i] - log_sum_weights);
+//        debug_check_log_weights[i] = p.getLogWeight();
+//
+//        ++i;
+//    }
+//    double debug_check_sum_log_weights = calcLogSum(debug_check_log_weights);
+//    assert(fabs(debug_check_sum_log_weights) < Proj::_small_enough);
+//}
 
 } ///end
