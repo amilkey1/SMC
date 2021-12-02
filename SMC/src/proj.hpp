@@ -37,6 +37,10 @@ namespace proj {
             static std::string     _program_name;
             static unsigned        _major_version;
             static unsigned        _minor_version;
+            void                    summarizeData(Data::SharedPtr);
+            void                    printFirstParticle(vector<Particle>);
+            unsigned                setNumberSpecies(Data::SharedPtr);
+            double                  getRunningSum(vector<double>);
 
     };
 
@@ -115,6 +119,50 @@ namespace proj {
         }
     }   ///end_processCommandLineOptions
 
+    inline void Proj::summarizeData(Data::SharedPtr) {
+        // Report information about data partition subsets
+        unsigned nsubsets = _data->getNumSubsets();
+        std::cout << "\nNumber of taxa: " << _data->getNumTaxa() << std::endl;
+        
+        std::cout << "Number of partition subsets: " << nsubsets << std::endl;
+        
+        for (unsigned subset = 0; subset < nsubsets; subset++) {
+            DataType dt = _partition->getDataTypeForSubset(subset);
+            std::cout << "  Subset " << (subset+1) << " (" << _data->getSubsetName(subset) << ")" << std::endl;
+            std::cout << "    data type: " << dt.getDataTypeAsString() << std::endl;
+            std::cout << "    sites:     " << _data->calcSeqLenInSubset(subset) << std::endl;
+            std::cout << "    patterns:  " << _data->getNumPatternsInSubset(subset) << std::endl;
+            }
+    }
+
+    inline void Proj::printFirstParticle(vector<Particle> my_vec) {
+//            print out particles at the start
+            cout << "\n Particles at the start: " << endl;
+             for (auto & p:my_vec) {
+                p.showParticle();
+            }
+    }
+
+    inline unsigned Proj::setNumberSpecies(Data::SharedPtr) {
+        unsigned nspecies;
+        nspecies = _data->getNumTaxa();
+        Forest::setNumSpecies(nspecies);
+        return nspecies;
+    }
+
+    inline double Proj::getRunningSum(vector<double> log_weight_vec) {
+        double running_sum = 0.0;
+        double log_particle_sum = 0.0;
+        
+        double log_max_weight = *max_element(log_weight_vec.begin(), log_weight_vec.end());
+        for (auto & i:log_weight_vec) {
+            running_sum += exp(i - log_max_weight);
+        }
+        log_particle_sum = log(running_sum) + log_max_weight;
+        
+        return log_particle_sum;
+    }
+
     inline void Proj::run() {
         std::cout << "Starting..." << std::endl;
         std::cout << "Current working directory: " << boost::filesystem::current_path() << std::endl;
@@ -126,64 +174,37 @@ namespace proj {
             _data->setPartition(_partition);
             _data->getDataFromFile(_data_file_name);
             
-            // Report information about data partition subsets
-            unsigned nsubsets = _data->getNumSubsets();
-            std::cout << "\nNumber of taxa: " << _data->getNumTaxa() << std::endl;
-            
-            std::cout << "Number of partition subsets: " << nsubsets << std::endl;
-            
-            for (unsigned subset = 0; subset < nsubsets; subset++) {
-                DataType dt = _partition->getDataTypeForSubset(subset);
-                std::cout << "  Subset " << (subset+1) << " (" << _data->getSubsetName(subset) << ")" << std::endl;
-                std::cout << "    data type: " << dt.getDataTypeAsString() << std::endl;
-                std::cout << "    sites:     " << _data->calcSeqLenInSubset(subset) << std::endl;
-                std::cout << "    patterns:  " << _data->getNumPatternsInSubset(subset) << std::endl;
-                }
+            summarizeData(_data);
             
             //set number of species to number in data file
-            rng.setSeed(2);
-            unsigned nspecies;
-            nspecies = _data->getNumTaxa();
-            Forest::setNumSpecies(nspecies);
+            unsigned nspecies = setNumberSpecies(_data);
+            rng.setSeed(5);
             
-            //create vector of particles
-            unsigned nparticles = 1000;
+//          create vector of particles
+            unsigned nparticles = 500;
             vector<Particle> my_vec(nparticles);
             for (auto & p:my_vec ) {
                 p.setData(_data);
                 p.setInitialWeight();
             }
-            
-            
 
-//            print out particles at the start
-            cout << "\n Particles at the start: " << endl;
-            for (auto & p:my_vec ) {
-                p.showParticle();
-            }
-            
+//            printFirstParticle(my_vec);
+
             //run through each generation of particles
             for (unsigned g=0; g<nspecies-2; g++){
                 vector<double> log_weight_vec;
-                double running_sum = 0.0;
                 double log_weight = 0.0;
-                double log_particle_sum = 0.0;
                 
 //                cout << "\n Particles after generation " << g << endl;
                 
                 //taxon joining and reweighting step
-//                log_weight_vec.reserve(nparticles);
                 for (auto & p:my_vec) {
                     log_weight = p.proposal();
                     log_weight_vec.push_back(log_weight);
                     p.showParticle();
                 }
                 
-                double log_max_weight = *max_element(log_weight_vec.begin(), log_weight_vec.end());
-                for (auto & i:log_weight_vec) {
-                    running_sum += exp(i - log_max_weight);
-                }
-                log_particle_sum = log(running_sum) + log_max_weight;
+                double log_particle_sum = getRunningSum(log_weight_vec);
                 
                 double ess_inverse = 0.0;
                 
@@ -203,7 +224,7 @@ namespace proj {
                 
                 if (ess < 100) {
                     vector<double> cum_probs(my_vec.size(), 0.0);
-                    unsigned ndarts = (unsigned) my_vec.size()*100;
+                    unsigned ndarts = (unsigned) my_vec.size();
                     //sample particles
                     for(unsigned i=0; i<ndarts; i++) {
                         double u = rng.uniform();
@@ -247,6 +268,12 @@ namespace proj {
                         }
                     }
                     copy(my_vec2.begin(), my_vec2.end(), my_vec.begin());
+                    
+                    //reset weights
+                    double log_w = -log(my_vec.size());
+                    for(unsigned i=0; i<my_vec.size(); i++) {
+                        my_vec[i].setLogWeight(log_w);
+                    }
                 }
             }
             double sum_h = 0.0;
@@ -267,39 +294,5 @@ namespace proj {
 
         std::cout << "\nFinished!" << std::endl;
     }
-
-//inline double Proj::calcLogSum(vector<double> & log_values) {
-//    double max_logv = *max_element(log_values.begin(), log_values.end());
-//
-//    double factored_sum = 0.0;
-//    for (auto & logv : log_values) {
-//        factored_sum += exp(logv - max_logv);
-//    }
-//    double log_sum_values = max_logv + log(factored_sum);
-//    return log_sum_values;
-//}
-//
-//inline void Proj::normalizeWeights() {
-//    // Store log weights in vector
-//    unsigned i = 0;
-//    vector<double> log_weights(_nparticles, 0.0);
-//    for (auto & p : *_particles)
-//        log_weights[i++] = p.getLogWeight();
-//
-//    // Calculate log of the sum of the weights
-//    double log_sum_weights = calcLogSum(log_weights);
-//
-//    // Normalize each weight by dividing by the sum of weights (but keep it all on log scale)
-//    i = 0;
-//    vector<double> debug_check_log_weights(_nparticles);
-//    for (auto & p : *_particles) {
-//        p.setLogWeight(log_weights[i] - log_sum_weights);
-//        debug_check_log_weights[i] = p.getLogWeight();
-//
-//        ++i;
-//    }
-//    double debug_check_sum_log_weights = calcLogSum(debug_check_log_weights);
-//    assert(fabs(debug_check_sum_log_weights) < Proj::_small_enough);
-//}
 
 } ///end

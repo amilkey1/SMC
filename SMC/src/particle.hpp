@@ -68,6 +68,7 @@ inline void Particle::showParticle() {
     cout << "Particle weight: " << _log_weight << "\n" ;
     cout << "Forest: " << "\n";
     _forest.showForest();
+    cout << "log likelihood is: " << _log_likelihood << endl;
 }
 
 inline double Particle::calcLogLikelihood() {

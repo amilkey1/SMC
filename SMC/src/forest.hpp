@@ -145,21 +145,22 @@ inline void Forest::clear() {
         nd->_right_sib=0;
         nd->_parent=subroot;
         nd->_number=i;
-        nd->_edge_length=_new_basal_height.first; //initialize all leaf nodes to have basal height
+        nd->_edge_length=0.0;
         }
     _nleaves=_nspecies;
     _ninternals=2;
     refreshPreorder();
     
     //initialize basal edge lengths
-    _new_basal_height = proposeBasalHeight();
     _old_basal_height = _new_basal_height;
+    _new_basal_height = proposeBasalHeight();
+//    _old_basal_height = _new_basal_height;
     
     //initialize species nodes with basal height
     for (auto nd:_preorder) {
         if (nd->_parent==_root->_left_child) {
-//        nd->_edge_length=_new_basal_height.first;
-          nd->_edge_length=_old_basal_height.first;
+        nd->_edge_length=_new_basal_height.first;
+//          nd->_edge_length=_old_basal_height.first;
         }
     }
     }
@@ -351,7 +352,7 @@ inline pair<double, double> Forest::proposeBasalHeight() {
     double new_basal_height = 0.0;
     double log_prob_basal_height = 0.0;
     unsigned s = countNumberTrees();
-    for (unsigned k=2; k<s; k++) {
+    for (unsigned k=2; k<=s; k++) {
         double u = rng.uniform();
         //transform uniform deviate to exponential, number of basal lineages = nspecies - ninternals + 2 (from root & subroot)
         double t = -log(1-u)/(_speciation_rate*k);
@@ -367,7 +368,7 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
     for (auto nd:_preorder) {
         //if node's parent is subroot, subtract basal height and add new branch length
         if (nd->_parent==_root->_left_child){
-            nd->_edge_length -= _old_basal_height.first; //subtract old basal height from each node whose parent is subroot
+            nd->_edge_length -= _new_basal_height.first; //subtract old basal height from each node whose parent is subroot
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each node whose parent is subroot
         }
     }
@@ -400,8 +401,10 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
 
     refreshPreorder();
     
+    cout << makeNewick(3, true) << endl;
+    
     //once new taxa have been joined, add new basal height to finish off tree
-//    _old_basal_height = _new_basal_height;
+    _old_basal_height = _new_basal_height;
     _new_basal_height = proposeBasalHeight();
     
     for (auto nd:_preorder) {
@@ -410,7 +413,7 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
             }
     }
     
-    _old_basal_height = _new_basal_height;
+//    _old_basal_height = _new_basal_height;
 }
 
 inline void Forest::detachSubtree(Node * s) {
@@ -491,9 +494,9 @@ inline double Forest::calcLogLikelihood() {
 //    return 0.0;
     auto data_matrix=_data->getDataMatrix();
     for (auto nd : boost::adaptors::reverse(_preorder)) {
-        if (nd->_parent==_root) {
+        if (nd ==_root) {
             
-            //if subroot is reached
+            //if root is reached
             break;
         }
         if (nd->_left_child){
@@ -530,9 +533,9 @@ inline double Forest::calcLogLikelihood() {
     }
 //    compute log likelihood of every subtree whose parent is subroot
     auto counts = _data->getPatternCounts();
-    Node* subroot = _root->_left_child;
+//    Node* subroot = _root->_left_child;
     double composite_log_likelihood = 0.0;
-    for (auto nd=subroot->_left_child; nd; nd=nd->_right_sib) {
+    for (auto nd=_root->_left_child; nd; nd=nd->_right_sib) {
         double log_like = 0.0;
         for (unsigned p=0; p<_npatterns; p++) {
             double site_like = 0.0;
