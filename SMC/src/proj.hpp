@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include "data.hpp"
-//POL #include "likelihood.hpp"
+//#include "likelihood.hpp"
 #include "partition.hpp"
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -10,7 +10,7 @@
 //#include "forest.hpp"
 #include "particle.hpp"
 using namespace std;
-using namespace boost;  //POL
+using namespace boost;
 
 namespace proj {
 
@@ -24,11 +24,11 @@ namespace proj {
             void                run();
             void                saveAllForests(const vector<Particle> &v) const ;
     
-            void                normalizeWeights(vector<Particle> & particles);  //POL
-            unsigned            chooseRandomParticle(vector<Particle> & particles);  //POL
-            void                resampleParticles(vector<Particle> & particles);  //POL
-            void                resetWeights(vector<Particle> & particles); //POL
-            void                debugNormalizedWeights(const vector<Particle> & particles) const; //POL
+            void                normalizeWeights(vector<Particle> & particles);
+            unsigned            chooseRandomParticle(vector<Particle> & particles);
+            void                resampleParticles(vector<Particle> & particles);
+            void                resetWeights(vector<Particle> & particles);
+            void                debugNormalizedWeights(const vector<Particle> & particles) const;
 
         private:
 
@@ -67,7 +67,7 @@ namespace proj {
         _use_gpu        = true;
         _ambig_missing  = true;
         _data = nullptr;
-        //POL _likelihood = nullptr;
+        //_likelihood = nullptr;
     }   ///end_clear
 ///
     inline void Proj::saveAllForests(const vector<Particle> &v) const {
@@ -170,7 +170,6 @@ namespace proj {
         return log_particle_sum;
     }
 
-    //POL
     inline void Proj::debugNormalizedWeights(const vector<Particle> & particles) const {
         cout << format("%12s %12s %12s\n") % "particle" % "weight" % "cumweight";
         double cumw = 0.0;
@@ -183,8 +182,7 @@ namespace proj {
         cout << endl;
     }
     
-    //POL
-    inline void Proj::normalizeWeights(vector<Particle> & particles) { //POL
+    inline void Proj::normalizeWeights(vector<Particle> & particles) {
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
         for (auto & p : particles) {
@@ -198,7 +196,6 @@ namespace proj {
         }
     }
     
-    //POL
     inline unsigned Proj::chooseRandomParticle(vector<Particle> & particles) {
         int chosen_index = -1;
         unsigned nparticles = (unsigned)particles.size();
@@ -215,8 +212,7 @@ namespace proj {
         return chosen_index;
     }
     
-    //POL
-    inline void Proj::resampleParticles(vector<Particle> & particles) { //POL
+    inline void Proj::resampleParticles(vector<Particle> & particles) {
         // throw darts
         unsigned nparticles = (unsigned)particles.size();
         vector<double> darts(nparticles, 0.0);
@@ -225,19 +221,17 @@ namespace proj {
             darts[j]++;
         }
 
-#if 0
         // show darts
         double cumw = 0.0;
         unsigned cumd = 0;
-        cout << format("\n%12s %12s %12s\n") % "particle" % "weight" % "darts";
+//        cout << format("\n%12s %12s %12s\n") % "particle" % "weight" % "darts";
         for (unsigned i = 0; i < nparticles; i++) {
             double w = exp(particles[i].getLogWeight());
             cumw += w;
             cumd += darts[i];
-            cout << format("%12d %12.5f %12d\n") % i % w % darts[i];
+//            cout << format("%12d %12.5f %12d\n") % i % w % darts[i];
         }
-        cout << format("%12s %12.5f %12d\n") % " " % cumw % cumd;
-#endif
+//        cout << format("%12s %12.5f %12d\n") % " " % cumw % cumd;
         
         // create new particle vector
         vector<Particle> new_particles;
@@ -252,8 +246,7 @@ namespace proj {
         copy(new_particles.begin(), new_particles.end(), particles.begin());
     }
     
-    //POL
-    inline void Proj::resetWeights(vector<Particle> & particles) { //POL
+    inline void Proj::resetWeights(vector<Particle> & particles) {
         double logw = -log(particles.size());
         for (auto & p : particles) {
             p.setLogWeight(logw);
@@ -287,13 +280,13 @@ namespace proj {
 
 //            printFirstParticle(my_vec);
 
-            normalizeWeights(my_vec); //POL
-            resampleParticles(my_vec); //POL
-            resetWeights(my_vec); //POL
+            normalizeWeights(my_vec);
+            resampleParticles(my_vec);
+            resetWeights(my_vec);
 
             //run through each generation of particles
             for (unsigned g=0; g<nspecies-2; g++){
-                //POL cout << "Generation " << g << endl;
+                //cout << "Generation " << g << endl;
                 
                 vector<double> log_weight_vec;
                 double log_weight = 0.0;
@@ -304,95 +297,12 @@ namespace proj {
                 for (auto & p:my_vec) {
                     log_weight = p.proposal();
                     log_weight_vec.push_back(log_weight);
-                    //POL p.showParticle();
+                    //p.showParticle();
                 }
                 
-#if 1
-                normalizeWeights(my_vec); //POL
-#else
-                double log_particle_sum = getRunningSum(log_weight_vec);
-                
-                double ess_inverse = 0.0;
-                
-                for (auto & p:my_vec) {
-                    //normalized weight is weight / particle sum = ln(weight)-ln(particle_sum)
-                    p.setLogWeight(p.getLogWeight() - log_particle_sum);
-                    double log_weight = p.getLogWeight();
-//                    ESS = 1/(weight^2)
-                    ess_inverse += exp(2.0*log_weight);
-                    
-//                    assert(ess_inverse > 0);
-//                    p.showParticle();
-                }
-                
-                double ess = 1.0/ess_inverse;
-                cout << "ESS is " << ess << "  " << "g = " << g << endl;
-                
-                //debugNormalizedWeights(my_vec); //POL
-#endif
-
-#if 1
-                resampleParticles(my_vec); //POL
-                resetWeights(my_vec); //POL
-#else
-                if (ess < 100) {
-                    vector<double> cum_probs(my_vec.size(), 0.0);
-                    unsigned ndarts = (unsigned) my_vec.size();
-                    //sample particles
-                    for(unsigned i=0; i<ndarts; i++) {
-                        double u = rng.uniform();
-                        double cum_prob = 0.0;
-                        unsigned j = 0;
-                        for(auto & p:my_vec) {
-                            cum_prob += exp(p.getLogWeight());
-                            if (u < cum_prob) {
-                                cum_probs[j]+=1.0;
-                                break;
-                            }
-                            j++;
-                        }
-                    }
-                    cum_probs[0]=cum_probs[0]/ndarts;
-                    if (cum_probs[0]>0.0) {
-                        my_vec[0].setLogWeight(log(cum_probs[0]));
-                    }
-                    for(unsigned i=1; i<my_vec.size(); i++) {
-                        double w = cum_probs[i]/ndarts;
-                        if (w>0.0){
-                            my_vec[i].setLogWeight(log(w));
-                        }
-                        cum_probs[i]=cum_probs[i-1]+w;
-//                        if (w>0.0) {
-//                            cout << w << " | " << my_vec[i].firstPair() << endl;
-//                            my_vec[i].showParticle();
-//                        }
-                    }
-                    
-                    //filter particles
-//                    double logNumParticles = log(my_vec.size());
-                    vector<Particle> my_vec2;
-                    for(unsigned i=0; i<my_vec.size(); i++) {
-                        double u = rng.uniform();
-                        for(unsigned j=0; j<my_vec.size(); j++) {
-                            if (u < cum_probs[j]) {
-                                my_vec2.push_back(my_vec[j]);
-                                break;
-                            }
-                        }
-                    }
-                    copy(my_vec2.begin(), my_vec2.end(), my_vec.begin());
-                    
-                    //reset weights
-                    double log_w = -log(my_vec.size());
-                    for(unsigned i=0; i<my_vec.size(); i++) {
-                        //POL my_vec2[i].debugParticle(boost::str(boost::format("old %d") % i));
-                        //POL my_vec[i].debugParticle(boost::str(boost::format("new %d") % i));
-                        //POL cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << endl;
-                        my_vec[i].setLogWeight(log_w);
-                    }
-                    cout << endl;
-                } // if (ess < 100)...
-#endif
+                normalizeWeights(my_vec);
+                resampleParticles(my_vec);
+                resetWeights(my_vec);
             } // g loop
             double sum_h = 0.0;
             for (auto & p:my_vec) {

@@ -4,7 +4,7 @@
 #include "boost/format.hpp"
 #include "boost/math/special_functions/gamma.hpp"
 using namespace std;
-using namespace boost;  //POL
+using namespace boost;
 
 #include "lot.hpp"
 
@@ -17,7 +17,7 @@ class Particle {
         Particle();
         Particle(const Particle & other);
 
-        void                                    debugParticle(std::string name);    //POL
+        void                                    debugParticle(std::string name);
         void                                    showParticle();
         double                                  proposal();
         void                                    setData(Data::SharedPtr d) {
@@ -63,11 +63,10 @@ inline void Particle::setInitialWeight() {
     //initalize starting weight
     _log_likelihood = calcLogLikelihood();
     _log_weight = _forest._new_basal_height.second + _log_likelihood;
-    //POL cout << format("\nInitial weight: %.5f + %.5f\n") % _forest._new_basal_height.second % _log_likelihood;
+    //cout << format("\nInitial weight: %.5f + %.5f\n") % _forest._new_basal_height.second % _log_likelihood;
 }
 
 inline void Particle::showParticle() {
-    //POL: rearranged slightly and put a blank line between particle summaries
     //print out weight of each particle
     cout << "\nParticle:\n";
     cout << "  _log_weight: " << _log_weight << "\n" ;
@@ -76,7 +75,7 @@ inline void Particle::showParticle() {
     cout << "  _log_likelihood: " << _log_likelihood << endl;
 }
 
-//POL: more detailed version of showParticle
+//more detailed version of showParticle
 inline void Particle::debugParticle(std::string name) {
     //print out weight of each particle
     cout << "\nParticle " << name << ":\n";
@@ -109,8 +108,8 @@ inline double Particle::proposal() {
     double prev_log_likelihood = _log_likelihood;
     _log_likelihood = calcLogLikelihood();
 
-    //POL cout << format("\nold weight: %.5f + %.5f\n") % _forest._old_basal_height.second % prev_log_likelihood;
-    //POL cout << format("new weight: %.5f + %.5f\n") % _forest._new_basal_height.second % _log_likelihood;
+    //cout << format("\nold weight: %.5f + %.5f\n") % _forest._old_basal_height.second % prev_log_likelihood;
+    //cout << format("new weight: %.5f + %.5f\n") % _forest._new_basal_height.second % _log_likelihood;
 
     _log_weight = _forest._new_basal_height.second + _log_likelihood - _forest._old_basal_height.second - prev_log_likelihood;
     _n++;
