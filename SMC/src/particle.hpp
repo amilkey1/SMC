@@ -36,8 +36,7 @@ class Particle {
             return _forest.makeNewick(8, true);
         }
         void                                    firstPair(pair<unsigned, unsigned>);
-        void                                     setInitialWeight();
-    
+
 
     private:
         Forest                                  _forest;
@@ -47,24 +46,11 @@ class Particle {
         unsigned                                _n;
 };
 
-// Constructor assigns a random weight
 inline Particle::Particle() {
-//    _log_weight = rng.uniform();
-    
-    //initialize starting weight
-//    _log_likelihood = calcLogLikelihood();
-//    _log_weight = (_log_prob_density_s * prev_log_likelihood);
-    
+    _log_weight = 0.0; //initialize starting weights to 0
     _n = 0;
     _log_likelihood = 0.0; //initialize log likelihood so generation 0 is able to calculate log weights
 };
-
-inline void Particle::setInitialWeight() {
-    //initalize starting weight
-    _log_likelihood = calcLogLikelihood();
-    _log_weight = _forest._new_basal_height.second + _log_likelihood;
-    //cout << format("\nInitial weight: %.5f + %.5f\n") % _forest._new_basal_height.second % _log_likelihood;
-}
 
 inline void Particle::showParticle() {
     //print out weight of each particle
@@ -96,9 +82,7 @@ inline void Particle::debugParticle(std::string name) {
 inline double Particle::calcLogLikelihood() {
     double log_likelihood = _forest.calcLogLikelihood();
 //    cout << "log likelihood equals " << log_likelihood << endl;
-//    savePaupFile("paup.nex", "green4.nex", "forest.tre", log_likelihood);
-//    saveForest("forest.tre");
-    
+
     return log_likelihood;
 }
 

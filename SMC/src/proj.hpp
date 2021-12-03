@@ -23,7 +23,7 @@ namespace proj {
             void                processCommandLineOptions(int argc, const char * argv[]);
             void                run();
             void                saveAllForests(const vector<Particle> &v) const ;
-    
+
             void                normalizeWeights(vector<Particle> & particles);
             unsigned            chooseRandomParticle(vector<Particle> & particles);
             void                resampleParticles(vector<Particle> & particles);
@@ -36,7 +36,7 @@ namespace proj {
             Partition::SharedPtr        _partition;
             Data::SharedPtr             _data;
             //Likelihood::SharedPtr       _likelihood;
-        
+
             bool                        _use_gpu;
             bool                        _ambig_missing;
 
@@ -93,7 +93,7 @@ namespace proj {
         ("gpu",           boost::program_options::value(&_use_gpu)->default_value(true),                "use GPU if available")
         ("ambigmissing",  boost::program_options::value(&_ambig_missing)->default_value(true),          "treat all ambiguities as missing data")
         ;
-        
+
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
         try {
             const boost::program_options::parsed_options & parsed = boost::program_options::parse_config_file< char >("proj.conf", desc, false);
@@ -115,7 +115,7 @@ namespace proj {
             std::cout << boost::str(boost::format("This is %s version %d.%d") % _program_name % _major_version % _minor_version) << std::endl;
             std::exit(1);
         }
-        
+
         // If user specified --subset on command line, break specified partition subset
         // definition into name and character set string and add to _partition
         if (vm.count("subset") > 0) {
@@ -130,9 +130,9 @@ namespace proj {
         // Report information about data partition subsets
         unsigned nsubsets = _data->getNumSubsets();
         std::cout << "\nNumber of taxa: " << _data->getNumTaxa() << std::endl;
-        
+
         std::cout << "Number of partition subsets: " << nsubsets << std::endl;
-        
+
         for (unsigned subset = 0; subset < nsubsets; subset++) {
             DataType dt = _partition->getDataTypeForSubset(subset);
             std::cout << "  Subset " << (subset+1) << " (" << _data->getSubsetName(subset) << ")" << std::endl;
@@ -160,13 +160,13 @@ namespace proj {
     inline double Proj::getRunningSum(vector<double> log_weight_vec) {
         double running_sum = 0.0;
         double log_particle_sum = 0.0;
-        
+
         double log_max_weight = *max_element(log_weight_vec.begin(), log_weight_vec.end());
         for (auto & i:log_weight_vec) {
             running_sum += exp(i - log_max_weight);
         }
         log_particle_sum = log(running_sum) + log_max_weight;
-        
+
         return log_particle_sum;
     }
 
@@ -181,7 +181,7 @@ namespace proj {
         }
         cout << endl;
     }
-    
+
     inline void Proj::normalizeWeights(vector<Particle> & particles) {
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
@@ -195,7 +195,7 @@ namespace proj {
             p.setLogWeight(p.getLogWeight() - log_particle_sum);
         }
     }
-    
+
     inline unsigned Proj::chooseRandomParticle(vector<Particle> & particles) {
         int chosen_index = -1;
         unsigned nparticles = (unsigned)particles.size();
@@ -211,7 +211,7 @@ namespace proj {
         assert(chosen_index > -1);
         return chosen_index;
     }
-    
+
     inline void Proj::resampleParticles(vector<Particle> & particles) {
         // throw darts
         unsigned nparticles = (unsigned)particles.size();
@@ -232,7 +232,7 @@ namespace proj {
 //            cout << format("%12d %12.5f %12d\n") % i % w % darts[i];
         }
 //        cout << format("%12s %12.5f %12d\n") % " " % cumw % cumd;
-        
+
         // create new particle vector
         vector<Particle> new_particles;
         for (unsigned i = 0; i < nparticles; i++) {
@@ -241,65 +241,60 @@ namespace proj {
             }
         }
         assert(nparticles == new_particles.size());
-        
+
         // copy particles
         copy(new_particles.begin(), new_particles.end(), particles.begin());
     }
-    
+
     inline void Proj::resetWeights(vector<Particle> & particles) {
         double logw = -log(particles.size());
         for (auto & p : particles) {
             p.setLogWeight(logw);
         }
     }
-    
+
     inline void Proj::run() {
         std::cout << "Starting..." << std::endl;
         std::cout << "Current working directory: " << boost::filesystem::current_path() << std::endl;
-        
+
         try {
             std::cout << "\n*** Reading and storing the data in the file " << _data_file_name << std::endl;
             std::cout << "data file name is " << _data_file_name << std::endl;
             _data = Data::SharedPtr(new Data());
             _data->setPartition(_partition);
             _data->getDataFromFile(_data_file_name);
-            
+
             summarizeData(_data);
-            
+
             //set number of species to number in data file
             unsigned nspecies = setNumberSpecies(_data);
             rng.setSeed(5);
-            
+
 //          create vector of particles
-            unsigned nparticles = 500;
+            unsigned nparticles = 1000;
             vector<Particle> my_vec(nparticles);
             for (auto & p:my_vec ) {
                 p.setData(_data);
-                p.setInitialWeight();
             }
 
 //            printFirstParticle(my_vec);
 
-            normalizeWeights(my_vec);
-            resampleParticles(my_vec);
-            resetWeights(my_vec);
-
             //run through each generation of particles
             for (unsigned g=0; g<nspecies-2; g++){
                 //cout << "Generation " << g << endl;
-                
+
                 vector<double> log_weight_vec;
                 double log_weight = 0.0;
-                
+
 //                cout << "\n Particles after generation " << g << endl;
-                
+
                 //taxon joining and reweighting step
                 for (auto & p:my_vec) {
                     log_weight = p.proposal();
                     log_weight_vec.push_back(log_weight);
                     //p.showParticle();
                 }
-                
+
                 normalizeWeights(my_vec);
                 resampleParticles(my_vec);
                 resetWeights(my_vec);
@@ -311,11 +306,11 @@ namespace proj {
             }
             sum_h/=my_vec.size();
             cout << "mean height equals " << sum_h << endl;
-            
+
             saveAllForests(my_vec);
             }
-        
-        
+
+
         catch (XProj & x) {
             std::cerr << "Proj encountered a problem:\n  " << x.what() << std::endl;
         }

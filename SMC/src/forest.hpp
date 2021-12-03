@@ -1,6 +1,6 @@
-#pragma once    
+#pragma once
 
-#include <stack>    
+#include <stack>
 #include <memory>
 #include <iostream>
 #include <boost/format.hpp>
@@ -31,7 +31,7 @@ class Forest {
         friend class TreeUpdater;
         friend class PolytomyUpdater;
         friend class Particle;
-        
+
 
     public:
 
@@ -47,8 +47,8 @@ class Forest {
         double                      calcLogLikelihood();
         void                        createDefaultTree();
         void operator=(const Forest & other);
-        
-    
+
+
     private:
 
         void                        clear();
@@ -84,14 +84,14 @@ class Forest {
         double                      _speciation_rate;
         pair <double, double>       _new_basal_height;
         pair <double, double>       _old_basal_height;
-        
+
         Data::SharedPtr             _data;
         static unsigned             _nspecies;
-        
+
     public:
         typedef std::shared_ptr<Forest> SharedPtr;
 };
-    
+
 
 inline Forest::Forest() {
     //std::cout << "Constructing a forest" << std::endl;
@@ -121,7 +121,7 @@ inline void Forest::clear() {
     _root->_parent=0;
     _root->_number=_nspecies;
     _root->_edge_length=double(0.0);
-    
+
     //creating subroot node
     Node* subroot=&_nodes[_nspecies+1];
     subroot->_name="subroot";
@@ -131,7 +131,10 @@ inline void Forest::clear() {
     subroot->_number=_nspecies+1;
     subroot->_edge_length=double(0.0);
     _root->_left_child=subroot;
-    
+
+    //initialize basal heights to 0 for first particle
+    _old_basal_height = make_pair(0.0, 0.0);
+    _new_basal_height = make_pair(0.0, 0.0);
     //create species
     for (unsigned i = 0; i < _nspecies; i++) {
         Node* nd=&_nodes[i];
@@ -151,19 +154,16 @@ inline void Forest::clear() {
     _nleaves=_nspecies;
     _ninternals=2;
     refreshPreorder();
-    
-    //initialize basal edge lengths
-    _old_basal_height = _new_basal_height;
-    _new_basal_height = proposeBasalHeight();
+
 //    _old_basal_height = _new_basal_height;
-    
+//    _new_basal_height = proposeBasalHeight();
+
     //initialize species nodes with basal height
-    for (auto nd:_preorder) {
-        if (nd->_parent==_root->_left_child) {
-        nd->_edge_length=_new_basal_height.first;
-//          nd->_edge_length=_old_basal_height.first;
-        }
-    }
+//    for (auto nd:_preorder) {
+//        if (nd->_parent==_root->_left_child) {
+//        nd->_edge_length=_new_basal_height.first;
+//        }
+//    }
     }
 
 inline Forest::Forest(const Forest & other) {
@@ -360,7 +360,7 @@ inline pair<double, double> Forest::proposeBasalHeight() {
         new_basal_height += t;
         log_prob_basal_height += log(k*_speciation_rate)-(k*_speciation_rate*t);
     }
-    
+
     return make_pair(new_basal_height, log_prob_basal_height);
 }
 
@@ -373,7 +373,7 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each node whose parent is subroot
         }
     }
-    
+
     assert(_nsubtrees>1);
     _nsubtrees--;
     Node * subtree1=getSubtreeAt(t1);
@@ -388,7 +388,7 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
     new_nd->_right_sib=0;
     new_nd->_parent=_root->_left_child;
     new_nd->_number=_nleaves+_ninternals;
-    
+
     new_nd->_edge_length=0.0;
 
 //    cout << "New node branch length is: " << new_nd->_edge_length << endl;
@@ -401,26 +401,24 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
     insertSubtreeOnLeft(new_nd, _root->_left_child);
 
     refreshPreorder();
-    
-    //cout << makeNewick(9, true) << endl;
-    
+
+    cout << makeNewick(9, true) << endl;
+
     //once new taxa have been joined, add new basal height to finish off tree
     _old_basal_height = _new_basal_height;
     _new_basal_height = proposeBasalHeight();
-    
+
     for (auto nd:_preorder) {
         if (nd->_parent==_root->_left_child){
             nd->_edge_length += _new_basal_height.first;
             }
     }
-    
-//    _old_basal_height = _new_basal_height;
 }
 
 inline void Forest::detachSubtree(Node * s) {
     assert(s);
     assert(s->_parent);
-    
+
     // Save pointers to relevant nodes
     Node * s_leftsib  = findLeftSib(s);
     Node * s_rightsib = s->_right_sib;
@@ -484,7 +482,7 @@ inline double Forest::calcTransitionProbability(unsigned from, unsigned to, doub
     if (from == to) {
         transition_prob = 0.25 + 0.75*exp(-4.0*edge_length/3.0);
     }
-    
+
     else {
         transition_prob = 0.25 - 0.25*exp(-4.0*edge_length/3.0);
     }
@@ -496,7 +494,7 @@ inline double Forest::calcLogLikelihood() {
     auto data_matrix=_data->getDataMatrix();
     for (auto nd : boost::adaptors::reverse(_preorder)) {
         if (nd ==_root) {
-            
+
             //if root is reached
             break;
         }
@@ -550,13 +548,13 @@ inline double Forest::calcLogLikelihood() {
         }
         composite_log_likelihood += log_like;
     }
-    
+
     return composite_log_likelihood;
 }
 
 inline void Forest::createDefaultTree() {
     clear();
-    
+
     //creating root node
     _root = &_nodes[_nspecies];
     _root->_name="root";
@@ -565,7 +563,7 @@ inline void Forest::createDefaultTree() {
     _root->_parent=0;
     _root->_number=_nspecies;
     _root->_edge_length=double(0.0);
-    
+
     //creating subroot node
     Node* subroot=&_nodes[_nspecies+1];
     subroot->_name="subroot";
@@ -575,7 +573,7 @@ inline void Forest::createDefaultTree() {
     subroot->_number=_nspecies + 1;
     subroot->_edge_length=double(0.0);
     _root->_left_child=subroot;
-    
+
     //create species
     double edge_length = rng.gamma(1.0, 1.0/_nspecies);
     for (unsigned i = 0; i < _nspecies; i++) {
@@ -605,7 +603,7 @@ inline void Forest::operator=(const Forest & other) {
     _preorder.resize(other._preorder.size());
     _partials.resize(other._partials.size());
     copy(other._partials.begin(), other._partials.end(), _partials.begin());
-    
+
     _speciation_rate  = other._speciation_rate;
     _nsubtrees        = other._nsubtrees;
     _nleaves          = other._nleaves;
@@ -631,7 +629,7 @@ inline void Forest::operator=(const Forest & other) {
 
         // update preorder vector
         _preorder[i] = &_nodes[k];
-        
+
         // copy parent
         assert(othernd->_parent);
         unsigned parent_number = othernd->_parent->_number;
@@ -644,7 +642,7 @@ inline void Forest::operator=(const Forest & other) {
         }
         else
             _nodes[k]._left_child = 0;
-        
+
         // copy right sibling
         if (othernd->_right_sib) {
             unsigned right_sib_number = othernd->_right_sib->_number;
@@ -652,11 +650,11 @@ inline void Forest::operator=(const Forest & other) {
         }
         else
             _nodes[k]._right_sib = 0;
-            
+
         _nodes[k]._number      = othernd->_number;
         _nodes[k]._name        = othernd->_name;
         _nodes[k]._edge_length = othernd->_edge_length;
-        
+
         i++;
     }
 }
