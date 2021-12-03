@@ -4,6 +4,7 @@
 #include "boost/format.hpp"
 #include "boost/math/special_functions/gamma.hpp"
 using namespace std;
+using namespace boost;  //POL
 
 #include "lot.hpp"
 
@@ -16,6 +17,7 @@ class Particle {
         Particle();
         Particle(const Particle & other);
 
+        void                                    debugParticle(std::string name);    //POL
         void                                    showParticle();
         double                                  proposal();
         void                                    setData(Data::SharedPtr d) {
@@ -60,15 +62,36 @@ inline Particle::Particle() {
 inline void Particle::setInitialWeight() {
     //initalize starting weight
     _log_likelihood = calcLogLikelihood();
-    _log_weight = _forest._new_basal_height.second+_log_likelihood;
+    _log_weight = _forest._new_basal_height.second + _log_likelihood;
+    //POL cout << format("\nInitial weight: %.5f + %.5f\n") % _forest._new_basal_height.second % _log_likelihood;
 }
 
 inline void Particle::showParticle() {
+    //POL: rearranged slightly and put a blank line between particle summaries
     //print out weight of each particle
-    cout << "Particle weight: " << _log_weight << "\n" ;
-    cout << "Forest: " << "\n";
+    cout << "\nParticle:\n";
+    cout << "  _log_weight: " << _log_weight << "\n" ;
+    cout << "  _forest: " << "\n";
     _forest.showForest();
-    cout << "log likelihood is: " << _log_likelihood << endl;
+    cout << "  _log_likelihood: " << _log_likelihood << endl;
+}
+
+//POL: more detailed version of showParticle
+inline void Particle::debugParticle(std::string name) {
+    //print out weight of each particle
+    cout << "\nParticle " << name << ":\n";
+    cout << "  _log_weight:               " << _log_weight                 << "\n" ;
+    cout << "  _log_likelihood:           " << _log_likelihood             << "\n";
+    cout << "  _forest._nleaves:          " << _forest._nleaves            << "\n";
+    cout << "  _forest._ninternals:       " << _forest._ninternals         << "\n";
+    cout << "  _forest._npatterns:        " << _forest._npatterns          << "\n";
+    cout << "  _forest._nstates:          " << _forest._nstates            << "\n";
+    cout << "  _forest._nsubtrees:        " << _forest._nsubtrees          << "\n";
+    cout << "  _forest._speciation_rate:  " << _forest._speciation_rate    << "\n";
+    cout << "  _forest._last_edge_length: " << _forest._last_edge_length   << "\n";
+    cout << "  _forest._new_basal_height: " << _forest._new_basal_height.first << ", " << _forest._new_basal_height.second << "\n";
+    cout << "  _forest._old_basal_height: " << _forest._old_basal_height.first << ", " << _forest._old_basal_height.second << "\n";
+    cout << "  newick description:        " << _forest.makeNewick(5,false) << "\n";
 }
 
 inline double Particle::calcLogLikelihood() {
@@ -85,6 +108,10 @@ inline double Particle::proposal() {
     _forest.createNewSubtree(taxon_pair.first, taxon_pair.second);
     double prev_log_likelihood = _log_likelihood;
     _log_likelihood = calcLogLikelihood();
+
+    //POL cout << format("\nold weight: %.5f + %.5f\n") % _forest._old_basal_height.second % prev_log_likelihood;
+    //POL cout << format("new weight: %.5f + %.5f\n") % _forest._new_basal_height.second % _log_likelihood;
+
     _log_weight = _forest._new_basal_height.second + _log_likelihood - _forest._old_basal_height.second - prev_log_likelihood;
     _n++;
 //    firstPair(taxon_pair);

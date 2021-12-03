@@ -51,25 +51,13 @@ class Forest {
     
     private:
 
+        //POL placed all private methods together below here
         void                        clear();
         void                        setData(Data::SharedPtr d);
-
-        Node *                      _root;
-        unsigned                    _nleaves;
-        unsigned                    _ninternals;
-        std::vector<Node *>         _preorder;
-        std::vector<Node *>         _levelorder;
-        std::vector<Node>           _nodes;
-        std::vector< std::vector <double> > _partials;
-        std::vector<Node *>         _unused_nodes;
-        static unsigned             _nspecies;
-        unsigned                    _npatterns;
-        unsigned                    _nstates;
-        unsigned                    _nsubtrees;
         void                        refreshPreorder();
         Node *                      findNextPreorder(Node * nd);
         std::string                 makeNewick(unsigned precision, bool use_names) const;
-        pair<unsigned, unsigned>                        chooseTaxaToJoin();
+        pair<unsigned, unsigned>    chooseTaxaToJoin();
         void                        detachSubtree(Node * s);
         void                        insertSubtreeOnLeft(Node * s, Node * u);
         Node *                      findLeftSib(Node * nd);
@@ -77,16 +65,31 @@ class Forest {
         unsigned                    getNumSubtrees();
         void                        setEdgeLength(Node * nd);
         void                        createNewSubtree(unsigned t1, unsigned t2);
-        Data::SharedPtr             _data;
         double                      calcTransitionProbability(unsigned from, unsigned to, double edge_length);
+        pair<double, double>        proposeBasalHeight();
+        unsigned                    countNumberTrees() const;
+
+        //POL placed all private data members together below here
+        Node *                      _root;
+        std::vector<Node *>         _preorder;
+        std::vector<Node *>         _levelorder;
+        std::vector<Node>           _nodes;
+        std::vector< std::vector <double> > _partials;
+        std::vector<Node *>         _unused_nodes;
+
+        unsigned                    _nleaves;
+        unsigned                    _ninternals;
+        unsigned                    _npatterns;
+        unsigned                    _nstates;
+        unsigned                    _nsubtrees;
         double                      _last_edge_length;
         double                      _speciation_rate;
-    pair <double, double> _new_basal_height;
-    pair <double, double> _old_basal_height;
-    pair<double, double>                      proposeBasalHeight();
-    unsigned countNumberTrees() const;
+        pair <double, double>       _new_basal_height;
+        pair <double, double>       _old_basal_height;
         
-    
+        Data::SharedPtr             _data;
+        static unsigned             _nspecies;
+        
     public:
         typedef std::shared_ptr<Forest> SharedPtr;
 };
@@ -261,7 +264,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
 }
 
 inline void Forest::showForest() {
-    cout << " " << makeNewick(3, true) << "\n";
+    cout << " " << makeNewick(9, true) << "\n"; //POL: changed precision from 3 to 9
 }
 
 inline std::string Forest::makeNewick(unsigned precision, bool use_names) const {
@@ -401,7 +404,7 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
 
     refreshPreorder();
     
-    cout << makeNewick(3, true) << endl;
+    //POL cout << makeNewick(3, true) << endl;
     
     //once new taxa have been joined, add new basal height to finish off tree
     _old_basal_height = _new_basal_height;
@@ -605,6 +608,11 @@ inline void Forest::operator=(const Forest & other) {
     _partials.resize(other._partials.size());
     copy(other._partials.begin(), other._partials.end(), _partials.begin());
     
+    _speciation_rate  = other._speciation_rate;     //POL added
+    _nsubtrees        = other._nsubtrees;           //POL added
+    _nleaves          = other._nleaves;             //POL added
+    _ninternals       = other._ninternals;          //POL added
+    _last_edge_length = other._last_edge_length;    //POL added
     _old_basal_height = other._old_basal_height;
     _new_basal_height = other._new_basal_height;
     // copy tree itself
