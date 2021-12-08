@@ -47,9 +47,10 @@ class Particle {
 };
 
 inline Particle::Particle() {
-    _log_weight = 0.0; //initialize starting weights to 0
+    //log weight and log likelihood are 0 for first generation
+    _log_weight = 0.0;
     _n = 0;
-    _log_likelihood = 0.0; //initialize log likelihood so generation 0 is able to calculate log weights
+    _log_likelihood = 0.0;
 };
 
 inline void Particle::showParticle() {

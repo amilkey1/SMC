@@ -12,7 +12,6 @@
 		22A40D732710AE5900DFFCA0 /* libncl.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A40D712710AE4700DFFCA0 /* libncl.a */; };
 		22A40D762710AE5900DFFCA0 /* libboost_filesystem.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A40D742710AE5900DFFCA0 /* libboost_filesystem.a */; };
 		22A40D772710AE5900DFFCA0 /* libboost_system.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A40D752710AE5900DFFCA0 /* libboost_system.a */; };
-		22A40D8827160CD900DFFCA0 /* libhmsbeagle.1.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A40D7A2710B14D00DFFCA0 /* libhmsbeagle.1.dylib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -60,7 +59,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				22A40D8827160CD900DFFCA0 /* libhmsbeagle.1.dylib in Frameworks */,
 				22A40D762710AE5900DFFCA0 /* libboost_filesystem.a in Frameworks */,
 				22A40D772710AE5900DFFCA0 /* libboost_system.a in Frameworks */,
 				22A40D732710AE5900DFFCA0 /* libncl.a in Frameworks */,

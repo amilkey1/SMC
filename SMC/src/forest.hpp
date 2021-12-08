@@ -50,7 +50,7 @@ class Forest {
 
 
     private:
-
+    typedef std::vector <double> partial_array_t;
         void                        clear();
         void                        setData(Data::SharedPtr d);
         void                        refreshPreorder();
@@ -67,13 +67,15 @@ class Forest {
         double                      calcTransitionProbability(unsigned from, unsigned to, double edge_length);
         pair<double, double>        proposeBasalHeight();
         unsigned                    countNumberTrees() const;
+        
 
         Node *                      _root;
         std::vector<Node *>         _preorder;
         std::vector<Node *>         _levelorder;
         std::vector<Node>           _nodes;
-        std::vector< std::vector <double> > _partials;
+        std::vector< boost::shared_ptr <partial_array_t> > _partials;
         std::vector<Node *>         _unused_nodes;
+//    std::vector< std::vector <double> > *Partials = &_partials;
 
         unsigned                    _nleaves;
         unsigned                    _ninternals;
@@ -176,8 +178,9 @@ inline void Forest::setData(Data::SharedPtr d) {
     _npatterns = d->getNumPatterns();
     const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
     unsigned i = 0;
-    for (unsigned j=0; j<_nodes.size(); j++) {
-        _partials[j].resize(_npatterns * _nstates);
+    for (unsigned j=0; j<_nspecies; j++) {
+        assert(_partials[j]==nullptr);
+//        _partials[j]=boost::shared_ptr<partial_array_t> (new partial_array_t(_npatterns * _nstates));
     }
     for (auto nd:_preorder) {
 //        _partials[nd->_number].resize(_npatterns * _nstates);
@@ -390,6 +393,8 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
     new_nd->_number=_nleaves+_ninternals;
 
     new_nd->_edge_length=0.0;
+    assert (_partials[new_nd->_number] == nullptr);
+//    _partials[new_nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
 
 //    cout << "New node branch length is: " << new_nd->_edge_length << endl;
 
@@ -402,7 +407,7 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
 
     refreshPreorder();
 
-    cout << makeNewick(9, true) << endl;
+//    cout << makeNewick(9, true) << endl;
 
     //once new taxa have been joined, add new basal height to finish off tree
     _old_basal_height = _new_basal_height;
@@ -490,7 +495,6 @@ inline double Forest::calcTransitionProbability(unsigned from, unsigned to, doub
 }
 
 inline double Forest::calcLogLikelihood() {
-//    return 0.0;
     auto data_matrix=_data->getDataMatrix();
     for (auto nd : boost::adaptors::reverse(_preorder)) {
         if (nd ==_root) {
@@ -500,36 +504,106 @@ inline double Forest::calcLogLikelihood() {
         }
         if (nd->_left_child){
             //internal node
-            assert(nd->_left_child->_right_sib);
-            for (unsigned p=0; p<_npatterns; p++) {
-                for (unsigned s=0; s<_nstates; s++) {
-                    double partial=1.0;
-                    for (Node * child=nd->_left_child; child; child=child->_right_sib){
-                        double child_sum=0.0;
-                        for (unsigned s_child=0; s_child<_nstates; s_child++) {
-                            double child_transition_prob = calcTransitionProbability(s, s_child, child->_edge_length);
-                            double child_partial = _partials[child->_number][p*_nstates + s_child];
-                            child_sum += child_transition_prob * child_partial;
+            if (_partials[nd->_number] == nullptr) {
+                _partials[nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
+            
+#if 0
+                assert(nd->_left_child->_right_sib);
+                auto &node_partial_array = (*_partials[nd->_number]);
+                for (Node * child=nd->_left_child; child; child=child->_right_sib){
+                    double expterm = exp(-4.0*(child->_edge_length)/3.0);
+                    double prsame = 0.25+0.75*expterm;
+                    double prdif = 0.25 - 0.25*expterm;
+                    auto &child_partial_array = (*_partials[child->_number]);
+                    for (unsigned s=0; s<_nstates; s++) {
+                        for (unsigned p=0; p<_npatterns; p++) {
+                            double partial=1.0;
+                        
+                            double child_sum=0.0;
+                           
+                            for (unsigned s_child=0; s_child<_nstates; s_child++) {
+//                                double child_transition_prob = calcTransitionProbability(s, s_child, child->_edge_length);
+                                double child_transition_prob = (s == s_child ? prsame:prdif);
+                                assert(_partials[child->_number] != nullptr);
+                                double child_partial = child_partial_array[p*_nstates + s_child];
+                                child_sum += child_transition_prob * child_partial;
+                            }
+                            partial *= child_sum;
                         }
-                        partial *= child_sum;
+            //                    assert(_partials[nd->_number][0]);
+                        node_partial_array[p*_nstates+s]= partial;
                     }
-//                    assert(_partials[nd->_number][0]);
-                    _partials[nd->_number][p*_nstates+s]= partial;
                 }
+#else
+                assert(nd->_left_child->_right_sib);
+                auto &node_partial_array = (*_partials[nd->_number]);
+                for (unsigned p=0; p<_npatterns; p++) {
+                    for (unsigned s=0; s<_nstates; s++) {
+                        double partial=1.0;
+                        for (Node * child=nd->_left_child; child; child=child->_right_sib){
+                            double child_sum=0.0;
+                            double expterm = exp(-4.0*(child->_edge_length)/3.0);
+                            double prsame = 0.25+0.75*expterm;
+                            double prdif = 0.25 - 0.25*expterm;
+                            auto &child_partial_array = (*_partials[child->_number]);
+                            for (unsigned s_child=0; s_child<_nstates; s_child++) {
+//                                double child_transition_prob = calcTransitionProbability(s, s_child, child->_edge_length);
+                                double child_transition_prob = (s == s_child ? prsame:prdif);
+                                assert(_partials[child->_number] != nullptr);
+                                double child_partial = child_partial_array[p*_nstates + s_child];
+                                child_sum += child_transition_prob * child_partial;
+                            }
+                            partial *= child_sum;
+                        }
+            //                    assert(_partials[nd->_number][0]);
+                        node_partial_array[p*_nstates+s]= partial;
+                    }
+                }
+#endif
             }
         }
         else {
             //leaf node
-            for (unsigned p=0; p<_npatterns; p++) {
-                for (unsigned s=0; s<_nstates; s++) {
-                    Data::state_t state = (Data::state_t)1 << s;
-                    Data::state_t d = data_matrix[nd->_number][p];
-                    double result = state & d;
-                    _partials[nd->_number][p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+            if (_partials[nd->_number] == nullptr) {
+                _partials[nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
+                for (unsigned p=0; p<_npatterns; p++) {
+                    for (unsigned s=0; s<_nstates; s++) {
+                        Data::state_t state = (Data::state_t)1 << s;
+                        Data::state_t d = data_matrix[nd->_number][p];
+                        double result = state & d;
+                        (*_partials[nd->_number])[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                    }
                 }
             }
         }
     }
+    // need to always recalculate partials for subroot
+    // if subroot partial array doesn't exist, create it
+    Node* subroot = _root->_left_child;
+    if (_partials[subroot->_number] == nullptr) {
+        _partials[subroot->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
+    }
+    
+    // recalculate subroot partials
+    assert(subroot->_left_child->_right_sib);
+    for (unsigned p=0; p<_npatterns; p++) {
+        for (unsigned s=0; s<_nstates; s++) {
+            double partial=1.0;
+            for (Node * child=subroot->_left_child; child; child=child->_right_sib){
+                double child_sum=0.0;
+                for (unsigned s_child=0; s_child<_nstates; s_child++) {
+                    double child_transition_prob = calcTransitionProbability(s, s_child, child->_edge_length);
+                    assert(_partials[child->_number] != nullptr);
+                    double child_partial = (*_partials[child->_number])[p*_nstates + s_child];
+                    child_sum += child_transition_prob * child_partial;
+                }
+                partial *= child_sum;
+            }
+//                    assert(_partials[nd->_number][0]);
+            (*_partials[subroot->_number])[p*_nstates+s]= partial;
+        }
+    }
+
 //    compute log likelihood of every subtree whose parent is subroot
     auto counts = _data->getPatternCounts();
 //    Node* subroot = _root->_left_child;
@@ -541,13 +615,15 @@ inline double Forest::calcLogLikelihood() {
             for (unsigned s=0; s<_nstates; s++) {
                 for (unsigned ss=0; ss<_nstates; ss++) {
                     double child_transition_prob = calcTransitionProbability(s, ss, nd->_edge_length);
-                    site_like += 0.25*child_transition_prob*_partials[nd->_number][p*_nstates+ss];
+                    site_like += 0.25*child_transition_prob*(*_partials[nd->_number])[p*_nstates+ss];
                 }
             }
             log_like += log(site_like)*counts[p];
         }
         composite_log_likelihood += log_like;
     }
+    
+//    cout << "log likelihood is " << composite_log_likelihood << endl;
 
     return composite_log_likelihood;
 }
@@ -602,7 +678,11 @@ inline void Forest::operator=(const Forest & other) {
     _nodes.resize(other._nodes.size());
     _preorder.resize(other._preorder.size());
     _partials.resize(other._partials.size());
+//    Partials = other.Partials;
+//    Partials->resize(other.Partials->size());
+//    copy(other.Partials->begin(), other.Partials->end(), Partials->begin());
     copy(other._partials.begin(), other._partials.end(), _partials.begin());
+
 
     _speciation_rate  = other._speciation_rate;
     _nsubtrees        = other._nsubtrees;

@@ -271,7 +271,7 @@ namespace proj {
             rng.setSeed(5);
 
 //          create vector of particles
-            unsigned nparticles = 1000;
+            unsigned nparticles = 50000;
             vector<Particle> my_vec(nparticles);
             for (auto & p:my_vec ) {
                 p.setData(_data);
