@@ -26,7 +26,7 @@ namespace proj {
 
             void                normalizeWeights(vector<Particle> & particles);
             unsigned            chooseRandomParticle(vector<Particle> & particles);
-            void                resampleParticles(vector<Particle> & particles);
+            void                resampleParticles(vector<Particle> & from_particles, vector<Particle> & to_particles);
             void                resetWeights(vector<Particle> & particles);
             void                debugNormalizedWeights(const vector<Particle> & particles) const;
 
@@ -47,7 +47,7 @@ namespace proj {
             void                    summarizeData(Data::SharedPtr);
             void                    printFirstParticle(vector<Particle>);
             unsigned                setNumberSpecies(Data::SharedPtr);
-            double                  getRunningSum(vector<double>);
+            double                  getRunningSum(const vector<double> &) const;
 
     };
 
@@ -157,7 +157,7 @@ namespace proj {
         return nspecies;
     }
 
-    inline double Proj::getRunningSum(vector<double> log_weight_vec) {
+    inline double Proj::getRunningSum(const vector<double> & log_weight_vec) const {
         double running_sum = 0.0;
         double log_particle_sum = 0.0;
 
@@ -212,12 +212,12 @@ namespace proj {
         return chosen_index;
     }
 
-    inline void Proj::resampleParticles(vector<Particle> & particles) {
+    inline void Proj::resampleParticles(vector<Particle> & from_particles, vector<Particle> & to_particles) {
         // throw darts
-        unsigned nparticles = (unsigned)particles.size();
+        unsigned nparticles = (unsigned)from_particles.size();
         vector<double> darts(nparticles, 0.0);
         for(unsigned i = 0; i < nparticles; i++) {
-            unsigned j = chooseRandomParticle(particles);
+            unsigned j = chooseRandomParticle(from_particles);
             darts[j]++;
         }
 
@@ -226,7 +226,7 @@ namespace proj {
         unsigned cumd = 0;
 //        cout << format("\n%12s %12s %12s\n") % "particle" % "weight" % "darts";
         for (unsigned i = 0; i < nparticles; i++) {
-            double w = exp(particles[i].getLogWeight());
+            double w = exp(from_particles[i].getLogWeight());
             cumw += w;
             cumd += darts[i];
 //            cout << format("%12d %12.5f %12d\n") % i % w % darts[i];
@@ -234,16 +234,16 @@ namespace proj {
 //        cout << format("%12s %12.5f %12d\n") % " " % cumw % cumd;
 
         // create new particle vector
-        vector<Particle> new_particles;
+        unsigned m = 0;
         for (unsigned i = 0; i < nparticles; i++) {
             for (unsigned k = 0; k < darts[i]; k++) {
-                new_particles.push_back(particles[i]);
+                to_particles[m++]=from_particles[i];
             }
         }
-        assert(nparticles == new_particles.size());
+        assert(nparticles == to_particles.size());
 
         // copy particles
-        copy(new_particles.begin(), new_particles.end(), particles.begin());
+//        copy(to_particles.begin(), to_particles.end(), from_particles.begin());
     }
 
     inline void Proj::resetWeights(vector<Particle> & particles) {
@@ -272,7 +272,10 @@ namespace proj {
 
 //          create vector of particles
             unsigned nparticles = 50000;
-            vector<Particle> my_vec(nparticles);
+            vector<Particle> my_vec_1(nparticles);
+            vector<Particle> my_vec_2(nparticles);
+            vector<Particle> &my_vec = my_vec_1;
+            bool use_first = true;
             for (auto & p:my_vec ) {
                 p.setData(_data);
             }
@@ -296,7 +299,15 @@ namespace proj {
                 }
 
                 normalizeWeights(my_vec);
-                resampleParticles(my_vec);
+                resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
+                
+                //if use_first is true, my_vec = my_vec_2
+                //if use_first if alse, my_vec = my_vec_1
+                my_vec = use_first ? my_vec_2:my_vec_1;
+                
+                //change use_first from true to false or false to true
+                use_first = !use_first;
+                
                 resetWeights(my_vec);
             } // g loop
             double sum_h = 0.0;
