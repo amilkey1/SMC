@@ -167,8 +167,19 @@ inline void Forest::setData(Data::SharedPtr d) {
     _npatterns = d->getNumPatterns();
     const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
     unsigned i = 0;
+    auto data_matrix=_data->getDataMatrix();
     for (unsigned j=0; j<_nspecies; j++) {
         assert(_partials[j]==nullptr);
+            //leaf node
+                _partials[j] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
+                for (unsigned p=0; p<_npatterns; p++) {
+                    for (unsigned s=0; s<_nstates; s++) {
+                        Data::state_t state = (Data::state_t)1 << s;
+                        Data::state_t d = data_matrix[j][p];
+                        double result = state & d;
+                        (*_partials[j])[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                    }
+                }
 //        _partials[j]=boost::shared_ptr<partial_array_t> (new partial_array_t(_npatterns * _nstates));
     }
     for (auto nd:_preorder) {
@@ -383,7 +394,6 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
 
     new_nd->_edge_length=0.0;
     assert (_partials[new_nd->_number] == nullptr);
-//    _partials[new_nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
 
 //    cout << "New node branch length is: " << new_nd->_edge_length << endl;
 
@@ -395,6 +405,35 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
     insertSubtreeOnLeft(new_nd, _root->_left_child);
 
     refreshPreorder();
+    
+    _partials[new_nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
+
+    assert(new_nd->_left_child->_right_sib);
+    auto & parent_partial_array = *(_partials[new_nd->_number]);
+    for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
+    
+        double expterm = exp(-4.0*(child->_edge_length)/3.0);
+        double prsame = 0.25+0.75*expterm;
+        double prdif = 0.25 - 0.25*expterm;
+        
+        auto & child_partial_array = *(_partials[child->_number]);
+        for (unsigned p = 0; p < _npatterns; p++) {
+            for (unsigned s = 0; s <_nstates; s++) {
+                double sum_over_child_states = 0.0;
+                for (unsigned s_child = 0; s_child < _nstates; s_child++) {
+                    double child_transition_prob = (s == s_child ? prsame : prdif);
+                    assert(_partials[child->_number] != nullptr);
+                    double child_partial = child_partial_array[p*_nstates + s_child];
+                    sum_over_child_states += child_transition_prob * child_partial;
+                }   // child state loop
+                if (child == new_nd->_left_child)
+                    parent_partial_array[p*_nstates+s] = sum_over_child_states;
+                else
+                    parent_partial_array[p*_nstates+s] *= sum_over_child_states;
+            }   // parent state loop
+        }   // pattern loop
+    }   // child loop
+
 
 //    cout << makeNewick(9, true) << endl;
 
@@ -485,60 +524,60 @@ inline unsigned Forest::getNumSubtrees() {
 
 inline double Forest::calcLogLikelihood() {
     auto data_matrix=_data->getDataMatrix();
-    for (auto nd : boost::adaptors::reverse(_preorder)) {
-        if (nd ==_root) {
-
-            //if root is reached
-            break;
-        }
-        if (nd->_left_child){
-            //internal node
-            if (_partials[nd->_number] == nullptr) {
-                _partials[nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
-
-                assert(nd->_left_child->_right_sib);
-                auto & parent_partial_array = *(_partials[nd->_number]);
-                for (Node * child=nd->_left_child; child; child=child->_right_sib) {
-                
-                    double expterm = exp(-4.0*(child->_edge_length)/3.0);
-                    double prsame = 0.25+0.75*expterm;
-                    double prdif = 0.25 - 0.25*expterm;
-                    
-                    auto & child_partial_array = *(_partials[child->_number]);
-                    for (unsigned p = 0; p < _npatterns; p++) {
-                        for (unsigned s = 0; s <_nstates; s++) {
-                            double sum_over_child_states = 0.0;
-                            for (unsigned s_child = 0; s_child < _nstates; s_child++) {
-                                double child_transition_prob = (s == s_child ? prsame : prdif);
-                                assert(_partials[child->_number] != nullptr);
-                                double child_partial = child_partial_array[p*_nstates + s_child];
-                                sum_over_child_states += child_transition_prob * child_partial;
-                            }   // child state loop
-                            if (child == nd->_left_child)
-                                parent_partial_array[p*_nstates+s] = sum_over_child_states;
-                            else
-                                parent_partial_array[p*_nstates+s] *= sum_over_child_states;
-                        }   // parent state loop
-                    }   // pattern loop
-                }   // child loop
-
-            }
-        }
-        else {
-            //leaf node
-            if (_partials[nd->_number] == nullptr) {
-                _partials[nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
-                for (unsigned p=0; p<_npatterns; p++) {
-                    for (unsigned s=0; s<_nstates; s++) {
-                        Data::state_t state = (Data::state_t)1 << s;
-                        Data::state_t d = data_matrix[nd->_number][p];
-                        double result = state & d;
-                        (*_partials[nd->_number])[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
-                    }
-                }
-            }
-        }
-    }
+//    for (auto nd : boost::adaptors::reverse(_preorder)) {
+//        if (nd ==_root) {
+//
+//            //if root is reached
+//            break;
+//        }
+//        if (nd->_left_child){
+//            //internal node
+//            if (_partials[nd->_number] == nullptr) {
+//                _partials[nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
+//
+//                assert(nd->_left_child->_right_sib);
+//                auto & parent_partial_array = *(_partials[nd->_number]);
+//                for (Node * child=nd->_left_child; child; child=child->_right_sib) {
+//
+//                    double expterm = exp(-4.0*(child->_edge_length)/3.0);
+//                    double prsame = 0.25+0.75*expterm;
+//                    double prdif = 0.25 - 0.25*expterm;
+//
+//                    auto & child_partial_array = *(_partials[child->_number]);
+//                    for (unsigned p = 0; p < _npatterns; p++) {
+//                        for (unsigned s = 0; s <_nstates; s++) {
+//                            double sum_over_child_states = 0.0;
+//                            for (unsigned s_child = 0; s_child < _nstates; s_child++) {
+//                                double child_transition_prob = (s == s_child ? prsame : prdif);
+//                                assert(_partials[child->_number] != nullptr);
+//                                double child_partial = child_partial_array[p*_nstates + s_child];
+//                                sum_over_child_states += child_transition_prob * child_partial;
+//                            }   // child state loop
+//                            if (child == nd->_left_child)
+//                                parent_partial_array[p*_nstates+s] = sum_over_child_states;
+//                            else
+//                                parent_partial_array[p*_nstates+s] *= sum_over_child_states;
+//                        }   // parent state loop
+//                    }   // pattern loop
+//                }   // child loop
+//
+//            }
+//        }
+//        else {
+//            //leaf node
+//            if (_partials[nd->_number] == nullptr) {
+//                _partials[nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
+//                for (unsigned p=0; p<_npatterns; p++) {
+//                    for (unsigned s=0; s<_nstates; s++) {
+//                        Data::state_t state = (Data::state_t)1 << s;
+//                        Data::state_t d = data_matrix[nd->_number][p];
+//                        double result = state & d;
+//                        (*_partials[nd->_number])[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+//                    }
+//                }
+//            }
+//        }
+//    }
     // need to always recalculate partials for subroot
     // if subroot partial array doesn't exist, create it
     Node* subroot = _root->_left_child;
