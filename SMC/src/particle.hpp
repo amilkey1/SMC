@@ -73,7 +73,7 @@ inline void Particle::debugParticle(std::string name) {
     cout << "  _forest._npatterns:        " << _forest._npatterns          << "\n";
     cout << "  _forest._nstates:          " << _forest._nstates            << "\n";
     cout << "  _forest._nsubtrees:        " << _forest._nsubtrees          << "\n";
-    cout << "  _forest._speciation_rate:  " << _forest._speciation_rate    << "\n";
+//    cout << "  _forest._speciation_rate:  " << _forest._speciation_rate    << "\n";
     cout << "  _forest._last_edge_length: " << _forest._last_edge_length   << "\n";
     cout << "  _forest._new_basal_height: " << _forest._new_basal_height.first << ", " << _forest._new_basal_height.second << "\n";
     cout << "  _forest._old_basal_height: " << _forest._old_basal_height.first << ", " << _forest._old_basal_height.second << "\n";
