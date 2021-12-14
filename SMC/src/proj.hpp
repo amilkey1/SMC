@@ -39,6 +39,7 @@ namespace proj {
 
             bool                        _use_gpu;
             bool                        _ambig_missing;
+            unsigned                    _nparticles;
 
 
             static std::string     _program_name;
@@ -66,6 +67,7 @@ namespace proj {
         _partition.reset(new Partition());
         _use_gpu        = true;
         _ambig_missing  = true;
+        _nparticles = 1000;
         _data = nullptr;
         //_likelihood = nullptr;
     }   ///end_clear
@@ -92,6 +94,7 @@ namespace proj {
         ("subset",  boost::program_options::value(&partition_subsets), "a string defining a partition subset, e.g. 'first:1-1234\3' or 'default[codon:standard]:1-3702'")
         ("gpu",           boost::program_options::value(&_use_gpu)->default_value(true),                "use GPU if available")
         ("ambigmissing",  boost::program_options::value(&_ambig_missing)->default_value(true),          "treat all ambiguities as missing data")
+        ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000),          "set number of particles")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -271,7 +274,7 @@ namespace proj {
             rng.setSeed(5);
 
 //          create vector of particles
-            unsigned nparticles = 50000;
+            unsigned nparticles = _nparticles;
             vector<Particle> my_vec_1(nparticles);
             vector<Particle> my_vec_2(nparticles);
             vector<Particle> &my_vec = my_vec_1;

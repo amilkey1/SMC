@@ -88,8 +88,8 @@ class Forest {
 
         Data::SharedPtr             _data;
         static unsigned             _nspecies;
-        const unsigned             pop_size = 10000;
-        unsigned                    _num_lineages;
+        double                      _theta = 10000;
+//        unsigned                    _num_lineages;
 
     public:
         typedef std::shared_ptr<Forest> SharedPtr;
@@ -116,7 +116,7 @@ inline void Forest::clear() {
     _nstates = 4;
     _nsubtrees = _nspecies;
 //    _speciation_rate = 10.9; //temporary
-    _num_lineages = 10;
+//    _num_lineages = 10;
     
     //creating root node
     _root = &_nodes[_nspecies];
@@ -362,21 +362,21 @@ inline pair<double, double> Forest::proposeBasalHeight() {
     unsigned s = countNumberTrees();
     //num lineages = nspecies - ninternals + 2 (from root & subroot)
     
-    double expected_time_to_coalescence = (pop_size)/((_num_lineages*(_num_lineages-1))/2);
     for (unsigned k=2; k<=s; k++) {
         double u = rng.uniform();
         //transform uniform deviate to exponential
-        double t = -log(1-u)/(expected_time_to_coalescence*k);
+        double coalescence_rate = 2*k*(k-1)/_theta;
+        double t = -log(1-u)/(coalescence_rate);
         new_basal_height += t;
-        log_prob_basal_height += log(k*expected_time_to_coalescence)-(k*expected_time_to_coalescence*t);
+        log_prob_basal_height += log(coalescence_rate)-(coalescence_rate*t);
     }
 
     return make_pair(new_basal_height, log_prob_basal_height);
 }
 
 inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
-    double expected_time_to_coalescence = (pop_size)/((_num_lineages*(_num_lineages-1))/2);
-    _last_edge_length = rng.gamma(1.0, 1.0/(_nsubtrees*expected_time_to_coalescence));
+    double coalescence_rate = 2*_nsubtrees*(_nsubtrees-1)/_theta;
+    _last_edge_length = rng.gamma(1.0, coalescence_rate);
     for (auto nd:_preorder) {
         //if node's parent is subroot, subtract basal height and add new branch length
         if (nd->_parent==_root->_left_child){
@@ -413,7 +413,7 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
     insertSubtreeOnLeft(new_nd, _root->_left_child);
 
     refreshPreorder();
-    _num_lineages--;
+//    _num_lineages--;
     
     _partials[new_nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
 
