@@ -40,6 +40,7 @@ namespace proj {
             bool                        _use_gpu;
             bool                        _ambig_missing;
             unsigned                    _nparticles;
+            double                      _random_seed;
 
 
             static std::string     _program_name;
@@ -67,7 +68,7 @@ namespace proj {
         _partition.reset(new Partition());
         _use_gpu        = true;
         _ambig_missing  = true;
-        _nparticles = 1000;
+        _nparticles = 10000;
         _data = nullptr;
         //_likelihood = nullptr;
     }   ///end_clear
@@ -95,6 +96,7 @@ namespace proj {
         ("gpu",           boost::program_options::value(&_use_gpu)->default_value(true),                "use GPU if available")
         ("ambigmissing",  boost::program_options::value(&_ambig_missing)->default_value(true),          "treat all ambiguities as missing data")
         ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000),          "set number of particles")
+        ("randomseed", boost::program_options::value(&_random_seed)->required(), "set random seed")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -135,6 +137,10 @@ namespace proj {
         std::cout << "\nNumber of taxa: " << _data->getNumTaxa() << std::endl;
 
         std::cout << "Number of partition subsets: " << nsubsets << std::endl;
+        
+        std::cout << "Number of particles: " << _nparticles << std::endl;
+        
+        std::cout << "Random seed: " << _random_seed << std::endl;
 
         for (unsigned subset = 0; subset < nsubsets; subset++) {
             DataType dt = _partition->getDataTypeForSubset(subset);
@@ -271,7 +277,7 @@ namespace proj {
 
             //set number of species to number in data file
             unsigned nspecies = setNumberSpecies(_data);
-            rng.setSeed(5);
+            rng.setSeed(_random_seed);
 
 //          create vector of particles
             unsigned nparticles = _nparticles;

@@ -360,12 +360,12 @@ inline pair<double, double> Forest::proposeBasalHeight() {
     double new_basal_height = 0.0;
     double log_prob_basal_height = 0.0;
     unsigned s = countNumberTrees();
-    //num lineages = nspecies - ninternals + 2 (from root & subroot)
     
     for (unsigned k=2; k<=s; k++) {
         double u = rng.uniform();
         //transform uniform deviate to exponential
-        double coalescence_rate = 2*k*(k-1)/_theta;
+//        double coalescence_rate = 2*k*(k-1)/_theta;
+        double coalescence_rate = k*(k-1)/_theta;
         double t = -log(1-u)/(coalescence_rate);
         new_basal_height += t;
         log_prob_basal_height += log(coalescence_rate)-(coalescence_rate*t);
