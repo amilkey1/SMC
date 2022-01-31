@@ -36,6 +36,9 @@ class Particle {
             return _forest.makeNewick(8, true);
         }
         void                                    firstPair(pair<unsigned, unsigned>);
+    bool operator<(const Particle & other) const {
+        return _log_weight<other._log_weight;
+    }
 
 
     private:
@@ -58,8 +61,8 @@ inline void Particle::showParticle() {
     cout << "\nParticle:\n";
     cout << "  _log_weight: " << _log_weight << "\n" ;
     cout << "  _forest: " << "\n";
-    _forest.showForest();
-    cout << "  _log_likelihood: " << _log_likelihood << endl;
+//    _forest.showForest();
+//    cout << "  _log_likelihood: " << _log_likelihood << endl;
 }
 
 //more detailed version of showParticle
@@ -82,6 +85,7 @@ inline void Particle::debugParticle(std::string name) {
 
 inline double Particle::calcLogLikelihood() {
     double log_likelihood = _forest.calcLogLikelihood();
+    assert(!isnan (log_likelihood));
 //    cout << "log likelihood equals " << log_likelihood << endl;
 
     return log_likelihood;

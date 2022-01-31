@@ -40,16 +40,16 @@ namespace proj {
             bool                        _use_gpu;
             bool                        _ambig_missing;
             unsigned                    _nparticles;
-            double                      _random_seed;
+            unsigned                    _random_seed;
 
 
-            static std::string     _program_name;
-            static unsigned        _major_version;
-            static unsigned        _minor_version;
-            void                    summarizeData(Data::SharedPtr);
-            void                    printFirstParticle(vector<Particle>);
-            unsigned                setNumberSpecies(Data::SharedPtr);
-            double                  getRunningSum(const vector<double> &) const;
+            static std::string           _program_name;
+            static unsigned              _major_version;
+            static unsigned              _minor_version;
+            void                          summarizeData(Data::SharedPtr);
+            void                          printFirstParticle(vector<Particle>);
+            unsigned                      setNumberSpecies(Data::SharedPtr);
+            double                        getRunningSum(const vector<double> &) const;
 
     };
 
@@ -68,7 +68,7 @@ namespace proj {
         _partition.reset(new Partition());
         _use_gpu        = true;
         _ambig_missing  = true;
-        _nparticles = 10000;
+        _nparticles = 50000;
         _data = nullptr;
         //_likelihood = nullptr;
     }   ///end_clear
@@ -93,10 +93,10 @@ namespace proj {
         ("version,v", "show program version")
         ("datafile,d",  boost::program_options::value(&_data_file_name)->required(), "name of a data file in NEXUS format")
         ("subset",  boost::program_options::value(&partition_subsets), "a string defining a partition subset, e.g. 'first:1-1234\3' or 'default[codon:standard]:1-3702'")
-        ("gpu",           boost::program_options::value(&_use_gpu)->default_value(true),                "use GPU if available")
-        ("ambigmissing",  boost::program_options::value(&_ambig_missing)->default_value(true),          "treat all ambiguities as missing data")
-        ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000),          "set number of particles")
-        ("randomseed", boost::program_options::value(&_random_seed)->required(), "set random seed")
+        ("gpu",           boost::program_options::value(&_use_gpu)->default_value(true), "use GPU if available")
+        ("ambigmissing",  boost::program_options::value(&_ambig_missing)->default_value(true), "treat all ambiguities as missing data")
+        ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000), "number of particles")
+        ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -139,8 +139,6 @@ namespace proj {
         std::cout << "Number of partition subsets: " << nsubsets << std::endl;
         
         std::cout << "Number of particles: " << _nparticles << std::endl;
-        
-        std::cout << "Random seed: " << _random_seed << std::endl;
 
         for (unsigned subset = 0; subset < nsubsets; subset++) {
             DataType dt = _partition->getDataTypeForSubset(subset);
@@ -265,6 +263,7 @@ namespace proj {
     inline void Proj::run() {
         std::cout << "Starting..." << std::endl;
         std::cout << "Current working directory: " << boost::filesystem::current_path() << std::endl;
+        std::cout << "Random seed: " << _random_seed << std::endl;
 
         try {
             std::cout << "\n*** Reading and storing the data in the file " << _data_file_name << std::endl;
@@ -292,7 +291,7 @@ namespace proj {
 //            printFirstParticle(my_vec);
 
             //run through each generation of particles
-            for (unsigned g=0; g<nspecies-2; g++){
+            for (unsigned g=0; g<nspecies-1; g++){
                 //cout << "Generation " << g << endl;
 
                 vector<double> log_weight_vec;
@@ -304,10 +303,25 @@ namespace proj {
                 for (auto & p:my_vec) {
                     log_weight = p.proposal();
                     log_weight_vec.push_back(log_weight);
-                    //p.showParticle();
+//                    p.showParticle();
                 }
 
                 normalizeWeights(my_vec);
+//                std::sort(my_vec.begin(), my_vec.end());
+//                auto a = std::max_element(my_vec.begin(), my_vec.end());
+//                auto b = std::min_element(my_vec.begin(), my_vec.end());
+//                cout << "generation is " << g << endl;
+//                unsigned k = 0;
+//                for (auto i = my_vec.rbegin(); i != my_vec.rend(); i++) {
+//                    cout << i->getLogWeight() << endl;
+//                    if (k>10) {
+//                        break;
+//                    }
+//                    k++;
+//                }
+//                cout << "max is " << a->getLogWeight() << endl;
+//                cout << "min is " << b->getLogWeight() << endl;
+                
                 resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                 
                 //if use_first is true, my_vec = my_vec_2

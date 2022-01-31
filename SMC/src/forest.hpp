@@ -88,7 +88,7 @@ class Forest {
 
         Data::SharedPtr             _data;
         static unsigned             _nspecies;
-        double                      _theta = 10000;
+        double                      _theta = 0.05;
 //        unsigned                    _num_lineages;
 
     public:
@@ -357,26 +357,34 @@ inline unsigned Forest::countNumberTrees() const{
 
 inline pair<double, double> Forest::proposeBasalHeight() {
     //draw random Uniform(0,1)
-    double new_basal_height = 0.0;
-    double log_prob_basal_height = 0.0;
-    unsigned s = countNumberTrees();
+//    double new_basal_height = 0.0;
+//    double log_prob_basal_height = 0.0;
+//    unsigned s = countNumberTrees();
+//
+//    for (unsigned k=2; k<=s; k++) {
+//        double u = rng.uniform();
+//        //transform uniform deviate to exponential
+//        double coalescence_rate = k*(k-1)/_theta;
+//        double t = -log(1-u)/(coalescence_rate);
+//        new_basal_height += t;
+//        log_prob_basal_height += log(coalescence_rate)-(coalescence_rate*t);
+//    }
     
-    for (unsigned k=2; k<=s; k++) {
-        double u = rng.uniform();
-        //transform uniform deviate to exponential
-//        double coalescence_rate = 2*k*(k-1)/_theta;
-        double coalescence_rate = k*(k-1)/_theta;
-        double t = -log(1-u)/(coalescence_rate);
-        new_basal_height += t;
-        log_prob_basal_height += log(coalescence_rate)-(coalescence_rate*t);
-    }
+    return make_pair(1000.0, 0.0);
 
-    return make_pair(new_basal_height, log_prob_basal_height);
+//    return make_pair(new_basal_height, log_prob_basal_height);
 }
 
+
 inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
-    double coalescence_rate = 2*_nsubtrees*(_nsubtrees-1)/_theta;
-    _last_edge_length = rng.gamma(1.0, coalescence_rate);
+    unsigned s = countNumberTrees();
+//    if (s == 2) {
+//        cout << endl;
+//    }
+    double u = rng.uniform();
+    double coalescence_rate = s*(s-1)/_theta;
+    _last_edge_length = -log(1-u)/coalescence_rate;
+//    _last_edge_length = rng.gamma(1.0, t);
     for (auto nd:_preorder) {
         //if node's parent is subroot, subtract basal height and add new branch length
         if (nd->_parent==_root->_left_child){
@@ -392,16 +400,21 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
 
     detachSubtree(subtree1);
     detachSubtree(subtree2);
+    
+    Node* new_nd = _root->_left_child;
+    if (s>2) {
     //creating new node
-    Node* new_nd=&_nodes[_nleaves+_ninternals];
+        new_nd=&_nodes[_nleaves+_ninternals];
+        new_nd->_parent=_root->_left_child;
+        new_nd->_number=_nleaves+_ninternals;
+    }
+    
     new_nd->_name=" ";
     new_nd->_left_child=subtree1;
     new_nd->_right_sib=0;
-    new_nd->_parent=_root->_left_child;
-    new_nd->_number=_nleaves+_ninternals;
 
     new_nd->_edge_length=0.0;
-    assert (_partials[new_nd->_number] == nullptr);
+    
 
 //    cout << "New node branch length is: " << new_nd->_edge_length << endl;
 
@@ -409,30 +422,37 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
     subtree1 -> _right_sib=subtree2;
     subtree1->_parent=new_nd;
     subtree2->_parent=new_nd;
-
-    insertSubtreeOnLeft(new_nd, _root->_left_child);
+    
+    if (s>2) {
+        insertSubtreeOnLeft(new_nd, _root->_left_child);
+    }
 
     refreshPreorder();
 //    _num_lineages--;
-    
-    _partials[new_nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
+        
+    if (s>2) {
+        
+        assert (_partials[new_nd->_number] == nullptr);
+        
+        _partials[new_nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
 
-    assert(new_nd->_left_child->_right_sib);
-    
-    calcPartialArray(new_nd);
+        assert(new_nd->_left_child->_right_sib);
+        
+        calcPartialArray(new_nd);
 
 
-//    cout << makeNewick(9, true) << endl;
+    //    cout << makeNewick(9, true) << endl;
 
-    //once new taxa have been joined, add new basal height to finish off tree
-    _old_basal_height = _new_basal_height;
-    _new_basal_height = proposeBasalHeight();
+        //once new taxa have been joined, add new basal height to finish off tree
+        _old_basal_height = _new_basal_height;
+        _new_basal_height = proposeBasalHeight();
 
-    for (auto nd:_preorder) {
-        if (nd->_parent==_root->_left_child){
-            nd->_edge_length += _new_basal_height.first;
+            for (auto nd:_preorder) {
+                if (nd->_parent==_root->_left_child){
+                        nd->_edge_length += _new_basal_height.first;
+                    }
             }
-    }
+        }
 }
 
 inline void Forest::calcPartialArray(Node* new_nd) {
