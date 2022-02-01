@@ -417,21 +417,21 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
 
         refreshPreorder();
 
-            assert (_partials[new_nd->_number] == nullptr);
-            _partials[new_nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
-            assert(new_nd->_left_child->_right_sib);
-            calcPartialArray(new_nd);
+        assert (_partials[new_nd->_number] == nullptr);
+        _partials[new_nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
+        assert(new_nd->_left_child->_right_sib);
+        calcPartialArray(new_nd);
 
-            //once new taxa have been joined, add new basal height to finish off tree
-            _old_basal_height = _new_basal_height;
-            _new_basal_height = proposeBasalHeight();
+        //once new taxa have been joined, add new basal height to finish off tree
+        _old_basal_height = _new_basal_height;
+        _new_basal_height = proposeBasalHeight();
 
-            for (auto nd:_preorder) {
-                if (nd->_parent==_root->_left_child){
-                        nd->_edge_length += _new_basal_height.first;
-                    }
+        for (auto nd:_preorder) {
+            if (nd->_parent==_root->_left_child){
+                    nd->_edge_length += _new_basal_height.first;
                 }
             }
+        }
 
     //last generation
     else {
