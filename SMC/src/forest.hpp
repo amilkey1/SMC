@@ -88,7 +88,7 @@ class Forest {
 
         Data::SharedPtr             _data;
         static unsigned             _nspecies;
-        double                      _theta = 0.05;
+        double                      _theta = 0.0005;
 //        unsigned                    _num_lineages;
 
     public:

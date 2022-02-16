@@ -29,12 +29,15 @@ namespace proj {
             void                resampleParticles(vector<Particle> & from_particles, vector<Particle> & to_particles);
             void                resetWeights(vector<Particle> & particles);
             void                debugNormalizedWeights(const vector<Particle> & particles) const;
+            void                calcMarginalLikelihood(double weight_average);
+            double              getWeightAverage(vector<double> log_weight_vec);
 
         private:
 
             std::string                 _data_file_name;
             Partition::SharedPtr        _partition;
             Data::SharedPtr             _data;
+        double              _log_marginal_likelihood = 0.0;
             //Likelihood::SharedPtr       _likelihood;
 
             bool                        _use_gpu;
@@ -201,6 +204,8 @@ namespace proj {
         for (auto & p : particles) {
             p.setLogWeight(p.getLogWeight() - log_particle_sum);
         }
+        
+        _log_marginal_likelihood += log_particle_sum - log(_nparticles);
     }
 
     inline unsigned Proj::chooseRandomParticle(vector<Particle> & particles) {
@@ -260,6 +265,22 @@ namespace proj {
         }
     }
 
+//    inline double Proj::getWeightAverage(vector<double> log_weight_vec) {
+//        double log_sum = 0.0;
+//
+//        for (auto & i:log_weight_vec) {
+//            log_sum += i;
+//        }
+//
+//        double log_weight_average = log_sum / (_nparticles);
+//
+//        return log_weight_average;
+//    }
+    
+//    inline void Proj::calcMarginalLikelihood(double log_weight_average) {
+//        log_marginal_likelihood += log_weight_average;
+//    }
+
     inline void Proj::run() {
         std::cout << "Starting..." << std::endl;
         std::cout << "Current working directory: " << boost::filesystem::current_path() << std::endl;
@@ -290,9 +311,10 @@ namespace proj {
 
 //            printFirstParticle(my_vec);
 
+            _log_marginal_likelihood = 0.0;
             //run through each generation of particles
             for (unsigned g=0; g<nspecies-1; g++){
-                //cout << "Generation " << g << endl;
+//                cout << "Generation " << g << endl;
 
                 vector<double> log_weight_vec;
                 double log_weight = 0.0;
@@ -305,22 +327,10 @@ namespace proj {
                     log_weight_vec.push_back(log_weight);
 //                    p.showParticle();
                 }
-
+                
+//                calcMarginalLikelihood(getWeightAverage(log_weight_vec));
+                
                 normalizeWeights(my_vec);
-//                std::sort(my_vec.begin(), my_vec.end());
-//                auto a = std::max_element(my_vec.begin(), my_vec.end());
-//                auto b = std::min_element(my_vec.begin(), my_vec.end());
-//                cout << "generation is " << g << endl;
-//                unsigned k = 0;
-//                for (auto i = my_vec.rbegin(); i != my_vec.rend(); i++) {
-//                    cout << i->getLogWeight() << endl;
-//                    if (k>10) {
-//                        break;
-//                    }
-//                    k++;
-//                }
-//                cout << "max is " << a->getLogWeight() << endl;
-//                cout << "min is " << b->getLogWeight() << endl;
                 
                 resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                 
@@ -331,8 +341,11 @@ namespace proj {
                 //change use_first from true to false or false to true
                 use_first = !use_first;
                 
+//                calcMarginalLikelihood(getWeightAverage(log_weight_vec));
+                
                 resetWeights(my_vec);
             } // g loop
+            
             double sum_h = 0.0;
             for (auto & p:my_vec) {
                 double h = p.calcHeight();
@@ -340,8 +353,14 @@ namespace proj {
             }
             sum_h/=my_vec.size();
             cout << "mean height equals " << sum_h << endl;
+            cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
 
             saveAllForests(my_vec);
+            
+//            for (auto&p:my_vec) {
+//                p.showParticle();
+//            }
+            
             }
 
 
