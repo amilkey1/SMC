@@ -42,8 +42,6 @@ namespace proj {
             int                                             _high;
     };
     
-    // member function bodies go here
-    
     inline Lot::Lot() : _seed(0), _gamma_shape(1.0), _low(0), _high(100) {
         //std::cout << "Constructing a Lot" << std::endl;
         _generator.seed(static_cast<unsigned int>(std::time(0)));

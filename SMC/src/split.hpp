@@ -52,8 +52,6 @@ namespace proj {
             typedef std::shared_ptr< Split >                    SharedPtr;
     };
 
-    // member function bodies go here
-
     inline Split::Split() {
         _mask = 0L;
         _nleaves = 0;

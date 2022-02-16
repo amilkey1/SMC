@@ -114,12 +114,9 @@ inline void Forest::clear() {
     _levelorder.clear();
 //    _partials.clear();
     _nodes.resize(2*_nspecies);
-//    _partials.resize(2*_nspecies);
     _npatterns = 0;
     _nstates = 4;
     _nsubtrees = _nspecies;
-//    _speciation_rate = 10.9; //temporary
-//    _num_lineages = 10;
     
     //creating root node
     _root = &_nodes[_nspecies];
@@ -344,8 +341,7 @@ inline pair<unsigned, unsigned> Forest::chooseTaxaToJoin(){
     unsigned t1=0;
     unsigned t2=1;
     unsigned nsubtrees = getNumSubtrees();
-    //don't use this when there's only one choice
-        //i.e. # of trees = 2
+    //don't use this when there's only one choice (2 subtrees)
     if (nsubtrees > 2) {
         t1 = ::rng.randint(0, nsubtrees-1);
         t2 = ::rng.randint(0, nsubtrees-1);
@@ -369,21 +365,6 @@ inline unsigned Forest::countNumberTrees() const{
 }
 
 inline pair<double, double> Forest::proposeBasalHeight() {
-    //draw random Uniform(0,1)
-//    double new_basal_height = 0.0;
-//    double log_prob_basal_height = 0.0;
-//    unsigned s = countNumberTrees();
-//
-//    for (unsigned k=2; k<=s; k++) {
-//        double u = rng.uniform();
-//        //transform uniform deviate to exponential
-//        double coalescence_rate = k*(k-1)/_theta;
-//        double t = -log(1-u)/(coalescence_rate);
-//        new_basal_height += t;
-//        log_prob_basal_height += log(coalescence_rate)-(coalescence_rate*t);
-//    }
-    
-//    return make_pair(new_basal_height, log_prob_basal_height);
     return make_pair(1000.0, 0.0);
 }
 
@@ -464,7 +445,6 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
 }
 
 inline void Forest::calcPartialArray(Node* new_nd) {
-    //    auto & parent_partial_array = *(_partials[new_nd->_number]);
         auto & parent_partial_array = *(new_nd->_partial);
 
     for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
@@ -473,7 +453,6 @@ inline void Forest::calcPartialArray(Node* new_nd) {
         double prsame = 0.25+0.75*expterm;
         double prdif = 0.25 - 0.25*expterm;
 
-//        auto & child_partial_array = *(_partials[child->_number]);
         auto & child_partial_array = *(child->_partial);
         for (unsigned p = 0; p < _npatterns; p++) {
             for (unsigned s = 0; s <_nstates; s++) {
@@ -560,40 +539,12 @@ inline double Forest::calcLogLikelihood() {
     // need to always recalculate partials for subroot
     // if subroot partial array doesn't exist, create it
     Node* subroot = _root->_left_child;
-//    if (_partials[subroot->_number] == nullptr) {
-//        _partials[subroot->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
-//    }
     
     // recalculate subroot partials
     assert(subroot->_left_child->_right_sib);
-    
-//    for (unsigned p=0; p<_npatterns; p++) {
-//        for (unsigned s=0; s<_nstates; s++) {
-//            double partial=1.0;
-//            for (Node * child=subroot->_left_child; child; child=child->_right_sib){
-//
-//                double expterm = exp(-4.0*(child->_edge_length)/3.0);
-//                double prsame = 0.25+0.75*expterm;
-//                double prdif = 0.25 - 0.25*expterm;
-//
-//                double child_sum=0.0;
-//                for (unsigned s_child=0; s_child<_nstates; s_child++) {
-////                    double child_transition_prob = calcTransitionProbability(s, s_child, child->_edge_length);
-//                    double child_transition_prob = (s == s_child ? prsame : prdif);
-//                    assert(_partials[child->_number] != nullptr);
-//                    double child_partial = (*_partials[child->_number])[p*_nstates + s_child];
-//                    child_sum += child_transition_prob * child_partial;
-//                }
-//                partial *= child_sum;
-//            }
-////                    assert(_partials[nd->_number][0]);
-//            (*_partials[subroot->_number])[p*_nstates+s]= partial;
-//        }
-//    }
 
 //    compute log likelihood of every subtree whose parent is subroot
     auto counts = _data->getPatternCounts();
-//    Node* subroot = _root->_left_child;
     double composite_log_likelihood = 0.0;
     for (auto nd=subroot->_left_child; nd; nd=nd->_right_sib) {
         
@@ -607,7 +558,6 @@ inline double Forest::calcLogLikelihood() {
                 double prdif = 0.25 - 0.25*expterm;
                 
                 for (unsigned ss=0; ss<_nstates; ss++) {
-//                    double child_transition_prob = calcTransitionProbability(s, ss, nd->_edge_length);
                     double child_transition_prob = (s == ss ? prsame : prdif);
                     site_like += 0.25*child_transition_prob*(*nd->_partial)[p*_nstates+ss];
                 }
@@ -738,11 +688,6 @@ inline void Forest::operator=(const Forest & other) {
     _npatterns = other._npatterns;
     _nodes.resize(other._nodes.size());
     _preorder.resize(other._preorder.size());
-//    _partials.resize(other._partials.size());
-//    copy(other._partials.begin(), other._partials.end(), _partials.begin());
-
-
-//    _speciation_rate  = other._speciation_rate;
     _nsubtrees        = other._nsubtrees;
     _nleaves          = other._nleaves;
     _ninternals       = other._ninternals;

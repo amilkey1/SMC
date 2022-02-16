@@ -1,4 +1,4 @@
-#pragma once    ///start
+#pragma once
 
 #include "genetic_code.hpp"
 #include <boost/format.hpp>
@@ -38,8 +38,6 @@ namespace proj {
             GeneticCode::SharedPtr          _genetic_code;
     };
     
-    // member function bodies go here
-    ///end_class_declaration
     inline DataType::DataType() : _datatype(0), _num_states(0) {    ///begin_constructor
         //std::cout << "Creating a DataType object" << std::endl;
         setNucleotide();
@@ -47,7 +45,7 @@ namespace proj {
     
     inline DataType::~DataType() {
         //std::cout << "Destroying a DataType object" << std::endl;
-    }    ///end_destructor
+    }
     
     inline void DataType::setNucleotide() {    ///begin_setNucleotide
         _datatype = 1;
@@ -71,9 +69,9 @@ namespace proj {
         _datatype = 4;
         _num_states = 2;
         _genetic_code = nullptr;
-    }   ///end_setStandard
+    }
 
-    inline bool DataType::isNucleotide() const {    ///begin_isNucleotide
+    inline bool DataType::isNucleotide() const {
         return (_datatype == 1);
     }
 
@@ -87,9 +85,9 @@ namespace proj {
 
     inline bool DataType::isStandard() const {
         return (_datatype == 4);
-    }   ///end_isStandard
+    }
 
-    inline void DataType::setGeneticCodeFromName(std::string genetic_code_name) {   ///begin_setGeneticCodeFromName
+    inline void DataType::setGeneticCodeFromName(std::string genetic_code_name) {
         assert(isCodon());
         _genetic_code = GeneticCode::SharedPtr(new GeneticCode(genetic_code_name));
     }
@@ -104,9 +102,9 @@ namespace proj {
         _datatype = 4;
         _num_states = nstates;
         _genetic_code = nullptr;
-    }   ///end_setStandardNumStates
+    }
 
-    inline unsigned DataType::getDataType() const {   ///begin_getDataType
+    inline unsigned DataType::getDataType() const {
         return _datatype;
     }
     
@@ -117,9 +115,9 @@ namespace proj {
     inline const GeneticCode::SharedPtr DataType::getGeneticCode() const {
         assert(isCodon());
         return _genetic_code;
-    }   ///end_getGeneticCode
+    }
     
-    inline std::string DataType::getDataTypeAsString() const {   ///begin_getDataTypeAsString
+    inline std::string DataType::getDataTypeAsString() const {
         std::string s = translateDataTypeToString(_datatype);
         if (isCodon())
             s += boost::str(boost::format(",%s") % _genetic_code->getGeneticCodeName());
@@ -136,6 +134,6 @@ namespace proj {
             return std::string("protein");
         else
             return std::string("standard");
-    }   ///end_translateDataTypeToString
+    }
     
-}   ///end
+}

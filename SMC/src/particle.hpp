@@ -35,11 +35,9 @@ class Particle {
         std::string                             saveForestNewick() const {
             return _forest.makeNewick(8, true);
         }
-        void                                    firstPair(pair<unsigned, unsigned>);
     bool operator<(const Particle & other) const {
         return _log_weight<other._log_weight;
     }
-
 
     private:
         Forest                                  _forest;
@@ -102,7 +100,6 @@ inline double Particle::proposal() {
 
     _log_weight = _forest._new_basal_height.second + _log_likelihood - _forest._old_basal_height.second - prev_log_likelihood;
     _n++;
-//    firstPair(taxon_pair);
     return _log_weight;
 }
 
@@ -152,23 +149,4 @@ inline void Particle::operator=(const Particle & other) {
     _forest         = other._forest;
     _data           = other._data;
 };
-
-
-inline void Particle::firstPair(pair<unsigned, unsigned> p) {
-    std::string s;
-    unsigned pair_1 = p.first;
-    unsigned pair_2 = p.second;
-
-    for (auto nd:_forest._preorder) {
-        if (nd->_number == pair_1) {
-            s += boost::str(boost::format("%s (%d) || ")%nd->_name %nd->_number);
-        }
-        else if (nd->_number == pair_2) {
-            s += boost::str(boost::format("%s (%d) | log likelihood is %.5f | branch length is %d ||")%nd->_name %nd->_number %_log_likelihood %nd->_edge_length);
-        }
-    }
-    cout << s << endl;
-    showParticle();
-
-}
 }

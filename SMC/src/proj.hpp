@@ -1,13 +1,11 @@
-#pragma once    ///start
+#pragma once
 
 #include <iostream>
 #include "data.hpp"
-//#include "likelihood.hpp"
 #include "partition.hpp"
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include "xproj.hpp"
-//#include "forest.hpp"
 #include "particle.hpp"
 using namespace std;
 using namespace boost;
@@ -40,9 +38,7 @@ namespace proj {
             std::string                 _data_file_name;
             Partition::SharedPtr        _partition;
             Data::SharedPtr             _data;
-        double              _log_marginal_likelihood = 0.0;
-            //Likelihood::SharedPtr       _likelihood;
-
+            double                      _log_marginal_likelihood = 0.0;
             bool                        _use_gpu;
             bool                        _ambig_missing;
             unsigned                    _nparticles;
@@ -59,26 +55,24 @@ namespace proj {
 
     };
 
-    //end_class_declaration
-    inline Proj::Proj() { ///begin_constructor
+    inline Proj::Proj() {
 //        std::cout << "Constructing a Proj" << std::endl;
         clear();
-    } //end_constructor
+    }
 
-    inline Proj::~Proj() { ///begin_destructor
+    inline Proj::~Proj() {
 //        std::cout << "Destroying a Proj" << std::endl;
-    } //end_destructor
+    }
 
-    inline void Proj::clear() {    ///begin_clear
+    inline void Proj::clear() {
         _data_file_name = "";
         _partition.reset(new Partition());
         _use_gpu        = true;
         _ambig_missing  = true;
         _nparticles = 50000;
         _data = nullptr;
-        //_likelihood = nullptr;
-    }   ///end_clear
-///
+    }
+
     inline void Proj::saveAllForests(const vector<Particle> &v) const {
         ofstream treef("forest.trees");
         treef << "#nexus\n\n";
@@ -268,22 +262,6 @@ namespace proj {
         }
     }
 
-//    inline double Proj::getWeightAverage(vector<double> log_weight_vec) {
-//        double log_sum = 0.0;
-//
-//        for (auto & i:log_weight_vec) {
-//            log_sum += i;
-//        }
-//
-//        double log_weight_average = log_sum / (_nparticles);
-//
-//        return log_weight_average;
-//    }
-    
-//    inline void Proj::calcMarginalLikelihood(double log_weight_average) {
-//        log_marginal_likelihood += log_weight_average;
-//    }
-
     inline void Proj::run() {
         std::cout << "Starting..." << std::endl;
         std::cout << "Current working directory: " << boost::filesystem::current_path() << std::endl;
@@ -313,8 +291,6 @@ namespace proj {
                 p.setData(_data);
             }
 
-//            printFirstParticle(my_vec);
-
             _log_marginal_likelihood = 0.0;
             //run through each generation of particles
             for (unsigned g=0; g<nspecies-1; g++){
@@ -323,16 +299,11 @@ namespace proj {
                 vector<double> log_weight_vec;
                 double log_weight = 0.0;
 
-//                cout << "\n Particles after generation " << g << endl;
-
                 //taxon joining and reweighting step
                 for (auto & p:my_vec) {
                     log_weight = p.proposal();
                     log_weight_vec.push_back(log_weight);
-//                    p.showParticle();
                 }
-                
-//                calcMarginalLikelihood(getWeightAverage(log_weight_vec));
                 
                 normalizeWeights(my_vec);
                 
@@ -344,9 +315,7 @@ namespace proj {
                 
                 //change use_first from true to false or false to true
                 use_first = !use_first;
-                
-//                calcMarginalLikelihood(getWeightAverage(log_weight_vec));
-                
+                                
                 resetWeights(my_vec);
             } // g loop
             
@@ -361,11 +330,6 @@ namespace proj {
             cout << "theta = " << Forest::_theta << endl;
 
             saveAllForests(my_vec);
-            
-//            for (auto&p:my_vec) {
-//                p.showParticle();
-//            }
-            
             }
 
 
@@ -376,4 +340,4 @@ namespace proj {
         std::cout << "\nFinished!" << std::endl;
     }
 
-} ///end
+}

@@ -1,17 +1,7 @@
-//
-//  main.cpp
-//  SMC
-//
-//  Created by Analisa Milkey on 9/24/21.
-//
-
 #include <iostream>
 #include <vector>
-
-//#include "conditionals.hpp"
 #include "proj.hpp"
 #include "particle.hpp"
-
 
 // Initialize our random number generator here so it will be a global variable
 #include "lot.hpp"
@@ -53,7 +43,7 @@ GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = { ///!start_
     {"trematodemito",        "NNKNTTTTSSSSMIMIQHQHPPPPRRRRLLLLEDEDAAAAGGGGVVVV*Y*YSSSSWCWCLFLF"},
     {"scenedesmusmito",      "KNKNTTTTRSRSIIMIQHQHPPPPRRRRLLLLEDEDAAAAGGGGVVVV*YLY*SSS*CWCLFLF"},
     {"thraustochytriummito", "KNKNTTTTRSRSIIMIQHQHPPPPRRRRLLLLEDEDAAAAGGGGVVVV*Y*YSSSS*CWC*FLF"}
-}; ///!end_definitions
+};
 
 int main(int argc, const char * argv[]) {
     Proj proj;

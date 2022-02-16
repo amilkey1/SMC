@@ -1,4 +1,4 @@
-#pragma once    ///start
+#pragma once
 
 #include <map>
 #include <boost/algorithm/string.hpp>
@@ -108,30 +108,28 @@ namespace proj {
             typedef std::shared_ptr< Likelihood >   SharedPtr;
     };
 
-    // member function bodies go here
-    ///end_class_declaration
-    inline Likelihood::Likelihood() {   ///begin_constructor
+    inline Likelihood::Likelihood() {
         //std::cout << "Constructing a Likelihood" << std::endl;
         clear();
-    }   ///end_constructor
+    }
 
-    inline Likelihood::~Likelihood() {  ///begin_destructor
+    inline Likelihood::~Likelihood() {
         //std::cout << "Destroying a Likelihood" << std::endl;
         finalizeBeagleLib(false);
         clear();
-    }   ///end_destructor
+    }
     
-    inline unsigned Likelihood::calcNumEdgesInFullyResolvedTree() const {   ///begin_calcNumEdgesInFullyResolvedTree
+    inline unsigned Likelihood::calcNumEdgesInFullyResolvedTree() const {
         assert(_ntaxa > 0);
         return (_rooted ? (2*_ntaxa - 2) : (2*_ntaxa - 3));
-    }  ///end_calcNumEdgesInFullyResolvedTree
+    }
     
-    inline unsigned Likelihood::calcNumInternalsInFullyResolvedTree() const {  ///begin_calcNumInternalsInFullyResolvedTree
+    inline unsigned Likelihood::calcNumInternalsInFullyResolvedTree() const {
         assert(_ntaxa > 0);
         return (_rooted ? (_ntaxa - 1) : (_ntaxa - 2));
-    }  ///end_calcNumInternalsInFullyResolvedTree
+    }
 
-    inline void Likelihood::finalizeBeagleLib(bool use_exceptions) {  ///begin_finalizeBeagleLib
+    inline void Likelihood::finalizeBeagleLib(bool use_exceptions) {
         // Close down all BeagleLib instances if active
         for (auto info : _instances) {
             if (info.handle >= 0) {
@@ -145,9 +143,9 @@ namespace proj {
             }
         }
         _instances.clear();
-    }  ///end_finalizeBeagleLib
+    }
 
-    inline void Likelihood::clear() {  ///begin_clear
+    inline void Likelihood::clear() {
         finalizeBeagleLib(true);
         
         _ntaxa                      = 0;
@@ -183,9 +181,9 @@ namespace proj {
         _beagle_error[-6] = std::string("no resource matches requirements");
         _beagle_error[-7] = std::string("no implementation matches requirements");
         _beagle_error[-8] = std::string("floating-point range exceeded");
-    }  ///end_clear
+    }
 
-    inline std::string Likelihood::beagleLibVersion() const {  ///begin_beagleLibVersion
+    inline std::string Likelihood::beagleLibVersion() const {
         return std::string(beagleGetVersion());
     }
     
@@ -210,9 +208,9 @@ namespace proj {
             s += boost::str(boost::format("  instance %d: %s (resource %d)\n") % _instances[i].handle % _instances[i].resourcename % _instances[i].resourcenumber);
         }
         return s;
-    }   ///end_usedResources
+    }
     
-    inline Data::SharedPtr Likelihood::getData() {  ///begin_getData
+    inline Data::SharedPtr Likelihood::getData() {
         return _data;
     }
     
@@ -220,34 +218,34 @@ namespace proj {
         assert(_instances.size() == 0);
         assert(!data->getDataMatrix().empty());
         _data = data;
-    }  ///end_setData
+    }
 
-    inline void Likelihood::setRooted(bool is_rooted) {  ///begin_setRooted
+    inline void Likelihood::setRooted(bool is_rooted) {
         assert(_instances.size() == 0 || _rooted == is_rooted); // can't change rooting status after initBeagleLib called
         _rooted = is_rooted;
-    }  ///end_setRooted
+    }
     
-    inline void Likelihood::setAmbiguityEqualsMissing(bool ambig_equals_missing) { ///begin_setAmbiguityEqualsMissing
+    inline void Likelihood::setAmbiguityEqualsMissing(bool ambig_equals_missing) {
         // Can't change GPU preference status after initBeagleLib called
         assert(_instances.size() == 0 || _ambiguity_equals_missing == ambig_equals_missing);
         _ambiguity_equals_missing = ambig_equals_missing;
-    } ///end_setAmbiguityEqualsMissing
+    }
     
-    inline void Likelihood::setPreferGPU(bool prefer_gpu) {  ///begin_setPreferGPU
+    inline void Likelihood::setPreferGPU(bool prefer_gpu) {
         // Can't change GPU preference status after initBeagleLib called
         assert(_instances.size() == 0 || _prefer_gpu == prefer_gpu);
         _prefer_gpu = prefer_gpu;
-    }  ///end_setPreferGPU
+    }
     
-    inline bool Likelihood::usingStoredData() const {   ///begin_usingStoredData
+    inline bool Likelihood::usingStoredData() const {
         return _using_data;
-    }   ///end_usingStoredData
+    }
     
-    inline void Likelihood::useStoredData(bool using_data) {  ///begin_useStoredData
+    inline void Likelihood::useStoredData(bool using_data) {
         _using_data = using_data;
-    }  ///end_useStoredData
+    }
     
-    inline void Likelihood::initBeagleLib() {  ///begin_initBeagleLib
+    inline void Likelihood::initBeagleLib() {
         assert(_data);
 
         // Close down any existing BeagleLib instances
@@ -284,9 +282,9 @@ namespace proj {
             setTipPartials();
         setPatternWeights();
         setPatternPartitionAssignments();
-    }  ///end_initBeagleLib
+    }
     
-    inline void Likelihood::newInstance(unsigned nstates, int nrates, std::vector<unsigned> & subset_indices) {  ///begin_newInstance
+    inline void Likelihood::newInstance(unsigned nstates, int nrates, std::vector<unsigned> & subset_indices) {
         unsigned num_subsets = (unsigned)subset_indices.size();
         
         unsigned ngammacat = (unsigned)nrates;
@@ -352,9 +350,9 @@ namespace proj {
         info.partial_offset = num_internals;
         info.tmatrix_offset = num_nodes;
         _instances.push_back(info);
-    } ///end_newInstance
+    }
 
-    inline void Likelihood::setTipStates() {   ///begin_setTipStates
+    inline void Likelihood::setTipStates() {
         assert(_instances.size() > 0);
         assert(_data);
         Data::state_t one = 1;
@@ -420,16 +418,16 @@ namespace proj {
             ++t;
             }
         }
-    }   ///end_setTipStates
+    }
 
-    inline void Likelihood::setTipPartials() {  ///begin_setTipPartials
+    inline void Likelihood::setTipPartials() {
         assert(_instances.size() > 0);
         assert(_data);
         Data::state_t one = 1;
         
         for (auto & info : _instances) {
-            if (info.nstates != 4)  ///begin_unconstrain
-                throw XProj(boost::format("This program can handle only 4-state DNA/RNA data. You specified data having %d states for at least one data subset.") % info.nstates);  ///end_unconstrain
+            if (info.nstates != 4)
+                throw XProj(boost::format("This program can handle only 4-state DNA/RNA data. You specified data having %d states for at least one data subset.") % info.nstates);
 
             std::vector<double> partials(info.nstates*info.npatterns);
             
@@ -474,9 +472,9 @@ namespace proj {
             ++t;
             }
         }
-    } ///end_setTipPartials
+    }
 
-    inline void Likelihood::setPatternPartitionAssignments() {  ///begin_setPatternPartitionAssignments
+    inline void Likelihood::setPatternPartitionAssignments() {
         assert(_instances.size() > 0);
         assert(_data);
         
@@ -514,9 +512,9 @@ namespace proj {
                 throw XProj(boost::format("failed to set pattern partition. BeagleLib error code was %d (%s)") % code % _beagle_error[code]);
             }
         }
-    }  ///end_setPatternPartitionAssignments
+    }
     
-    inline void Likelihood::setPatternWeights() {  ///begin_setPatternWeights
+    inline void Likelihood::setPatternWeights() {
         assert(_instances.size() > 0);
         assert(_data);
         Data::pattern_counts_t v;
@@ -545,9 +543,9 @@ namespace proj {
             if (code != 0)
                 throw XProj(boost::format("Failed to set pattern weights for instance %d. BeagleLib error code was %d (%s)") % info.handle % code % _beagle_error[code]);
         }
-    }  ///end_setPatternWeights
+    }
 
-    inline void Likelihood::setAmongSiteRateHeterogenetity() {  ///begin_setAmongSiteRateHeterogenetity
+    inline void Likelihood::setAmongSiteRateHeterogenetity() {
         assert(_instances.size() > 0);
         int code = 0;
         
@@ -576,9 +574,9 @@ namespace proj {
                     throw XProj(boost::str(boost::format("Failed to set category probabilities for BeagleLib instance %d. BeagleLib error code was %d (%s)") % info.handle % code % _beagle_error[code]));
             }
         }
-    }  ///end_setAmongSiteRateHeterogenetity
+    }
 
-    inline void Likelihood::setModelRateMatrix() {  ///begin_setModelRateMatrix
+    inline void Likelihood::setModelRateMatrix() {
         assert(_instances.size() > 0);
         int code = 0;
         double state_freqs[4] = {0.25, 0.25, 0.25, 0.25};
@@ -627,24 +625,24 @@ namespace proj {
                     throw XProj(boost::str(boost::format("Failed to set eigen decomposition for BeagleLib instance %d. BeagleLib error code was %d (%s)") % info.handle % code % _beagle_error[code]));
             }
         }
-    } ///end_setModelRateMatrix
+    }
     
-    inline unsigned Likelihood::getScalerIndex(Node * nd, InstanceInfo & info) const {  ///begin_getScalerIndex
+    inline unsigned Likelihood::getScalerIndex(Node * nd, InstanceInfo & info) const {
         return BEAGLE_OP_NONE;
-    }   ///end_getScalerIndex
+    }
     
-    inline unsigned Likelihood::getPartialIndex(Node * nd, InstanceInfo & info) const { ///begin_getPartialIndex
+    inline unsigned Likelihood::getPartialIndex(Node * nd, InstanceInfo & info) const {
         // Note: do not be tempted to subtract _ntaxa from pindex: BeagleLib does this itself
         assert(nd->_number >= 0);
         return nd->_number;
-    } ///end_getPartialIndex
+    }
     
-    inline unsigned Likelihood::getTMatrixIndex(Node * nd, InstanceInfo & info, unsigned subset_index) const {  ///begin_getTMatrixIndex
+    inline unsigned Likelihood::getTMatrixIndex(Node * nd, InstanceInfo & info, unsigned subset_index) const {
         unsigned tindex = subset_index*info.tmatrix_offset + nd->_number;
         return tindex;
-    }   ///end_getTMatrixIndex
+    }
       
-    inline void Likelihood::defineOperations(Forest::SharedPtr t) {   ///begin_defineOperations
+    inline void Likelihood::defineOperations(Forest::SharedPtr t) {
         assert(_instances.size() > 0);
         assert(t);
 //        assert(t->isRooted() == _rooted);
@@ -680,9 +678,9 @@ namespace proj {
                 queuePartialsRecalculation(nd, lchild, rchild);
             }
         }
-    }  ///end_defineOperations
+    }
     
-    inline void Likelihood::queuePartialsRecalculation(Node * nd, Node * lchild, Node * rchild) {   ///begin_queuePartialsRecalculation
+    inline void Likelihood::queuePartialsRecalculation(Node * nd, Node * lchild, Node * rchild) {
         for (auto & info : _instances) {
             unsigned instance_specific_subset_index = 0;
             for (unsigned s : info.subsets) {
@@ -690,9 +688,9 @@ namespace proj {
                 ++instance_specific_subset_index;
             }
         }
-    }   ///end_queuePartialsRecalculation
+    }
     
-    inline void Likelihood::queueTMatrixRecalculation(Node * nd) {  ///begin_queueTMatrixRecalculation
+    inline void Likelihood::queueTMatrixRecalculation(Node * nd) {
         double subset_relative_rate = 1.0;  // assuming all subsets have equal relative rates for now
         for (auto & info : _instances) {
             unsigned instance_specific_subset_index = 0;
@@ -706,9 +704,9 @@ namespace proj {
                 ++instance_specific_subset_index;
             }
         }
-    }   ///end_queueTMatrixRecalculation
+    }
     
-    inline void Likelihood::addOperation(InstanceInfo & info, Node * nd, Node * lchild, Node * rchild, unsigned subset_index) { ///begin_addOperation
+    inline void Likelihood::addOperation(InstanceInfo & info, Node * nd, Node * lchild, Node * rchild, unsigned subset_index) {
         assert(nd);
         assert(lchild);
         assert(rchild);
@@ -747,9 +745,9 @@ namespace proj {
             // 9. cumulative scale index
             _operations[info.handle].push_back(BEAGLE_OP_NONE);
         }
-    }  ///end_addOperation
+    }
     
-    inline void Likelihood::updateTransitionMatrices() {    ///begin_updateTransitionMatrices
+    inline void Likelihood::updateTransitionMatrices() {
         assert(_instances.size() > 0);
         if (_pmatrix_index.size() == 0)
             return;
@@ -784,9 +782,9 @@ namespace proj {
             if (code != 0)
                 throw XProj(boost::str(boost::format("Failed to update transition matrices for instance %d. BeagleLib error code was %d (%s)") % info.handle % code % _beagle_error[code]));
         }
-    }   ///end_updateTransitionMatrices
+    }
     
-    inline void Likelihood::calculatePartials() {  ///begin_calculatePartials
+    inline void Likelihood::calculatePartials() {
         assert(_instances.size() > 0);
         if (_operations.size() == 0)
             return;
@@ -815,9 +813,9 @@ namespace proj {
                     throw XProj(boost::format("failed to update partials. BeagleLib error code was %d (%s)") % code % _beagle_error[code]);
             }
         }
-    } ///end_calculatePartials
+    }
     
-    inline double Likelihood::calcInstanceLogLikelihood(InstanceInfo & info, Forest::SharedPtr t) {   ///begin_calcInstanceLogLikelihood
+    inline double Likelihood::calcInstanceLogLikelihood(InstanceInfo & info, Forest::SharedPtr t) {
         int code = 0;
         unsigned nsubsets = (unsigned)info.subsets.size();
         assert(nsubsets > 0);
@@ -892,9 +890,9 @@ namespace proj {
             throw XProj(boost::str(boost::format("failed to calculate edge logLikelihoods in CalcLogLikelihood. BeagleLib error code was %d (%s)") % code % _beagle_error[code]));
 
         return log_likelihood;
-    }  ///end_calcInstanceLogLikelihood
+    }
     
-    inline double Likelihood::calcLogLikelihood(Forest::SharedPtr t) {  ///begin_calcLogLikelihood
+    inline double Likelihood::calcLogLikelihood(Forest::SharedPtr t) {
         assert(_instances.size() > 0);
         
         if (!_using_data)
@@ -921,6 +919,6 @@ namespace proj {
         }
         
         return log_likelihood;
-    }  ///end_calcLogLikelihood
+    }
 
-}   ///end
+}

@@ -1,4 +1,4 @@
-#pragma once    ///start
+#pragma once
 
 #include <fstream>
 #include <regex>
@@ -83,21 +83,20 @@ namespace proj {
     };
 
     // Member function bodies go below here but above the right curly bracket that ends the namespace block
-    ///end_class_declaration
-    inline Data::Data() {   ///begin_constructor
+    inline Data::Data() {
         //std::cout << "Creating a Data object" << std::endl;
         clear();
     }
 
     inline Data::~Data() {
         //std::cout << "Destroying a Data object" << std::endl;
-    }   ///end_destructor
+    }
     
-    inline void Data::setPartition(Partition::SharedPtr partition) {    ///begin_setPartition
+    inline void Data::setPartition(Partition::SharedPtr partition) {
         _partition = partition;
-    }    ///end_setPartition
+    }
 
-    inline Partition::SharedPtr Data::getPartition() {    ///begin_getPartition
+    inline Partition::SharedPtr Data::getPartition() {
         return _partition;
     }
 
@@ -107,9 +106,9 @@ namespace proj {
     
     inline std::string Data::getSubsetName(unsigned subset) const {
         return _partition ? _partition->getSubsetName(subset) : std::string("default");
-    }    ///end_getSubsetName
+    }
 
-    inline const Data::partition_key_t & Data::getPartitionKey() const {    ///begin_getPartitionKey
+    inline const Data::partition_key_t & Data::getPartitionKey() const {
         return _partition_key;
     }
     
@@ -131,17 +130,17 @@ namespace proj {
 
     inline const Data::data_matrix_t & Data::getDataMatrix() const {
         return _data_matrix;
-    }    ///end_getDataMatrix
+    }
 
-    inline Data::begin_end_pair_t Data::getSubsetBeginEnd(unsigned subset) const {    ///begin_getSubsetBeginEnd
+    inline Data::begin_end_pair_t Data::getSubsetBeginEnd(unsigned subset) const {
         assert(_subset_end.size() > subset);
         if (subset == 0)
             return std::make_pair(0, _subset_end[0]);
         else
             return std::make_pair(_subset_end[subset-1], _subset_end[subset]);
-    }    ///end_getSubsetBeginEnd
+    }
 
-    inline void Data::clear() {    ///begin_clear
+    inline void Data::clear() {
         _partition_key.clear();
         _pattern_counts.clear();
         _monomorphic.clear();
@@ -149,47 +148,47 @@ namespace proj {
         _taxon_names.clear();
         _data_matrix.clear();
         _subset_end.clear();
-    }    ///end_clear
+    }
 
-    inline unsigned Data::getNumPatterns() const {    ///begin_getNumPatterns
+    inline unsigned Data::getNumPatterns() const {
         if (_data_matrix.size() > 0)
             return (unsigned)_data_matrix[0].size();
         else
             return 0;
-    }    ///end_getNumPatterns
+    }
 
-    inline Data::npatterns_vect_t Data::calcNumPatternsVect() const {    ///begin_calcNumPatternsVect
+    inline Data::npatterns_vect_t Data::calcNumPatternsVect() const {
         unsigned nsubsets = (unsigned)_subset_end.size();
         std::vector<unsigned> num_patterns_vect(nsubsets, 0);
         for (unsigned s = 0; s < nsubsets; s++)
             num_patterns_vect[s] = getNumPatternsInSubset(s);
         return num_patterns_vect;
-    }    ///end_calcNumPatternsVect
+    }
     
-    inline unsigned Data::getNumStatesForSubset(unsigned subset) const {    ///begin_getNumStatesForSubset
+    inline unsigned Data::getNumStatesForSubset(unsigned subset) const {
         DataType data_type = _partition->getDataTypeForSubset(subset);
         return data_type.getNumStates();
-    }    ///end_getNumStatesForSubset
+    }
 
-    inline unsigned Data::getNumPatternsInSubset(unsigned subset) const {    ///begin_getNumPatternsInSubset
+    inline unsigned Data::getNumPatternsInSubset(unsigned subset) const {
         assert(_subset_end.size() > subset);
         return (unsigned)_subset_end[subset] - (subset == 0 ? 0 : _subset_end[subset-1]);
-    }    ///end_getNumPatternsInSubset
+    }
     
-    inline unsigned Data::getNumTaxa() const {    ///begin_getNumTaxa
+    inline unsigned Data::getNumTaxa() const {
         return (unsigned)_taxon_names.size();
-    }    ///end_getNumTaxa
+    }
 
-    inline unsigned Data::calcSeqLen() const {    ///begin_calcSeqLen
+    inline unsigned Data::calcSeqLen() const {
         return std::accumulate(_pattern_counts.begin(), _pattern_counts.end(), 0);
-    }    ///end_calcSeqLen
+    }
 
-    inline unsigned Data::calcSeqLenInSubset(unsigned subset) const {    ///begin_calcSeqLenInSubset
+    inline unsigned Data::calcSeqLenInSubset(unsigned subset) const {
         begin_end_pair_t s = getSubsetBeginEnd(subset);
         return std::accumulate(_pattern_counts.begin() + s.first, _pattern_counts.begin() + s.second, 0);
-    }    ///end_calcSeqLenInSubset
+    }
     
-    inline unsigned Data::buildSubsetSpecificMaps(unsigned ntaxa, unsigned seqlen, unsigned nsubsets) {    ///begin_buildSubsetSpecificMaps
+    inline unsigned Data::buildSubsetSpecificMaps(unsigned ntaxa, unsigned seqlen, unsigned nsubsets) {
         pattern_vect_t pattern(ntaxa);
 
         _pattern_map_vect.clear();
@@ -219,9 +218,9 @@ namespace proj {
         }
         
         return npatterns;
-    }    ///end_buildSubsetSpecificMaps
+    }
 
-    inline void Data::updatePatternMap(Data::pattern_vect_t & pattern, unsigned subset) {    ///begin_updatePatternMap
+    inline void Data::updatePatternMap(Data::pattern_vect_t & pattern, unsigned subset) {
         // If pattern is not already in pattern_map, insert it and set value to 1.
         // If it does exist, increment its current value.
         // (see item 24, p. 110, in Meyers' Efficient STL for more info on the technique used here)
@@ -235,9 +234,9 @@ namespace proj {
             // this pattern has not yet been seen
             _pattern_map_vect[subset].insert(lowb, pattern_map_t::value_type(pattern, 1));
         }
-    }    ///end_updatePatternMap
+    }
 
-    inline void Data::compressPatterns() {    ///begin_compressPatterns
+    inline void Data::compressPatterns() {
         // Perform sanity checks
         if (_data_matrix.empty())
             throw XProj("Attempted to compress an empty data matrix");
@@ -262,7 +261,7 @@ namespace proj {
             row.resize(npatterns);
         }
 
-        unsigned p = 0; ///begin_compresspatterns_mainloop
+        unsigned p = 0;
         for (unsigned subset = 0; subset < nsubsets; subset++) {
             for (auto & pc : _pattern_map_vect[subset]) {
                 _pattern_counts[p] = pc.second; // record how many sites have pattern p
@@ -279,7 +278,7 @@ namespace proj {
                 // constant_state equals 0 if polymorphic or state code of state present if monomorphic
                 _monomorphic[p] = constant_state;
                 ++p;
-            }   ///end_compresspatterns_mainloop
+            }
             
             _subset_end[subset] = p;
 
@@ -287,7 +286,7 @@ namespace proj {
             // so we can now free this memory
             _pattern_map_vect[subset].clear();
         }
-    }    ///end_compressPatterns
+    }
 
     inline unsigned Data::storeTaxonNames(NxsTaxaBlock * taxaBlock, unsigned taxa_block_index) {    ///begin_storeTaxonNames
         unsigned ntax = 0;
@@ -309,9 +308,9 @@ namespace proj {
         }
         
         return ntax;
-    }    ///end_storeTaxonNames
+    }
             
-    inline unsigned Data::storeData(unsigned ntax, unsigned nchar_before, NxsCharactersBlock * charBlock, NxsCharactersBlock::DataTypesEnum datatype) {    ///begin_storeData
+    inline unsigned Data::storeData(unsigned ntax, unsigned nchar_before, NxsCharactersBlock * charBlock, NxsCharactersBlock::DataTypesEnum datatype) {
         unsigned seqlen = 0;
         
         // Find the data type for the partition subset containing the first site in this NxsCharactersBlock
@@ -401,9 +400,9 @@ namespace proj {
         }
         
         return seqlen;
-    }    ///end_storeData
+    }
 
-    inline void Data::getDataFromFile(const std::string filename) {    ///begin_getDataFromFile
+    inline void Data::getDataFromFile(const std::string filename) {
         // See http://phylo.bio.ku.edu/ncldocs/v2.1/funcdocs/index.html for documentation
         //
         // -1 means "process all blocks found" (this is a bit field and -1 fills the bit field with 1s)
@@ -448,7 +447,7 @@ namespace proj {
                 NxsCharactersBlock::DataTypesEnum datatype = charBlock->GetOriginalDataType();
                 cum_nchar += storeData(ntax, cum_nchar, charBlock, datatype);
             }
-        }   ///end_mainloop
+        }
 
         // No longer any need to store raw data from nexus file
         nexusReader.DeleteBlocksFromFactories();
@@ -461,6 +460,6 @@ namespace proj {
         else {
             compressPatterns();
         }
-    }    ///end_getDataFromFile
+    }
     
-}   ///end
+}

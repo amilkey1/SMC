@@ -62,18 +62,16 @@ namespace proj {
             const unsigned                              _infinity;
     };
     
-    // member function bodies here
-    ///end_class_declaration
-    inline Partition::Partition() : _infinity(std::numeric_limits<unsigned>::max()) {   ///begin_constructor
+    inline Partition::Partition() : _infinity(std::numeric_limits<unsigned>::max()) {
         //std::cout << "Constructing a Partition" << std::endl;
         clear();
     }
 
     inline Partition::~Partition() {
         //std::cout << "Destroying a Partition" << std::endl;
-    }   ///end_destructor
+    }
 
-    inline unsigned Partition::getNumSites() const {    ///begin_getNumSites
+    inline unsigned Partition::getNumSites() const {
         return _num_sites;
     }
     
@@ -97,16 +95,16 @@ namespace proj {
 
     inline const std::vector<DataType> & Partition::getSubsetDataTypes() const {
         return _subset_data_types;
-    }    ///end_getSubsetDataTypes
+    }
 
-    inline unsigned Partition::findSubsetByName(const std::string & subset_name) const {    ///begin_findSubsetByName
+    inline unsigned Partition::findSubsetByName(const std::string & subset_name) const {
         auto iter = std::find(_subset_names.begin(), _subset_names.end(), subset_name);
         if (iter == _subset_names.end())
             throw XProj(boost::format("Specified subset name \"%s\" not found in partition") % subset_name);
         return (unsigned)std::distance(_subset_names.begin(),iter);
-    }    ///end_findSubsetByName
+    }
 
-    inline unsigned Partition::findSubsetForSite(unsigned site_index) const {    ///begin_findSubsetForSite
+    inline unsigned Partition::findSubsetForSite(unsigned site_index) const {
         for (auto & t : _subset_ranges) {
             unsigned begin_site = std::get<0>(t);
             unsigned end_site = std::get<1>(t);
@@ -117,14 +115,14 @@ namespace proj {
                 return site_subset;
         }
         throw XProj(boost::format("Site %d not found in any subset of partition") % (site_index + 1));
-    }    ///end_findSubsetForSite
+    }
     
-    inline bool Partition::siteInSubset(unsigned site_index, unsigned subset_index) const {    ///begin_siteInSubset
+    inline bool Partition::siteInSubset(unsigned site_index, unsigned subset_index) const {
         unsigned which_subset = findSubsetForSite(site_index);
         return (which_subset == subset_index ? true : false);
-    }    ///end_siteInSubset
+    }
     
-    inline unsigned Partition::numSitesInSubset(unsigned subset_index) const {    ///begin_numSitesInSubset
+    inline unsigned Partition::numSitesInSubset(unsigned subset_index) const {
         unsigned nsites = 0;
         for (auto & t : _subset_ranges) {
             unsigned begin_site = std::get<0>(t);
@@ -137,9 +135,9 @@ namespace proj {
             }
         }
         return nsites;
-    }    ///end_numSitesInSubset
+    }
     
-    inline std::vector<unsigned> Partition::calcSubsetSizes() const {    ///begin_calcSubsetSizes
+    inline std::vector<unsigned> Partition::calcSubsetSizes() const {
         assert(_num_sites > 0); // only makes sense to call this function after subsets are defined
         std::vector<unsigned> nsites_vect(_num_subsets, 0);
         for (auto & t : _subset_ranges) {
@@ -152,9 +150,9 @@ namespace proj {
             nsites_vect[site_subset] += n;
         }
         return nsites_vect;
-    }    ///end_calcSubsetSizes
+    }
     
-    inline void Partition::clear() {    ///begin_clear
+    inline void Partition::clear() {
         _num_sites = 0;
         _num_subsets = 1;
         _subset_data_types.clear();
@@ -165,7 +163,7 @@ namespace proj {
         _subset_ranges.push_back(std::make_tuple(1, _infinity, 1, 0));
     }    ///end_clear
     
-    inline void Partition::parseSubsetDefinition(std::string & s) {    ///begin_parseSubsetDefinition
+    inline void Partition::parseSubsetDefinition(std::string & s) {
         std::vector<std::string> v;
         
         // first separate part before colon (stored in v[0]) from part after colon (stored in v[1])
@@ -241,17 +239,17 @@ namespace proj {
         addSubset(_num_subsets - 1, subset_definition);
 
         std::cout << boost::str(boost::format("Partition subset %s comprises sites %s and has type %s") % subset_name % subset_definition % datatype) << std::endl;
-    }    ///end_parseSubsetDefinition
+    }
     
-    inline void Partition::addSubset(unsigned subset_index, std::string subset_definition) {    ///begin_addSubset
+    inline void Partition::addSubset(unsigned subset_index, std::string subset_definition) {
         std::vector<std::string> parts;
         boost::split(parts, subset_definition, boost::is_any_of(","));
         for (auto subset_component : parts) {
             addSubsetRange(subset_index, subset_component);
         }
-    }    ///end_addSubset
+    }
     
-    inline void Partition::addSubsetRange(unsigned subset_index, std::string range_definition) {    ///begin_addSubsetRange
+    inline void Partition::addSubsetRange(unsigned subset_index, std::string range_definition) {
         // match patterns like these: "1-.\3" "1-1000" "1001-."
         const char * pattern_string = R"((\d+)\s*(-\s*([0-9.]+)(\\\s*(\d+))*)*)";   ///regex
         std::regex re(pattern_string);
@@ -280,9 +278,9 @@ namespace proj {
         if (last_site_in_subset > _num_sites) {
             _num_sites = last_site_in_subset;
         }
-    }    ///end_addSubsetRange
+    }
     
-    inline int Partition::extractIntFromRegexMatch(regex_match_t s, unsigned min_value) {    ///begin_extractIntFromRegexMatch
+    inline int Partition::extractIntFromRegexMatch(regex_match_t s, unsigned min_value) {
         int int_value = min_value;
         if (s.length() > 0) {
             std::string str_value = s.str();
@@ -299,9 +297,9 @@ namespace proj {
             }
         }
         return int_value;
-    }    ///end_extractIntFromRegexMatch
+    }
     
-    inline void Partition::finalize(unsigned nsites) {    ///begin_finalize
+    inline void Partition::finalize(unsigned nsites) {
         if (_num_sites == 0) {
             defaultPartition(nsites);
             return;
@@ -334,13 +332,13 @@ namespace proj {
             throw XProj("Some sites were not included in any partition subset");
         }
         tmp.clear();
-    }    ///end_finalize
+    }
     
-    inline void Partition::defaultPartition(unsigned nsites) {    ///begin_defaultPartition
+    inline void Partition::defaultPartition(unsigned nsites) {
         clear();
         _num_sites = nsites;
         _num_subsets = 1;
         _subset_ranges[0] = std::make_tuple(1, nsites, 1, 0);
-    }    ///end_defaultPartition
+    }
     
-}   ///end
+}
