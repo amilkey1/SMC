@@ -4,6 +4,7 @@
 #include <vector>
 #include  <iostream>
 #include "split.hpp"
+#include "partial_store.hpp"
 
 namespace proj {
 
@@ -29,28 +30,28 @@ namespace proj {
                     std::string         getName()                   {return _name;}
                     Split               getSplit()                  {return _split;}
         
-                    bool                isSelected()                {return _flags & Flag::Selected;}
-                    void                select()                    {_flags |= Flag::Selected;}
-                    void                deselect()                  {_flags &= ~Flag::Selected;}
-
-                    bool                isSelPartial()              {return _flags & Flag::SelPartial;}
-                    void                selectPartial()             {_flags |= Flag::SelPartial;}
-                    void                deselectPartial()           {_flags &= ~Flag::SelPartial;}
-
-                    bool                isSelTMatrix()              {return _flags & Flag::SelTMatrix;}
-                    void                selectTMatrix()             {_flags |= Flag::SelTMatrix;}
-                    void                deselectTMatrix()           {_flags &= ~Flag::SelTMatrix;}
-
-                    bool                isAltPartial()              {return _flags & Flag::AltPartial;}
-                    void                setAltPartial()             {_flags |= Flag::AltPartial;}
-                    void                clearAltPartial()           {_flags &= ~Flag::AltPartial;}
-
-                    bool                isAltTMatrix()              {return _flags & Flag::AltTMatrix;}
-                    void                setAltTMatrix()             {_flags |= Flag::AltTMatrix;}
-                    void                clearAltTMatrix()           {_flags &= ~Flag::AltTMatrix;}
-                    
-                    void                flipTMatrix()               {isAltTMatrix() ? clearAltTMatrix() : setAltTMatrix();}
-                    void                flipPartial()               {isAltPartial() ? clearAltPartial() : setAltPartial();}
+//                    bool                isSelected()                {return _flags & Flag::Selected;}
+//                    void                select()                    {_flags |= Flag::Selected;}
+//                    void                deselect()                  {_flags &= ~Flag::Selected;}
+//
+//                    bool                isSelPartial()              {return _flags & Flag::SelPartial;}
+//                    void                selectPartial()             {_flags |= Flag::SelPartial;}
+//                    void                deselectPartial()           {_flags &= ~Flag::SelPartial;}
+//
+//                    bool                isSelTMatrix()              {return _flags & Flag::SelTMatrix;}
+//                    void                selectTMatrix()             {_flags |= Flag::SelTMatrix;}
+//                    void                deselectTMatrix()           {_flags &= ~Flag::SelTMatrix;}
+//
+//                    bool                isAltPartial()              {return _flags & Flag::AltPartial;}
+//                    void                setAltPartial()             {_flags |= Flag::AltPartial;}
+//                    void                clearAltPartial()           {_flags &= ~Flag::AltPartial;}
+//
+//                    bool                isAltTMatrix()              {return _flags & Flag::AltTMatrix;}
+//                    void                setAltTMatrix()             {_flags |= Flag::AltTMatrix;}
+//                    void                clearAltTMatrix()           {_flags &= ~Flag::AltTMatrix;}
+//
+//                    void                flipTMatrix()               {isAltTMatrix() ? clearAltTMatrix() : setAltTMatrix();}
+//                    void                flipPartial()               {isAltPartial() ? clearAltPartial() : setAltPartial();}
 
                     double              getEdgeLength()             {return _edge_length;}
                     void                setEdgeLength(double v);
@@ -84,6 +85,7 @@ namespace proj {
             double              _edge_length;
             Split               _split;
             int                 _flags;
+            PartialStore::partial_t _partial;
     };
     
     

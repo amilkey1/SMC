@@ -12,6 +12,9 @@
 using namespace std;
 using namespace boost;
 
+#include "partial_store.hpp"
+extern proj::PartialStore ps;
+
 namespace proj {
 
     class Proj {
@@ -294,7 +297,8 @@ namespace proj {
             _data->getDataFromFile(_data_file_name);
 
             summarizeData(_data);
-
+            ps.setnelements(4*_data->getNumPatterns());
+            
             //set number of species to number in data file
             unsigned nspecies = setNumberSpecies(_data);
             rng.setSeed(_random_seed);
@@ -354,6 +358,7 @@ namespace proj {
             sum_h/=my_vec.size();
             cout << "mean height equals " << sum_h << endl;
             cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
+            cout << "theta = " << Forest::_theta << endl;
 
             saveAllForests(my_vec);
             

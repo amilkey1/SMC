@@ -17,6 +17,9 @@
 #include "lot.hpp"
 proj::Lot rng;
 
+#include "partial_store.hpp"
+proj::PartialStore ps;
+
 using namespace proj;
 using namespace std;
 
@@ -28,6 +31,7 @@ unsigned     Proj::_major_version       = 1;
 unsigned     Proj::_minor_version       = 0;
 
 unsigned Forest::_nspecies = 4;
+double Forest::_theta = 0.05;
 const double Node::_smallest_edge_length=1.0e-12;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = { ///!start_definitions
