@@ -24,7 +24,7 @@ unsigned Forest::_nspecies = 4;
 double Forest::_theta = 0.05;
 const double Node::_smallest_edge_length=1.0e-12;
 
-GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = { ///!start_definitions
+GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT
     {"standard",             "KNKNTTTTRSRSIIMIQHQHPPPPRRRRLLLLEDEDAAAAGGGGVVVV*Y*YSSSS*CWCLFLF"},
     {"vertmito",             "KNKNTTTT*S*SMIMIQHQHPPPPRRRRLLLLEDEDAAAAGGGGVVVV*Y*YSSSSWCWCLFLF"},

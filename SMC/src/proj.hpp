@@ -43,6 +43,7 @@ namespace proj {
             bool                        _ambig_missing;
             unsigned                    _nparticles;
             unsigned                    _random_seed;
+            double                      _theta;
 
 
             static std::string           _program_name;
@@ -97,6 +98,7 @@ namespace proj {
         ("ambigmissing",  boost::program_options::value(&_ambig_missing)->default_value(true), "treat all ambiguities as missing data")
         ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000), "number of particles")
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
+        ("theta, t", boost::program_options::value(&_theta)->default_value(0.05), "theta")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -129,7 +131,7 @@ namespace proj {
                 _partition->parseSubsetDefinition(s);
             }
         }
-    }   ///end_processCommandLineOptions
+    }
 
     inline void Proj::summarizeData(Data::SharedPtr) {
         // Report information about data partition subsets
@@ -266,6 +268,7 @@ namespace proj {
         std::cout << "Starting..." << std::endl;
         std::cout << "Current working directory: " << boost::filesystem::current_path() << std::endl;
         std::cout << "Random seed: " << _random_seed << std::endl;
+        std::cout << "Theta: " << _theta << std::endl;
 
         try {
             std::cout << "\n*** Reading and storing the data in the file " << _data_file_name << std::endl;
@@ -280,6 +283,8 @@ namespace proj {
             //set number of species to number in data file
             unsigned nspecies = setNumberSpecies(_data);
             rng.setSeed(_random_seed);
+            
+            Forest::setTheta(_theta);
 
 //          create vector of particles
             unsigned nparticles = _nparticles;

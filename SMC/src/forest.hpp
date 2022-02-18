@@ -47,6 +47,7 @@ class Forest {
         unsigned                    numNodes() const;
         void                        showForest();
         static void                 setNumSpecies(unsigned n);
+        static void                 setTheta(double t);
         double                      calcLogLikelihood();
         void                        createDefaultTree();
         void operator=(const Forest & other);
@@ -335,6 +336,10 @@ inline std::string Forest::makeNewick(unsigned precision, bool use_names) const 
 inline void Forest::setNumSpecies(unsigned n){
     //TODO be careful, this function should not be called after forests have already been created
     _nspecies=n;
+}
+
+inline void Forest::setTheta(double t) {
+    _theta=t;
 }
 
 inline pair<unsigned, unsigned> Forest::chooseTaxaToJoin(){
