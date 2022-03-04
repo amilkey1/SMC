@@ -44,13 +44,13 @@ class Particle {
         double                                  _log_weight;
         Data::SharedPtr                          _data;
         double                                  _log_likelihood;
-        unsigned                                _n;
+//        unsigned                                _n;
 };
 
 inline Particle::Particle() {
     //log weight and log likelihood are 0 for first generation
     _log_weight = 0.0;
-    _n = 0;
+//    _n = 0;
     _log_likelihood = 0.0;
 };
 
@@ -59,7 +59,7 @@ inline void Particle::showParticle() {
     cout << "\nParticle:\n";
     cout << "  _log_weight: " << _log_weight << "\n" ;
     cout << "  _forest: " << "\n";
-//    _forest.showForest();
+    _forest.showForest();
 //    cout << "  _log_likelihood: " << _log_likelihood << endl;
 }
 
@@ -76,13 +76,16 @@ inline void Particle::debugParticle(std::string name) {
     cout << "  _forest._nsubtrees:        " << _forest._nsubtrees          << "\n";
 //    cout << "  _forest._speciation_rate:  " << _forest._speciation_rate    << "\n";
     cout << "  _forest._last_edge_length: " << _forest._last_edge_length   << "\n";
-    cout << "  _forest._new_basal_height: " << _forest._new_basal_height.first << ", " << _forest._new_basal_height.second << "\n";
-    cout << "  _forest._old_basal_height: " << _forest._old_basal_height.first << ", " << _forest._old_basal_height.second << "\n";
+//    cout << "  _forest._new_basal_height: " << _forest._new_basal_height.first << ", " << _forest._new_basal_height.second << "\n";
+//    cout << "  _forest._old_basal_height: " << _forest._old_basal_height.first << ", " << _forest._old_basal_height.second << "\n";
     cout << "  newick description:        " << _forest.makeNewick(5,false) << "\n";
 }
 
 inline double Particle::calcLogLikelihood() {
+    
     double log_likelihood = _forest.calcLogLikelihood();
+//    showParticle();
+//    _forest.showForest();
     assert(!isnan (log_likelihood));
 //    cout << "log likelihood equals " << log_likelihood << endl;
 
@@ -98,8 +101,10 @@ inline double Particle::proposal() {
     //cout << format("\nold weight: %.5f + %.5f\n") % _forest._old_basal_height.second % prev_log_likelihood;
     //cout << format("new weight: %.5f + %.5f\n") % _forest._new_basal_height.second % _log_likelihood;
 
-    _log_weight = _forest._new_basal_height.second + _log_likelihood - _forest._old_basal_height.second - prev_log_likelihood;
-    _n++;
+//    _log_weight = _forest._new_basal_height.second + _log_likelihood - _forest._old_basal_height.second - prev_log_likelihood;
+    _log_weight = _log_likelihood - prev_log_likelihood;
+
+//    _n++;
     return _log_weight;
 }
 

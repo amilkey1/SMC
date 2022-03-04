@@ -139,7 +139,7 @@ namespace proj {
         std::cout << "\nNumber of taxa: " << _data->getNumTaxa() << std::endl;
 
         std::cout << "Number of partition subsets: " << nsubsets << std::endl;
-        
+
         std::cout << "Number of particles: " << _nparticles << std::endl;
 
         for (unsigned subset = 0; subset < nsubsets; subset++) {
@@ -203,7 +203,7 @@ namespace proj {
         for (auto & p : particles) {
             p.setLogWeight(p.getLogWeight() - log_particle_sum);
         }
-        
+
         _log_marginal_likelihood += log_particle_sum - log(_nparticles);
     }
 
@@ -225,6 +225,8 @@ namespace proj {
 
     inline void Proj::resampleParticles(vector<Particle> & from_particles, vector<Particle> & to_particles) {
         // throw darts
+        
+        //all vectors are correct here
         unsigned nparticles = (unsigned)from_particles.size();
         vector<double> darts(nparticles, 0.0);
         for(unsigned i = 0; i < nparticles; i++) {
@@ -233,6 +235,8 @@ namespace proj {
         }
 
         // show darts
+        
+        //from_particles is correct here
         double cumw = 0.0;
         unsigned cumd = 0;
 //        cout << format("\n%12s %12s %12s\n") % "particle" % "weight" % "darts";
@@ -245,6 +249,8 @@ namespace proj {
 //        cout << format("%12s %12.5f %12d\n") % " " % cumw % cumd;
 
         // create new particle vector
+        
+        //from_particles is correct here
         unsigned m = 0;
         for (unsigned i = 0; i < nparticles; i++) {
             for (unsigned k = 0; k < darts[i]; k++) {
@@ -279,11 +285,11 @@ namespace proj {
 
             summarizeData(_data);
             ps.setnelements(4*_data->getNumPatterns());
-            
+
             //set number of species to number in data file
             unsigned nspecies = setNumberSpecies(_data);
             rng.setSeed(_random_seed);
-            
+
             Forest::setTheta(_theta);
 
 //          create vector of particles
@@ -305,25 +311,53 @@ namespace proj {
                 double log_weight = 0.0;
 
                 //taxon joining and reweighting step
+                unsigned k = 0;
+                unsigned total = my_vec.size();
+                
+                
                 for (auto & p:my_vec) {
                     log_weight = p.proposal();
                     log_weight_vec.push_back(log_weight);
+                    
+//                    if (g == 4) {
+//                        cout << "x" << endl;
+//                    }
+                    
+                    // last particle in generation 6
+//                    if (k == 0 && g==5) {
+//                        cout << "stop" << endl;
+//                        saveAllForests(my_vec);
+////                        p.showParticle();
+//                    }
+                    k++;
+                    
+//                    p.showParticle();
                 }
-                
+
                 normalizeWeights(my_vec);
-                
+
+                //my_vec, my_vec_1, and my_vec_2 are correct here
                 resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
-                
+
                 //if use_first is true, my_vec = my_vec_2
                 //if use_first if alse, my_vec = my_vec_1
-                my_vec = use_first ? my_vec_2:my_vec_1;
                 
+                
+                //my_vec_2[1] is wrong, it's a copy of my_vec_2[0] and it shouldn't be
+                //my_vec_2[1] doesn't have partials assigned, so it's copying them from the first particle
+                my_vec = use_first ? my_vec_2:my_vec_1;
+
                 //change use_first from true to false or false to true
                 use_first = !use_first;
-                                
+
                 resetWeights(my_vec);
+                
+//                if (g==1) {
+//                saveAllForests(my_vec);
+//                }
+                
             } // g loop
-            
+
             double sum_h = 0.0;
             for (auto & p:my_vec) {
                 double h = p.calcHeight();

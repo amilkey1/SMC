@@ -71,7 +71,7 @@ class Forest {
         pair<double, double>        proposeBasalHeight();
         unsigned                    countNumberTrees() const;
         void                        calcPartialArray(Node* new_nd);
-        
+
 
         Node *                      _root;
         std::vector<Node *>         _preorder;
@@ -87,12 +87,13 @@ class Forest {
         unsigned                    _nsubtrees;
         double                      _last_edge_length;
 //        double                      _speciation_rate;
-        pair <double, double>       _new_basal_height;
-        pair <double, double>       _old_basal_height;
+//        pair <double, double>       _new_basal_height;
+//        pair <double, double>       _old_basal_height;
 
         Data::SharedPtr             _data;
         static unsigned             _nspecies;
 //        unsigned                    _num_lineages;
+        bool                        _fullyresolved;
 
     public:
         typedef std::shared_ptr<Forest> SharedPtr;
@@ -118,7 +119,8 @@ inline void Forest::clear() {
     _npatterns = 0;
     _nstates = 4;
     _nsubtrees = _nspecies;
-    
+    _fullyresolved = false;
+
     //creating root node
     _root = &_nodes[_nspecies];
     _root->_name="root";
@@ -139,8 +141,8 @@ inline void Forest::clear() {
     _root->_left_child=subroot;
 
     //initialize basal heights to 0 for first particle
-    _old_basal_height = make_pair(0.0, 0.0);
-    _new_basal_height = make_pair(0.0, 0.0);
+//    _old_basal_height = make_pair(0.0, 0.0);
+//    _new_basal_height = make_pair(0.0, 0.0);
     //create species
     for (unsigned i = 0; i < _nspecies; i++) {
         Node* nd=&_nodes[i];
@@ -173,22 +175,8 @@ inline void Forest::setData(Data::SharedPtr d) {
     const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
     unsigned i = 0;
     auto data_matrix=_data->getDataMatrix();
-//    for (unsigned j=0; j<_nspecies; j++) {
-//        assert(_partials[j]==nullptr);
-//            //leaf node
-//                _partials[j] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
-//                for (unsigned p=0; p<_npatterns; p++) {
-//                    for (unsigned s=0; s<_nstates; s++) {
-//                        Data::state_t state = (Data::state_t)1 << s;
-//                        Data::state_t d = data_matrix[j][p];
-//                        double result = state & d;
-//                        (*_partials[j])[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
-//                    }
-//                }
-////        _partials[j]=boost::shared_ptr<partial_array_t> (new partial_array_t(_npatterns * _nstates));
-//    }
+
     for (auto nd:_preorder) {
-//        _partials[nd->_number].resize(_npatterns * _nstates);
         if (!nd->_left_child) {
             // replace all spaces with underscores so that other programs do not have
               // trouble parsing your tree descriptions
@@ -196,7 +184,7 @@ inline void Forest::setData(Data::SharedPtr d) {
               boost::replace_all(name, " ", "_");
               nd->_name = name;
             nd->_partial=ps.getPartial();
-            
+
             for (unsigned p=0; p<_npatterns; p++) {
                 for (unsigned s=0; s<_nstates; s++) {
                     Data::state_t state = (Data::state_t)1 << s;
@@ -356,6 +344,10 @@ inline pair<unsigned, unsigned> Forest::chooseTaxaToJoin(){
             t2 = ::rng.randint(0, nsubtrees-1);
         }
     }
+    else {
+        //only 2 taxa to join
+        _fullyresolved = true;
+    }
     return make_pair(t1, t2);
 }
 
@@ -369,19 +361,21 @@ inline unsigned Forest::countNumberTrees() const{
     return n;
 }
 
-inline pair<double, double> Forest::proposeBasalHeight() {
-    return make_pair(1000.0, 0.0);
-}
+//inline pair<double, double> Forest::proposeBasalHeight() {
+//    return make_pair (1000.0, 0.0);
+//}
 
 inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
     unsigned s = countNumberTrees();
     double u = rng.uniform();
     double coalescence_rate = s*(s-1)/_theta;
     _last_edge_length = -log(1-u)/coalescence_rate;
+    
+//    cout << "last edge length: " << _last_edge_length << endl;
+
     for (auto nd:_preorder) {
-        //if node's parent is subroot, subtract basal height and add new branch length
+        //if node's parent is subroot, add new branch length
         if (nd->_parent==_root->_left_child){
-            nd->_edge_length -= _new_basal_height.first; //subtract old basal height from each node whose parent is subroot
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each node whose parent is subroot
         }
     }
@@ -402,64 +396,62 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
         new_nd->_parent=_root->_left_child;
         new_nd->_number=_nleaves+_ninternals;
 
-        new_nd->_name=" ";
-        new_nd->_left_child=subtree1;
-        new_nd->_right_sib=0;
-        new_nd->_edge_length=0.0;
+//        if (new_nd->_number ==23) {
+//            cout << "nd 23" << endl;
+//        }
 
         _ninternals++;
-        subtree1 -> _right_sib=subtree2;
+        insertSubtreeOnLeft(new_nd, _root->_left_child);
+    }
+
+        new_nd->_name=" ";
+        new_nd->_left_child=subtree1;
+//        new_nd->_right_sib=0;
+        new_nd->_edge_length=0.0;
+
+        subtree1->_right_sib=subtree2;
         subtree1->_parent=new_nd;
         subtree2->_parent=new_nd;
-
-        insertSubtreeOnLeft(new_nd, _root->_left_child);
 
         refreshPreorder();
 
         assert (new_nd->_partial == nullptr);
-//        _partials[new_nd->_number] = boost::shared_ptr<partial_array_t> (new partial_array_t(_nstates*_npatterns));
         new_nd->_partial=ps.getPartial();
         assert(new_nd->_left_child->_right_sib);
         calcPartialArray(new_nd);
-
-        //once new taxa have been joined, add new basal height to finish off tree
-        _old_basal_height = _new_basal_height;
-        _new_basal_height = proposeBasalHeight();
-
-        for (auto nd:_preorder) {
-            if (nd->_parent==_root->_left_child){
-                    nd->_edge_length += _new_basal_height.first;
-                }
-            }
-        }
-
-    //last generation
-    else {
-        new_nd->_name=" ";
-        new_nd->_left_child=subtree1;
-        new_nd->_right_sib=0;
-        new_nd->_edge_length=0.0;
-
-        _ninternals++;
-        subtree1 -> _right_sib=subtree2;
-        subtree1->_parent=new_nd;
-        subtree2->_parent=new_nd;
-
-        refreshPreorder();
+    
+    ofstream outf(boost::str(boost::format("node %d.txt")%new_nd->_number));
+    outf << makeNewick(9, true) << endl;
+    outf << "left child = " << new_nd->_left_child->_number << endl;
+    outf << "left child edge length = " << new_nd->_left_child->_edge_length << endl;
+    outf << "right child = " << new_nd->_left_child->_right_sib->_number << endl;
+    outf << "right child edge length = " << new_nd->_left_child->_right_sib->_edge_length << endl;
+    double k=0;
+    for (unsigned p=0; p<_npatterns; p++) {
+        outf << "[" << k << "]  "<< (*new_nd->_partial)[p] << endl;
+            k++;
     }
+    outf.close();
+    
 }
 
 inline void Forest::calcPartialArray(Node* new_nd) {
-        auto & parent_partial_array = *(new_nd->_partial);
-
+    auto & parent_partial_array = *(new_nd->_partial);
     for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
-
         double expterm = exp(-4.0*(child->_edge_length)/3.0);
         double prsame = 0.25+0.75*expterm;
         double prdif = 0.25 - 0.25*expterm;
 
         auto & child_partial_array = *(child->_partial);
+        
+//        if (new_nd->_number == 25) {
+//        cout << "child partial at 0: " << child_partial_array[0] << endl;
+//        }
+        
         for (unsigned p = 0; p < _npatterns; p++) {
+//            if (new_nd->_number == 25) {
+//            cout << "p: " << p << endl;
+//            }
             for (unsigned s = 0; s <_nstates; s++) {
                 double sum_over_child_states = 0.0;
                 for (unsigned s_child = 0; s_child < _nstates; s_child++) {
@@ -467,12 +459,30 @@ inline void Forest::calcPartialArray(Node* new_nd) {
 //                    assert(_partials[child->_number] != nullptr);
                     double child_partial = child_partial_array[p*_nstates + s_child];
                     sum_over_child_states += child_transition_prob * child_partial;
+                    
+//                    if (new_nd->_number == 25) {
+//                        cout << "child partial at 0: " << child_partial_array[0] << endl;
+//                    }
+                    
                 }   // child state loop
                 if (child == new_nd->_left_child)
                     parent_partial_array[p*_nstates+s] = sum_over_child_states;
                 else
+                    //child partial is wrong the firs time through here
                     parent_partial_array[p*_nstates+s] *= sum_over_child_states;
+//                if (new_nd->_number == 25) {
+//                    cout << "sum over child states: " << sum_over_child_states << endl;
+//                }
             }   // parent state loop
+//            if (new_nd->_number == 25) {
+//                cout << "parent partial array: " << parent_partial_array[p*0] << endl;
+//                cout << "parent partial array: " << parent_partial_array[p*1] << endl;
+//                cout << "parent partial array: " << parent_partial_array[p*2] << endl;
+//                cout << "parent partial array: " << parent_partial_array[p*3] << endl;
+//            }
+//            if (p==326 && new_nd->_number == 25) { //4x
+//                cout << "STOP" << endl;
+//            }
         }   // pattern loop
     }   // child loop
 }
@@ -540,40 +550,38 @@ inline unsigned Forest::getNumSubtrees() {
 }
 
 inline double Forest::calcLogLikelihood() {
+//    showForest();
     auto data_matrix=_data->getDataMatrix();
     // need to always recalculate partials for subroot
     // if subroot partial array doesn't exist, create it
     Node* subroot = _root->_left_child;
-    
-    // recalculate subroot partials
+
     assert(subroot->_left_child->_right_sib);
 
 //    compute log likelihood of every subtree whose parent is subroot
     auto counts = _data->getPatternCounts();
     double composite_log_likelihood = 0.0;
-    for (auto nd=subroot->_left_child; nd; nd=nd->_right_sib) {
+    
+    //if tree is fully resolved, calc likelihood from root
+    Node* base_node=_fullyresolved ? _root : subroot;
+    for (auto nd=base_node->_left_child; nd; nd=nd->_right_sib) {
         
         double log_like = 0.0;
         for (unsigned p=0; p<_npatterns; p++) {
             double site_like = 0.0;
             for (unsigned s=0; s<_nstates; s++) {
+
+                double partial = (*nd->_partial)[p*_nstates+s];
                 
-                double expterm = exp(-4.0*(nd->_edge_length)/3.0);
-                double prsame = 0.25+0.75*expterm;
-                double prdif = 0.25 - 0.25*expterm;
-                
-                for (unsigned ss=0; ss<_nstates; ss++) {
-                    double child_transition_prob = (s == ss ? prsame : prdif);
-                    site_like += 0.25*child_transition_prob*(*nd->_partial)[p*_nstates+ss];
-                }
+                site_like += 0.25*partial;
             }
+//            double log_site_like = log(site_like);
+            
             log_like += log(site_like)*counts[p];
         }
         composite_log_likelihood += log_like;
     }
-    
-//    cout << "log likelihood is " << composite_log_likelihood << endl;
-
+//    cout << "comp log like " << composite_log_likelihood << endl;
     return composite_log_likelihood;
 }
 
@@ -697,8 +705,8 @@ inline void Forest::operator=(const Forest & other) {
     _nleaves          = other._nleaves;
     _ninternals       = other._ninternals;
     _last_edge_length = other._last_edge_length;
-    _old_basal_height = other._old_basal_height;
-    _new_basal_height = other._new_basal_height;
+
+
     // copy tree itself
     assert(other._root->_number == _nspecies);
     assert(other._root->_left_child->_number == _nspecies + 1);
@@ -721,11 +729,15 @@ inline void Forest::operator=(const Forest & other) {
         // copy parent
         assert(othernd->_parent);
         unsigned parent_number = othernd->_parent->_number;
+//        shared_ptr<std::vector<double>> _partial = othernd->_parent->_partial;
+        PartialStore::partial_t _partial = othernd->_parent->_partial;
+        
         _nodes[k]._parent = &_nodes[parent_number];
 
         // copy left child
         if (othernd->_left_child) {
             unsigned left_child_number = othernd->_left_child->_number;
+            PartialStore::partial_t _partial = othernd->_left_child->_partial;
             _nodes[k]._left_child = &_nodes[left_child_number];
         }
         else
@@ -734,6 +746,7 @@ inline void Forest::operator=(const Forest & other) {
         // copy right sibling
         if (othernd->_right_sib) {
             unsigned right_sib_number = othernd->_right_sib->_number;
+            PartialStore::partial_t _partial = othernd->_right_sib->_partial;
             _nodes[k]._right_sib = &_nodes[right_sib_number];
         }
         else
@@ -742,6 +755,7 @@ inline void Forest::operator=(const Forest & other) {
         _nodes[k]._number      = othernd->_number;
         _nodes[k]._name        = othernd->_name;
         _nodes[k]._edge_length = othernd->_edge_length;
+        _nodes[k]._partial = othernd->_partial;
 
         i++;
     }
