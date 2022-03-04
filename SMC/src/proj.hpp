@@ -17,6 +17,7 @@ namespace proj {
 
     class Proj {
         public:
+        
                                 Proj();
                                 ~Proj();
 
@@ -27,10 +28,8 @@ namespace proj {
 
             void                normalizeWeights(vector<Particle> & particles);
             unsigned            chooseRandomParticle(vector<Particle> & particles, vector<double> & cum_prob);
-//            unsigned            chooseRandomParticle(vector<double> & cum_prob);
             void                resampleParticles(vector<Particle> & from_particles, vector<Particle> & to_particles);
             void                resetWeights(vector<Particle> & particles);
-            void                debugNormalizedWeights(const vector<Particle> & particles) const;
             void                calcMarginalLikelihood(double weight_average);
             double              getWeightAverage(vector<double> log_weight_vec);
 
@@ -51,7 +50,6 @@ namespace proj {
             static unsigned              _major_version;
             static unsigned              _minor_version;
             void                          summarizeData(Data::SharedPtr);
-            void                          printFirstParticle(vector<Particle>);
             unsigned                      setNumberSpecies(Data::SharedPtr);
             double                        getRunningSum(const vector<double> &) const;
 
@@ -138,9 +136,7 @@ namespace proj {
         // Report information about data partition subsets
         unsigned nsubsets = _data->getNumSubsets();
         std::cout << "\nNumber of taxa: " << _data->getNumTaxa() << std::endl;
-
         std::cout << "Number of partition subsets: " << nsubsets << std::endl;
-
         std::cout << "Number of particles: " << _nparticles << std::endl;
 
         for (unsigned subset = 0; subset < nsubsets; subset++) {
@@ -149,14 +145,6 @@ namespace proj {
             std::cout << "    data type: " << dt.getDataTypeAsString() << std::endl;
             std::cout << "    sites:     " << _data->calcSeqLenInSubset(subset) << std::endl;
             std::cout << "    patterns:  " << _data->getNumPatternsInSubset(subset) << std::endl;
-            }
-    }
-
-    inline void Proj::printFirstParticle(vector<Particle> my_vec) {
-//            print out particles at the start
-            cout << "\n Particles at the start: " << endl;
-             for (auto & p:my_vec) {
-                p.showParticle();
             }
     }
 
@@ -180,18 +168,6 @@ namespace proj {
         return log_particle_sum;
     }
 
-    inline void Proj::debugNormalizedWeights(const vector<Particle> & particles) const {
-        cout << format("%12s %12s %12s\n") % "particle" % "weight" % "cumweight";
-        double cumw = 0.0;
-        unsigned i = 0;
-        for (auto p : particles) {
-            double w = exp(p.getLogWeight());
-            cumw += w;
-            cout << format("%12d %12.5f %12.5f\n") % (++i) % w % cumw;
-        }
-        cout << endl;
-    }
-
     inline void Proj::normalizeWeights(vector<Particle> & particles) {
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
@@ -206,11 +182,9 @@ namespace proj {
         }
 
         _log_marginal_likelihood += log_particle_sum - log(_nparticles);
-        
         sort(particles.begin(), particles.end(), greater<Particle>());
     }
 
-#if 1
     inline unsigned Proj::chooseRandomParticle(vector<Particle> & particles, vector<double> & cum_probs) {
         int chosen_index = -1;
         unsigned nparticles = (unsigned)particles.size();
@@ -225,7 +199,6 @@ namespace proj {
             else
                 cum_prob = cum_probs[j];
             
-            
             if (u < cum_prob) {
                 chosen_index = j;
                 break;
@@ -234,55 +207,21 @@ namespace proj {
         assert(chosen_index > -1);
         return chosen_index;
     }
-#else
-inline unsigned Proj::chooseRandomParticle(vector<double> & cum_prob) {
-    int chosen_index = -1;
-    unsigned nparticles = (unsigned)cum_prob.size();
-    double u = rng.uniform();
-    for(unsigned j = 0; j < nparticles; j++) {
-        if (u < cum_prob[j]) {
-            chosen_index = j;
-            break;
-        }
-    }
-    assert(chosen_index > -1);
-    return chosen_index;
-}
-#endif
+
     inline void Proj::resampleParticles(vector<Particle> & from_particles, vector<Particle> & to_particles) {
         unsigned nparticles = (unsigned)from_particles.size();
         vector<double> cum_probs(nparticles, -1.0);
-        
-//        double cum_prob = 0.0;
-//        vector<double> cum_probs(nparticles, 0.0);
-//        for(unsigned j=0; j<nparticles; j++) {
-//            cum_prob += exp(from_particles[j].getLogWeight());
-//            cum_probs[j] = cum_prob;
-//        }
         
         // throw darts
         vector<unsigned> darts(nparticles, 0);
         unsigned max_j = 0;
         for(unsigned i = 0; i < nparticles; i++) {
-//            unsigned j = chooseRandomParticle(cum_probs);
             unsigned j = chooseRandomParticle(from_particles, cum_probs);
             if (j>max_j){
                 max_j = j;
             }
             darts[j]++;
         }
-
-        // show darts
-//        double cumw = 0.0;
-//        unsigned cumd = 0;
-////        cout << format("\n%12s %12s %12s\n") % "particle" % "weight" % "darts";
-//        for (unsigned i = 0; i < nparticles; i++) {
-//            double w = exp(from_particles[i].getLogWeight());
-//            cumw += w;
-//            cumd += darts[i];
-////            cout << format("%12d %12.5f %12d\n") % i % w % darts[i];
-//        }
-//        cout << format("%12s %12.5f %12d\n") % " " % cumw % cumd;
 
         // create new particle vector
         unsigned m = 0;
@@ -336,8 +275,6 @@ inline unsigned Proj::chooseRandomParticle(vector<double> & cum_prob) {
             _log_marginal_likelihood = 0.0;
             //run through each generation of particles
             for (unsigned g=0; g<nspecies-1; g++){
-//                cout << "Generation " << g << endl;
-
                 vector<double> log_weight_vec;
                 double log_weight = 0.0;
 
@@ -348,12 +285,10 @@ inline unsigned Proj::chooseRandomParticle(vector<double> & cum_prob) {
                 }
 
                 normalizeWeights(my_vec);
-
                 resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
 
                 //if use_first is true, my_vec = my_vec_2
                 //if use_first if alse, my_vec = my_vec_1
-                
                 my_vec = use_first ? my_vec_2:my_vec_1;
 
                 //change use_first from true to false or false to true
@@ -382,5 +317,4 @@ inline unsigned Proj::chooseRandomParticle(vector<double> & cum_prob) {
 
         std::cout << "\nFinished!" << std::endl;
     }
-
 }

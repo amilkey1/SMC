@@ -82,7 +82,6 @@ namespace proj {
             subset_end_t                                _subset_end;
     };
 
-    // Member function bodies go below here but above the right curly bracket that ends the namespace block
     inline Data::Data() {
         //std::cout << "Creating a Data object" << std::endl;
         clear();
@@ -121,10 +120,6 @@ namespace proj {
     }
 
     inline const Data::taxon_names_t & Data::getTaxonNames() const {
-//        std::cout << &_taxon_names;
-//        for (auto i: _taxon_names) {
-//            std::cout << i << std::endl;
-//        }
         return _taxon_names;
     }
 

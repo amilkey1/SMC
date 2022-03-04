@@ -7,6 +7,7 @@ namespace proj {
 
     class DataType {
         public:
+        
                                             DataType();
                                             ~DataType();
 

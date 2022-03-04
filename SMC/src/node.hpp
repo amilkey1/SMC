@@ -94,5 +94,4 @@ namespace proj {
         }
         return n_children;
     }
-
 }

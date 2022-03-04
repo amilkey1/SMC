@@ -47,7 +47,6 @@
 		22A40D782710B11F00DFFCA0 /* libboost_atomic.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libboost_atomic.a; path = ../libraries/static/libboost_atomic.a; sourceTree = "<group>"; };
 		22A40D7A2710B14D00DFFCA0 /* libhmsbeagle.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libhmsbeagle.1.dylib; path = ../../../lib/libhmsbeagle.1.dylib; sourceTree = "<group>"; };
 		22A40D7C2710B96D00DFFCA0 /* AVKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVKit.framework; path = System/Library/Frameworks/AVKit.framework; sourceTree = SDKROOT; };
-		22A40D8427134F9100DFFCA0 /* proj.conf */ = {isa = PBXFileReference; lastKnownFileType = text; path = proj.conf; sourceTree = "<group>"; };
 		22A40D852713541300DFFCA0 /* rbcl10.nex */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = rbcl10.nex; sourceTree = "<group>"; };
 		22A40D872715F29100DFFCA0 /* likelihood.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = likelihood.hpp; sourceTree = "<group>"; };
 		22BD6F8F2707555A00DEB698 /* forest.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = forest.hpp; sourceTree = "<group>"; };
@@ -110,7 +109,6 @@
 				22A40D6C2710A2FB00DFFCA0 /* datatype.hpp */,
 				22A40D6D2710A8B800DFFCA0 /* partition.hpp */,
 				22A40D6E2710AD5500DFFCA0 /* data.hpp */,
-				22A40D8427134F9100DFFCA0 /* proj.conf */,
 				22A40D872715F29100DFFCA0 /* likelihood.hpp */,
 				220195C127BD892B00E8A1CF /* partial_store.hpp */,
 			);

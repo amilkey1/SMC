@@ -41,14 +41,14 @@ namespace proj {
             split_metrics_t                                     getSplitMetrics() const;
 
         private:
-
+        
             split_unit_t                                        _mask;
             split_t                                             _bits;
             unsigned                                            _bits_per_unit;
             unsigned                                            _nleaves;
 
         public:
-
+        
             typedef std::shared_ptr< Split >                    SharedPtr;
     };
 

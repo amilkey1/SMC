@@ -58,6 +58,5 @@ int main(int argc, const char * argv[]) {
     catch(...) {
         std::cerr << "Exception of unknown type!\n";
     }
-    
     return 0;
 }

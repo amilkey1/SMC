@@ -1,20 +1,21 @@
-#pragma once    ///start
+#pragma once
 
 #include <tuple>
 #include <limits>
 #include <cmath>
 #include <boost/format.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/algorithm/string/split.hpp>             ///!a
-#include <boost/algorithm/string/classification.hpp>    ///!b
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
 #include "genetic_code.hpp"
 #include "datatype.hpp"
 #include "xproj.hpp"
-///end_headers
+
 namespace proj {
 
     class Partition {
         public:
+        
             typedef std::match_results<std::string::const_iterator>::const_reference    regex_match_t;
             typedef std::tuple<unsigned, unsigned, unsigned, unsigned>                  subset_range_t;
             typedef std::vector<subset_range_t>                                         partition_t;
