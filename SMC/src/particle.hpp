@@ -35,9 +35,13 @@ class Particle {
         std::string                             saveForestNewick() const {
             return _forest.makeNewick(8, true);
         }
-    bool operator<(const Particle & other) const {
-        return _log_weight<other._log_weight;
-    }
+        bool operator<(const Particle & other) const {
+            return _log_weight<other._log_weight;
+        }
+        
+        bool operator>(const Particle & other) const {
+            return _log_weight>other._log_weight;
+        }
 
     private:
         Forest                                  _forest;

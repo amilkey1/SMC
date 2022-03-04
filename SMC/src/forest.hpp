@@ -389,7 +389,6 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
 
         new_nd->_name=" ";
         new_nd->_left_child=subtree1;
-//        new_nd->_right_sib=0;
         new_nd->_edge_length=0.0;
 
         subtree1->_right_sib=subtree2;
@@ -403,18 +402,18 @@ inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
         assert(new_nd->_left_child->_right_sib);
         calcPartialArray(new_nd);
     
-    ofstream outf(boost::str(boost::format("node %d.txt")%new_nd->_number));
-    outf << makeNewick(9, true) << endl;
-    outf << "left child = " << new_nd->_left_child->_number << endl;
-    outf << "left child edge length = " << new_nd->_left_child->_edge_length << endl;
-    outf << "right child = " << new_nd->_left_child->_right_sib->_number << endl;
-    outf << "right child edge length = " << new_nd->_left_child->_right_sib->_edge_length << endl;
-    double k=0;
-    for (unsigned p=0; p<_npatterns; p++) {
-        outf << "[" << k << "]  "<< (*new_nd->_partial)[p] << endl;
-            k++;
-    }
-    outf.close();
+//    ofstream outf(boost::str(boost::format("node %d.txt")%new_nd->_number));
+//    outf << makeNewick(9, true) << endl;
+//    outf << "left child = " << new_nd->_left_child->_number << endl;
+//    outf << "left child edge length = " << new_nd->_left_child->_edge_length << endl;
+//    outf << "right child = " << new_nd->_left_child->_right_sib->_number << endl;
+//    outf << "right child edge length = " << new_nd->_left_child->_right_sib->_edge_length << endl;
+//    double k=0;
+//    for (unsigned p=0; p<_npatterns; p++) {
+//        outf << "[" << k << "]  "<< (*new_nd->_partial)[p] << endl;
+//            k++;
+//    }
+//    outf.close();
     
 }
 
@@ -504,7 +503,6 @@ inline unsigned Forest::getNumSubtrees() {
             nsubtrees++;
         }
     }
-//    cout << "Number of subtrees is: " << nsubtrees << endl;
     return nsubtrees;
 }
 
@@ -526,9 +524,7 @@ inline double Forest::calcLogLikelihood() {
         for (unsigned p=0; p<_npatterns; p++) {
             double site_like = 0.0;
             for (unsigned s=0; s<_nstates; s++) {
-
                 double partial = (*nd->_partial)[p*_nstates+s];
-                
                 site_like += 0.25*partial;
             }
             
@@ -617,14 +613,15 @@ inline void Forest::operator=(const Forest & other) {
         assert(othernd->_parent);
         unsigned parent_number = othernd->_parent->_number;
 //        shared_ptr<std::vector<double>> _partial = othernd->_parent->_partial;
-        PartialStore::partial_t _partial = othernd->_parent->_partial;
+//        PartialStore::partial_t _partial = othernd->_parent->_partial;
+        _nodes[k]._partial = othernd->_partial;
         
         _nodes[k]._parent = &_nodes[parent_number];
 
         // copy left child
         if (othernd->_left_child) {
             unsigned left_child_number = othernd->_left_child->_number;
-            PartialStore::partial_t _partial = othernd->_left_child->_partial;
+//            PartialStore::partial_t _partial = othernd->_left_child->_partial;
 //            shared_ptr<std::vector<double>> _partial = othernd->_left_child->_partial;
             _nodes[k]._left_child = &_nodes[left_child_number];
         }
@@ -634,7 +631,7 @@ inline void Forest::operator=(const Forest & other) {
         // copy right sibling
         if (othernd->_right_sib) {
             unsigned right_sib_number = othernd->_right_sib->_number;
-            PartialStore::partial_t _partial = othernd->_right_sib->_partial;
+//            PartialStore::partial_t _partial = othernd->_right_sib->_partial;
 //            shared_ptr<std::vector<double>> _partial = othernd->_right_sib->_partial;
             _nodes[k]._right_sib = &_nodes[right_sib_number];
         }
@@ -644,7 +641,7 @@ inline void Forest::operator=(const Forest & other) {
         _nodes[k]._number      = othernd->_number;
         _nodes[k]._name        = othernd->_name;
         _nodes[k]._edge_length = othernd->_edge_length;
-        _nodes[k]._partial = othernd->_partial;
+//        _nodes[k]._partial = othernd->_partial;
 
         i++;
     }

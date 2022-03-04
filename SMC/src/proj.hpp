@@ -26,7 +26,8 @@ namespace proj {
             void                saveAllForests(const vector<Particle> &v) const ;
 
             void                normalizeWeights(vector<Particle> & particles);
-            unsigned            chooseRandomParticle(vector<Particle> & particles);
+            unsigned            chooseRandomParticle(vector<Particle> & particles, vector<double> & cum_prob);
+//            unsigned            chooseRandomParticle(vector<double> & cum_prob);
             void                resampleParticles(vector<Particle> & from_particles, vector<Particle> & to_particles);
             void                resetWeights(vector<Particle> & particles);
             void                debugNormalizedWeights(const vector<Particle> & particles) const;
@@ -205,15 +206,26 @@ namespace proj {
         }
 
         _log_marginal_likelihood += log_particle_sum - log(_nparticles);
+        
+        sort(particles.begin(), particles.end(), greater<Particle>());
     }
 
-    inline unsigned Proj::chooseRandomParticle(vector<Particle> & particles) {
+#if 1
+    inline unsigned Proj::chooseRandomParticle(vector<Particle> & particles, vector<double> & cum_probs) {
         int chosen_index = -1;
         unsigned nparticles = (unsigned)particles.size();
         double u = rng.uniform();
         double cum_prob = 0.0;
+        
         for(unsigned j = 0; j < nparticles; j++) {
-            cum_prob += exp(particles[j].getLogWeight());
+            if (cum_probs[j]<0.0){
+                cum_prob += exp(particles[j].getLogWeight());
+                cum_probs[j] = cum_prob;
+            }
+            else
+                cum_prob = cum_probs[j];
+            
+            
             if (u < cum_prob) {
                 chosen_index = j;
                 break;
@@ -222,26 +234,54 @@ namespace proj {
         assert(chosen_index > -1);
         return chosen_index;
     }
-
+#else
+inline unsigned Proj::chooseRandomParticle(vector<double> & cum_prob) {
+    int chosen_index = -1;
+    unsigned nparticles = (unsigned)cum_prob.size();
+    double u = rng.uniform();
+    for(unsigned j = 0; j < nparticles; j++) {
+        if (u < cum_prob[j]) {
+            chosen_index = j;
+            break;
+        }
+    }
+    assert(chosen_index > -1);
+    return chosen_index;
+}
+#endif
     inline void Proj::resampleParticles(vector<Particle> & from_particles, vector<Particle> & to_particles) {
-        // throw darts
         unsigned nparticles = (unsigned)from_particles.size();
-        vector<double> darts(nparticles, 0.0);
+        vector<double> cum_probs(nparticles, -1.0);
+        
+//        double cum_prob = 0.0;
+//        vector<double> cum_probs(nparticles, 0.0);
+//        for(unsigned j=0; j<nparticles; j++) {
+//            cum_prob += exp(from_particles[j].getLogWeight());
+//            cum_probs[j] = cum_prob;
+//        }
+        
+        // throw darts
+        vector<unsigned> darts(nparticles, 0);
+        unsigned max_j = 0;
         for(unsigned i = 0; i < nparticles; i++) {
-            unsigned j = chooseRandomParticle(from_particles);
+//            unsigned j = chooseRandomParticle(cum_probs);
+            unsigned j = chooseRandomParticle(from_particles, cum_probs);
+            if (j>max_j){
+                max_j = j;
+            }
             darts[j]++;
         }
 
         // show darts
-        double cumw = 0.0;
-        unsigned cumd = 0;
-//        cout << format("\n%12s %12s %12s\n") % "particle" % "weight" % "darts";
-        for (unsigned i = 0; i < nparticles; i++) {
-            double w = exp(from_particles[i].getLogWeight());
-            cumw += w;
-            cumd += darts[i];
-//            cout << format("%12d %12.5f %12d\n") % i % w % darts[i];
-        }
+//        double cumw = 0.0;
+//        unsigned cumd = 0;
+////        cout << format("\n%12s %12s %12s\n") % "particle" % "weight" % "darts";
+//        for (unsigned i = 0; i < nparticles; i++) {
+//            double w = exp(from_particles[i].getLogWeight());
+//            cumw += w;
+//            cumd += darts[i];
+////            cout << format("%12d %12.5f %12d\n") % i % w % darts[i];
+//        }
 //        cout << format("%12s %12.5f %12d\n") % " " % cumw % cumd;
 
         // create new particle vector
