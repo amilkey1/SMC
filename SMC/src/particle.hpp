@@ -100,8 +100,6 @@ inline double Particle::proposal() {
 
     //cout << format("\nold weight: %.5f + %.5f\n") % _forest._old_basal_height.second % prev_log_likelihood;
     //cout << format("new weight: %.5f + %.5f\n") % _forest._new_basal_height.second % _log_likelihood;
-
-//    _log_weight = _forest._new_basal_height.second + _log_likelihood - _forest._old_basal_height.second - prev_log_likelihood;
     _log_weight = _log_likelihood - prev_log_likelihood;
 
 //    _n++;
