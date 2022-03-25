@@ -7,6 +7,7 @@
 #include <boost/filesystem.hpp>
 #include "xproj.hpp"
 #include "particle.hpp"
+
 using namespace std;
 using namespace boost;
 
@@ -84,7 +85,7 @@ namespace proj {
         treef.close();
     }
 
-    inline void Proj::processCommandLineOptions(int argc, const char * argv[]) {   ///begin_processCommandLineOptions
+    inline void Proj::processCommandLineOptions(int argc, const char * argv[]) {
         std::vector<std::string> partition_subsets;
         boost::program_options::variables_map vm;
         boost::program_options::options_description desc("Allowed options");
@@ -264,6 +265,10 @@ namespace proj {
 
 //          create vector of particles
             unsigned nparticles = _nparticles;
+            
+            unsigned nsubsets = _data->getNumSubsets();
+            Particle::setNumSubsets(nsubsets);
+            
             vector<Particle> my_vec_1(nparticles);
             vector<Particle> my_vec_2(nparticles);
             vector<Particle> &my_vec = my_vec_1;
@@ -274,6 +279,7 @@ namespace proj {
 
             _log_marginal_likelihood = 0.0;
             //run through each generation of particles
+            
             for (unsigned g=0; g<nspecies-1; g++){
                 vector<double> log_weight_vec;
                 double log_weight = 0.0;
@@ -309,7 +315,6 @@ namespace proj {
 
             saveAllForests(my_vec);
             }
-
 
         catch (XProj & x) {
             std::cerr << "Proj encountered a problem:\n  " << x.what() << std::endl;

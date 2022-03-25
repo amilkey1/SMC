@@ -21,10 +21,14 @@ class Particle {
         void                                    debugParticle(std::string name);
         void                                    showParticle();
         double                                  proposal();
-        void                                    setData(Data::SharedPtr d) {
-                                                    _data = d;
-                                                    _forest.setData(d);
-                                                }
+        void                                        setData(Data::SharedPtr d) {
+                                                        _data = d;
+                                                        int index = -1;
+                                                    for (auto &_forest:_forests) {
+                                                        _forest.setData(d, index);
+                                                        index++;
+                                                    }
+        }
         void                                    saveForest(std::string treefilename) const;
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
@@ -32,9 +36,9 @@ class Particle {
         double                                  getLogWeight() const {return _log_weight;}
         void                                    setLogWeight(double w){_log_weight = w;}
         void                                    operator=(const Particle & other);
-        const Forest &                          getForest() const {return _forest;}
+        const vector<Forest> &                  getForest() const {return _forests;}
         std::string                             saveForestNewick() const {
-            return _forest.makeNewick(8, true);
+                return _forests[0].makeNewick(8, true);
         }
         bool operator<(const Particle & other) const {
             return _log_weight<other._log_weight;
@@ -43,10 +47,13 @@ class Particle {
         bool operator>(const Particle & other) const {
             return _log_weight>other._log_weight;
         }
+    
+        static void                                   setNumSubsets(unsigned n);
 
     private:
     
-        Forest                                  _forest;
+        static unsigned                         _nsubsets;
+        vector<Forest>                          _forests{_nsubsets+1};
         double                                  _log_weight;
         Data::SharedPtr                          _data;
         double                                  _log_likelihood;
@@ -63,34 +70,57 @@ class Particle {
         cout << "\nParticle:\n";
         cout << "  _log_weight: " << _log_weight << "\n" ;
         cout << "  _forest: " << "\n";
-        _forest.showForest();
+        for (auto &_forest:_forests) {
+            _forest.showForest();
+        }
     }
 
     //more detailed version of showParticle
     inline void Particle::debugParticle(std::string name) {
         //print out weight of each particle
         cout << "\nParticle " << name << ":\n";
-        cout << "  _log_weight:               " << _log_weight                 << "\n" ;
-        cout << "  _log_likelihood:           " << _log_likelihood             << "\n";
-        cout << "  _forest._nleaves:          " << _forest._nleaves            << "\n";
-        cout << "  _forest._ninternals:       " << _forest._ninternals         << "\n";
-        cout << "  _forest._npatterns:        " << _forest._npatterns          << "\n";
-        cout << "  _forest._nstates:          " << _forest._nstates            << "\n";
-        cout << "  _forest._nsubtrees:        " << _forest._nsubtrees          << "\n";
-        cout << "  _forest._last_edge_length: " << _forest._last_edge_length   << "\n";
-        cout << "  newick description:        " << _forest.makeNewick(5,false) << "\n";
+        for (auto &_forest:_forests) {
+            cout << "  _log_weight:               " << _log_weight                 << "\n" ;
+            cout << "  _log_likelihood:           " << _log_likelihood             << "\n";
+            cout << "  _forest._nleaves:          " << _forest._nleaves            << "\n";
+            cout << "  _forest._ninternals:       " << _forest._ninternals         << "\n";
+            cout << "  _forest._npatterns:        " << _forest._npatterns          << "\n";
+            cout << "  _forest._nstates:          " << _forest._nstates            << "\n";
+            cout << "  _forest._nsubtrees:        " << _forest._nsubtrees          << "\n";
+            cout << "  _forest._last_edge_length: " << _forest._last_edge_length   << "\n";
+            cout << "  newick description:        " << _forest.makeNewick(5,false) << "\n";
+        }
     }
 
     inline double Particle::calcLogLikelihood() {
-        
-        double log_likelihood = _forest.calcLogLikelihood();
-        assert(!isnan (log_likelihood));
+        //calculate likelihood for each gene tree
+        unsigned i = 1;
+        double log_likelihood = 0.0;
+        for (auto &_forest:_forests) {
+            double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
+            assert(!isnan (log_likelihood));
+            
+            //total log likelihood is sum of gene tree log likelihoods?
+            log_likelihood += gene_tree_log_likelihood;
+        }
         return log_likelihood;
     }
 
     inline double Particle::proposal() {
-        auto taxon_pair = _forest.chooseTaxaToJoin(); //proposal step
-        _forest.createNewSubtree(taxon_pair.first, taxon_pair.second);
+        int i = -1;
+        for (auto &_forest:_forests){
+            i++;
+            //gene trees
+            if (i > 0) {
+                _forest.drawCoalescenceTime();
+            }
+            //species tree
+            else {
+                auto taxon_pair = _forests[0].chooseTaxaToJoin(); //choose two taxa from species tree
+                _forests[0].createNewSubtree(taxon_pair.first, taxon_pair.second); //advance species tree based on speciation rate
+            }
+        }
+        
         double prev_log_likelihood = _log_likelihood;
         _log_likelihood = calcLogLikelihood();
         _log_weight = _log_likelihood - prev_log_likelihood;
@@ -102,12 +132,14 @@ class Particle {
     }
 
     inline void Particle::saveForest(std::string treefilename) const {
-        ofstream treef(treefilename);
-        treef << "#nexus\n\n";
-        treef << "begin trees;\n";
-        treef << "  tree test = [&R] " << _forest.makeNewick(8, true)  << ";\n";
-        treef << "end;\n";
-        treef.close();
+        for (auto &_forest:_forests) {
+            ofstream treef(treefilename);
+            treef << "#nexus\n\n";
+            treef << "begin trees;\n";
+            treef << "  tree test = [&R] " << _forest.makeNewick(8, true)  << ";\n";
+            treef << "end;\n";
+            treef.close();
+        }
     }
 
     inline void Particle::savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const {
@@ -125,22 +157,27 @@ class Particle {
     }
 
     inline double Particle::calcHeight() {
-        double sum_height = 0.0;
-        for (auto nd : _forest._preorder) {
-            if (nd->getParent()!=_forest._root) {
-                sum_height += nd->getEdgeLength();
+        //species tree
+            double sum_height = 0.0;
+            for (auto nd : _forests[0]._preorder) {
+                if (nd->getParent()!=_forests[0]._root) {
+                    sum_height += nd->getEdgeLength();
+                }
+                if (!nd->getLeftChild()) {
+                    break;
+                }
             }
-            if (!nd->getLeftChild()) {
-                break;
-            }
-        }
         return sum_height;
+    }
+
+    inline void Particle::setNumSubsets(unsigned n) {
+        _nsubsets = n;
     }
 
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_likelihood = other._log_likelihood;
-        _forest         = other._forest;
+        _forests         = other._forests;
         _data           = other._data;
     };
 }

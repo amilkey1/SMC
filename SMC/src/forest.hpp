@@ -55,7 +55,7 @@ class Forest {
     
         typedef std::vector <double> partial_array_t;
         void                        clear();
-        void                        setData(Data::SharedPtr d);
+        void                        setData(Data::SharedPtr d, int index);
         void                        refreshPreorder();
         Node *                      findNextPreorder(Node * nd);
         std::string                 makeNewick(unsigned precision, bool use_names) const;
@@ -67,7 +67,7 @@ class Forest {
         unsigned                    getNumSubtrees();
         void                        setEdgeLength(Node * nd);
         void                        createNewSubtree(unsigned t1, unsigned t2);
-        pair<double, double>        proposeBasalHeight();
+        void                        drawCoalescenceTime();
         unsigned                    countNumberTrees() const;
         void                        calcPartialArray(Node* new_nd);
 
@@ -159,9 +159,18 @@ class Forest {
         *this = other;
     }
 
-    inline void Forest::setData(Data::SharedPtr d) {
+    inline void Forest::setData(Data::SharedPtr d, int index) {
         _data = d;
+        //index so it doesn't do this for species tree
         _npatterns = d->getNumPatterns();
+        
+        unsigned _first_pattern = 0;
+        
+        if (index>=0) {
+            Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index);
+            _first_pattern = gene_begin_end.first;
+            }
+        
         const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
         unsigned i = 0;
         auto data_matrix=_data->getDataMatrix();
@@ -176,11 +185,12 @@ class Forest {
                 nd->_partial=ps.getPartial();
 
                 for (unsigned p=0; p<_npatterns; p++) {
+                    unsigned pp = _first_pattern+p;
                     for (unsigned s=0; s<_nstates; s++) {
                         Data::state_t state = (Data::state_t)1 << s;
-                        Data::state_t d = data_matrix[nd->_number][p];
+                        Data::state_t d = data_matrix[nd->_number][pp];
                         double result = state & d;
-                        (*nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*nd->_partial)[pp*_nstates+s]= (result == 0.0 ? 0.0:1.0);
                     }
                 }
             }
@@ -353,13 +363,15 @@ class Forest {
     inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
         unsigned s = countNumberTrees();
         double u = rng.uniform();
+        //need to use speciation rate here
+        
         double coalescence_rate = s*(s-1)/_theta;
         _last_edge_length = -log(1-u)/coalescence_rate;
 
         for (auto nd:_preorder) {
             //if node's parent is subroot, add new branch length
             if (nd->_parent==_root->_left_child){
-                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each node whose parent is subroot
+                nd->_edge_length += _last_edge_length; //eadd most recently chosen branch length to each node whose parent is subroot
             }
         }
 
@@ -399,13 +411,21 @@ class Forest {
             calcPartialArray(new_nd);
     }
 
+    inline void Forest::drawCoalescenceTime(){
+        unsigned s = countNumberTrees();
+        double u = rng.uniform();
+        
+        double coalescence_rate = s*(s-1)/_theta;
+        _last_edge_length = -log(1-u)/coalescence_rate;
+    }
+
     inline void Forest::calcPartialArray(Node* new_nd) {
         auto & parent_partial_array = *(new_nd->_partial);
         for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
             double expterm = exp(-4.0*(child->_edge_length)/3.0);
             double prsame = 0.25+0.75*expterm;
             double prdif = 0.25 - 0.25*expterm;
-
+            
             auto & child_partial_array = *(child->_partial);
             
             for (unsigned p = 0; p < _npatterns; p++) {

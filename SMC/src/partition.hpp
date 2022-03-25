@@ -47,6 +47,7 @@ namespace proj {
             void                                        finalize(unsigned nsites);
 
             void                                        clear();
+            unsigned                                    getNumSubsets();
 
         private:
 
@@ -342,4 +343,7 @@ namespace proj {
         _subset_ranges[0] = std::make_tuple(1, nsites, 1, 0);
     }
     
+    inline unsigned Partition::getNumSubsets() {
+        return _num_subsets;
+    }
 }
