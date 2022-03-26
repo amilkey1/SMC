@@ -21,13 +21,18 @@ class Particle {
         void                                    debugParticle(std::string name);
         void                                    showParticle();
         double                                  proposal();
-        void                                        setData(Data::SharedPtr d) {
-                                                        _data = d;
-                                                        int index = -1;
+        void                                    setData(Data::SharedPtr d) {
+                                                    _data = d;
+                                                    int index = -1;
                                                     for (auto &_forest:_forests) {
                                                         _forest.setData(d, index);
-                                                        index++;
-                                                    }
+                                                        //for species tree only
+                                                        if (index == -1) {
+                                                            //create polytomy of taxa in each species
+                                                            _forest.createPolytomy(polytomy_vec);
+                                                        }
+                                                    index++;
+                                                }
         }
         void                                    saveForest(std::string treefilename) const;
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
@@ -57,6 +62,7 @@ class Particle {
         double                                  _log_weight;
         Data::SharedPtr                          _data;
         double                                  _log_likelihood;
+        vector<int> polytomy_vec{1,2,3};
 };
 
     inline Particle::Particle() {

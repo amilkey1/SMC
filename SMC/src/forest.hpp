@@ -70,6 +70,7 @@ class Forest {
         void                        drawCoalescenceTime();
         unsigned                    countNumberTrees() const;
         void                        calcPartialArray(Node* new_nd);
+        void                        createPolytomy(vector<int> polytomy_vec);
 
         Node *                      _root;
         std::vector<Node *>         _preorder;
@@ -636,5 +637,47 @@ class Forest {
             
             i++;
         }
+    }
+
+    inline void Forest::createPolytomy(vector<int> polytomy_vec) {
+        //create new empty node
+        Node* new_nd = _root->_left_child;
+        
+        new_nd=&_nodes[_nleaves+_ninternals];
+        new_nd->_parent=_root->_left_child;
+        new_nd->_number=_nleaves+_ninternals;
+        new_nd->_name=" ";
+        new_nd->_edge_length=1.0;
+        
+        //create vector of subtrees
+        vector<Node*> subtree_vec;
+        for (auto &i:polytomy_vec) {
+            Node* subtree = getSubtreeAt(i);
+            subtree_vec.push_back(subtree);
+        }
+                
+        //detach each subtree
+        for (auto &subtree:subtree_vec) {
+            detachSubtree(subtree);
+        }
+                
+        insertSubtreeOnLeft(new_nd, _root->_left_child);
+        
+        new_nd->_left_child=subtree_vec[0];
+        for (int i=0; i < subtree_vec.size()-1; i++) {
+            subtree_vec[i]->_right_sib=subtree_vec[i+1];
+        }
+                
+        for (int i=0; i < subtree_vec.size(); i++) {
+            subtree_vec[i]->_parent=new_nd;
+        }
+
+        refreshPreorder();
+
+        assert (new_nd->_partial == nullptr);
+        new_nd->_partial=ps.getPartial();
+        assert(new_nd->_left_child->_right_sib);
+        
+        calcPartialArray(new_nd);
     }
 }
