@@ -299,7 +299,7 @@ namespace proj {
             vector<Particle> &my_vec = my_vec_1;
             bool use_first = true;
             for (auto & p:my_vec ) {
-                p.setData(_data);
+                p.setData(_data, _species_map);
             }
 
             _log_marginal_likelihood = 0.0;

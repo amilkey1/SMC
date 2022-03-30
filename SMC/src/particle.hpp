@@ -21,7 +21,8 @@ class Particle {
         void                                    debugParticle(std::string name);
         void                                    showParticle();
         double                                  proposal();
-        void                                    setData(Data::SharedPtr d) {
+        void                                    setData(Data::SharedPtr d, map<string, vector<string> > species_map) {
+                                                    _species_map = species_map;
                                                     _data = d;
                                                     int index = 0;
                                                     for (auto &_forest:_forests) {
@@ -63,6 +64,7 @@ class Particle {
         double                                  _log_weight;
         Data::SharedPtr                          _data;
         double                                  _log_likelihood;
+        map<string, vector<string> >            _species_map;
 };
 
     inline Particle::Particle() {
