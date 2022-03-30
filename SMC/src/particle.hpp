@@ -105,8 +105,6 @@ class Particle {
             double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
             assert(!isnan (log_likelihood));
             cout << "gene tree log like: " << gene_tree_log_likelihood << endl;
-//            cout << "gene forest patterns: " << _forests[i]._npatterns << endl;
-//            cout << "gene forest begin: " << _forests[i]._first_pattern << endl;
 
             //total log likelihood is sum of gene tree log likelihoods?
             log_likelihood += gene_tree_log_likelihood;

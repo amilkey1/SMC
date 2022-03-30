@@ -33,6 +33,7 @@ namespace proj {
             void                resetWeights(vector<Particle> & particles);
             void                calcMarginalLikelihood(double weight_average);
             double              getWeightAverage(vector<double> log_weight_vec);
+            void                createSpeciesMap(Data::SharedPtr);
 
         private:
 
@@ -53,6 +54,7 @@ namespace proj {
             void                          summarizeData(Data::SharedPtr);
             unsigned                      setNumberSpecies(Data::SharedPtr);
             double                        getRunningSum(const vector<double> &) const;
+            map<string, vector<string> >           _species_map;
 
     };
 
@@ -240,6 +242,27 @@ namespace proj {
             p.setLogWeight(logw);
         }
     }
+    
+    inline void Proj::createSpeciesMap(Data::SharedPtr d) {
+        const vector<string> &names = d->getTaxonNames();
+        for (auto &name:names) {
+            regex re(".+\\^(.+)");
+            smatch match_obj;
+            bool matched=regex_match(name, match_obj, re); //search name for regular expression, store result in match_obj
+            if (matched) {
+                string species_name = match_obj[1];
+                string taxon_name = name;
+                _species_map[species_name].push_back(taxon_name);
+            }
+        }
+        
+        for (auto x:_species_map) {
+            cout << x.first << endl;
+            for (auto i:x.second) {
+                cout << "   " << i << endl;
+            }
+        }
+    }
 
     inline void Proj::run() {
         std::cout << "Starting..." << std::endl;
@@ -255,11 +278,13 @@ namespace proj {
             _data->getDataFromFile(_data_file_name);
 
             summarizeData(_data);
+            createSpeciesMap(_data);
 //            ps.setnelements(4*_data->getNumPatterns());
 
             //set number of species to number in data file
             unsigned nspecies = setNumberSpecies(_data);
             rng.setSeed(_random_seed);
+            
 
             Forest::setTheta(_theta);
 
