@@ -255,7 +255,7 @@ namespace proj {
             _data->getDataFromFile(_data_file_name);
 
             summarizeData(_data);
-            ps.setnelements(4*_data->getNumPatterns());
+//            ps.setnelements(4*_data->getNumPatterns());
 
             //set number of species to number in data file
             unsigned nspecies = setNumberSpecies(_data);

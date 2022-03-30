@@ -13,7 +13,6 @@ proj::PartialStore ps;
 using namespace proj;
 using namespace std;
 
-// Must initialize _nspecies here because it is a static data member of Forest
 #include "forest.hpp"
 #include "data.hpp"
 std::string  Proj::_program_name        = "proj";

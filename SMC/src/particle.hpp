@@ -23,14 +23,14 @@ class Particle {
         double                                  proposal();
         void                                    setData(Data::SharedPtr d) {
                                                     _data = d;
-                                                    int index = -1;
+                                                    int index = 0;
                                                     for (auto &_forest:_forests) {
                                                         _forest.setData(d, index);
                                                         //for species tree only
-                                                        if (index == -1) {
+//                                                        if (index == -1) {
                                                             //create polytomy of taxa in each species
-                                                            _forest.createPolytomy(polytomy_vec);
-                                                        }
+//                                                            _forest.createPolytomy(polytomy_vec);
+//                                                        }
                                                     index++;
                                                 }
         }
@@ -54,6 +54,7 @@ class Particle {
         }
     
         static void                                   setNumSubsets(unsigned n);
+    vector<int> polytomy_vec{};
 
     private:
     
@@ -62,7 +63,6 @@ class Particle {
         double                                  _log_weight;
         Data::SharedPtr                          _data;
         double                                  _log_likelihood;
-        vector<int> polytomy_vec{1,2,3};
 };
 
     inline Particle::Particle() {
@@ -100,12 +100,14 @@ class Particle {
 
     inline double Particle::calcLogLikelihood() {
         //calculate likelihood for each gene tree
-        unsigned i = 1;
         double log_likelihood = 0.0;
-        for (auto &_forest:_forests) {
+        for (unsigned i=1; i<_forests.size(); i++) {
             double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
             assert(!isnan (log_likelihood));
-            
+            cout << "gene tree log like: " << gene_tree_log_likelihood << endl;
+//            cout << "gene forest patterns: " << _forests[i]._npatterns << endl;
+//            cout << "gene forest begin: " << _forests[i]._first_pattern << endl;
+
             //total log likelihood is sum of gene tree log likelihoods?
             log_likelihood += gene_tree_log_likelihood;
         }
@@ -121,10 +123,10 @@ class Particle {
                 _forest.drawCoalescenceTime();
             }
             //species tree
-            else {
-                auto taxon_pair = _forests[0].chooseTaxaToJoin(); //choose two taxa from species tree
-                _forests[0].createNewSubtree(taxon_pair.first, taxon_pair.second); //advance species tree based on speciation rate
-            }
+//            else {
+//                auto taxon_pair = _forests[0].chooseTaxaToJoin(); //choose two taxa from species tree
+//                _forests[0].createNewSubtree(taxon_pair.first, taxon_pair.second); //advance species tree based on speciation rate
+//            }
         }
         
         double prev_log_likelihood = _log_likelihood;
