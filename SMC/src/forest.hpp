@@ -46,7 +46,7 @@ class Forest {
         unsigned                    numNodes() const;
         void                        showForest();
         static void                 setNumSpecies(unsigned n);
-        static void                 setTheta(double t);
+        static void                 setNumTaxa(unsigned n);
         double                      calcLogLikelihood();
         void                        createDefaultTree();
         void operator=(const Forest & other);
@@ -59,7 +59,7 @@ class Forest {
         void                        refreshPreorder();
         Node *                      findNextPreorder(Node * nd);
         std::string                 makeNewick(unsigned precision, bool use_names) const;
-        pair<unsigned, unsigned>    chooseTaxaToJoin();
+        pair<unsigned, unsigned>    chooseTaxaToJoin(double s);
         void                        detachSubtree(Node * s);
         void                        insertSubtreeOnLeft(Node * s, Node * u);
         Node *                      findLeftSib(Node * nd);
@@ -70,14 +70,19 @@ class Forest {
         void                        drawCoalescenceTime();
         unsigned                    countNumberTrees() const;
         void                        calcPartialArray(Node* new_nd);
-        void                        createPolytomy(vector<int> polytomy_vec);
         Node*                       getNode(int i);
+        void                        setUpGeneForest(map<string, string> &taxon_map);
+        void                        setUpSpeciesForest(vector<string> &species_names);
+        tuple<string,string, string> speciesTreeProposal();
+        void                        geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment);
+        void                        evolveSpeciesFor(list<Node*> &nodes, double time_increment) ;
+        void                        fullyCoalesceGeneTree(list<Node*> &nodes);
 
         Node *                      _root;
         std::vector<Node *>         _preorder;
-        std::vector<Node *>         _levelorder;
+//        std::vector<Node *>         _levelorder;
         std::vector<Node>           _nodes;
-        std::vector<Node *>         _unused_nodes;
+//        std::vector<Node *>         _unused_nodes;
 
         unsigned                    _nleaves;
         unsigned                    _ninternals;
@@ -88,15 +93,17 @@ class Forest {
 
         Data::SharedPtr             _data;
         static unsigned             _nspecies;
+        static unsigned             _ntaxa;
         bool                        _fullyresolved;
-        unsigned                    _speciation_rate = 8.1;
         unsigned                    _first_pattern = 0;
         unsigned                    _index;
+        map<string, list<Node*> > _species_partition;
 
     public:
     
         typedef std::shared_ptr<Forest> SharedPtr;
         static double               _theta;
+        static double               _speciation_rate;
 };
 
 
@@ -112,34 +119,34 @@ class Forest {
     inline void Forest::clear() {
         _nodes.clear();
         _preorder.clear();
-        _levelorder.clear();
-        _nodes.resize(2*_nspecies);
+//        _levelorder.clear();
+        _nodes.resize(2*_ntaxa);
         _npatterns = 0;
         _nstates = 4;
-        _nsubtrees = _nspecies;
+        _nsubtrees = _ntaxa;
         _fullyresolved = false;
 
         //creating root node
-        _root = &_nodes[_nspecies];
+        _root = &_nodes[_ntaxa];
         _root->_name="root";
         _root->_left_child=0;
         _root->_right_sib=0;
         _root->_parent=0;
-        _root->_number=_nspecies;
+        _root->_number=_ntaxa;
         _root->_edge_length=double(0.0);
 
         //creating subroot node
-        Node* subroot=&_nodes[_nspecies+1];
+        Node* subroot=&_nodes[_ntaxa+1];
         subroot->_name="subroot";
         subroot->_left_child=0;
         subroot->_right_sib=0;
         subroot->_parent=_root;
-        subroot->_number=_nspecies+1;
+        subroot->_number=_ntaxa+1;
         subroot->_edge_length=double(0.0);
         _root->_left_child=subroot;
 
-        //create species
-        for (unsigned i = 0; i < _nspecies; i++) {
+        //create taxa
+        for (unsigned i = 0; i < _ntaxa; i++) {
             Node* nd=&_nodes[i];
             if (i==0) {
                 subroot->_left_child=nd;
@@ -154,7 +161,7 @@ class Forest {
             nd->_number=i;
             nd->_edge_length=0.0;
             }
-        _nleaves=_nspecies;
+        _nleaves=_ntaxa;
         _ninternals=2;
         refreshPreorder();
         }
@@ -328,32 +335,38 @@ class Forest {
         return newick;
     }
 
-    inline void Forest::setNumSpecies(unsigned n){
+    inline void Forest::setNumTaxa(unsigned n){
+        _ntaxa=n;
+    }
+
+    inline void Forest::setNumSpecies(unsigned n) {
         _nspecies=n;
     }
 
-    inline void Forest::setTheta(double t) {
-        _theta=t;
-    }
-
-    inline pair<unsigned, unsigned> Forest::chooseTaxaToJoin(){
+    inline pair<unsigned, unsigned> Forest::chooseTaxaToJoin(double s){
+        _nsubtrees = s;
         unsigned t1=0;
         unsigned t2=1;
-        unsigned nsubtrees = getNumSubtrees();
         //don't use this when there's only one choice (2 subtrees)
-        if (nsubtrees > 2) {
-            t1 = ::rng.randint(0, nsubtrees-1);
-            t2 = ::rng.randint(0, nsubtrees-1);
+        if (_nsubtrees > 2) {
+            t1 = ::rng.randint(0, _nsubtrees-1);
+            t2 = ::rng.randint(0, _nsubtrees-1);
 
             //keep calling t2 until it doesn't equal t1
             while (t2 == t1) {
-                t2 = ::rng.randint(0, nsubtrees-1);
+                t2 = ::rng.randint(0, _nsubtrees-1);
             }
+            _fullyresolved = false;
         }
-        else {
-            //only 2 taxa to join
+        if (_nsubtrees == 1) {
             _fullyresolved = true;
         }
+//        else {
+//            //only 2 taxa to join
+//            //TODO this doesn't work anymore?
+//            //should be when there are only 2 lineages to join?
+//            _fullyresolved = true;
+//        }
         return make_pair(t1, t2);
     }
 
@@ -365,63 +378,6 @@ class Forest {
             n++;
         }
         return n;
-    }
-
-    inline void Forest::createNewSubtree(unsigned t1, unsigned t2) {
-        unsigned s = countNumberTrees();
-//        double u = rng.uniform();
-        
-        _last_edge_length = rng.gamma(1.0, 1.0/((_nsubtrees-1)*_speciation_rate));
-
-        for (auto nd:_preorder) {
-            //if node's parent is subroot, add new branch length
-            if (nd->_parent==_root->_left_child){
-                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each node whose parent is subroot
-            }
-        }
-
-        assert(_nsubtrees>1);
-        _nsubtrees--;
-        Node * subtree1=getSubtreeAt(t1);
-        Node * subtree2 = getSubtreeAt(t2);
-
-        detachSubtree(subtree1);
-        detachSubtree(subtree2);
-
-        Node* new_nd = _root->_left_child;
-
-        if (s>2) {
-        //creating new node
-            new_nd=&_nodes[_nleaves+_ninternals];
-            new_nd->_parent=_root->_left_child;
-            new_nd->_number=_nleaves+_ninternals;
-            
-            _ninternals++;
-            insertSubtreeOnLeft(new_nd, _root->_left_child);
-        }
-
-            new_nd->_name=" ";
-            new_nd->_left_child=subtree1;
-            new_nd->_edge_length=0.0;
-
-            subtree1->_right_sib=subtree2;
-            subtree1->_parent=new_nd;
-            subtree2->_parent=new_nd;
-
-            refreshPreorder();
-
-            assert (new_nd->_partial == nullptr);
-            new_nd->_partial=ps.getPartial(0);
-            assert(new_nd->_left_child->_right_sib);
-            calcPartialArray(new_nd);
-    }
-
-    inline void Forest::drawCoalescenceTime(){
-        unsigned s = countNumberTrees();
-        double u = rng.uniform();
-        
-        double coalescence_rate = s*(s-1)/_theta;
-        _last_edge_length = -log(1-u)/coalescence_rate;
     }
 
     inline void Forest::calcPartialArray(Node* new_nd) {
@@ -524,7 +480,6 @@ class Forest {
         //if tree is fully resolved, calc likelihood from root
         Node* base_node=_fullyresolved ? _root : subroot;
         for (auto nd=base_node->_left_child; nd; nd=nd->_right_sib) {
-            
             double log_like = 0.0;
             for (unsigned p=0; p<_npatterns; p++) {
                 double site_like = 0.0;
@@ -544,27 +499,27 @@ class Forest {
         clear();
 
         //creating root node
-        _root = &_nodes[_nspecies];
+        _root = &_nodes[_ntaxa];
         _root->_name="root";
         _root->_left_child=0;
         _root->_right_sib=0;
         _root->_parent=0;
-        _root->_number=_nspecies;
+        _root->_number=_ntaxa;
         _root->_edge_length=double(0.0);
 
         //creating subroot node
-        Node* subroot=&_nodes[_nspecies+1];
+        Node* subroot=&_nodes[_ntaxa+1];
         subroot->_name="subroot";
         subroot->_left_child=0;
         subroot->_right_sib=0;
         subroot->_parent=_root;
-        subroot->_number=_nspecies + 1;
+        subroot->_number=_ntaxa + 1;
         subroot->_edge_length=double(0.0);
         _root->_left_child=subroot;
 
-        //create species
-        double edge_length = rng.gamma(1.0, 1.0/_nspecies);
-        for (unsigned i = 0; i < _nspecies; i++) {
+        //create taxa
+        double edge_length = rng.gamma(1.0, 1.0/_ntaxa);
+        for (unsigned i = 0; i < _ntaxa; i++) {
             Node* nd=&_nodes[i];
             if (i==0) {
                 subroot->_left_child=nd;
@@ -579,7 +534,7 @@ class Forest {
             nd->_number=i;
             nd->_edge_length = edge_length;
             }
-        _nleaves=_nspecies;
+        _nleaves=_ntaxa;
         _ninternals=2;
         refreshPreorder();
     }
@@ -593,18 +548,43 @@ class Forest {
         _nleaves          = other._nleaves;
         _ninternals       = other._ninternals;
         _last_edge_length = other._last_edge_length;
+        _index              = other._index;
+        _fullyresolved       = other._fullyresolved;
+        _first_pattern      = other._first_pattern;
 
         // copy tree itself
-        assert(other._root->_number == _nspecies);
-        assert(other._root->_left_child->_number == _nspecies + 1);
-        _root               = &_nodes[_nspecies];
-        _root->_number      = _nspecies;
+        
+        //species tree
+        if (_index==0) {
+            assert (other._root->_number == _nspecies);
+            assert(other._root->_left_child->_number == _nspecies + 1);
+            _root = &_nodes[_nspecies];
+            _root->_number = _nspecies;
+            _root->_left_child =&_nodes[_nspecies + 1];
+        }
+        
+        //gene trees
+        else {
+            assert(other._root->_number == _ntaxa);
+            assert(other._root->_left_child->_number == _ntaxa + 1);
+            _root = &_nodes[_ntaxa];
+            _root->_number = _ntaxa;
+            _root->_left_child = &_nodes[_ntaxa + 1];
+        }
+        
         _root->_name        = "root";
         _root->_edge_length = 0.0;
         _root->_parent      = 0;
-        _root->_left_child  = &_nodes[_nspecies + 1];
         _root->_right_sib   = 0;
-
+        
+        _species_partition.clear();
+        for (auto spiter : other._species_partition) {
+            for (auto nd : spiter.second) {
+                unsigned number = nd->_number;
+                _species_partition[spiter.first].push_back(&_nodes[number]);
+            }
+        }
+        
         unsigned i = 0;
         for (auto othernd : other._preorder) {
             // get number of next node in preorder sequence (serves as index of node in _nodes vector)
@@ -644,92 +624,341 @@ class Forest {
         }
     }
 
-    inline void Forest::createPolytomy(vector<int> polytomy_vec) {
-        //parse taxon names
-        //this assumes they are in order with species name in front
-        char index;
-        int m=0;
-        int count=0;
+    inline void Forest::setUpSpeciesForest(vector<string> &species_names) {
+        assert (_index==0);
+        assert (_nspecies = (unsigned) species_names.size());
         
+//        unsigned nspecies = (unsigned) species_names.size();
+        clear();
 
-        for (int i=0; i<_nspecies; i) {
-//        for (auto i:_data->_taxon_names) {
-            //get first letter in each taxon name
-            //if first letter equals previous first letter,
-//            if (i[0] == index || count==0) {
-            if (_data->_taxon_names[i][0] == index || count==0) {
-                //add to group
-                polytomy_vec.push_back(m);
+        //creating root node
+        _root = &_nodes[_nspecies];
+        _root->_name="root";
+        _root->_left_child=0;
+        _root->_right_sib=0;
+        _root->_parent=0;
+        _root->_number=_nspecies;
+        _root->_edge_length=double(0.0);
+
+        //creating subroot node
+        Node* subroot=&_nodes[_nspecies+1];
+        subroot->_name="subroot";
+        subroot->_left_child=0;
+        subroot->_right_sib=0;
+        subroot->_parent=_root;
+        subroot->_number=_nspecies + 1;
+        subroot->_edge_length=double(0.0);
+        _root->_left_child=subroot;
+
+        //create species
+        double edge_length = 0.0;
+        for (unsigned i = 0; i < _nspecies; i++) {
+            Node* nd=&_nodes[i];
+            if (i==0) {
+                subroot->_left_child=nd;
             }
             else {
-                //if no match, create polytomy
+                _nodes[i-1]._right_sib=nd;
+            }
+            nd->_name=species_names[i];
+            nd->_left_child=0;
+            nd->_right_sib=0;
+            nd->_parent=subroot;
+            nd->_number=i;
+            nd->_edge_length = edge_length;
+            }
+        _nleaves=_nspecies;
+        _ninternals=2;
+        refreshPreorder();
+        _nsubtrees = _nspecies;
+        _nodes.resize(_nspecies*2);
+    }
+
+    inline tuple<string,string, string> Forest::speciesTreeProposal() {
+        if (_nsubtrees == 1) {
+            _last_edge_length = -1.0;
+            return make_tuple("null", "null", "null");
+        }
+        
+        double rate = _speciation_rate*_nsubtrees;
+        _last_edge_length = rng.gamma(1.0, 1.0/rate);
+
+        //add increment to each lineage
+        for (auto nd:_preorder) {
+            //if node's parent is subroot, add new branch length
+            if (nd->_parent==_root->_left_child){
+                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each node whose parent is subroot
+            }
+        }
+        
+        pair<unsigned, unsigned> t = chooseTaxaToJoin(_nsubtrees);
+
+//        if (_fullyresolved == false) {
+        
+        Node * subtree1=getSubtreeAt(t.first);
+        Node * subtree2 = getSubtreeAt(t.second);
+
+        detachSubtree(subtree1);
+        detachSubtree(subtree2);
+        
+        Node* new_nd = _root->_left_child;
+
+        if (_nsubtrees>2) {
+        //creating new node
+            new_nd=&_nodes[_nleaves+_ninternals];
+            new_nd->_parent=_root->_left_child;
+            new_nd->_number=_nleaves+_ninternals;
+            
+            _ninternals++;
+            insertSubtreeOnLeft(new_nd, _root->_left_child);
+            new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
+        }
+
+        new_nd->_left_child=subtree1;
+        new_nd->_edge_length=0.0;
+
+        subtree1->_right_sib=subtree2;
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+    
+        _nsubtrees--;
+
+        refreshPreorder();
+        
+        showForest();
+        
+        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
+//        }
+
+//        else {
+//            showForest();
+//            return make_tuple("null", "null", "subroot");
+//        }
+    }
+
+
+    inline void Forest::setUpGeneForest(map<string, string> &taxon_map) {
+        assert (_index >0);
+        _species_partition.clear();
+        for (auto nd:_preorder) {
+            if (!nd->_left_child) {
+                string species_name = taxon_map[nd->_name];
+                _species_partition[species_name].push_back(nd);
+//                cerr << species_name << "  " << _species_partition[species_name].size() << endl;
+            }
+        }
+    }
+
+    inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double species_tree_increment) {
+        bool done = false;
+        double cum_time = 0.0;
+        
+        while (!done) {
+            double s = nodes.size();
+            double coalescence_rate = s*(s-1)/_theta;
+            double increment = rng.gamma(1.0, 1.0/coalescence_rate);
+            
+            bool time_limited = species_tree_increment > 0.0;
+            bool lineages_left_to_join = s > 1;
+            bool time_limit_reached = cum_time+increment > species_tree_increment;
+            if ((time_limited && time_limit_reached) || !lineages_left_to_join)  {
+                done = true;
+                increment = species_tree_increment - cum_time;
+            }
+            //add increment to each lineage
+
+            for (auto nd:nodes) {
+                //if node's parent is subroot, add new branch length
+                
+                if (nd->_parent==_root->_left_child){
+                //why is this not working?
+                
+                //this doesn't coalesce all the way down once we are done?
+//                if (nd->_parent->_name=="subroot" ) {
+                    nd->_edge_length += increment; //add most recently chosen branch length to each node whose parent is subroot
+                }
+            }
+            
+            if (!done) {
+                pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+                Node *subtree1 = nullptr;
+                Node *subtree2 = nullptr;
+                
+                unsigned i = 0;
+                for (auto iter=nodes.begin(); iter != nodes.end(); iter++){
+                    if (i==t.first) {
+                        subtree1 = *iter;
+                    }
+                    else if (i==t.second) {
+                        subtree2 = *iter;
+                    }
+                    if (subtree1 && subtree2) {
+                        break;
+                    }
+                    i++;
+                }
+                
+                detachSubtree(subtree1);
+                detachSubtree(subtree2);
+                
                 Node* new_nd = _root->_left_child;
                 
+                bool new_node_needed = !(s==2 && _species_partition.size()==1);
+                
+                if (new_node_needed) {
+                    
+                    //issue is here? new_nd parent  goes to null?
+                    //because &_nodes[_nleaves+_ninternals] doesn't exist
+                    //no new node is needed
+                    //nodes is wrong, so s = nodes.size() is wrong
+                    new_nd=&_nodes[_nleaves+_ninternals];
+
+                    new_nd->_parent=_root->_left_child;
+                    new_nd->_number=_nleaves+_ninternals;
+        
+                    _ninternals++;
+                    insertSubtreeOnLeft(new_nd, _root->_left_child);
+                }
+                
+//                if only 2 taxa left, new_nd is just subroot
+                new_nd->_left_child=subtree1;
+                new_nd->_edge_length=0.0;
+                
+                subtree1->_right_sib=subtree2;
+                subtree1->_parent=new_nd;
+                subtree2->_parent=new_nd;
+                
+                refreshPreorder();
+                
+                if (new_nd->_parent!=_root) {
+                    assert (new_nd->_partial == nullptr);
+                    new_nd->_partial=ps.getPartial(_npatterns*4);
+                    assert(new_nd->_left_child->_right_sib);
+                    calcPartialArray(new_nd);
+                    }
+                
+                //update species list
+                auto iter = find(nodes.begin(), nodes.end(), subtree1);
+                nodes.erase(iter);
+                iter = find(nodes.begin(), nodes.end(), subtree2);
+                nodes.erase(iter);
+                nodes.push_back(new_nd);
+            }
+            cum_time += increment;
+            
+            refreshPreorder();
+            showForest();
+        }
+    }
+
+inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
+    bool done = false;
+    
+    while (!done) {
+        double s = nodes.size();
+        double coalescence_rate = s*(s-1)/_theta;
+        double increment = rng.gamma(1.0, 1.0/coalescence_rate);
+        
+        bool lineages_left_to_join = s > 1;
+        if (!lineages_left_to_join)  {
+            done = true;
+        }
+        //add increment to each lineage
+        
+        if (!done) {
+            for (auto nd:nodes) {
+                //if node's parent is subroot, add new branch length
+                
+                if (nd->_parent==_root->_left_child){
+                    nd->_edge_length += increment; //add most recently chosen branch length to each node whose parent is subroot
+                }
+            }
+            pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+            Node *subtree1 = nullptr;
+            Node *subtree2 = nullptr;
+            
+            unsigned i = 0;
+            for (auto iter=nodes.begin(); iter != nodes.end(); iter++){
+                if (i==t.first) {
+                    subtree1 = *iter;
+                }
+                else if (i==t.second) {
+                    subtree2 = *iter;
+                }
+                if (subtree1 && subtree2) {
+                    break;
+                }
+                i++;
+            }
+            
+            detachSubtree(subtree1);
+            detachSubtree(subtree2);
+            
+            Node* new_nd = _root->_left_child;
+            
+            bool new_node_needed = !(s==2 && _species_partition.size()==1);
+            
+            if (new_node_needed) {
+                
+                //issue is here? new_nd parent  goes to null?
+                //because &_nodes[_nleaves+_ninternals] doesn't exist
+                //no new node is needed
+                //nodes is wrong, so s = nodes.size() is wrong
                 new_nd=&_nodes[_nleaves+_ninternals];
+
                 new_nd->_parent=_root->_left_child;
                 new_nd->_number=_nleaves+_ninternals;
-                new_nd->_name=" ";
-                new_nd->_edge_length=1.0;
-                
-                //this doesn't work when there's already a polytomy?
-                //create vector of subtrees
-                vector<Node*> subtree_vec;
-                for (auto &i:polytomy_vec) {
-//                    Node* subtree = getSubtreeAt(i);
-                    Node* subtree = getNode(i);
-                    subtree_vec.push_back(subtree);
-                }
-                        
-                //detach each subtree
-                for (auto &subtree:subtree_vec) {
-                    detachSubtree(subtree);
-//                    showForest();
-                }
-                
-                showForest();
-                        
+    
+                _ninternals++;
                 insertSubtreeOnLeft(new_nd, _root->_left_child);
-                
-                new_nd->_left_child=subtree_vec[0];
-                for (int i=0; i < subtree_vec.size()-1; i++) {
-                    subtree_vec[i]->_right_sib=subtree_vec[i+1];
-                }
-                        
-                for (int i=0; i < subtree_vec.size(); i++) {
-                    subtree_vec[i]->_parent=new_nd;
-                }
-
-//                showForest();
-                refreshPreorder();
-
+            }
+            
+//                if only 2 taxa left, new_nd is just subroot
+            new_nd->_left_child=subtree1;
+            new_nd->_edge_length=0.0;
+            
+            subtree1->_right_sib=subtree2;
+            subtree1->_parent=new_nd;
+            subtree2->_parent=new_nd;
+            
+            refreshPreorder();
+            
+            if (new_nd->_parent!=_root) {
                 assert (new_nd->_partial == nullptr);
-//                new_nd->_partial=ps.getPartial();
-//                assert(new_nd->_left_child->_right_sib);
-//
-//                calcPartialArray(new_nd);
-//                count = 0;
-//                polytomy_vec.clear();
-////                i--;
-//                continue;
+                new_nd->_partial=ps.getPartial(_npatterns*4);
+                assert(new_nd->_left_child->_right_sib);
+                calcPartialArray(new_nd);
                 }
-            //set new index
-            index = _data->_taxon_names[i][0];
-            m++;
-            count++;
-            i++;
-            }
-//        showForest();
+            
+            //update species list
+            auto iter = find(nodes.begin(), nodes.end(), subtree1);
+            nodes.erase(iter);
+            iter = find(nodes.begin(), nodes.end(), subtree2);
+            nodes.erase(iter);
+            nodes.push_back(new_nd);
         }
+        refreshPreorder();
+        showForest();
+    }
+}
 
-    inline Node* Forest::getNode(int i) {
-        Node * the_nd = 0;
-        for (auto nd : _preorder) {
-            if (nd->_number == i) {
-                the_nd = nd;
-                break;
-            }
+    inline void Forest::geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment) {
+        if (_species_partition.size() == 1) {
+            fullyCoalesceGeneTree(_species_partition.begin()->second);
         }
-        assert(the_nd);
-        return the_nd;
+        else {
+            for (auto & s:_species_partition) {
+                evolveSpeciesFor(s.second, time_increment);
+            }
+            string new_name = get<2>(species_merge_info);
+            string species1 = get<0>(species_merge_info);
+            string species2 = get<1>(species_merge_info);
+
+            list<Node*> &nodes = _species_partition[new_name];
+            copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
+            copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
+            _species_partition.erase(species1);
+            _species_partition.erase(species2);
+        }
     }
 }

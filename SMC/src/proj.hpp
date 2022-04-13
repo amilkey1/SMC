@@ -45,16 +45,16 @@ namespace proj {
             bool                        _ambig_missing;
             unsigned                    _nparticles;
             unsigned                    _random_seed;
-            double                      _theta;
 
 
             static std::string           _program_name;
             static unsigned              _major_version;
             static unsigned              _minor_version;
             void                          summarizeData(Data::SharedPtr);
-            unsigned                      setNumberSpecies(Data::SharedPtr);
+            unsigned                      setNumberTaxa(Data::SharedPtr);
             double                        getRunningSum(const vector<double> &) const;
-            map<string, vector<string> >           _species_map;
+            vector<string>                _species_names;
+            map<string, string>           _taxon_map;
 
     };
 
@@ -91,6 +91,7 @@ namespace proj {
         std::vector<std::string> partition_subsets;
         boost::program_options::variables_map vm;
         boost::program_options::options_description desc("Allowed options");
+        
         desc.add_options()
         ("help,h", "produce help message")
         ("version,v", "show program version")
@@ -100,7 +101,8 @@ namespace proj {
         ("ambigmissing",  boost::program_options::value(&_ambig_missing)->default_value(true), "treat all ambiguities as missing data")
         ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000), "number of particles")
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
-        ("theta, t", boost::program_options::value(&_theta)->default_value(0.05), "theta")
+        ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.05), "theta")
+        ("speciation_rate", boost::program_options::value(&Forest::_speciation_rate)->default_value(10), "speciation rate")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -151,11 +153,12 @@ namespace proj {
             }
     }
 
-    inline unsigned Proj::setNumberSpecies(Data::SharedPtr) {
-        unsigned nspecies;
-        nspecies = _data->getNumTaxa();
-        Forest::setNumSpecies(nspecies);
-        return nspecies;
+    inline unsigned Proj::setNumberTaxa(Data::SharedPtr) {
+        unsigned ntaxa;
+        ntaxa = _data->getNumTaxa();
+//        Forest::setNumSpecies(ntaxa);
+        Forest::setNumTaxa(ntaxa);
+        return ntaxa;
     }
 
     inline double Proj::getRunningSum(const vector<double> & log_weight_vec) const {
@@ -252,14 +255,10 @@ namespace proj {
             if (matched) {
                 string species_name = match_obj[1];
                 string taxon_name = name;
-                _species_map[species_name].push_back(taxon_name);
-            }
-        }
-        
-        for (auto x:_species_map) {
-            cout << x.first << endl;
-            for (auto i:x.second) {
-                cout << "   " << i << endl;
+                if (find(_species_names.begin(), _species_names.end(), species_name) == _species_names.end()) {
+                    _species_names.push_back(species_name);
+                }
+                _taxon_map[taxon_name]=species_name;
             }
         }
     }
@@ -268,7 +267,7 @@ namespace proj {
         std::cout << "Starting..." << std::endl;
         std::cout << "Current working directory: " << boost::filesystem::current_path() << std::endl;
         std::cout << "Random seed: " << _random_seed << std::endl;
-        std::cout << "Theta: " << _theta << std::endl;
+        std::cout << "Theta: " << Forest::_theta << std::endl;
 
         try {
             std::cout << "\n*** Reading and storing the data in the file " << _data_file_name << std::endl;
@@ -279,14 +278,12 @@ namespace proj {
 
             summarizeData(_data);
             createSpeciesMap(_data);
-//            ps.setnelements(4*_data->getNumPatterns());
 
             //set number of species to number in data file
-            unsigned nspecies = setNumberSpecies(_data);
+            unsigned ntaxa = setNumberTaxa(_data);
+            unsigned nspecies = _species_names.size();
+            Forest::setNumSpecies(nspecies);
             rng.setSeed(_random_seed);
-            
-
-            Forest::setTheta(_theta);
 
 //          create vector of particles
             unsigned nparticles = _nparticles;
@@ -299,27 +296,32 @@ namespace proj {
             vector<Particle> &my_vec = my_vec_1;
             bool use_first = true;
             for (auto & p:my_vec ) {
-                p.setData(_data, _species_map);
+                p.setData(_data);
+                p.mapSpecies(_taxon_map, _species_names);
             }
 
             _log_marginal_likelihood = 0.0;
             //run through each generation of particles
             
-            for (unsigned g=0; g<nspecies-1; g++){
+//            for (unsigned g=0; g<ntaxa-1; g++){
+            for (unsigned g=0; g<nspecies; g++){
+
                 vector<double> log_weight_vec;
                 double log_weight = 0.0;
 
                 //taxon joining and reweighting step 
                 for (auto & p:my_vec) {
                     log_weight = p.proposal();
+                    //at this step, the internal nodes of each particle are getting switched somehow (gene forests)
                     log_weight_vec.push_back(log_weight);
                 }
-
+                
                 normalizeWeights(my_vec);
                 resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
 
                 //if use_first is true, my_vec = my_vec_2
-                //if use_first if alse, my_vec = my_vec_1
+                //if use_first is false, my_vec = my_vec_1
+                
                 my_vec = use_first ? my_vec_2:my_vec_1;
 
                 //change use_first from true to false or false to true

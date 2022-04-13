@@ -21,20 +21,17 @@ class Particle {
         void                                    debugParticle(std::string name);
         void                                    showParticle();
         double                                  proposal();
-        void                                    setData(Data::SharedPtr d, map<string, vector<string> > species_map) {
-                                                    _species_map = species_map;
+        void                                    setData(Data::SharedPtr d) {
+                                                    _nsubsets = d->getNumSubsets();
                                                     _data = d;
                                                     int index = 0;
+                                                    _forests.resize(_nsubsets+1);
                                                     for (auto &_forest:_forests) {
                                                         _forest.setData(d, index);
-                                                        //for species tree only
-//                                                        if (index == -1) {
-                                                            //create polytomy of taxa in each species
-//                                                            _forest.createPolytomy(polytomy_vec);
-//                                                        }
-                                                    index++;
+                                                        index++;
+                                                    }
                                                 }
-        }
+        void                                    mapSpecies(map<string, string> &taxon_map, vector<string> &species_names);
         void                                    saveForest(std::string treefilename) const;
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
@@ -55,16 +52,14 @@ class Particle {
         }
     
         static void                                   setNumSubsets(unsigned n);
-    vector<int> polytomy_vec{};
 
     private:
     
         static unsigned                         _nsubsets;
-        vector<Forest>                          _forests{_nsubsets+1};
+        vector<Forest>                         _forests;
         double                                  _log_weight;
         Data::SharedPtr                          _data;
         double                                  _log_likelihood;
-        map<string, vector<string> >            _species_map;
 };
 
     inline Particle::Particle() {
@@ -106,27 +101,22 @@ class Particle {
         for (unsigned i=1; i<_forests.size(); i++) {
             double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
             assert(!isnan (log_likelihood));
-            cout << "gene tree log like: " << gene_tree_log_likelihood << endl;
+//            cout << "gene tree log like: " << gene_tree_log_likelihood << endl;
 
             //total log likelihood is sum of gene tree log likelihoods?
             log_likelihood += gene_tree_log_likelihood;
         }
+        cout << "total log like: " << log_likelihood << endl;
         return log_likelihood;
     }
 
     inline double Particle::proposal() {
-        int i = -1;
-        for (auto &_forest:_forests){
-            i++;
-            //gene trees
-            if (i > 0) {
-                _forest.drawCoalescenceTime();
-            }
-            //species tree
-//            else {
-//                auto taxon_pair = _forests[0].chooseTaxaToJoin(); //choose two taxa from species tree
-//                _forests[0].createNewSubtree(taxon_pair.first, taxon_pair.second); //advance species tree based on speciation rate
-//            }
+        //species tree
+        tuple<string, string, string> t = _forests[0].speciesTreeProposal();
+        
+        //gene trees
+        for (unsigned i=1; i<_forests.size(); i++){
+            _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
         }
         
         double prev_log_likelihood = _log_likelihood;
@@ -182,10 +172,21 @@ class Particle {
         _nsubsets = n;
     }
 
+    inline void Particle::mapSpecies(map<string, string> &taxon_map, vector<string> &species_names) {
+        //species tree
+        _forests[0].setUpSpeciesForest(species_names);
+        
+        //gene trees
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i].setUpGeneForest(taxon_map);
+        }
+    }
+
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_likelihood = other._log_likelihood;
         _forests         = other._forests;
         _data           = other._data;
+        _nsubsets       = other._nsubsets;
     };
 }
