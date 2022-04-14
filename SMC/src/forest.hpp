@@ -80,10 +80,8 @@ class Forest {
 
         Node *                      _root;
         std::vector<Node *>         _preorder;
-//        std::vector<Node *>         _levelorder;
         std::vector<Node>           _nodes;
-//        std::vector<Node *>         _unused_nodes;
-
+    
         unsigned                    _nleaves;
         unsigned                    _ninternals;
         unsigned                    _npatterns;
@@ -94,7 +92,6 @@ class Forest {
         Data::SharedPtr             _data;
         static unsigned             _nspecies;
         static unsigned             _ntaxa;
-        bool                        _fullyresolved;
         unsigned                    _first_pattern = 0;
         unsigned                    _index;
         map<string, list<Node*> > _species_partition;
@@ -119,12 +116,10 @@ class Forest {
     inline void Forest::clear() {
         _nodes.clear();
         _preorder.clear();
-//        _levelorder.clear();
         _nodes.resize(2*_ntaxa);
         _npatterns = 0;
         _nstates = 4;
         _nsubtrees = _ntaxa;
-        _fullyresolved = false;
 
         //creating root node
         _root = &_nodes[_ntaxa];
@@ -356,17 +351,7 @@ class Forest {
             while (t2 == t1) {
                 t2 = ::rng.randint(0, _nsubtrees-1);
             }
-            _fullyresolved = false;
         }
-        if (_nsubtrees == 1) {
-            _fullyresolved = true;
-        }
-//        else {
-//            //only 2 taxa to join
-//            //TODO this doesn't work anymore?
-//            //should be when there are only 2 lineages to join?
-//            _fullyresolved = true;
-//        }
         return make_pair(t1, t2);
     }
 
@@ -478,7 +463,7 @@ class Forest {
         double composite_log_likelihood = 0.0;
         
         //if tree is fully resolved, calc likelihood from root
-        Node* base_node=_fullyresolved ? _root : subroot;
+        Node* base_node=subroot;
         for (auto nd=base_node->_left_child; nd; nd=nd->_right_sib) {
             double log_like = 0.0;
             for (unsigned p=0; p<_npatterns; p++) {
@@ -549,7 +534,6 @@ class Forest {
         _ninternals       = other._ninternals;
         _last_edge_length = other._last_edge_length;
         _index              = other._index;
-        _fullyresolved       = other._fullyresolved;
         _first_pattern      = other._first_pattern;
 
         // copy tree itself
@@ -627,8 +611,6 @@ class Forest {
     inline void Forest::setUpSpeciesForest(vector<string> &species_names) {
         assert (_index==0);
         assert (_nspecies = (unsigned) species_names.size());
-        
-//        unsigned nspecies = (unsigned) species_names.size();
         clear();
 
         //creating root node
@@ -692,9 +674,6 @@ class Forest {
         }
         
         pair<unsigned, unsigned> t = chooseTaxaToJoin(_nsubtrees);
-
-//        if (_fullyresolved == false) {
-        
         Node * subtree1=getSubtreeAt(t.first);
         Node * subtree2 = getSubtreeAt(t.second);
 
@@ -728,12 +707,6 @@ class Forest {
         showForest();
         
         return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
-//        }
-
-//        else {
-//            showForest();
-//            return make_tuple("null", "null", "subroot");
-//        }
     }
 
 
@@ -744,7 +717,6 @@ class Forest {
             if (!nd->_left_child) {
                 string species_name = taxon_map[nd->_name];
                 _species_partition[species_name].push_back(nd);
-//                cerr << species_name << "  " << _species_partition[species_name].size() << endl;
             }
         }
     }
@@ -771,10 +743,6 @@ class Forest {
                 //if node's parent is subroot, add new branch length
                 
                 if (nd->_parent==_root->_left_child){
-                //why is this not working?
-                
-                //this doesn't coalesce all the way down once we are done?
-//                if (nd->_parent->_name=="subroot" ) {
                     nd->_edge_length += increment; //add most recently chosen branch length to each node whose parent is subroot
                 }
             }
@@ -806,11 +774,6 @@ class Forest {
                 bool new_node_needed = !(s==2 && _species_partition.size()==1);
                 
                 if (new_node_needed) {
-                    
-                    //issue is here? new_nd parent  goes to null?
-                    //because &_nodes[_nleaves+_ninternals] doesn't exist
-                    //no new node is needed
-                    //nodes is wrong, so s = nodes.size() is wrong
                     new_nd=&_nodes[_nleaves+_ninternals];
 
                     new_nd->_parent=_root->_left_child;
@@ -899,11 +862,6 @@ inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
             bool new_node_needed = !(s==2 && _species_partition.size()==1);
             
             if (new_node_needed) {
-                
-                //issue is here? new_nd parent  goes to null?
-                //because &_nodes[_nleaves+_ninternals] doesn't exist
-                //no new node is needed
-                //nodes is wrong, so s = nodes.size() is wrong
                 new_nd=&_nodes[_nleaves+_ninternals];
 
                 new_nd->_parent=_root->_left_child;

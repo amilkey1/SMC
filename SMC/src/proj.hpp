@@ -302,8 +302,6 @@ namespace proj {
 
             _log_marginal_likelihood = 0.0;
             //run through each generation of particles
-            
-//            for (unsigned g=0; g<ntaxa-1; g++){
             for (unsigned g=0; g<nspecies; g++){
 
                 vector<double> log_weight_vec;
@@ -312,7 +310,6 @@ namespace proj {
                 //taxon joining and reweighting step 
                 for (auto & p:my_vec) {
                     log_weight = p.proposal();
-                    //at this step, the internal nodes of each particle are getting switched somehow (gene forests)
                     log_weight_vec.push_back(log_weight);
                 }
                 
