@@ -34,6 +34,7 @@ namespace proj {
             void                calcMarginalLikelihood(double weight_average);
             double              getWeightAverage(vector<double> log_weight_vec);
             void                createSpeciesMap(Data::SharedPtr);
+            void                showParticlesByWeight(vector<Particle> my_vec);
 
         private:
 
@@ -263,6 +264,22 @@ namespace proj {
         }
     }
 
+    inline void Proj::showParticlesByWeight(vector<Particle> my_vec) {
+        vector <double> weights;
+        
+        //create weight vector
+        for (auto & p:my_vec) {
+            weights.push_back(p.getLogWeight());
+        }
+        
+        //sort particles by weight
+        sort(my_vec.begin(), my_vec.end(), greater<Particle>());
+        
+        //print first particle
+        cout << "\n" << "Heaviest particle: ";
+        my_vec[0].showParticle();
+    }
+
     inline void Proj::run() {
         std::cout << "Starting..." << std::endl;
         std::cout << "Current working directory: " << boost::filesystem::current_path() << std::endl;
@@ -338,6 +355,7 @@ namespace proj {
             cout << "theta = " << Forest::_theta << endl;
 
             saveAllForests(my_vec);
+            showParticlesByWeight(my_vec);
             }
 
         catch (XProj & x) {

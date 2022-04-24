@@ -95,6 +95,7 @@ class Forest {
         unsigned                    _first_pattern = 0;
         unsigned                    _index;
         map<string, list<Node*> > _species_partition;
+        double                    _gene_tree_log_likelihood;
 
     public:
     
@@ -277,7 +278,15 @@ class Forest {
     }
 
     inline void Forest::showForest() {
+        if (_index > 0) {
+            cout << " gene tree " << _index << ": " << endl;
+            cout << " _gene_tree_log_likelihood: " << _gene_tree_log_likelihood << "\n";
+        }
+        else if (_index == 0) {
+            cout << " species tree: " << endl;
+        }
         cout << " " << makeNewick(9, true) << "\n";
+        cout << "\n";
     }
 
     inline std::string Forest::makeNewick(unsigned precision, bool use_names) const {
@@ -460,7 +469,7 @@ class Forest {
 
     //    compute log likelihood of every subtree whose parent is subroot
         auto &counts = _data->getPatternCounts();
-        double composite_log_likelihood = 0.0;
+        _gene_tree_log_likelihood = 0.0;
         
         //if tree is fully resolved, calc likelihood from root
         Node* base_node=subroot;
@@ -475,9 +484,9 @@ class Forest {
                 assert(site_like>0);
                 log_like += log(site_like)*counts[_first_pattern+p];
             }
-            composite_log_likelihood += log_like;
+            _gene_tree_log_likelihood += log_like;
         }
-        return composite_log_likelihood;
+        return _gene_tree_log_likelihood;
     }
 
     inline void Forest::createDefaultTree() {
@@ -535,6 +544,7 @@ class Forest {
         _last_edge_length = other._last_edge_length;
         _index              = other._index;
         _first_pattern      = other._first_pattern;
+        _gene_tree_log_likelihood = other._gene_tree_log_likelihood;
 
         // copy tree itself
         
@@ -704,7 +714,7 @@ class Forest {
 
         refreshPreorder();
         
-        showForest();
+//        showForest();
         
         return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
     }
@@ -810,7 +820,7 @@ class Forest {
             cum_time += increment;
             
             refreshPreorder();
-            showForest();
+//            showForest();
         }
     }
 
@@ -896,7 +906,7 @@ inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
             nodes.push_back(new_nd);
         }
         refreshPreorder();
-        showForest();
+//        showForest();
     }
 }
 

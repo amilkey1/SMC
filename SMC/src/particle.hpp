@@ -72,7 +72,9 @@ class Particle {
         //print out weight of each particle
         cout << "\nParticle:\n";
         cout << "  _log_weight: " << _log_weight << "\n" ;
+        cout << " _log_likelihood: " << _log_likelihood << "\n";
         cout << "  _forest: " << "\n";
+        cout << "\n";
         for (auto &_forest:_forests) {
             _forest.showForest();
         }
@@ -106,7 +108,7 @@ class Particle {
             //total log likelihood is sum of gene tree log likelihoods?
             log_likelihood += gene_tree_log_likelihood;
         }
-        cout << "total log like: " << log_likelihood << endl;
+//        cout << "total log like: " << log_likelihood << endl;
         return log_likelihood;
     }
 
