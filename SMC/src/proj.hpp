@@ -234,10 +234,15 @@ namespace proj {
         unsigned m = 0;
         for (unsigned i = 0; i < nparticles; i++) {
             for (unsigned k = 0; k < darts[i]; k++) {
+                cout << "particle " << i << " is copied to particle " << m << endl;
                 to_particles[m++]=from_particles[i];
             }
         }
         assert(nparticles == to_particles.size());
+        
+        for (unsigned i = 0; i < nparticles; i++) {
+            to_particles[i].getForests()[2].debugForest();
+            }
     }
 
     inline void Proj::resetWeights(vector<Particle> & particles) {

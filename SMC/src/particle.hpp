@@ -52,6 +52,8 @@ class Particle {
         }
     
         static void                                   setNumSubsets(unsigned n);
+    
+        vector<Forest> &                             getForests() {return _forests;}
 
     private:
     
@@ -117,7 +119,9 @@ class Particle {
         tuple<string, string, string> t = _forests[0].speciesTreeProposal();
         
         //gene trees
+        _forests[0].showForest();
         for (unsigned i=1; i<_forests.size(); i++){
+            cout << "gene " << i << endl;
             _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
         }
         
@@ -187,6 +191,17 @@ class Particle {
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_likelihood = other._log_likelihood;
+        
+//        _forests.resize(other._forests.size());
+//
+////        _forests.clear();
+//        unsigned i = 0;
+//        for (auto forest : other._forests) {
+////            _forests.push_back(forest);
+//            _forests[i] = forest;
+//            i++;
+//        }
+
         _forests         = other._forests;
         _data           = other._data;
         _nsubsets       = other._nsubsets;

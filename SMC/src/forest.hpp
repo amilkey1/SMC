@@ -50,6 +50,7 @@ class Forest {
         double                      calcLogLikelihood();
         void                        createDefaultTree();
         void operator=(const Forest & other);
+        void                        debugForest();
 
     private:
     
@@ -536,6 +537,7 @@ class Forest {
     inline void Forest::operator=(const Forest & other) {
         _nstates = other._nstates;
         _npatterns = other._npatterns;
+        _nodes.clear();
         _nodes.resize(other._nodes.size());
         _preorder.resize(other._preorder.size());
         _nsubtrees        = other._nsubtrees;
@@ -545,6 +547,7 @@ class Forest {
         _index              = other._index;
         _first_pattern      = other._first_pattern;
         _gene_tree_log_likelihood = other._gene_tree_log_likelihood;
+        _data                   = other._data;
 
         // copy tree itself
         
@@ -579,41 +582,54 @@ class Forest {
             }
         }
         
-        unsigned i = 0;
-        for (auto othernd : other._preorder) {
+//        unsigned i = 0;
+//        for (auto othernd : other._preorder) {
+        for (auto othernd : other._nodes) {
             // get number of next node in preorder sequence (serves as index of node in _nodes vector)
-            unsigned k = othernd->_number;
-
+            int k = othernd._number;
+            
+            if (k>-1) {
             // update preorder vector
-            _preorder[i] = &_nodes[k];
+//            _preorder[i] = &_nodes[k];
 
             // copy parent
-            assert(othernd->_parent);
-            unsigned parent_number = othernd->_parent->_number;
-            _nodes[k]._partial = othernd->_partial;
-            
-            _nodes[k]._parent = &_nodes[parent_number];
+//            assert(othernd._parent);
+            if (othernd._parent) {
+                unsigned parent_number = othernd._parent->_number;
+                _nodes[k]._partial = othernd._partial;
+                
+                _nodes[k]._parent = &_nodes[parent_number];
+            }
 
             // copy left child
-            if (othernd->_left_child) {
-                unsigned left_child_number = othernd->_left_child->_number;
+            if (othernd._left_child) {
+                unsigned left_child_number = othernd._left_child->_number;
                 _nodes[k]._left_child = &_nodes[left_child_number];
             }
             else
                 _nodes[k]._left_child = 0;
 
             // copy right sibling
-            if (othernd->_right_sib) {
-                unsigned right_sib_number = othernd->_right_sib->_number;
+            if (othernd._right_sib) {
+                unsigned right_sib_number = othernd._right_sib->_number;
                 _nodes[k]._right_sib = &_nodes[right_sib_number];
             }
             else
                 _nodes[k]._right_sib = 0;
 
-            _nodes[k]._number      = othernd->_number;
-            _nodes[k]._name        = othernd->_name;
-            _nodes[k]._edge_length = othernd->_edge_length;
+            _nodes[k]._number      = othernd._number;
+            _nodes[k]._name        = othernd._name;
+            _nodes[k]._edge_length = othernd._edge_length;
             
+//            i++;
+            }
+        }
+        
+        unsigned i = 0;
+        
+        for (auto othernd : other._preorder) {
+            unsigned k = othernd->_number;
+            _preorder[i] = &_nodes[k];
             i++;
         }
     }
@@ -789,6 +805,9 @@ class Forest {
                     new_nd->_parent=_root->_left_child;
                     new_nd->_number=_nleaves+_ninternals;
         
+                    if (new_nd->_number==19) {
+                        cout << "19 first used " << endl;
+                    }
                     _ninternals++;
                     insertSubtreeOnLeft(new_nd, _root->_left_child);
                 }
@@ -804,6 +823,9 @@ class Forest {
                 refreshPreorder();
                 
                 if (new_nd->_parent!=_root) {
+                    cout << "   calculating partial for node number " << new_nd->_number << endl;
+                    cout << "       left child " << new_nd->_left_child->_number << endl;
+                    cout << "       right child " << new_nd->_left_child->_right_sib->_number << endl;
                     assert (new_nd->_partial == nullptr);
                     new_nd->_partial=ps.getPartial(_npatterns*4);
                     assert(new_nd->_left_child->_right_sib);
@@ -911,6 +933,7 @@ inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
 }
 
     inline void Forest::geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment) {
+//        showForest();
         if (_species_partition.size() == 1) {
             fullyCoalesceGeneTree(_species_partition.begin()->second);
         }
@@ -918,6 +941,7 @@ inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
             for (auto & s:_species_partition) {
                 evolveSpeciesFor(s.second, time_increment);
             }
+//            showForest();
             string new_name = get<2>(species_merge_info);
             string species1 = get<0>(species_merge_info);
             string species2 = get<1>(species_merge_info);
@@ -928,5 +952,29 @@ inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
             _species_partition.erase(species1);
             _species_partition.erase(species2);
         }
+    }
+
+    
+    inline void Forest::debugForest() {
+        cout << "debugging forest" << endl;
+        for (auto &node : _nodes) {
+            cout << "   node number " << node._number << " ";
+            if (node._left_child) {
+                cout << node._left_child->_number << " ";
+                
+                if (node._left_child->_right_sib) {
+                    cout << node._left_child->_right_sib->_number << " ";
+                }
+            }
+            else (cout << " - - ");
+            
+            if (node._partial!=nullptr) {
+                cout << " * ";
+            }
+            cout << endl;
+        }
+        cout << "   _nleaves " << _nleaves << " ";
+        cout << "   _ninternals " << _ninternals << " ";
+        cout << endl;
     }
 }
