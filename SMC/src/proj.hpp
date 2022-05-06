@@ -25,13 +25,13 @@ namespace proj {
             void                clear();
             void                processCommandLineOptions(int argc, const char * argv[]);
             void                run();
-            void                saveAllForests(const vector<Particle> &v) const ;
+//            void                saveAllForests(const vector<Particle> &v) const ;
+        void                saveAllForests(vector<Particle> &v) const ;
 
             void                normalizeWeights(vector<Particle> & particles);
             unsigned            chooseRandomParticle(vector<Particle> & particles, vector<double> & cum_prob);
             void                resampleParticles(vector<Particle> & from_particles, vector<Particle> & to_particles);
             void                resetWeights(vector<Particle> & particles);
-            void                calcMarginalLikelihood(double weight_average);
             double              getWeightAverage(vector<double> log_weight_vec);
             void                createSpeciesMap(Data::SharedPtr);
             void                showParticlesByWeight(vector<Particle> my_vec);
@@ -77,7 +77,8 @@ namespace proj {
         _data = nullptr;
     }
 
-    inline void Proj::saveAllForests(const vector<Particle> &v) const {
+//    inline void Proj::saveAllForests(const vector<Particle> &v) const {
+inline void Proj::saveAllForests(vector<Particle> &v) const {
         ofstream treef("forest.trees");
         treef << "#nexus\n\n";
         treef << "begin trees;\n";
@@ -234,15 +235,10 @@ namespace proj {
         unsigned m = 0;
         for (unsigned i = 0; i < nparticles; i++) {
             for (unsigned k = 0; k < darts[i]; k++) {
-                cout << "particle " << i << " is copied to particle " << m << endl;
                 to_particles[m++]=from_particles[i];
             }
         }
         assert(nparticles == to_particles.size());
-        
-        for (unsigned i = 0; i < nparticles; i++) {
-            to_particles[i].getForests()[2].debugForest();
-            }
     }
 
     inline void Proj::resetWeights(vector<Particle> & particles) {
@@ -318,7 +314,7 @@ namespace proj {
             vector<Particle> &my_vec = my_vec_1;
             bool use_first = true;
             for (auto & p:my_vec ) {
-                p.setData(_data);
+                p.setData(_data, _taxon_map);
                 p.mapSpecies(_taxon_map, _species_names);
             }
 
@@ -360,7 +356,7 @@ namespace proj {
             cout << "theta = " << Forest::_theta << endl;
 
             saveAllForests(my_vec);
-            showParticlesByWeight(my_vec);
+//            showParticlesByWeight(my_vec);
             }
 
         catch (XProj & x) {
