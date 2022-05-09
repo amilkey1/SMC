@@ -32,8 +32,7 @@ class Particle {
                                                     }
                                                 }
         void                                    mapSpecies(map<string, string> &taxon_map, vector<string> &species_names);
-//        void                                    saveForest(std::string treefilename) const;
-    void                                    saveForest(std::string treefilename);
+        void                                    saveForest(std::string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
         double                                  calcHeight();
@@ -41,9 +40,8 @@ class Particle {
         void                                    setLogWeight(double w){_log_weight = w;}
         void                                    operator=(const Particle & other);
         const vector<Forest> &                  getForest() const {return _forests;}
-//        std::string                             saveForestNewick() const {
         std::string                             saveForestNewick() {
-                return _forests[0].makeNewick(8, true);
+            return _forests[1].makeNewick(8, true);
         }
         bool operator<(const Particle & other) const {
             return _log_weight<other._log_weight;
@@ -54,7 +52,6 @@ class Particle {
         }
     
         static void                                   setNumSubsets(unsigned n);
-    
         vector<Forest> &                             getForests() {return _forests;}
 
     private:
@@ -104,7 +101,6 @@ class Particle {
         //calculate likelihood for each gene tree
         double log_likelihood = 0.0;
         for (unsigned i=1; i<_forests.size(); i++) {
-            _forests[i].showForest();
             double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
             assert(!isnan (log_likelihood));
 //            cout << "gene tree log like: " << gene_tree_log_likelihood << endl;
@@ -119,13 +115,11 @@ class Particle {
     inline double Particle::proposal() {
         //species tree
         tuple<string, string, string> t = _forests[0].speciesTreeProposal();
-        _forests[0].showForest();
         
         //gene trees
         for (unsigned i=1; i<_forests.size(); i++){
-            cout << "gene " << i << endl;
+//            cout << "gene " << i << endl;
             _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
-            _forests[i].showForest();
         }
         
         double prev_log_likelihood = _log_likelihood;
@@ -138,8 +132,7 @@ class Particle {
         *this = other;
     }
 
-//    inline void Particle::saveForest(std::string treefilename) const {
-inline void Particle::saveForest(std::string treefilename)  {
+    inline void Particle::saveForest(std::string treefilename)  {
         for (auto &_forest:_forests) {
             ofstream treef(treefilename);
             treef << "#nexus\n\n";
@@ -185,7 +178,6 @@ inline void Particle::saveForest(std::string treefilename)  {
         //gene trees
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].setUpGeneForest(taxon_map);
-//            _forests[i].setUpLineages(species_names);
         }
     }
 
