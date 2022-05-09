@@ -104,6 +104,7 @@ class Particle {
         //calculate likelihood for each gene tree
         double log_likelihood = 0.0;
         for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i].showForest();
             double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
             assert(!isnan (log_likelihood));
 //            cout << "gene tree log like: " << gene_tree_log_likelihood << endl;
@@ -118,6 +119,7 @@ class Particle {
     inline double Particle::proposal() {
         //species tree
         tuple<string, string, string> t = _forests[0].speciesTreeProposal();
+        _forests[0].showForest();
         
         //gene trees
         for (unsigned i=1; i<_forests.size(); i++){
@@ -183,7 +185,7 @@ inline void Particle::saveForest(std::string treefilename)  {
         //gene trees
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].setUpGeneForest(taxon_map);
-            _forests[i].setUpLineages(species_names);
+//            _forests[i].setUpLineages(species_names);
         }
     }
 
