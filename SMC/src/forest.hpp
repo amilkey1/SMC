@@ -22,9 +22,6 @@ namespace proj {
 using namespace std;
 
 class Likelihood;
-//class Updater;
-//class TreeUpdater;
-//class PolytomyUpdater;
 class Particle;
 
 class Forest {
@@ -60,18 +57,24 @@ class Forest {
         std::string                 makeNewick(unsigned precision, bool use_names);
         pair<unsigned, unsigned>    chooseTaxaToJoin(double s);
         void                        setEdgeLength(Node * nd);
-        void                        createNewSubtree(unsigned t1, unsigned t2);
+        tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> p, list<Node*> node_list, double increment);
         void                        drawCoalescenceTime();
         void                        calcPartialArray(Node* new_nd);
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
         tuple<string,string, string> speciesTreeProposal();
         void                        geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment);
-        void                        evolveSpeciesFor(list <Node*> &nodes, double time_increment) ;
+        void                        evolveSpeciesFor(list <Node*> &nodes, double time_increment);
         void                        fullyCoalesceGeneTree(list<Node*> &nodes);
         void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
-        void                        removeNodeFromVector(vector<Node *> & node_vector, Node * addnode1, Node * addnode2, Node * delnode1);
+        void                        revertNodeVector(vector<Node *> & node_vector, Node * addnode1, Node * addnode2, Node * delnode1);
+//        void                        revertNodeList(list<Node* > &node_vector, Node *delnode);
+        double                      getRunningSumChoices(vector<double> &log_weight_choices);
+        vector<double>              reweightChoices(vector<double> & likelihood_vec, vector<double> &prev_likelihood_vec);
+        pair<unsigned, unsigned>    chooseAllPairs(list<Node *> &node_list, double increment);
+        pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
+        int                         selectPair(vector<double> weight_vec);
 
         std::vector<Node *>         _lineages;
         std::vector<Node>           _nodes;
@@ -89,6 +92,9 @@ class Forest {
         unsigned                    _index;
         map<string, list<Node*> > _species_partition;
         double                    _gene_tree_log_likelihood;
+        vector<pair<Node*, Node*>> _node_choices;
+        vector<double>              _log_likelihood_choices;
+        vector<double>              _prev_log_likelihood_choices;
 
     public:
     
@@ -124,6 +130,7 @@ class Forest {
             nd->_parent=0;
             nd->_number=i;
             nd->_edge_length=0.0;
+            nd->_position_in_lineages=i;
             }
         _nleaves=_ntaxa;
         _ninternals=0;
@@ -375,6 +382,173 @@ class Forest {
         return _gene_tree_log_likelihood;
     }
 
+    inline pair<unsigned, unsigned> Forest::chooseAllPairs(list<Node*> &node_list, double increment) {
+        _node_choices.clear();
+        // save vector of log likelihoods from previous choices
+        _prev_log_likelihood_choices.resize(_log_likelihood_choices.size());
+        for (int i=0; i<_log_likelihood_choices.size(); i++ ) {
+            _prev_log_likelihood_choices[i] = _log_likelihood_choices[i];
+        }
+        assert (_prev_log_likelihood_choices == _log_likelihood_choices);
+        _log_likelihood_choices.clear();
+        
+        //choose pair of nodes to try
+            for (int i = 0; i < node_list.size()-1; i++) {
+                for (int j = i+1; j < node_list.size(); j++) {
+                // createNewSubtree returns subtree1, subtree2, new_nd
+                tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment);
+                _log_likelihood_choices.push_back(calcLogLikelihood());
+
+                // revert _lineages
+                revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
+                
+                //reset siblings and parents of original nodes back to 0
+                get<0>(t)->_right_sib=0;
+                get<1>(t)->_right_sib=0;
+                
+                get<0>(t)->_parent=0;
+                get<1>(t)->_parent=0;
+                
+                // clear new node from _nodes
+                //clear new node that was just created
+                get<2>(t)->clear();
+                
+                // TODO: make this a function in partialStore
+                get<2>(t)->_partial=nullptr;
+                }
+            
+                // TODO: save and return likelihood + 2 nodes for each choice of pairs (or just best pair?)
+                // TODO: 1 choice only
+            }
+        
+        // if _prev_log_likelihood_choices is empty, resize it
+        if (_prev_log_likelihood_choices.size() == 0) {
+            _prev_log_likelihood_choices.resize(_log_likelihood_choices.size());
+        }
+        // reweight each choice of pairs
+        vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_log_likelihood_choices);
+        
+        // normalize weights
+        double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
+        for (int b=0; b<log_weight_choices.size(); b++) {
+            log_weight_choices[b] = log_weight_choices[b] - log_weight_choices_sum;
+        }
+        
+        // randomly select a pair
+        int index = selectPair(log_weight_choices);
+        
+        // find nodes to join in node_list
+        Node *subtree1 = _node_choices[index].first;
+        Node *subtree2 = _node_choices[index].second;
+        
+        int nd1_number = 0;
+        int nd2_number = 0;
+        int i = 0;
+        
+        for (auto nd:node_list) {
+            if (nd == subtree1) {
+                nd1_number = i;
+                i++;
+            }
+            if (nd == subtree2) {
+                nd2_number = i;
+                i++;
+            }
+        }
+        
+        return make_pair(nd1_number, nd2_number);
+    }
+
+    inline int Forest::selectPair(vector<double> weight_vec) {
+        // choose a random number [0,1]
+        double u = rng.uniform();
+        double cum_prob = 0.0;
+        int index = 0.0;
+        for (int i=0; i<weight_vec.size(); i++) {
+            cum_prob += exp(weight_vec[i]);
+            if (u <= cum_prob) {
+                index = i;
+                break;
+            }
+        }
+        // return index of choice
+        return index;
+    }
+
+    inline vector<double> Forest::reweightChoices(vector<double> & likelihood_vec, vector<double> &prev_likelihood_vec) {
+        vector<double> weight_vec;
+        for (int a = 0; a<likelihood_vec.size(); a++) {
+            weight_vec.push_back(likelihood_vec[a]-prev_likelihood_vec[a]);
+        }
+        return weight_vec;
+    }
+    inline double Forest::getRunningSumChoices(vector<double> &log_weight_choices) {
+        double running_sum = 0.0;
+        double log_weight_choices_sum = 0.0;
+        double log_max_weight = *max_element(log_weight_choices.begin(), log_weight_choices.end());
+        for (auto & i:log_weight_choices) {
+            running_sum += exp(i - log_max_weight);
+        }
+        log_weight_choices_sum = log(running_sum) + log_max_weight;
+        return log_weight_choices_sum;
+    }
+
+    inline pair<Node*, Node*> Forest::getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list) {
+        Node *subtree1 = nullptr;
+        Node *subtree2 = nullptr;
+
+        unsigned a = 0;
+        for (auto iter=node_list.begin(); iter != node_list.end(); iter++){
+            if (a==t.first) {
+                subtree1 = *iter;
+            }
+            else if (a==t.second) {
+                subtree2 = *iter;
+            }
+            if (subtree1 && subtree2) {
+                break;
+            }
+            a++;
+        }
+        
+        pair<Node*, Node*> s = make_pair(subtree1, subtree2);
+        _node_choices.push_back(s);
+        
+        return s;
+    }
+
+    inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, double increment) {
+        pair<Node*, Node*> p = getSubtreeAt(t, node_list);
+        
+        Node* subtree1 = p.first;
+        Node* subtree2 = p.second;
+        
+//        new node is always needed
+        Node* new_nd=&_nodes[_nleaves+_ninternals];
+
+        new_nd->_parent=0;
+        new_nd->_number=_nleaves+_ninternals;
+        new_nd->_edge_length=0.0;
+        new_nd->_right_sib=0;
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+
+        //always calculating partials now
+        assert (new_nd->_partial == nullptr);
+        new_nd->_partial=ps.getPartial(_npatterns*4);
+        assert(new_nd->_left_child->_right_sib);
+        calcPartialArray(new_nd);
+
+        //update species list
+        updateNodeList(node_list, subtree1, subtree2, new_nd);
+        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+        return make_tuple(subtree1, subtree2, new_nd);
+    }
+
     inline void Forest::debugLogLikelihood(Node* nd, double log_like) {
         cout << "calculating likelihood for node : " << endl;
         cout << "\t" << "name: " << nd->_name << endl;
@@ -407,6 +581,7 @@ class Forest {
             nd->_parent=0;
             nd->_number=i;
             nd->_edge_length = edge_length;
+            nd->_position_in_lineages=i;
             }
         _nleaves=_ntaxa;
         _ninternals=0;
@@ -418,13 +593,19 @@ class Forest {
         _nodes.clear();
         _nodes.resize(other._nodes.size());
         _lineages.resize(other._lineages.size());
-        _nleaves          = other._nleaves;
-        _ninternals       = other._ninternals;
-        _last_edge_length = other._last_edge_length;
+        _nleaves            = other._nleaves;
+        _ninternals         = other._ninternals;
+        _last_edge_length   = other._last_edge_length;
         _index              = other._index;
         _first_pattern      = other._first_pattern;
         _gene_tree_log_likelihood = other._gene_tree_log_likelihood;
-        _data                   = other._data;
+        _data               = other._data;
+        _nspecies           = other._nspecies;
+        _ntaxa              = other._ntaxa;
+        
+        _node_choices = other._node_choices;
+        _log_likelihood_choices = other._log_likelihood_choices;
+        _prev_log_likelihood_choices = other._prev_log_likelihood_choices;
 
         // copy tree itself
         
@@ -470,13 +651,12 @@ class Forest {
             _nodes[k]._number      = othernd._number;
             _nodes[k]._name        = othernd._name;
             _nodes[k]._edge_length = othernd._edge_length;
+            _nodes[k]._position_in_lineages = othernd._position_in_lineages;
             _nodes[k]._partial = othernd._partial;
             }
         }
         
         unsigned i = 0;
-        
-        
         for (auto othernd : other._lineages) {
             unsigned k = othernd->_number;
             _lineages[i] = &_nodes[k];
@@ -501,6 +681,7 @@ class Forest {
             nd->_number=i;
             nd->_edge_length = edge_length;
             _lineages.push_back(nd);
+            nd->_position_in_lineages=i;
             }
         _nleaves=_nspecies;
         _ninternals=0;
@@ -579,7 +760,9 @@ class Forest {
             }
             
             if (!done) {
-                pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+//                pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+//                showForest();
+                pair<unsigned, unsigned> t = chooseAllPairs(nodes, increment);
                 Node *subtree1 = nullptr;
                 Node *subtree2 = nullptr;
 
@@ -627,9 +810,11 @@ class Forest {
     }
 
 inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
+//    showForest();
     bool done = false;
     
     while (!done) {
+//        showForest();
         double s = nodes.size();
         double coalescence_rate = s*(s-1)/_theta;
         double increment = rng.gamma(1.0, 1.0/coalescence_rate);
@@ -640,11 +825,13 @@ inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
         }
         
         //add increment to each lineage
-        if (!done) {
+//        if (!done) {
             for (auto nd:nodes) {
-                    nd->_edge_length += increment;
+                nd->_edge_length += increment;
             }
-            pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+        if (!done) {
+//            pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+            pair<unsigned, unsigned> t = chooseAllPairs(nodes, increment);
             Node *subtree1 = nullptr;
             Node *subtree2 = nullptr;
             
@@ -663,7 +850,7 @@ inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
             }
             
             //new node is not needed at last step
-            if (_lineages.size() > 2) {
+//            if (_lineages.size() > 2) {
                 Node* new_nd=&_nodes[_nleaves+_ninternals];
                 
                 new_nd->_parent=0;
@@ -686,9 +873,10 @@ inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
                 //update species list
                 updateNodeList(nodes, subtree1, subtree2, new_nd);
                 updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-            }
+//            }
         }
     }
+    showForest();
 }
 
     inline void Forest::geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment) {
@@ -697,6 +885,8 @@ inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
         }
         else {
             for (auto & s:_species_partition) {
+                
+//                pair<unsigned, unsigned> t = chooseAllPairs(s.second);
                 evolveSpeciesFor(s.second, time_increment);
             }
             
@@ -750,20 +940,60 @@ inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
 
         // Add addnode to node_vector
         node_vector.push_back(addnode);
+        
+        // reset _position_in_lineages
+        for (int i=0; i<_lineages.size(); i++) {
+            _lineages[i] -> _position_in_lineages=i;
+        }
     }
 
-    inline void Forest::removeNodeFromVector(vector<Node *> &node_vector, Node *addnode1, Node *addnode2, Node *delnode1) {
-        // Add addnode1 to node_vector
-        node_vector.push_back(addnode1);
-        
-        // Add addnode2 to node_vector
-        node_vector.push_back(addnode2);
-        
+    inline void Forest::revertNodeVector(vector<Node *> &node_vector, Node *addnode1, Node *addnode2, Node *delnode1) {
         // Delete delnode1 from node_vector
         auto it = find(node_vector.begin(), node_vector.end(), delnode1);
         assert (it != node_vector.end());
         node_vector.erase(it);
+        
+        // find positions of nodes to insert
+        auto position1 = addnode1->_position_in_lineages;
+        auto iter1 = addnode1;
+        
+        auto position2 = addnode2->_position_in_lineages;
+        auto iter2 = addnode2;
+        
+        // lower position must be inserted first
+        if (position1 < position2) {
+            node_vector.insert(node_vector.begin()+position1, iter1);
+            node_vector.insert(node_vector.begin()+position2, iter2);
+        }
+        else {
+            node_vector.insert(node_vector.begin()+position2, iter2);
+            node_vector.insert(node_vector.begin()+position1, iter1);
+        }
+        
+                assert(_lineages[addnode1->_position_in_lineages] == addnode1);
+                assert(_lineages[addnode2->_position_in_lineages] == addnode2);
+        
+        
+//        node_vector.insert(node_vector.begin()+position1, iter1);
+//
+//        // Add addnode2 to node_vector at correct spot
+//        auto position2 = addnode2->_position_in_lineages;
+//        auto iter2 = addnode2;
+//        node_vector.insert(node_vector.begin()+position2, iter2);
+//        assert(_lineages[addnode1->_position_in_lineages] == addnode1);
+//        assert(_lineages[addnode2->_position_in_lineages] == addnode2);
+        
+        // reset _position_in_lineages
+        for (int i=0; i<_lineages.size(); i++) {
+            _lineages[i] -> _position_in_lineages=i;
+        }
     }
+
+//    inline void Forest::revertNodeList(list<Node* > &node_vector, Node *delnode) {
+//        auto it = find(node_vector.begin(), node_vector.end(), delnode);
+//        assert (it != node_vector.end());
+//        node_vector.erase(it);
+//    }
 
     inline void Forest::updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode) {
         // Delete delnode1 from node_list
@@ -778,5 +1008,11 @@ inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
         
         // Add addnode to node_list
         node_list.push_back(addnode);
+        
+        // reset _position_in_lineages
+        for (int i=0; i<_lineages.size(); i++) {
+            _lineages[i] -> _position_in_lineages=i;
+        }
+        
     }
 }

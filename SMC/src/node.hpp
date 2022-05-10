@@ -63,6 +63,7 @@ namespace proj {
             Split               _split;
             int                 _flags;
             PartialStore::partial_t _partial;
+            int                 _position_in_lineages;
     };
     
     

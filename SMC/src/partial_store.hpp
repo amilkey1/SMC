@@ -8,6 +8,7 @@ namespace proj {
             typedef std::shared_ptr < std::vector<double> >   partial_t;
             partial_t getPartial(unsigned nelements);
 //            void setnelements(unsigned nelements) {_nelements = nelements;}
+        void resetPartial();
 //        private:
 //            unsigned _nelements;
     };
