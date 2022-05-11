@@ -329,6 +329,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 for (auto & p:my_vec) {
                     log_weight = p.proposal();
                     log_weight_vec.push_back(log_weight);
+//                    p.showParticle();
                 }
                 
                 normalizeWeights(my_vec);
@@ -342,7 +343,12 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 //change use_first from true to false or false to true
                 use_first = !use_first;
 
+                // TODO: is this necessary?
                 resetWeights(my_vec);
+                
+                for (auto &p:my_vec){
+                    p.showParticle();
+                }
             } // g loop
 
             double sum_h = 0.0;

@@ -115,7 +115,9 @@ class Particle {
 
     inline double Particle::proposal() {
         //species tree
+//        _forests[0].showForest();
         tuple<string, string, string> t = _forests[0].speciesTreeProposal();
+//        _forests[0].showForest();
         
         //gene trees
         for (unsigned i=1; i<_forests.size(); i++){
@@ -163,7 +165,14 @@ class Particle {
             double sum_height = 0.0;
         //add height of each lineage
             for (auto nd : _forests[0]._lineages) {
-                    sum_height += nd->_left_child->getEdgeLength();
+                if (_forests[0]._lineages.size() > 2) {
+                        sum_height += nd->_left_child->getEdgeLength();
+                }
+                else {
+                    if (!nd->_left_child) {
+                        sum_height += nd->getEdgeLength();
+                    }
+                }
                 }
         return sum_height;
     }
