@@ -35,7 +35,8 @@ namespace proj {
         
                     unsigned            countChildren() const;
 
-                    void                clearPointers()             {_left_child = _right_sib = _parent = 0;}   
+                    void                clearPointers()             {_left_child = _right_sib = _parent = 0;}
+            void                resetNode();
                                         
             static const double _smallest_edge_length;
 
@@ -82,6 +83,7 @@ namespace proj {
         _number = -1;
         _name = "";
         _edge_length = _smallest_edge_length;
+        _partial.reset();
     }   
 
     inline void Node::setEdgeLength(double v) {
@@ -94,5 +96,10 @@ namespace proj {
             n_children ++;
         }
         return n_children;
+    }
+
+    inline void Node::resetNode() {
+        _parent=0;
+        _right_sib=0;
     }
 }
