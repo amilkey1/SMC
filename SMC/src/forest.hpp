@@ -94,9 +94,9 @@ class Forest {
         double                    _gene_tree_log_likelihood;
         vector<pair<Node*, Node*>> _node_choices;
         vector<double>              _log_likelihood_choices;
-//        vector<double>              _prev_log_likelihood_choices;
         double                      _prev_log_likelihood;
         int                         _index_of_choice;
+        bool                        _finished = false;
 
     public:
     
@@ -389,6 +389,7 @@ class Forest {
         _node_choices.clear();
         
         // TODO: not sure about this
+        // reset _log_likelihood_choices to 0 if we are in a new lineage
         if (_log_likelihood_choices.size() == 0) {
             _prev_log_likelihood = 0.0;
         }
@@ -678,7 +679,7 @@ class Forest {
     }
 
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
-        if (_lineages.size() == 1) {
+        if (_finished) {
 //        if (_lineages.size() <=2) {
             _last_edge_length = -1.0;
             return make_tuple("null", "null", "null");
@@ -691,48 +692,33 @@ class Forest {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
         }
         
-//        showForest();
-        
         if (_lineages.size() == 2) {
+            _finished = true;
             return make_tuple(_lineages[0]->_name, _lineages[1]->_name, "final lineage");
         }
         
-//        if (_lineages.size() == 2) {
-//            Node *subtree1 = _lineages[0];
-//            Node *subtree2 = _lineages[1];
-//
-//            assert(!subtree1->_parent && !subtree2->_parent);
-//            assert(!subtree1->_right_sib && !subtree2->_right_sib);
-//
-//            subtree1->_right_sib=subtree2;
-//
-//            return make_tuple(subtree1->_name, subtree2->_name, "null");
-//        }
-//
-//        else {
-            pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
-            Node *subtree1=_lineages[t.first];
-            Node *subtree2=_lineages[t.second];
-            assert(!subtree1->_parent && !subtree2->_parent);
-            assert(!subtree1->_right_sib && !subtree2->_right_sib);
+        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
+        Node *subtree1=_lineages[t.first];
+        Node *subtree2=_lineages[t.second];
+        assert(!subtree1->_parent && !subtree2->_parent);
+        assert(!subtree1->_right_sib && !subtree2->_right_sib);
+    
+        Node* new_nd = &_nodes[_nleaves+_ninternals];
+        new_nd->_parent=0;
+        new_nd->_number=_nleaves+_ninternals;
+        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+        new_nd->_right_sib=0;
         
-            Node* new_nd = &_nodes[_nleaves+_ninternals];
-            new_nd->_parent=0;
-            new_nd->_number=_nleaves+_ninternals;
-            new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
-            new_nd->_edge_length=0.0;
-            _ninternals++;
-            new_nd->_right_sib=0;
-            
-            new_nd->_left_child=subtree1;
-            subtree1->_right_sib=subtree2;
-            
-            subtree1->_parent=new_nd;
-            subtree2->_parent=new_nd;
-            
-            updateNodeVector (_lineages, subtree1, subtree2, new_nd);
-            return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
-//        }
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+        
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+        
+        updateNodeVector (_lineages, subtree1, subtree2, new_nd);
+        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
     }
 
 
@@ -772,15 +758,27 @@ class Forest {
             }
             
             if (!done) {
-//                pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+
                 Node *subtree1;
                 Node *subtree2;
                 
                 if (nodes.size()>2) {
+// prior-prior proposal
+# if (false)
+                    pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+                    auto it1 = std::next(nodes.begin(), t.first);
+                    subtree1 = *it1;
+                    
+                    auto it2 = std::next(nodes.begin(), t.second);
+                    subtree2 = *it2;
+                    
+// prior-post proposal
+# else
                     pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
                     
                     subtree1 = t.first;
                     subtree2 = t.second;
+# endif
                 }
                 else {
                     // if there are only two lineages left, there is only one choice
@@ -881,7 +879,7 @@ class Forest {
                 
 //                pair<unsigned, unsigned> t = chooseAllPairs(s.second);
                 evolveSpeciesFor(s.second, time_increment);
-//                showForest();
+                showForest();
             }
             
             //update species partition
