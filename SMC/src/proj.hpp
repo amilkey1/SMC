@@ -105,6 +105,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
         ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.05), "theta")
         ("speciation_rate", boost::program_options::value(&Forest::_speciation_rate)->default_value(10), "speciation rate")
+        ("proposal",  boost::program_options::value(&Forest::_proposal)->default_value("prior-post"), "a string defining a proposal (prior-prior or prior-post)")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -346,9 +347,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 // TODO: is this necessary?
                 resetWeights(my_vec);
                 
-                for (auto &p:my_vec){
-                    p.showParticle();
-                }
             } // g loop
 
             double sum_h = 0.0;
@@ -363,6 +361,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
             saveAllForests(my_vec);
 //            showParticlesByWeight(my_vec);
+            for (auto &p:my_vec){
+                p.showParticle();
+            }
             }
 
         catch (XProj & x) {

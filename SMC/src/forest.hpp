@@ -103,6 +103,7 @@ class Forest {
         typedef std::shared_ptr<Forest> SharedPtr;
         static double               _theta;
         static double               _speciation_rate;
+        static string               _proposal;
 };
 
 
@@ -403,7 +404,7 @@ class Forest {
                 // createNewSubtree returns subtree1, subtree2, new_nd
                 tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment);
                 _log_likelihood_choices.push_back(calcLogLikelihood());
-                Node* new_nd = get<2>(t);
+//                Node* new_nd = get<2>(t);
 //                _newnd_choices.push_back(new_nd);
 
                 // revert _lineages
@@ -755,24 +756,29 @@ class Forest {
                 if (nodes.size()>2) {
                     
 // prior-prior proposal
-# if (false)
-                    pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
-                    auto it1 = std::next(nodes.begin(), t.first);
-                    subtree1 = *it1;
-                    
-                    auto it2 = std::next(nodes.begin(), t.second);
-                    subtree2 = *it2;
+//# if (false)
+                    if (_proposal == "prior-prior") {
+                        pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+                        auto it1 = std::next(nodes.begin(), t.first);
+                        subtree1 = *it1;
+                        
+                        auto it2 = std::next(nodes.begin(), t.second);
+                        subtree2 = *it2;
+                    }
                     
 // prior-post proposal
-# else
-                    pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
-                    
-                    subtree1 = t.first;
-                    subtree2 = t.second;
-# endif
+//# else
+                    if (_proposal == "prior-post") {
+                        pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
+                        
+                        subtree1 = t.first;
+                        subtree2 = t.second;
+                    }
+//# endif
                 }
                 else {
                     // if there are only two lineages left, there is only one choice
+                    // prior-prior and prior-post proposals will return the same thing
                     subtree1 = nodes.front();
                     subtree2 = nodes.back();
                 }
@@ -870,7 +876,6 @@ class Forest {
                 
 //                pair<unsigned, unsigned> t = chooseAllPairs(s.second);
                 evolveSpeciesFor(s.second, time_increment);
-                showForest();
             }
             
             //update species partition
