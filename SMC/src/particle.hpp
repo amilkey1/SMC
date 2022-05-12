@@ -101,8 +101,7 @@ class Particle {
         //calculate likelihood for each gene tree
         double log_likelihood = 0.0;
         for (unsigned i=1; i<_forests.size(); i++) {
-//            double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
-            double gene_tree_log_likelihood = _forests[i].getLogLikelihood();
+            double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
             assert(!isnan (log_likelihood));
 //            cout << "gene tree log like: " << gene_tree_log_likelihood << endl;
 
@@ -162,18 +161,14 @@ class Particle {
 
     inline double Particle::calcHeight() {
         //species tree
-            double sum_height = 0.0;
-        //add height of each lineage
-            for (auto nd : _forests[0]._lineages) {
-                if (_forests[0]._lineages.size() > 2) {
-                        sum_height += nd->_left_child->getEdgeLength();
-                }
-                else {
-                    if (!nd->_left_child) {
-                        sum_height += nd->getEdgeLength();
-                    }
-                }
-                }
+        double sum_height = 0.0;
+        
+        // calculate height of lineage
+        Node* base_node = _forests[0]._lineages[0];
+        sum_height += base_node->getEdgeLength();
+        for (Node* child=base_node->_left_child; child; child=child->_left_child) {
+            sum_height += child->getEdgeLength();
+        }
         return sum_height;
     }
 

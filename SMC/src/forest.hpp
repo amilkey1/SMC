@@ -47,7 +47,6 @@ class Forest {
         void operator=(const Forest & other);
         void                        debugForest();
         void                        debugLogLikelihood(Node* nd, double log_like);
-        double                        getLogLikelihood();
 
     private:
     
@@ -97,6 +96,7 @@ class Forest {
         double                      _prev_log_likelihood;
         int                         _index_of_choice;
         bool                        _finished = false;
+    
 
     public:
     
@@ -388,7 +388,6 @@ class Forest {
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment) {
         _node_choices.clear();
         
-        // TODO: not sure about this
         // reset _log_likelihood_choices to 0 if we are in a new lineage
         if (_log_likelihood_choices.size() == 0) {
             _prev_log_likelihood = 0.0;
@@ -404,6 +403,8 @@ class Forest {
                 // createNewSubtree returns subtree1, subtree2, new_nd
                 tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment);
                 _log_likelihood_choices.push_back(calcLogLikelihood());
+                Node* new_nd = get<2>(t);
+//                _newnd_choices.push_back(new_nd);
 
                 // revert _lineages
                 revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
@@ -524,17 +525,6 @@ class Forest {
         updateNodeList(node_list, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         return make_tuple(subtree1, subtree2, new_nd);
-    }
-
-    inline double Forest::getLogLikelihood(){
-//        if (_log_likelihood_choices.size()>0) {
-////            assert (calcLogLikelihood() == _log_likelihood_choices[_index_of_choice]);
-//            return _log_likelihood_choices[_index_of_choice];
-//        }
-//        else {
-//            return calcLogLikelihood();
-//        }
-        return calcLogLikelihood();
     }
 
     inline void Forest::debugLogLikelihood(Node* nd, double log_like) {
@@ -763,6 +753,7 @@ class Forest {
                 Node *subtree2;
                 
                 if (nodes.size()>2) {
+                    
 // prior-prior proposal
 # if (false)
                     pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
