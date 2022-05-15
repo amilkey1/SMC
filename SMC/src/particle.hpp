@@ -14,7 +14,7 @@ namespace proj {
 
 class Particle {
     public:
-    
+
         Particle();
         Particle(const Particle & other);
 
@@ -46,21 +46,24 @@ class Particle {
         bool operator<(const Particle & other) const {
             return _log_weight<other._log_weight;
         }
-        
+
         bool operator>(const Particle & other) const {
             return _log_weight>other._log_weight;
         }
-    
-        static void                                   setNumSubsets(unsigned n);
-        vector<Forest> &                             getForests() {return _forests;}
+
+        static void                                     setNumSubsets(unsigned n);
+        vector<Forest> &                                getForests() {return _forests;}
+        void                                            showSpeciesIncrement();
+        void                                            showSpeciesJoined();
 
     private:
-    
+
         static unsigned                         _nsubsets;
         vector<Forest>                         _forests;
         double                                  _log_weight;
         Data::SharedPtr                          _data;
         double                                  _log_likelihood;
+        int                                     _generation = 0;
 };
 
     inline Particle::Particle() {
@@ -99,9 +102,11 @@ class Particle {
 
     inline double Particle::calcLogLikelihood() {
         //calculate likelihood for each gene tree
+//        _forests[0].showForest();
         double log_likelihood = 0.0;
         for (unsigned i=1; i<_forests.size(); i++) {
             double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
+//            _forests[i].showForest();
             assert(!isnan (log_likelihood));
 //            cout << "gene tree log like: " << gene_tree_log_likelihood << endl;
 
@@ -109,24 +114,44 @@ class Particle {
             log_likelihood += gene_tree_log_likelihood;
         }
 //        cout << "total log like: " << log_likelihood << endl;
+        _generation++;
         return log_likelihood;
     }
 
     inline double Particle::proposal() {
         //species tree
 //        _forests[0].showForest();
-        tuple<string, string, string> t = _forests[0].speciesTreeProposal();
-//        _forests[0].showForest();
-        
-        //gene trees
-        for (unsigned i=1; i<_forests.size(); i++){
-//            cout << "gene " << i << endl;
-            _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
+        if (_generation == 0) {
+            _forests[0].chooseSpeciesIncrement();
+            tuple <string, string, string> a = make_tuple("null", "null", "null");
+            for (unsigned i=1; i<_forests.size(); i++){
+    //            cout << "gene " << i << endl;
+                _forests[i].geneTreeProposal(a, _forests[0]._last_edge_length);
+            }
         }
-        
+
+        else {
+            tuple<string, string, string> t = _forests[0].speciesTreeProposal();
+            //gene trees
+            for (unsigned i=1; i<_forests.size(); i++){
+    //            cout << "gene " << i << endl;
+                _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
+            }
+        }
+//        _forests[0].showForest();
+
+        //gene trees
+//        for (unsigned i=1; i<_forests.size(); i++){
+////            cout << "gene " << i << endl;
+//            _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
+//        }
+
+//        tuple<string, string, string> t = _forests[0].speciesTreeProposal();
+
         double prev_log_likelihood = _log_likelihood;
         _log_likelihood = calcLogLikelihood();
         _log_weight = _log_likelihood - prev_log_likelihood;
+//        cout << "\t" << "particle weight is: " << _log_weight << endl;
         return _log_weight;
     }
 
@@ -162,7 +187,7 @@ class Particle {
     inline double Particle::calcHeight() {
         //species tree
         double sum_height = 0.0;
-        
+
         // calculate height of lineage
         Node* base_node = _forests[0]._lineages[0];
         sum_height += base_node->getEdgeLength();
@@ -179,11 +204,19 @@ class Particle {
     inline void Particle::mapSpecies(map<string, string> &taxon_map, vector<string> &species_names) {
         //species tree
         _forests[0].setUpSpeciesForest(species_names); //this also sets species lineages
-        
+
         //gene trees
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].setUpGeneForest(taxon_map);
         }
+    }
+
+    inline void Particle::showSpeciesIncrement(){
+        cout << "species tree increment: " << "     " << _forests[0]._last_edge_length << endl;
+    }
+
+    inline void Particle::showSpeciesJoined(){
+        _forests[0].showSpeciesJoined();
     }
 
     inline void Particle::operator=(const Particle & other) {

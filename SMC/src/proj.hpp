@@ -104,7 +104,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000), "number of particles")
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
         ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.05), "theta")
-        ("speciation_rate", boost::program_options::value(&Forest::_speciation_rate)->default_value(10), "speciation rate")
+        ("speciation_rate", boost::program_options::value(&Forest::_speciation_rate)->default_value(1), "speciation rate")
         ("proposal",  boost::program_options::value(&Forest::_proposal)->default_value("prior-post"), "a string defining a proposal (prior-prior or prior-post)")
         ;
 
@@ -326,29 +326,50 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 vector<double> log_weight_vec;
                 double log_weight = 0.0;
 
-                //taxon joining and reweighting step 
+                //taxon joining and reweighting step
                 for (auto & p:my_vec) {
                     log_weight = p.proposal();
                     log_weight_vec.push_back(log_weight);
-//                    p.showParticle();
                 }
                 
+                double ess_inverse = 0.0;
                 normalizeWeights(my_vec);
-                resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
-
-                //if use_first is true, my_vec = my_vec_2
-                //if use_first is false, my_vec = my_vec_1
+                for (auto & p:my_vec) {
+                    ess_inverse += exp(2.0*p.getLogWeight());
+                }
                 
-                my_vec = use_first ? my_vec_2:my_vec_1;
+                double ess = 1.0/ess_inverse;
+                cout << "ESS is " << ess << " " << "g = " << g << endl;
+                
+//                for (auto &p:my_vec) {
+//                    p.showSpeciesIncrement();
+//                    p.showSpeciesJoined();
+//                    cout << "\t" << "particle weight is: " << p.getLogWeight() << endl;
+//                }
+                
+                if (ess < 100) {
+                
+                    resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
+                    
+                    //if use_first is true, my_vec = my_vec_2
+                    //if use_first is false, my_vec = my_vec_1
+                    
+                    my_vec = use_first ? my_vec_2:my_vec_1;
 
-                //change use_first from true to false or false to true
-                use_first = !use_first;
-
-                // TODO: is this necessary?
+                    //change use_first from true to false or false to true
+                    use_first = !use_first;
+                }
+                
                 resetWeights(my_vec);
+//                cout << "\n" << endl;
+//                cout << "____________________" << endl;
                 
             } // g loop
 
+            for (auto &p:my_vec){
+                p.showParticle();
+            }
+            
             double sum_h = 0.0;
             for (auto & p:my_vec) {
                 double h = p.calcHeight();
@@ -361,9 +382,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
             saveAllForests(my_vec);
 //            showParticlesByWeight(my_vec);
-            for (auto &p:my_vec){
-                p.showParticle();
-            }
+
             }
 
         catch (XProj & x) {
