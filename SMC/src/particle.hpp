@@ -102,7 +102,6 @@ class Particle {
 
     inline double Particle::calcLogLikelihood() {
         //calculate likelihood for each gene tree
-//        _forests[0].showForest();
         double log_likelihood = 0.0;
         for (unsigned i=1; i<_forests.size(); i++) {
             double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
@@ -120,13 +119,14 @@ class Particle {
 
     inline double Particle::proposal() {
         //species tree
-//        _forests[0].showForest();
+        
+        // don't choose species to join for generation 0
         if (_generation == 0) {
             _forests[0].chooseSpeciesIncrement();
-            tuple <string, string, string> a = make_tuple("null", "null", "null");
+            tuple <string, string, string> t = make_tuple("null", "null", "null");
             for (unsigned i=1; i<_forests.size(); i++){
     //            cout << "gene " << i << endl;
-                _forests[i].geneTreeProposal(a, _forests[0]._last_edge_length);
+                _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
             }
         }
 
@@ -138,15 +138,6 @@ class Particle {
                 _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
             }
         }
-//        _forests[0].showForest();
-
-        //gene trees
-//        for (unsigned i=1; i<_forests.size(); i++){
-////            cout << "gene " << i << endl;
-//            _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
-//        }
-
-//        tuple<string, string, string> t = _forests[0].speciesTreeProposal();
 
         double prev_log_likelihood = _log_likelihood;
         _log_likelihood = calcLogLikelihood();

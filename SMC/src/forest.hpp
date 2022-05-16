@@ -408,7 +408,6 @@ class Forest {
                 // createNewSubtree returns subtree1, subtree2, new_nd
                 tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment);
                 _log_likelihood_choices.push_back(calcLogLikelihood());
-                Node* new_nd = get<2>(t);
 
                 // revert _lineages
                 revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
@@ -683,17 +682,12 @@ class Forest {
     }
 
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
-        if (_lineages.size() == 1) {
-            _last_edge_length = -1.0;
-            return make_tuple("null", "null", "null");
-        }
+//        if (_lineages.size() == 1) {
+//            _last_edge_length = -1.0;
+//            return make_tuple("null", "null", "null");
+//        }
 
-        double rate = _speciation_rate*_lineages.size();
-        _last_edge_length = rng.gamma(1.0, 1.0/rate);
-
-        for (auto nd:_lineages) {
-            nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
-        }
+        chooseSpeciesIncrement();
 
         pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
         Node *subtree1=_lineages[t.first];
@@ -851,25 +845,35 @@ class Forest {
 //            if (!done) {
                 Node* subtree1;
                 Node *subtree2;
+                
+                if (nodes.size()>2) {
 
-                // TODO: 2 choices only
 // prior-prior proposal
-                if (_proposal == "prior-prior") {
-                    pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
-                    auto it1 = std::next(nodes.begin(), t.first);
-                    subtree1 = *it1;
+                    if (_proposal == "prior-prior") {
+                        pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+                        auto it1 = std::next(nodes.begin(), t.first);
+                        subtree1 = *it1;
 
-                    auto it2 = std::next(nodes.begin(), t.second);
-                    subtree2 = *it2;
-                }
+                        auto it2 = std::next(nodes.begin(), t.second);
+                        subtree2 = *it2;
+                    }
 
 // prior-post proposal
-                if (_proposal == "prior-post") {
-                    pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
+                    if (_proposal == "prior-post") {
+                        pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
 
-                    subtree1 = t.first;
-                    subtree2 = t.second;
+                        subtree1 = t.first;
+                        subtree2 = t.second;
+                    }
                 }
+                
+                else {
+                    // if there are only two lineages left, there is only one choice
+                    // prior-prior and prior-post proposals will return the same thing
+                    subtree1 = nodes.front();
+                    subtree2 = nodes.back();
+                }
+                
 
                 Node* new_nd=&_nodes[_nleaves+_ninternals];
 
@@ -916,17 +920,6 @@ class Forest {
             for (auto & s:_species_partition) {
                 evolveSpeciesFor(s.second, time_increment);
             }
-
-//            //update species partition
-//            string new_name = get<2>(species_merge_info);
-//            string species1 = get<0>(species_merge_info);
-//            string species2 = get<1>(species_merge_info);
-//
-//            list<Node*> &nodes = _species_partition[new_name];
-//            copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
-//            copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
-//            _species_partition.erase(species1);
-//            _species_partition.erase(species2);
         }
 
     }
