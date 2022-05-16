@@ -99,6 +99,7 @@ class Forest {
 //        vector<Node*>               _newnd_choices;
         pair<Node*, Node*>          _species_joined;
         void                        showSpeciesJoined();
+        double                      calcTransitionProbability(Node* child, double s, double s_child);
 
 
     public:
@@ -107,6 +108,7 @@ class Forest {
         static double               _theta;
         static double               _speciation_rate;
         static string               _proposal;
+        static string               _model;
 };
 
 
@@ -341,9 +343,9 @@ class Forest {
     inline void Forest::calcPartialArray(Node* new_nd) {
         auto & parent_partial_array = *(new_nd->_partial);
         for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
-            double expterm = exp(-4.0*(child->_edge_length)/3.0);
-            double prsame = 0.25+0.75*expterm;
-            double prdif = 0.25 - 0.25*expterm;
+//            double expterm = exp(-4.0*(child->_edge_length)/3.0);
+//            double prsame = 0.25+0.75*expterm;
+//            double prdif = 0.25 - 0.25*expterm;
 
             auto & child_partial_array = *(child->_partial);
 
@@ -351,7 +353,8 @@ class Forest {
                 for (unsigned s = 0; s <_nstates; s++) {
                     double sum_over_child_states = 0.0;
                     for (unsigned s_child = 0; s_child < _nstates; s_child++) {
-                        double child_transition_prob = (s == s_child ? prsame : prdif);
+                        double child_transition_prob = calcTransitionProbability(child, s, s_child);
+//                        double child_transition_prob = (s == s_child ? prsame : prdif);
                         double child_partial = child_partial_array[p*_nstates + s_child];
                         sum_over_child_states += child_transition_prob * child_partial;
                     }   // child state loop
@@ -364,9 +367,108 @@ class Forest {
         }   // child loop
     }
 
-    inline double Forest::calcLogLikelihood() {
-//        showForest();
+    inline double Forest::calcTransitionProbability(Node* child, double s, double s_child) {
+        double child_transition_prob = 0.0;
+//        double i = 0.5;
+//        double j = 0.5;
+        
+        if (_model == "JC" ) {
+            double expterm = exp(-4.0*(child->_edge_length)/3.0);
+            double prsame = 0.25+0.75*expterm;
+            double prdif = 0.25 - 0.25*expterm;
+            
+            child_transition_prob = (s == s_child ? prsame : prdif);
+            return child_transition_prob;
+        }
+        
+        if (_model == "HKY") {
+            // s = 0: A
+            // s = 1: C
+            // s = 2: G
+            // s = 3: T
+            
+            // TODO: this is for JC model
+            double pi_A = 0.25;
+            double pi_C = 0.25;
+            double pi_G = 0.25;
+            double pi_T = 0.25;
+            double pi_j = 0.0;
+            double PI_purine = pi_A + pi_G;
+            double PI_pyrimidine = pi_C + pi_T;
+            double kappa = 1.0;
+            double alpha = 1.0;
+//            double beta = 1.0;
+            
+            // transition prob depends on ending state
+            if (s_child == 0) {
+                pi_j = pi_A;
+            }
+            if (s_child == 1) {
+                pi_j = pi_C;
+            }
+            if (s_child == 2) {
+                pi_j = pi_G;
+            }
+            if (s_child == 3) {
+                pi_j = pi_T;
+            }
+            
+            double expterm = exp(-4.0*child->_edge_length/3.0);
 
+            if (s == s_child) {
+                // no transition or transversion
+                // if s_child is a purine
+                if (s_child == 0 || s_child == 2) {
+                    double first_term = 1 + ((1-PI_purine)/PI_purine)*expterm;
+                    double second_term = ((PI_purine-pi_j)/PI_purine)*(pow(expterm,pi_j+1-pi_j));
+                    child_transition_prob = pi_j*first_term+second_term;
+                    return child_transition_prob;
+                }
+                if (s_child == 1 || s_child == 3) {
+                    // s_child is a pyrimidine
+                    double first_term = 1 + ((1-PI_pyrimidine)/PI_pyrimidine)*expterm;
+                    double second_term = ((PI_pyrimidine-pi_j)/PI_pyrimidine)*(pow(expterm,pi_j+1-pi_j));
+
+                    child_transition_prob = pi_j*first_term+second_term;
+                    return child_transition_prob;
+                }
+                
+                // if s_child is a pyrimidine
+                
+            }
+            
+            if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
+                // transition
+                
+                if (s_child == 1 || s_child == 3) {
+                // purine transition
+                    double first_term = 1 + ((1-PI_purine)/PI_purine)*expterm;
+                    double second_term = -1/PI_purine*(pow(expterm,pi_j+1-pi_j));
+                    child_transition_prob = pi_j*(first_term+second_term);
+                    return child_transition_prob;
+                }
+                
+                if (s_child == 0 || s_child == 2) {
+                // pyrimidine transition
+                    double first_term = 1 + ((1-PI_pyrimidine)/PI_pyrimidine)*expterm;
+                    double second_term = -1/PI_pyrimidine*(pow(expterm,pi_j+1-pi_j));
+                    child_transition_prob = pi_j*(first_term+second_term);
+                    return child_transition_prob;
+                }
+            }
+            
+            else {
+                // transversion
+                child_transition_prob = pi_j*(1-expterm);
+                return child_transition_prob;
+            }
+        }
+        
+        // TODO: better way to do this?
+        return 0.0;
+    }
+
+    inline double Forest::calcLogLikelihood() {
         auto data_matrix=_data->getDataMatrix();
 
         //calc likelihood for each lineage separately
@@ -463,6 +565,7 @@ class Forest {
         }
         return weight_vec;
     }
+
     inline double Forest::getRunningSumChoices(vector<double> &log_weight_choices) {
         double running_sum = 0.0;
         double log_weight_choices_sum = 0.0;

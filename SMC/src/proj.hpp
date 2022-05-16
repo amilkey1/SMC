@@ -106,6 +106,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.05), "theta")
         ("speciation_rate", boost::program_options::value(&Forest::_speciation_rate)->default_value(1), "speciation rate")
         ("proposal",  boost::program_options::value(&Forest::_proposal)->default_value("prior-post"), "a string defining a proposal (prior-prior or prior-post)")
+        ("model", boost::program_options::value(&Forest::_model)->default_value("JC"), "a string defining a substitutio model")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);

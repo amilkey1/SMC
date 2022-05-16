@@ -9,13 +9,13 @@
 namespace proj {
 
     class Likelihood;
-    class Updater;
+//    class Updater;
     class Forest;
     class Particle;
 
     class Node {
         friend class Likelihood;
-        friend class Updater;
+//        friend class Updater;
         friend class Forest;
         friend class Particle;
 

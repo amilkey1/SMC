@@ -26,6 +26,7 @@ double Forest::_speciation_rate = 1;
 unsigned Particle::_nsubsets = 1;
 const double Node::_smallest_edge_length=1.0e-12;
 string Forest::_proposal;
+string Forest::_model;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT
