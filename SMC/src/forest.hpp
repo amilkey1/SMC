@@ -369,8 +369,6 @@ class Forest {
 
     inline double Forest::calcTransitionProbability(Node* child, double s, double s_child) {
         double child_transition_prob = 0.0;
-//        double i = 0.5;
-//        double j = 0.5;
         
         if (_model == "JC" ) {
             double expterm = exp(-4.0*(child->_edge_length)/3.0);
@@ -378,6 +376,7 @@ class Forest {
             double prdif = 0.25 - 0.25*expterm;
             
             child_transition_prob = (s == s_child ? prsame : prdif);
+            assert (child_transition_prob > 0.0);
             return child_transition_prob;
         }
         
@@ -387,88 +386,73 @@ class Forest {
             // s = 2: G
             // s = 3: T
             
-            // TODO: this is for JC model
-            double pi_A = 0.25;
-            double pi_C = 0.25;
-            double pi_G = 0.25;
-            double pi_T = 0.25;
+            double pi_A = 0.2;
+            double pi_C = 0.3;
+            double pi_G = 0.2;
+            double pi_T = 0.3;
+            
             double pi_j = 0.0;
-            double PI_purine = pi_A + pi_G;
-            double PI_pyrimidine = pi_C + pi_T;
-            double kappa = 1.0;
-            double alpha = 1.0;
-//            double beta = 1.0;
+            double PI_J = 0.0;
+            double kappa = 2.0;
             
-            // transition prob depends on ending state
+            double phi = (pi_A+pi_G)*(pi_C+pi_T)+kappa*(pi_A*pi_G+pi_C*pi_T);
+            double beta_t = 0.5*(child->_edge_length)/phi;
+            
+            // transition prob depends only on ending state
             if (s_child == 0) {
+                // purine
                 pi_j = pi_A;
+                PI_J = pi_A + pi_G;
             }
-            if (s_child == 1) {
+            else if (s_child == 1) {
+                // pyrimidine
                 pi_j = pi_C;
+                PI_J = pi_C + pi_T;
             }
-            if (s_child == 2) {
+            else if (s_child == 2) {
+                // purine
                 pi_j = pi_G;
+                PI_J = pi_A + pi_G;
             }
-            if (s_child == 3) {
+            else if (s_child == 3) {
+                // pyrimidine
                 pi_j = pi_T;
+                PI_J = pi_C + pi_T;
             }
             
-            double expterm = exp(-4.0*child->_edge_length/3.0);
-
-            if (s == s_child) {
-                // no transition or transversion
-                // if s_child is a purine
-                if (s_child == 0 || s_child == 2) {
-                    double first_term = 1 + ((1-PI_purine)/PI_purine)*expterm;
-                    double second_term = ((PI_purine-pi_j)/PI_purine)*(pow(expterm,pi_j+1-pi_j));
+            while (true) {
+                if (s == s_child) {
+                    // no transition or transversion
+                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
+                    double second_term = (PI_J-pi_j)/PI_J*exp(-beta_t*(PI_J*kappa+(1-PI_J)));
                     child_transition_prob = pi_j*first_term+second_term;
-                    return child_transition_prob;
+                    break;
                 }
-                if (s_child == 1 || s_child == 3) {
-                    // s_child is a pyrimidine
-                    double first_term = 1 + ((1-PI_pyrimidine)/PI_pyrimidine)*expterm;
-                    double second_term = ((PI_pyrimidine-pi_j)/PI_pyrimidine)*(pow(expterm,pi_j+1-pi_j));
-
-                    child_transition_prob = pi_j*first_term+second_term;
-                    return child_transition_prob;
-                }
-                
-                // if s_child is a pyrimidine
-                
-            }
             
-            if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
-                // transition
-                
-                if (s_child == 1 || s_child == 3) {
-                // purine transition
-                    double first_term = 1 + ((1-PI_purine)/PI_purine)*expterm;
-                    double second_term = -1/PI_purine*(pow(expterm,pi_j+1-pi_j));
-                    child_transition_prob = pi_j*(first_term+second_term);
-                    return child_transition_prob;
+                else if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
+                    // transition
+                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
+                    double second_term = (1/PI_J)*exp(-beta_t*(PI_J*kappa+(1-PI_J)));
+                    child_transition_prob = pi_j*(first_term-second_term);
+                    break;
                 }
-                
-                if (s_child == 0 || s_child == 2) {
-                // pyrimidine transition
-                    double first_term = 1 + ((1-PI_pyrimidine)/PI_pyrimidine)*expterm;
-                    double second_term = -1/PI_pyrimidine*(pow(expterm,pi_j+1-pi_j));
-                    child_transition_prob = pi_j*(first_term+second_term);
-                    return child_transition_prob;
-                }
-            }
             
-            else {
-                // transversion
-                child_transition_prob = pi_j*(1-expterm);
-                return child_transition_prob;
+                else {
+                    // transversion
+                    child_transition_prob = pi_j*(1-exp(-beta_t));
+                    break;
+                }
             }
         }
         
-        // TODO: better way to do this?
-        return 0.0;
+        assert (child_transition_prob > 0.0);
+        return child_transition_prob;
     }
 
     inline double Forest::calcLogLikelihood() {
+//        if (_index == 20) {
+//            showForest();
+//        }
         auto data_matrix=_data->getDataMatrix();
 
         //calc likelihood for each lineage separately
@@ -515,12 +499,12 @@ class Forest {
                 revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
 
                 //reset siblings and parents of original nodes back to 0
-                get<0>(t)->resetNode();
-                get<1>(t)->resetNode();
+                get<0>(t)->resetNode(); //subtree1
+                get<1>(t)->resetNode(); //subtree2
 
                 // clear new node from _nodes
                 //clear new node that was just created
-                get<2>(t)->clear();
+                get<2>(t)->clear(); //new_nd
             }
         }
 
@@ -1010,17 +994,23 @@ class Forest {
         string species1 = get<0>(species_merge_info);
         string species2 = get<1>(species_merge_info);
 
-        list<Node*> &nodes = _species_partition[new_name];
-        copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
-        copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
-        _species_partition.erase(species1);
-        _species_partition.erase(species2);
+        if (new_name != "null" ){
+            // skip this for generation 0, no species have been joined yet
+            list<Node*> &nodes = _species_partition[new_name];
+            copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
+            copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
+            _species_partition.erase(species1);
+            _species_partition.erase(species2);
+        }
 
         if (_species_partition.size() == 1) {
             fullyCoalesceGeneTree(_species_partition.begin()->second);
         }
         else {
             for (auto & s:_species_partition) {
+                if (s.second.size() == 0) {
+                }
+                assert (s.second.size()>0);
                 evolveSpeciesFor(s.second, time_increment);
             }
         }

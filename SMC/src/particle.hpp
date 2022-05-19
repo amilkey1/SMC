@@ -194,7 +194,7 @@ class Particle {
 
     inline void Particle::mapSpecies(map<string, string> &taxon_map, vector<string> &species_names) {
         //species tree
-        _forests[0].setUpSpeciesForest(species_names); //this also sets species lineages
+        _forests[0].setUpSpeciesForest(species_names);
 
         //gene trees
         for (unsigned i=1; i<_forests.size(); i++) {

@@ -251,6 +251,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
     }
     
     inline void Proj::createSpeciesMap(Data::SharedPtr d) {
+        // TODO: this only works if names are in taxon^species format (no _)
         const vector<string> &names = d->getTaxonNames();
         for (auto &name:names) {
             regex re(".+\\^(.+)");
