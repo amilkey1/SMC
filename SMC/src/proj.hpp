@@ -378,7 +378,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             Particle::setNumSubsets(nsubsets);
             
             // theta loop
-                for (int i=0; i<200; i++) {
+                for (int i=0; i<10; i++) {
                     vector<Particle> my_vec_1(nparticles);
                     vector<Particle> my_vec_2(nparticles);
                     vector<Particle> &my_vec = my_vec_1;
@@ -427,8 +427,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         resetWeights(my_vec);
                     } // g loop
                     
-                    _theta_vector.push_back(Forest::_theta);
-                    
                     if (i == 0) {
                         _prev_particles=my_vec;
                     }
@@ -439,32 +437,46 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood;
                         string outcome = acceptTheta();
                         if (outcome == "reject") {
-//                            _accepted_particle_vec = _prev_particles;
-//                            my_vec = _accepted_particle_vec;
                             my_vec = _prev_particles;
                             _log_marginal_likelihood = _prev_log_marginal_likelihood;
                             Forest::_theta = _prev_theta;
                             cout << "\n" << "REJECT" << endl;
+                            _theta_vector.push_back(Forest::_theta);
                         }
                         else {
-//                            _accepted_particle_vec = my_vec;
                             _prev_particles = my_vec;
-//                            cout << Forest::_theta << endl;
+                            cout << "\n" << "ACCEPT" << endl;
+                            _theta_vector.push_back(Forest::_theta);
                         }
-//                        _prev_particles = my_vec;
-                        
                     }
-//                    cout << "theta: " << Forest::_theta << endl;
-//                    cout << "\t" << "marg like: " << _log_marginal_likelihood << endl;
                     
                     // propose new theta for all steps but last step
-                    if (i<199) {
+                    if (i<9) {
                         proposeTheta();
                     }
                     
                     _accepted_particle_vec = my_vec;
             }
             showFinal(_accepted_particle_vec);
+            
+            cout << "________________________________________" << endl;
+            
+            // sort sampled thetas by frequency
+            sort(_theta_vector.begin(), _theta_vector.end(), greater<double>());
+            int a = 0;
+            int b = 0;
+            for (auto & i:_theta_vector) {
+                if (_theta_vector[a] == _theta_vector[a+1]) {
+                    b++;
+                }
+                else {
+                    cout << "theta: " << _theta_vector[a] << "\t" << "\t" << "frequency: " << b << endl;
+                    b = 0;
+                }
+                a++;
+            }
+            
+            cout << "________________________________________" << endl;
         }
 
         catch (XProj & x) {
