@@ -35,6 +35,10 @@ namespace proj {
             double              getWeightAverage(vector<double> log_weight_vec);
             void                createSpeciesMap(Data::SharedPtr);
             void                showParticlesByWeight(vector<Particle> my_vec);
+            void                proposeTheta();
+            double              logPrior(double theta);
+            string              acceptTheta();
+            void                showFinal(vector<Particle>);
 
         private:
 
@@ -42,20 +46,25 @@ namespace proj {
             Partition::SharedPtr        _partition;
             Data::SharedPtr             _data;
             double                      _log_marginal_likelihood = 0.0;
+            double                      _prev_log_marginal_likelihood = 0.0;
             bool                        _use_gpu;
             bool                        _ambig_missing;
             unsigned                    _nparticles;
             unsigned                    _random_seed;
 
 
-            static std::string           _program_name;
-            static unsigned              _major_version;
-            static unsigned              _minor_version;
-            void                          summarizeData(Data::SharedPtr);
-            unsigned                      setNumberTaxa(Data::SharedPtr);
-            double                        getRunningSum(const vector<double> &) const;
-            vector<string>                _species_names;
-            map<string, string>           _taxon_map;
+            static std::string          _program_name;
+            static unsigned             _major_version;
+            static unsigned             _minor_version;
+            void                        summarizeData(Data::SharedPtr);
+            unsigned                    setNumberTaxa(Data::SharedPtr);
+            double                      getRunningSum(const vector<double> &) const;
+            vector<string>              _species_names;
+            map<string, string>         _taxon_map;
+            double                      _prev_theta = 0.0;
+            vector<Particle>            _accepted_particle_vec;
+            vector<Particle>            _prev_particles;
+            vector<double>              _theta_vector;
 
     };
 
@@ -106,7 +115,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.05), "theta")
         ("speciation_rate", boost::program_options::value(&Forest::_speciation_rate)->default_value(1), "speciation rate")
         ("proposal",  boost::program_options::value(&Forest::_proposal)->default_value("prior-post"), "a string defining a proposal (prior-prior or prior-post)")
-        ("model", boost::program_options::value(&Forest::_model)->default_value("JC"), "a string defining a substitutio model")
+        ("model", boost::program_options::value(&Forest::_model)->default_value("JC"), "a string defining a substitution model")
+        ("kappa",  boost::program_options::value(&Forest::_kappa)->default_value(1.0), "value of kappa")
+//        ("base_frequencies", boost::program_options::value(&Forest::_base_frequencies), "base frequencies A C G T")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -190,9 +201,45 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         for (auto & p : particles) {
             p.setLogWeight(p.getLogWeight() - log_particle_sum);
         }
-
+        
         _log_marginal_likelihood += log_particle_sum - log(_nparticles);
+        
         sort(particles.begin(), particles.end(), greater<Particle>());
+    }
+
+    inline void Proj::proposeTheta() {
+//        double theta = Forest::_theta;
+        double u = rng.uniform();
+        
+        // TODO: window width?
+        double window_width = 0.5;
+        double proposed_theta = window_width*u+(Forest::_theta-window_width/2.0);
+        
+        // make sure proposed theta is positive
+        if (proposed_theta < 0.0) {
+            proposed_theta*=-1;
+        }
+        
+        _prev_theta = Forest::_theta;
+        Forest::_theta = proposed_theta;
+//        cout << "\t" << "proposed theta: " << proposed_theta << endl;
+    }
+
+    inline string Proj::acceptTheta() {
+        double u = rng.uniform();
+        double log_acceptance_ratio = (_log_marginal_likelihood+logPrior(Forest::_theta))-(_prev_log_marginal_likelihood+logPrior(_prev_theta));
+        if (log(u) > log_acceptance_ratio){
+            // reject proposed theta
+            return "reject";
+        }
+        else {
+            return "accept";
+        }
+    }
+
+    inline double Proj::logPrior(double theta) {
+        double exponential_rate = -log(0.05);
+        return (log(exponential_rate) - theta*exponential_rate);
     }
 
     inline unsigned Proj::chooseRandomParticle(vector<Particle> & particles, vector<double> & cum_probs) {
@@ -267,6 +314,24 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             }
         }
     }
+    
+    inline void Proj::showFinal(vector<Particle> my_vec) {
+        for (auto &p:my_vec){
+            p.showParticle();
+        }
+        
+        double sum_h = 0.0;
+        for (auto & p:my_vec) {
+            double h = p.calcHeight();
+            sum_h += h;
+        }
+        sum_h/=my_vec.size();
+        cout << "mean height equals " << sum_h << endl;
+        cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
+        cout << "theta = " << Forest::_theta << endl;
+
+        saveAllForests(my_vec);
+    }
 
     inline void Proj::showParticlesByWeight(vector<Particle> my_vec) {
         vector <double> weights;
@@ -312,80 +377,95 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             unsigned nsubsets = _data->getNumSubsets();
             Particle::setNumSubsets(nsubsets);
             
-            vector<Particle> my_vec_1(nparticles);
-            vector<Particle> my_vec_2(nparticles);
-            vector<Particle> &my_vec = my_vec_1;
-            bool use_first = true;
-            for (auto & p:my_vec ) {
-                p.setData(_data, _taxon_map);
-                p.mapSpecies(_taxon_map, _species_names);
-            }
-
-            _log_marginal_likelihood = 0.0;
-            //run through each generation of particles
-            for (unsigned g=0; g<nspecies; g++){
-
-                vector<double> log_weight_vec;
-                double log_weight = 0.0;
-
-                //taxon joining and reweighting step
-                for (auto & p:my_vec) {
-                    log_weight = p.proposal();
-                    log_weight_vec.push_back(log_weight);
-                }
-                
-                double ess_inverse = 0.0;
-                normalizeWeights(my_vec);
-                for (auto & p:my_vec) {
-                    ess_inverse += exp(2.0*p.getLogWeight());
-                }
-                
-                double ess = 1.0/ess_inverse;
-                cout << "ESS is " << ess << " " << "g = " << g << endl;
-                
-//                for (auto &p:my_vec) {
-//                    p.showSpeciesIncrement();
-//                    p.showSpeciesJoined();
-//                    cout << "\t" << "particle weight is: " << p.getLogWeight() << endl;
-//                }
-                
-                if (ess < 100) {
-                
-                    resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
+            // theta loop
+                for (int i=0; i<200; i++) {
+                    vector<Particle> my_vec_1(nparticles);
+                    vector<Particle> my_vec_2(nparticles);
+                    vector<Particle> &my_vec = my_vec_1;
+                    bool use_first = true;
+                    for (auto & p:my_vec ) {
+                        p.setData(_data, _taxon_map);
+                        p.mapSpecies(_taxon_map, _species_names);
+                    }
                     
-                    //if use_first is true, my_vec = my_vec_2
-                    //if use_first is false, my_vec = my_vec_1
+                    _prev_log_marginal_likelihood = _log_marginal_likelihood;
                     
-                    my_vec = use_first ? my_vec_2:my_vec_1;
+                    // reset marginal likelihood
+                    _log_marginal_likelihood = 0.0;
+                    //run through each generation of particles
+                    for (unsigned g=0; g<nspecies; g++){
 
-                    //change use_first from true to false or false to true
-                    use_first = !use_first;
-                }
-                
-                resetWeights(my_vec);
-//                cout << "\n" << endl;
-//                cout << "____________________" << endl;
-                
-            } // g loop
+                        vector<double> log_weight_vec;
+                        double log_weight = 0.0;
 
-            for (auto &p:my_vec){
-                p.showParticle();
+                        //taxon joining and reweighting step
+                        for (auto & p:my_vec) {
+                            log_weight = p.proposal();
+                            log_weight_vec.push_back(log_weight);
+                        }
+                        
+                        double ess_inverse = 0.0;
+                        normalizeWeights(my_vec);
+                        
+                        for (auto & p:my_vec) {
+                            ess_inverse += exp(2.0*p.getLogWeight());
+                        }
+                        
+                        double ess = 1.0/ess_inverse;
+//                        cout << "ESS is " << ess << " " << "g = " << g << endl;
+                        
+                        if (ess < 100) {
+                            resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
+                            //if use_first is true, my_vec = my_vec_2
+                            //if use_first is false, my_vec = my_vec_1
+                            
+                            my_vec = use_first ? my_vec_2:my_vec_1;
+
+                            //change use_first from true to false or false to true
+                            use_first = !use_first;
+                        }
+                        resetWeights(my_vec);
+                    } // g loop
+                    
+                    _theta_vector.push_back(Forest::_theta);
+                    
+                    if (i == 0) {
+                        _prev_particles=my_vec;
+                    }
+                    // propose new value of theta
+                    if (_prev_log_marginal_likelihood != 0.0) {
+                        cout << "\n" << "previous theta: " << _prev_theta << "\t" << "proposed theta: " << Forest::_theta << endl;
+                        cout << "\t" << "proposed marg like: " << _log_marginal_likelihood;
+                        cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood;
+                        string outcome = acceptTheta();
+                        if (outcome == "reject") {
+//                            _accepted_particle_vec = _prev_particles;
+//                            my_vec = _accepted_particle_vec;
+                            my_vec = _prev_particles;
+                            _log_marginal_likelihood = _prev_log_marginal_likelihood;
+                            Forest::_theta = _prev_theta;
+                            cout << "\n" << "REJECT" << endl;
+                        }
+                        else {
+//                            _accepted_particle_vec = my_vec;
+                            _prev_particles = my_vec;
+//                            cout << Forest::_theta << endl;
+                        }
+//                        _prev_particles = my_vec;
+                        
+                    }
+//                    cout << "theta: " << Forest::_theta << endl;
+//                    cout << "\t" << "marg like: " << _log_marginal_likelihood << endl;
+                    
+                    // propose new theta for all steps but last step
+                    if (i<199) {
+                        proposeTheta();
+                    }
+                    
+                    _accepted_particle_vec = my_vec;
             }
-            
-            double sum_h = 0.0;
-            for (auto & p:my_vec) {
-                double h = p.calcHeight();
-                sum_h += h;
-            }
-            sum_h/=my_vec.size();
-            cout << "mean height equals " << sum_h << endl;
-            cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
-            cout << "theta = " << Forest::_theta << endl;
-
-            saveAllForests(my_vec);
-//            showParticlesByWeight(my_vec);
-
-            }
+            showFinal(_accepted_particle_vec);
+        }
 
         catch (XProj & x) {
             std::cerr << "Proj encountered a problem:\n  " << x.what() << std::endl;

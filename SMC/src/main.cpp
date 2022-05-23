@@ -27,6 +27,8 @@ unsigned Particle::_nsubsets = 1;
 const double Node::_smallest_edge_length=1.0e-12;
 string Forest::_proposal;
 string Forest::_model;
+double Forest::_kappa = 1.0;
+//vector<double> Forest::_base_frequencies{0.25,0.25,0.25,0.25};
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT

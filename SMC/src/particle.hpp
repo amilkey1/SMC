@@ -41,7 +41,7 @@ class Particle {
         void                                    operator=(const Particle & other);
         const vector<Forest> &                  getForest() const {return _forests;}
         std::string                             saveForestNewick() {
-            return _forests[1].makeNewick(8, true);
+            return _forests[0].makeNewick(8, true);
         }
         bool operator<(const Particle & other) const {
             return _log_weight<other._log_weight;
@@ -216,5 +216,6 @@ class Particle {
         _forests         = other._forests;
         _data           = other._data;
         _nsubsets       = other._nsubsets;
+        _generation     = other._generation;
     };
 }

@@ -109,6 +109,8 @@ class Forest {
         static double               _speciation_rate;
         static string               _proposal;
         static string               _model;
+        static double               _kappa;
+//        static vector<double>       _base_frequencies;
 };
 
 
@@ -343,10 +345,6 @@ class Forest {
     inline void Forest::calcPartialArray(Node* new_nd) {
         auto & parent_partial_array = *(new_nd->_partial);
         for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
-//            double expterm = exp(-4.0*(child->_edge_length)/3.0);
-//            double prsame = 0.25+0.75*expterm;
-//            double prdif = 0.25 - 0.25*expterm;
-
             auto & child_partial_array = *(child->_partial);
 
             for (unsigned p = 0; p < _npatterns; p++) {
@@ -354,7 +352,6 @@ class Forest {
                     double sum_over_child_states = 0.0;
                     for (unsigned s_child = 0; s_child < _nstates; s_child++) {
                         double child_transition_prob = calcTransitionProbability(child, s, s_child);
-//                        double child_transition_prob = (s == s_child ? prsame : prdif);
                         double child_partial = child_partial_array[p*_nstates + s_child];
                         sum_over_child_states += child_transition_prob * child_partial;
                     }   // child state loop
@@ -385,17 +382,48 @@ class Forest {
             // s = 1: C
             // s = 2: G
             // s = 3: T
+//            double pi_A = 0.0;
+//            double pi_C = 0.0;
+//            double pi_G = 0.0;
+//            double pi_T = 0.0;
+//
+//            double kappa = 0.0;
+//
+//            if (_index == 1) {
+//                pi_A = 0.40773;
+//                pi_C = 0.20916;
+//                pi_G = 0.19045;
+//                pi_T = 0.19266;
+//                kappa = 4.512;
+//            }
+//            else if (_index == 2) {
+//                pi_A = 0.24545;
+//                pi_C = 0.21384;
+//                pi_G = 0.23701;
+//                pi_T = 0.30370;
+//                kappa = 4.153;
+//            }
+//            else if (_index == 3) {
+//                pi_A = 0.20170;
+//                pi_C = 0.21367;
+//                pi_G = 0.21209;
+//                pi_T = 0.37254;
+//                kappa = 3.58;
+//            }
             
-            double pi_A = 0.2;
-            double pi_C = 0.3;
-            double pi_G = 0.2;
-            double pi_T = 0.3;
+            double pi_A = 0.285;
+            double pi_C = 0.212;
+            double pi_G = 0.213;
+            double pi_T = 0.29;
+//            double pi_A = _base_frequencies[0];
+//            double pi_C = _base_frequencies[1];
+//            double pi_G = _base_frequencies[2];
+//            double pi_T = _base_frequencies[3];
             
             double pi_j = 0.0;
             double PI_J = 0.0;
-            double kappa = 2.0;
             
-            double phi = (pi_A+pi_G)*(pi_C+pi_T)+kappa*(pi_A*pi_G+pi_C*pi_T);
+            double phi = (pi_A+pi_G)*(pi_C+pi_T)+_kappa*(pi_A*pi_G+pi_C*pi_T);
             double beta_t = 0.5*(child->_edge_length)/phi;
             
             // transition prob depends only on ending state
@@ -424,7 +452,7 @@ class Forest {
                 if (s == s_child) {
                     // no transition or transversion
                     double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
-                    double second_term = (PI_J-pi_j)/PI_J*exp(-beta_t*(PI_J*kappa+(1-PI_J)));
+                    double second_term = (PI_J-pi_j)/PI_J*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
                     child_transition_prob = pi_j*first_term+second_term;
                     break;
                 }
@@ -432,7 +460,7 @@ class Forest {
                 else if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
                     // transition
                     double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
-                    double second_term = (1/PI_J)*exp(-beta_t*(PI_J*kappa+(1-PI_J)));
+                    double second_term = (1/PI_J)*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
                     child_transition_prob = pi_j*(first_term-second_term);
                     break;
                 }
@@ -450,9 +478,6 @@ class Forest {
     }
 
     inline double Forest::calcLogLikelihood() {
-//        if (_index == 20) {
-//            showForest();
-//        }
         auto data_matrix=_data->getDataMatrix();
 
         //calc likelihood for each lineage separately
@@ -809,7 +834,9 @@ class Forest {
 
     inline void Forest::showSpeciesJoined() {
         assert (_index==0);
+        if (_species_joined.first != NULL) {
         cout << "\t" << "joining species " << _species_joined.first->_name << " and " << _species_joined.second->_name << endl;
+        }
     }
 
 
