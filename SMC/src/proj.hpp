@@ -42,6 +42,7 @@ namespace proj {
             string              acceptTheta();
             string              acceptSpeciationRate();
             void                showFinal(vector<Particle>);
+            void                tune(bool accepted);
 
         private:
 
@@ -73,6 +74,10 @@ namespace proj {
             double                      _theta_accepted_number = 0.0;
             double                      _speciation_rate_accepted_number = 0.0;
             string                      _sample;
+            int                         _nattempts = 0;
+            bool                        _tuning = true;
+            double                      _target_acceptance = 0.3;
+            double                      _lambda;
 
     };
 
@@ -179,7 +184,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
     inline unsigned Proj::setNumberTaxa(Data::SharedPtr) {
         unsigned ntaxa;
         ntaxa = _data->getNumTaxa();
-//        Forest::setNumSpecies(ntaxa);
         Forest::setNumTaxa(ntaxa);
         return ntaxa;
     }
@@ -215,12 +219,27 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         sort(particles.begin(), particles.end(), greater<Particle>());
     }
 
+    inline void Proj::tune(bool accepted) {
+        _nattempts++;
+        if (_tuning) {
+            double gamma_n = 10.0/(100.0 + (double)_nattempts);
+            if (accepted)
+                _lambda *= 1.0 + gamma_n*(1.0 - _target_acceptance)/(2.0*_target_acceptance);
+            else
+                _lambda *= 1.0 - gamma_n*0.5;
+
+            // Prevent run-away increases in boldness for low-information marginal densities
+            if (_lambda > 1000.0)
+                _lambda = 1000.0;
+        }
+    }
+
     inline void Proj::proposeTheta() {
         double u = rng.uniform();
         
         // TODO: window width?
-        double window_width = 0.4;
-        double proposed_theta = window_width*u+(Forest::_theta-window_width/2.0);
+//        double window_width = 0.4;
+        double proposed_theta = _lambda*u+(Forest::_theta-_lambda/2.0);
         
         // make sure proposed theta is positive
         if (proposed_theta < 0.0) {
@@ -236,9 +255,13 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         double log_acceptance_ratio = (_log_marginal_likelihood+logThetaPrior(Forest::_theta))-(_prev_log_marginal_likelihood+logThetaPrior(_prev_theta));
         if (log(u) > log_acceptance_ratio){
             // reject proposed theta
+            bool accepted = false;
+            tune(accepted);
             return "reject";
         }
         else {
+            bool accepted = true;
+            tune(accepted);
             return "accept";
         }
     }
@@ -247,8 +270,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         double u = rng.uniform();
 
         // TODO: window width?
-        double window_width = 25.0;
-        double proposed_speciation_rate = window_width*u+(Forest::_speciation_rate-window_width/2.0);
+//        _lambda = 25.0;
+        double proposed_speciation_rate = _lambda*u+(Forest::_speciation_rate-_lambda/2.0);
         
         // make sure proposed speciation rate is positive
         if (proposed_speciation_rate < 0.0) {
@@ -263,10 +286,14 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         double u = rng.uniform();
         double log_acceptance_ratio = (_log_marginal_likelihood+logSpeciationRatePrior(Forest::_speciation_rate))-(_prev_log_marginal_likelihood+logSpeciationRatePrior(_prev_speciation_rate));
         if (log(u) > log_acceptance_ratio){
+            bool accepted = false;
+            tune(accepted);
             // reject proposed speciation rate
             return "reject";
         }
         else {
+            bool accepted = true;
+            tune(accepted);
             return "accept";
         }
     }
@@ -421,6 +448,13 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 // z=0 -> theta loop
                 // z=1 -> speciation rate loop
             for (int z=0; z<2; z++) {
+                // set starting window size for each parameter
+                if (z == 0) {
+                    _lambda = 0.5;
+                }
+                else if (z == 1) {
+                    _lambda = 100.0;
+                }
             // theta or speciation rate loop
                 for (int i=0; i<100; i++) {
                     vector<Particle> my_vec_1(nparticles);
@@ -478,20 +512,22 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         }
                         // propose new value of theta
                         if (_prev_log_marginal_likelihood != 0.0) {
-    //                        cout << "\n" << "previous theta: " << _prev_theta << "\t" << "proposed theta: " << Forest::_theta << endl;
-    //                        cout << "\t" << "proposed marg like: " << _log_marginal_likelihood;
-    //                        cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood;
+                            cout << "\n" << "previous theta: " << _prev_theta << "\t" << "proposed theta: " << Forest::_theta << endl;
+                            cout << "\t" << "proposed marg like: " << _log_marginal_likelihood;
+                            cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood;
                             string outcome = acceptTheta();
                             if (outcome == "reject") {
                                 my_vec = _prev_particles;
                                 _log_marginal_likelihood = _prev_log_marginal_likelihood;
                                 Forest::_theta = _prev_theta;
-    //                            cout << "\n" << "REJECT" << endl;
+                                cout << "\n" << "REJECT" << endl;
+                                cout << "lambda: " << _lambda << endl;
                                 _theta_vector.push_back(Forest::_theta);
                             }
                             else {
                                 _prev_particles = my_vec;
-    //                            cout << "\n" << "ACCEPT" << endl;
+                                cout << "\n" << "ACCEPT" << endl;
+                                cout << "lambda: " << _lambda << endl;
                                 _theta_vector.push_back(Forest::_theta);
                                 _theta_accepted_number++;
                             }
@@ -518,6 +554,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                                 _log_marginal_likelihood = _prev_log_marginal_likelihood;
                                 Forest::_speciation_rate = _prev_speciation_rate;
                                 cout << "\n" << "REJECT" << endl;
+                                cout << "lambda: " << _lambda << endl;
+                                
                                 _speciation_rate_vector.push_back(Forest::_speciation_rate);
                             }
                             else {
@@ -525,9 +563,10 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                                 _speciation_rate_vector.push_back(Forest::_speciation_rate);
                                 _speciation_rate_accepted_number++;
                                 cout << "\n" << "ACCEPT" << endl;
+                                cout << "lambda: " << _lambda << endl;
                             }
                         }
-                        if (i<499) {
+                        if (i<99) {
                             proposeSpeciationRate();
                         }
                         _accepted_particle_vec = my_vec;
