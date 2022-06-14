@@ -55,6 +55,7 @@ class Particle {
         vector<Forest> &                                getForests() {return _forests;}
         void                                            showSpeciesIncrement();
         void                                            showSpeciesJoined();
+        void                                            showSpeciesTree();
 
     private:
 
@@ -82,6 +83,16 @@ class Particle {
         for (auto &_forest:_forests) {
             _forest.showForest();
         }
+    }
+
+    inline void Particle::showSpeciesTree() {
+        //print out weight of each particle
+        cout << "\nParticle:\n";
+        cout << "  _log_weight: " << _log_weight << "\n" ;
+        cout << " _log_likelihood: " << _log_likelihood << "\n";
+        cout << "  _forest: " << "\n";
+        cout << "\n";
+        _forests[0].showForest();
     }
 
     //more detailed version of showParticle

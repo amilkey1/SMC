@@ -7,10 +7,13 @@
 #include <vector>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <thread>
+#include <mutex>
 
 
 #include "lot.hpp"
 extern proj::Lot rng;
+std::mutex mtx;
 
 #include "partial_store.hpp"
 extern proj::PartialStore ps;
@@ -27,9 +30,7 @@ class Particle;
 class Forest {
 
         friend class Likelihood;
-        friend class TreeUpdater;
         friend class Particle;
-
 
     public:
                                     Forest();
@@ -96,7 +97,6 @@ class Forest {
         vector<double>              _log_likelihood_choices;
         double                      _prev_log_likelihood;
         int                         _index_of_choice;
-//        vector<Node*>               _newnd_choices;
         pair<Node*, Node*>          _species_joined;
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -110,7 +110,8 @@ class Forest {
         static string               _proposal;
         static string               _model;
         static double               _kappa;
-//        static vector<double>       _base_frequencies;
+        static vector<double>       _base_frequencies;
+        static string               _string_base_frequencies;
 };
 
 
@@ -330,8 +331,13 @@ class Forest {
         unsigned t1=0;
         unsigned t2=1;
         //don't use this when there's only one choice (2 subtrees)
+        // thread safe random number generator with mutex
+        mtx.lock();
         if (nsubtrees > 2) {
             t1 = ::rng.randint(0, nsubtrees-1);
+            if (t1>=s) {
+                cout << "x" << endl;
+            }
             t2 = ::rng.randint(0, nsubtrees-1);
 
             //keep calling t2 until it doesn't equal t1
@@ -339,6 +345,7 @@ class Forest {
                 t2 = ::rng.randint(0, nsubtrees-1);
             }
         }
+        mtx.unlock();
         return make_pair(t1, t2);
     }
 
@@ -387,42 +394,43 @@ class Forest {
 //            double pi_G = 0.0;
 //            double pi_T = 0.0;
 //
-//            double kappa = 0.0;
+//            double _kappa = 0.0;
 //
 //            if (_index == 1) {
 //                pi_A = 0.40773;
 //                pi_C = 0.20916;
 //                pi_G = 0.19045;
 //                pi_T = 0.19266;
-//                kappa = 4.512;
+//                _kappa = 4.512;
 //            }
 //            else if (_index == 2) {
 //                pi_A = 0.24545;
 //                pi_C = 0.21384;
 //                pi_G = 0.23701;
 //                pi_T = 0.30370;
-//                kappa = 4.153;
+//                _kappa = 4.153;
 //            }
 //            else if (_index == 3) {
 //                pi_A = 0.20170;
 //                pi_C = 0.21367;
 //                pi_G = 0.21209;
 //                pi_T = 0.37254;
-//                kappa = 3.58;
+//                _kappa = 3.58;
 //            }
             
-            double pi_A = 0.285;
-            double pi_C = 0.212;
-            double pi_G = 0.213;
-            double pi_T = 0.29;
-//            double pi_A = _base_frequencies[0];
-//            double pi_C = _base_frequencies[1];
-//            double pi_G = _base_frequencies[2];
-//            double pi_T = _base_frequencies[3];
+//            double pi_A = 0.285;
+//            double pi_C = 0.212;
+//            double pi_G = 0.213;
+//            double pi_T = 0.29;
+            double pi_A = _base_frequencies[0];
+            double pi_C = _base_frequencies[1];
+            double pi_G = _base_frequencies[2];
+            double pi_T = _base_frequencies[3];
             
             double pi_j = 0.0;
             double PI_J = 0.0;
             
+//            cout << _kappa << endl;
             double phi = (pi_A+pi_G)*(pi_C+pi_T)+_kappa*(pi_A*pi_G+pi_C*pi_T);
             double beta_t = 0.5*(child->_edge_length)/phi;
             
@@ -794,11 +802,6 @@ class Forest {
     }
 
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
-//        if (_lineages.size() == 1) {
-//            _last_edge_length = -1.0;
-//            return make_tuple("null", "null", "null");
-//        }
-
         chooseSpeciesIncrement();
 
         pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
@@ -857,6 +860,9 @@ class Forest {
         _prev_log_likelihood = 0.0;
         bool done = false;
         double cum_time = 0.0;
+        
+        double t1 = 0.0;
+        double t2 = 0.0;
 
         while (!done) {
             double s = nodes.size();
@@ -891,6 +897,12 @@ class Forest {
 
                         auto it2 = std::next(nodes.begin(), t.second);
                         subtree2 = *it2;
+//                        cout << "gene number: " << _index << endl;
+//                        cerr << "pair is: " << t.first << " and " << t.second << endl;
+                        
+                        t1 = t.first;
+                        t2 = t.second;
+                        assert (t1 < nodes.size() && t2 < nodes.size());
                     }
 
 // prior-post proposal
@@ -950,6 +962,9 @@ class Forest {
             if (!lineages_left_to_join)  {
                 done = true;
             }
+            
+            double t1 = 0.0;
+            double t2 = 0.0;
 
             //add increment to each lineage
             if (!done) {
@@ -970,6 +985,9 @@ class Forest {
 
                         auto it2 = std::next(nodes.begin(), t.second);
                         subtree2 = *it2;
+                        
+                        t1 = t.first;
+                        t2 = t.second;
                     }
 
 // prior-post proposal
@@ -996,6 +1014,9 @@ class Forest {
                 new_nd->_edge_length=0.0;
                 _ninternals++;
                 new_nd->_right_sib=0;
+                
+                cerr << "t1: " << t1 << endl;
+                cerr << "t2: " << t2 << endl;
 
                 new_nd->_left_child=subtree1;
                 subtree1->_right_sib=subtree2;
