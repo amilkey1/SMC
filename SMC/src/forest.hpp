@@ -335,9 +335,6 @@ class Forest {
         mtx.lock();
         if (nsubtrees > 2) {
             t1 = ::rng.randint(0, nsubtrees-1);
-            if (t1>=s) {
-                cout << "x" << endl;
-            }
             t2 = ::rng.randint(0, nsubtrees-1);
 
             //keep calling t2 until it doesn't equal t1
@@ -417,11 +414,7 @@ class Forest {
 //                pi_T = 0.37254;
 //                _kappa = 3.58;
 //            }
-            
-//            double pi_A = 0.285;
-//            double pi_C = 0.212;
-//            double pi_G = 0.213;
-//            double pi_T = 0.29;
+
             double pi_A = _base_frequencies[0];
             double pi_C = _base_frequencies[1];
             double pi_G = _base_frequencies[2];
@@ -430,7 +423,6 @@ class Forest {
             double pi_j = 0.0;
             double PI_J = 0.0;
             
-//            cout << _kappa << endl;
             double phi = (pi_A+pi_G)*(pi_C+pi_T)+_kappa*(pi_A*pi_G+pi_C*pi_T);
             double beta_t = 0.5*(child->_edge_length)/phi;
             
@@ -611,7 +603,7 @@ class Forest {
             }
             a++;
         }
-
+        
         pair<Node*, Node*> s = make_pair(subtree1, subtree2);
         _node_choices.push_back(s);
 
@@ -727,7 +719,6 @@ class Forest {
             if (k>-1) {
 
             // copy parent
-//            assert(othernd._parent);
                 if (othernd._parent) {
                     unsigned parent_number = othernd._parent->_number;
 //                    _nodes[k]._partial = othernd._partial;
@@ -838,7 +829,10 @@ class Forest {
     inline void Forest::showSpeciesJoined() {
         assert (_index==0);
         if (_species_joined.first != NULL) {
-        cout << "\t" << "joining species " << _species_joined.first->_name << " and " << _species_joined.second->_name << endl;
+            cout << "joining species " << _species_joined.first->_name << " and " << _species_joined.second->_name << endl;
+        }
+        else {
+            cout << "no species joined" << endl;
         }
     }
 
@@ -860,9 +854,6 @@ class Forest {
         _prev_log_likelihood = 0.0;
         bool done = false;
         double cum_time = 0.0;
-        
-        double t1 = 0.0;
-        double t2 = 0.0;
 
         while (!done) {
             double s = nodes.size();
@@ -897,12 +888,7 @@ class Forest {
 
                         auto it2 = std::next(nodes.begin(), t.second);
                         subtree2 = *it2;
-//                        cout << "gene number: " << _index << endl;
-//                        cerr << "pair is: " << t.first << " and " << t.second << endl;
-                        
-                        t1 = t.first;
-                        t2 = t.second;
-                        assert (t1 < nodes.size() && t2 < nodes.size());
+                        assert (t.first < nodes.size() && t.second < nodes.size());
                     }
 
 // prior-post proposal
@@ -962,16 +948,12 @@ class Forest {
             if (!lineages_left_to_join)  {
                 done = true;
             }
-            
-            double t1 = 0.0;
-            double t2 = 0.0;
 
             //add increment to each lineage
             if (!done) {
                 for (auto nd:nodes) {
                     nd->_edge_length += increment;
                 }
-//            if (!done) {
                 Node* subtree1;
                 Node *subtree2;
                 
@@ -985,9 +967,6 @@ class Forest {
 
                         auto it2 = std::next(nodes.begin(), t.second);
                         subtree2 = *it2;
-                        
-                        t1 = t.first;
-                        t2 = t.second;
                     }
 
 // prior-post proposal
@@ -1014,9 +993,6 @@ class Forest {
                 new_nd->_edge_length=0.0;
                 _ninternals++;
                 new_nd->_right_sib=0;
-                
-                cerr << "t1: " << t1 << endl;
-                cerr << "t2: " << t2 << endl;
 
                 new_nd->_left_child=subtree1;
                 subtree1->_right_sib=subtree2;
@@ -1062,7 +1038,6 @@ class Forest {
                 evolveSpeciesFor(s.second, time_increment);
             }
         }
-
     }
 
     inline void Forest::debugForest() {
@@ -1158,6 +1133,5 @@ class Forest {
         for (int i=0; i<_lineages.size(); i++) {
             _lineages[i] -> _position_in_lineages=i;
         }
-
     }
 }

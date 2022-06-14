@@ -49,6 +49,8 @@ namespace proj {
             void                tune(bool accepted);
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
             void                proposeParticles(vector<Particle> &particles);
+            void                printSpeciationRates();
+            void                printThetas();
 
         private:
 
@@ -75,20 +77,23 @@ namespace proj {
             double                      _prev_speciation_rate = 0.0;
             vector<Particle>            _accepted_particle_vec;
             vector<Particle>            _prev_particles;
-            vector<double>              _theta_vector;
-            vector<double>              _speciation_rate_vector;
+            vector<pair<double, double>>  _theta_vector;
+            vector<pair<double, double>>  _speciation_rate_vector;
             double                      _theta_accepted_number = 0.0;
             double                      _speciation_rate_accepted_number = 0.0;
-            string                      _sample;
             int                         _nattempts = 0;
             bool                        _tuning = true;
             double                      _target_acceptance = 0.3;
             double                      _lambda;
             unsigned                    _nthreads;
+            bool                        _estimate_theta;
+            bool                        _estimate_speciation_rate;
+            unsigned                    _nsamples; // number of total samples
+            int                         _sample = 0; // index of current sample
             void                        handleBaseFrequencies();
-//            vector<Particle>           _particles;
-//            vector<double>              _log_weight_vec;
-
+            void                        debugSpeciesTree(vector<Particle> &particles);
+            void                        estimateTheta(vector<Particle> &particles);
+            void                        estimateSpeciationRate(vector<Particle> &particles);
     };
 
     inline Proj::Proj() {
@@ -142,6 +147,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("kappa",  boost::program_options::value(&Forest::_kappa)->default_value(1.0), "value of kappa")
         ("base_frequencies", boost::program_options::value(&Forest::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ("nthreads",  boost::program_options::value(&_nthreads)->default_value(1.0), "number of threads for multi threading")
+        ("estimate_theta", boost::program_options::value(&_estimate_theta)->default_value("false"), "bool: true if theta estimated, false if empirical")
+        ("estimate_speciation_rate", boost::program_options::value(&_estimate_speciation_rate)->default_value("false"), "bool: true if speciation rate estimated, false if empirical")
+        ("nsamples", boost::program_options::value(&_nsamples)->default_value(1.0), "number of samples if parameters are being estimated")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -175,6 +183,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             }
         }
         
+        // If user specified "base_frequencies" in conf file, convert them to a vector<double>
         if (vm.count("base_frequencies") > 0) {
             handleBaseFrequencies();
         }
@@ -184,12 +193,11 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         vector <string> temp;
         split(temp, Forest::_string_base_frequencies, is_any_of(","));
         double sum = 0.0;
-        // iterate thru temp
+        // iterate through temp
         for (auto &i:temp) {
             double f = stof(i);
             Forest::_base_frequencies.push_back(f);
             sum +=f;
-            cout << "base frequency: " << f << endl;
         }
         cout << sum-1 << endl;
         assert (fabs(sum-1) < 0.000001);
@@ -211,7 +219,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             std::cout << "    data type: " << dt.getDataTypeAsString() << std::endl;
             std::cout << "    sites:     " << _data->calcSeqLenInSubset(subset) << std::endl;
             std::cout << "    patterns:  " << _data->getNumPatternsInSubset(subset) << std::endl;
-            }
+        }
     }
 
     inline unsigned Proj::setNumberTaxa(Data::SharedPtr) {
@@ -248,7 +256,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
         
         _log_marginal_likelihood += log_particle_sum - log(_nparticles);
-        
         sort(particles.begin(), particles.end(), greater<Particle>());
     }
 
@@ -267,12 +274,75 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
     }
 
+    inline void Proj::estimateTheta(vector<Particle> &particles) {
+        if (_sample == 0) {
+            _theta_vector.push_back(make_pair(Forest::_theta, _log_marginal_likelihood));
+            _prev_particles = particles;
+            _prev_log_marginal_likelihood = 0.0;
+        }
+        // propose new value of theta
+        if (_prev_log_marginal_likelihood != 0.0) {
+//            cout << "\n" << "previous theta: " << _prev_theta << "\t" << "proposed theta: " << Forest::_theta << endl;
+//            cout << "\t" << "proposed marg like: " << _log_marginal_likelihood;
+//            cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood << endl;
+            string outcome = acceptTheta();
+            if (outcome == "reject") {
+                particles = _prev_particles;
+                _log_marginal_likelihood = _prev_log_marginal_likelihood;
+                Forest::_theta = _prev_theta;
+//                cout << "lambda: " << _lambda << endl;
+                _theta_vector.push_back(make_pair(Forest::_theta, _log_marginal_likelihood));
+            }
+            else {
+                _prev_particles = particles;
+//                cout << "\n" << "ACCEPT" << endl;
+//                cout << "lambda: " << _lambda << endl;
+                _theta_vector.push_back(make_pair(Forest::_theta, _log_marginal_likelihood));
+                _theta_accepted_number++;
+            }
+        }
+        // propose new theta for all steps but last step
+        if (_sample<_nsamples) {
+            proposeTheta();
+        }
+        _accepted_particle_vec = particles;
+    }
+
+    inline void Proj::estimateSpeciationRate(vector<Particle> &particles){
+        if (_sample == 0) {
+            _prev_particles = particles;
+            _prev_log_marginal_likelihood = 0.0;
+            _speciation_rate_vector.push_back(make_pair(Forest::_speciation_rate, _log_marginal_likelihood));
+        }
+        // propose new value of speciation rate
+        if (_prev_log_marginal_likelihood != 0.0) {
+//            cout << "\n" << "previous speciation rate: " << _prev_speciation_rate << "\t" << "proposed speciation rate: " << Forest::_speciation_rate << endl;
+//            cout << "\t" << "proposed marg like: " << _log_marginal_likelihood;
+//            cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood << endl;
+            string outcome = acceptSpeciationRate();
+            if (outcome == "reject") {
+                particles = _prev_particles;
+                _log_marginal_likelihood = _prev_log_marginal_likelihood;
+                Forest::_speciation_rate = _prev_speciation_rate;
+    //          cout << "\n" << "REJECT" << endl;
+                _speciation_rate_vector.push_back(make_pair(Forest::_speciation_rate, _log_marginal_likelihood));
+            }
+            else {
+                _prev_particles = particles;
+                _speciation_rate_vector.push_back(make_pair(Forest::_speciation_rate, _log_marginal_likelihood));
+                _speciation_rate_accepted_number++;
+//                cout << "\n" << "ACCEPT" << endl;
+//                cout << "lambda: " << _lambda << endl;
+            }
+        }
+        if (_sample<_nsamples) {
+            proposeSpeciationRate();
+        }
+        _accepted_particle_vec = particles;
+    }
+
     inline void Proj::proposeTheta() {
         double u = rng.uniform();
-        
-        // TODO: window width?
-        // TODO: check window is centered over current value
-//        double window_width = 0.4;
         double proposed_theta = _lambda*u+(Forest::_theta-_lambda/2.0);
         
         // make sure proposed theta is positive
@@ -302,9 +372,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
     inline void Proj::proposeSpeciationRate() {
         double u = rng.uniform();
-
-        // TODO: window width?
-//        _lambda = 25.0;
         double proposed_speciation_rate = _lambda*u+(Forest::_speciation_rate-_lambda/2.0);
         
         // make sure proposed speciation rate is positive
@@ -444,7 +511,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         else {
           // divide up the particles as evenly as possible across threads
           unsigned first = 0;
-          unsigned incr = _nparticles/_nthreads + (_nparticles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle
+          unsigned incr = _nparticles/_nthreads + (_nparticles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
           unsigned last = incr;
 
           // need a vector of threads because we have to wait for each one to finish
@@ -463,7 +530,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 break;
             }
           }
-        
 
           // the join function causes this loop to pause until the ith thread finishes
           for (unsigned i = 0; i < threads.size(); i++) {
@@ -494,6 +560,31 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         my_vec[0].showParticle();
     }
 
+    inline void Proj::debugSpeciesTree(vector<Particle> &particles) {
+        for (auto &p:particles) {
+            p.showSpeciesJoined();
+            p.showSpeciesIncrement();
+            p.showSpeciesTree();
+            cout << " _______ " << endl;
+        }
+    }
+
+    inline void Proj::printSpeciationRates() {
+        // print sampled speciation rates and marginal likelihood in csv format
+        cout << "theta, marginal_likelihood " << endl;
+        for (auto &p:_speciation_rate_vector) {
+            cout << p.first << ", " << p.second << endl;
+        }
+    }
+
+    inline void Proj::printThetas() {
+        // print sampled thetas and marginal likelihood in csv format
+        cout << "theta, marginal_likelihood " << endl;
+        for (auto &p:_theta_vector) {
+            cout << p.first << ", " << p.second << endl;
+        }
+    }
+
     inline void Proj::run() {
         cout << "Starting..." << endl;
         cout << "Current working directory: " << boost::filesystem::current_path() << endl;
@@ -512,7 +603,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             createSpeciesMap(_data);
 
             //set number of species to number in data file
-            unsigned ntaxa = setNumberTaxa(_data);
+            setNumberTaxa(_data);
             unsigned nspecies = _species_names.size();
             Forest::setNumSpecies(nspecies);
             rng.setSeed(_random_seed);
@@ -523,19 +614,37 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             unsigned nsubsets = _data->getNumSubsets();
             Particle::setNumSubsets(nsubsets);
             
-            // sampling loop
-                // z=0 -> theta loop
-                // z=1 -> speciation rate loop
-//            for (int z=0; z<0; z++) {
-                // set starting window size for each parameter
-//                if (z == 0) {
-//                    _lambda = 0.001;
-//                }
-//                else if (z == 1) {
-//                    _lambda = 200.00;
-//                }
-            // theta or speciation rate loop
-//                for (int i=0; i<1; i++) {
+            // estimate neither theta nor speciation rate OR estimate one but not the other
+            double number_of_sampling_loops = 1.0;
+
+            if (_estimate_theta == true && _estimate_speciation_rate == true) {
+                // estimate both
+                number_of_sampling_loops = 2.0;
+            }
+            
+            // only go through z loop once if no sampling
+            for (int z = 0; z<number_of_sampling_loops; z++) {
+                
+                // sampling both theta and speciation rate
+                // set starting window size
+                if (number_of_sampling_loops == 2.0) {
+                    if (z == 0) {_lambda = 0.001;}
+                    if (z == 1) {_lambda = 25.0;}
+                }
+                
+                // sampling just theta
+                // set starting window size
+                if (_estimate_theta && !_estimate_speciation_rate){
+                    _lambda = 0.001;
+                }
+                
+                // sampling just speciation rate
+                // set starting window size
+                else if (_estimate_speciation_rate && !_estimate_theta) {
+                    _lambda = 25.0;
+                }
+            // loop for number of samples (either theta or speciation rate)
+                for (_sample=0; _sample<_nsamples; _sample++) {
                     vector<Particle> my_vec_1(nparticles);
                     vector<Particle> my_vec_2(nparticles);
                     vector<Particle> &my_vec = my_vec_1;
@@ -552,26 +661,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     _log_marginal_likelihood = 0.0;
                     //run through each generation of particles
                     for (unsigned g=0; g<nspecies; g++){
-                        cerr << "generation: " << g << endl;
-//                        vector<double> log_weight_vec;
-//                        double log_weight = 0.0;
-
                         //taxon joining and reweighting step
                         proposeParticles(my_vec);
-//                        for (auto &p:my_vec) {
-//                            p.showParticle();
-//                        }
-//                        for (auto & p:my_vec) {
-//                            log_weight = p.proposal();
-//                            log_weight_vec.push_back(log_weight);
-//                        }
-                        
-//                        for (auto &p:my_vec) {
-//                            p.showSpeciesJoined();
-//                            p.showSpeciesIncrement();
-//                            p.showSpeciesTree();
-//                        }
-//                        cout << " _______ " << endl;
+//                        debugSpeciesTree(my_vec);
                         
                         double ess_inverse = 0.0;
                         normalizeWeights(my_vec);
@@ -581,7 +673,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         }
                         
                         double ess = 1.0/ess_inverse;
-//                        cout << "ESS is " << ess << " " << "g = " << g << endl;
                         
                         if (ess < 100) {
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
@@ -597,122 +688,31 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         _accepted_particle_vec = my_vec;
                     } // g loop
                     
-                    // theta proposal
-//                    if (z == 0) {
-//                        if (i == 0) {
-//                            _prev_particles=my_vec;
-//                        }
-//                        // propose new value of theta
-//                        if (_prev_log_marginal_likelihood != 0.0) {
-//                            cout << "\n" << "previous theta: " << _prev_theta << "\t" << "proposed theta: " << Forest::_theta << endl;
-//                            cout << "\t" << "proposed marg like: " << _log_marginal_likelihood;
-//                            cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood;
-//                            string outcome = acceptTheta();
-//                            if (outcome == "reject") {
-//                                my_vec = _prev_particles;
-//                                _log_marginal_likelihood = _prev_log_marginal_likelihood;
-//                                Forest::_theta = _prev_theta;
-////                                cout << "\n" << "REJECT" << endl;
-//                                cout << "lambda: " << _lambda << endl;
-//                                _theta_vector.push_back(Forest::_theta);
-//                            }
-//                            else {
-//                                _prev_particles = my_vec;
-//                                cout << "\n" << "ACCEPT" << endl;
-//                                cout << "lambda: " << _lambda << endl;
-//                                _theta_vector.push_back(Forest::_theta);
-//                                _theta_accepted_number++;
-//                            }
-//                        }
-//                        // propose new theta for all steps but last step
-//                        if (i<0) {
-//                            proposeTheta();
-//                        }
-//                        _accepted_particle_vec = my_vec;
-//                    }
-//                    if (z == 1) {
-//                        if (i == 0) {
-//                            _prev_particles = my_vec;
-//                            _prev_log_marginal_likelihood = 0.0;
-//                        }
-//                        // propose new value of speciation rate
-//                        if (_prev_log_marginal_likelihood != 0.0) {
-//                            cout << "\n" << "previous speciation rate: " << _prev_speciation_rate << "\t" << "proposed speciation rate: " << Forest::_speciation_rate << endl;
-//                            cout << "\t" << "proposed marg like: " << _log_marginal_likelihood;
-//                            cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood;
-//                            string outcome = acceptSpeciationRate();
-//                            if (outcome == "reject") {
-//                                my_vec = _prev_particles;
-//                                _log_marginal_likelihood = _prev_log_marginal_likelihood;
-//                                Forest::_speciation_rate = _prev_speciation_rate;
-////                                cout << "\n" << "REJECT" << endl;
-//                                cout << "lambda: " << _lambda << endl;
-//
-//                                _speciation_rate_vector.push_back(Forest::_speciation_rate);
-//                            }
-//                            else {
-//                                _prev_particles = my_vec;
-//                                _speciation_rate_vector.push_back(Forest::_speciation_rate);
-//                                _speciation_rate_accepted_number++;
-//                                cout << "\n" << "ACCEPT" << endl;
-//                                cout << "lambda: " << _lambda << endl;
-//                            }
-//                        }
-//                        if (i<0) {
-//                            proposeSpeciationRate();
-//                        }
-//                        _accepted_particle_vec = my_vec;
-//                    }
-//                } // i loop
-//            } // z loop
+                    if (number_of_sampling_loops == 2.0) {
+                        if (z == 0) {estimateTheta(my_vec);}
+                        if (z == 1) {estimateSpeciationRate(my_vec);}
+                    }
+                    
+                    else if (number_of_sampling_loops == 1.0) {
+                        if (_estimate_theta) {estimateTheta(my_vec);}
+                        else if (_estimate_speciation_rate) {estimateSpeciationRate(my_vec);}
+                    }
+                } // _nsamples loop - number of samples
+            } // z loop - theta or speciation rate
+            
             showFinal(_accepted_particle_vec);
             
-            cout << "________________________________________" << endl;
-            
-            for (auto &i:_theta_vector) {
-                cout << i << "\n";
+            if (_estimate_theta) {
+                cout << "number of accepted theta proposals: " << _theta_accepted_number << endl;
+                printThetas();
+                cout << "Theta: " << _theta_vector[_nsamples-1].first << endl;
             }
-            // sort sampled thetas by frequency
-//            cout << "~theta, ~freq, " << endl;
-//            sort(_theta_vector.begin(), _theta_vector.end(), greater<double>());
-//            int b = 1;
-//            for (int a = 0; a < _theta_vector.size(); a++) {
-//                if (_theta_vector[a] == _theta_vector[a+1]) {
-//                    b++;
-//                }
-//                else {
-////                    cout << "theta: " << _theta_vector[a] << "\t" << "\t" << "frequency: " << b << endl;
-//                    cout << _theta_vector[a] << " , " << b << " , " << endl;
-//                    b = 1;
-//                }
-//                a++;
-//            }
             
-            cout << "\n" << "________________________________________" << endl;
-            cout << "number of accepted theta proposals: " << _theta_accepted_number << endl;
-            
-            cout << "________________________________________" << endl;
-            for (auto &i:_speciation_rate_vector) {
-                cout << i << "\n";
+            if (_estimate_speciation_rate) {
+                cout << "number of accepted speciation rate proposals: " << _speciation_rate_accepted_number << endl;
+                printSpeciationRates();
+                cout << "Speciation rate: " << _speciation_rate_vector[_nsamples-1].first << endl;
             }
-            // sort sampled speciation rates by frequency
-//            cout << "~speciation_rate, ~freq, " << endl;
-//            sort(_speciation_rate_vector.begin(), _speciation_rate_vector.end(), greater<double>());
-//            int n = 1;
-//            for (int m = 0; m < _speciation_rate_vector.size(); m++) {
-//                if (_speciation_rate_vector[m] == _speciation_rate_vector[m+1]) {
-//                    n++;
-//                }
-//                else {
-////                    cout << "speciation rate: " << _speciation_rate_vector[m] << "\t" << "\t" << "frequency: " << n << endl;
-//                    cout << _speciation_rate_vector[m] << " , " << n << " , " << endl;
-//                    n = 1;
-//                }
-//                m++;
-//            }
-            
-            cout << "\n" << "________________________________________" << endl;
-            cout << "number of accepted speciation rate proposals: " << _speciation_rate_accepted_number << endl;
         }
 
         catch (XProj & x) {
