@@ -147,9 +147,10 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("kappa",  boost::program_options::value(&Forest::_kappa)->default_value(1.0), "value of kappa")
         ("base_frequencies", boost::program_options::value(&Forest::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ("nthreads",  boost::program_options::value(&_nthreads)->default_value(1.0), "number of threads for multi threading")
-        ("estimate_theta", boost::program_options::value(&_estimate_theta)->default_value("false"), "bool: true if theta estimated, false if empirical")
-        ("estimate_speciation_rate", boost::program_options::value(&_estimate_speciation_rate)->default_value("false"), "bool: true if speciation rate estimated, false if empirical")
+        ("estimate_theta", boost::program_options::value(&_estimate_theta)->default_value(false), "bool: true if theta estimated, false if empirical")
+        ("estimate_speciation_rate", boost::program_options::value(&_estimate_speciation_rate)->default_value(false), "bool: true if speciation rate estimated, false if empirical")
         ("nsamples", boost::program_options::value(&_nsamples)->default_value(1.0), "number of samples if parameters are being estimated")
+        ("migration_rate", boost::program_options::value(&Forest::_migration_rate)->default_value(0.0), "migration rate")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -561,6 +562,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
     }
 
     inline void Proj::debugSpeciesTree(vector<Particle> &particles) {
+        cout << "debugging species tree" << endl;
         for (auto &p:particles) {
             p.showSpeciesJoined();
             p.showSpeciesIncrement();
@@ -614,6 +616,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             unsigned nsubsets = _data->getNumSubsets();
             Particle::setNumSubsets(nsubsets);
             
+            // TODO: sampling will only work if the sampled params are only theta and / or speciation rate
             // estimate neither theta nor speciation rate OR estimate one but not the other
             double number_of_sampling_loops = 1.0;
 

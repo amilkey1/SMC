@@ -30,6 +30,7 @@ string Forest::_model;
 double Forest::_kappa = 1.0;
 vector<double> Forest::_base_frequencies;
 string Forest::_string_base_frequencies;
+double Forest::_migration_rate;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT

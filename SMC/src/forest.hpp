@@ -59,7 +59,6 @@ class Forest {
         pair<unsigned, unsigned>    chooseTaxaToJoin(double s);
         void                        setEdgeLength(Node * nd);
         tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> p, list<Node*> node_list, double increment);
-        void                        drawCoalescenceTime();
         void                        calcPartialArray(Node* new_nd);
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
@@ -72,10 +71,15 @@ class Forest {
         void                        revertNodeVector(vector<Node *> & node_vector, Node * addnode1, Node * addnode2, Node * delnode1);
         double                      getRunningSumChoices(vector<double> &log_weight_choices);
         vector<double>              reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
-        pair<Node*, Node*>    chooseAllPairs(list<Node *> &node_list, double increment);
+        pair<Node*, Node*>          chooseAllPairs(list<Node *> &node_list, double increment);
         pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
         int                         selectPair(vector<double> weight_vec);
         void                        chooseSpeciesIncrement();
+        void                        allowMigration(list<Node*> &nodes);
+        void                        setGeneration(double g) {_generation = g;}
+        double                      chooseTaxonToMigrate(double s);
+        string                      findKeyToDel(Node* taxon_to_migrate);
+        void                        migrateTaxon(unsigned taxon_choice, string key_to_del, Node* taxon_to_migrate);
 
         std::vector<Node *>         _lineages;
         std::vector<Node>           _nodes;
@@ -98,6 +102,7 @@ class Forest {
         double                      _prev_log_likelihood;
         int                         _index_of_choice;
         pair<Node*, Node*>          _species_joined;
+        double                      _generation = 0;
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
 
@@ -112,6 +117,7 @@ class Forest {
         static double               _kappa;
         static vector<double>       _base_frequencies;
         static string               _string_base_frequencies;
+        static double               _migration_rate;
 };
 
 
@@ -255,68 +261,67 @@ class Forest {
         cout << "\n";
     }
 
-//    inline std::string Forest::makeNewick(unsigned precision, bool use_names) const {
-        inline string Forest::makeNewick(unsigned precision, bool use_names) {
-                string newick = "(";
-                const boost::format tip_node_name_format( boost::str(boost::format("%%s:%%.%df") % precision) );
-                const boost::format tip_node_number_format( boost::str(boost::format("%%d:%%.%df") % precision) );
-                const boost::format internal_node_format( boost::str(boost::format("):%%.%df") % precision) );
-                stack<Node *> node_stack;
+    inline string Forest::makeNewick(unsigned precision, bool use_names) {
+            string newick = "(";
+            const boost::format tip_node_name_format( boost::str(boost::format("%%s:%%.%df") % precision) );
+            const boost::format tip_node_number_format( boost::str(boost::format("%%d:%%.%df") % precision) );
+            const boost::format internal_node_format( boost::str(boost::format("):%%.%df") % precision) );
+            stack<Node *> node_stack;
 
-                unsigned i = 0;
-                for (auto lineage : _lineages) {
-                    Node * nd = lineage;
-                    while (nd) {
-                        if (nd->_left_child) {
-                            // internal node
-                            newick += "(";
-                            node_stack.push(nd);
+            unsigned i = 0;
+            for (auto lineage : _lineages) {
+                Node * nd = lineage;
+                while (nd) {
+                    if (nd->_left_child) {
+                        // internal node
+                        newick += "(";
+                        node_stack.push(nd);
+                    }
+                    else {
+                        // leaf node
+                        if (use_names) {
+                            newick += boost::str(boost::format(tip_node_name_format)
+                                % nd->_name
+                                % nd->_edge_length);
+                        } else {
+                            newick += boost::str(boost::format(tip_node_number_format)
+                                % (nd->_number + 1)
+                                % nd->_edge_length);
                         }
+                        if (nd->_right_sib)
+                            newick += ",";
                         else {
-                            // leaf node
-                            if (use_names) {
-                                newick += boost::str(boost::format(tip_node_name_format)
-                                    % nd->_name
-                                    % nd->_edge_length);
-                            } else {
-                                newick += boost::str(boost::format(tip_node_number_format)
-                                    % (nd->_number + 1)
-                                    % nd->_edge_length);
-                            }
-                            if (nd->_right_sib)
-                                newick += ",";
-                            else {
-                                Node * popped = (node_stack.empty() ? 0 : node_stack.top());
-                                while (popped && !popped->_right_sib) {
-                                    node_stack.pop();
-                                    if (node_stack.empty()) {
-                                        //newick += ")";
-                                        newick += boost::str(boost::format(internal_node_format) % lineage->_edge_length);
-                                        popped = 0;
-                                    }
-                                    else {
-                                        newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
-                                        popped = node_stack.top();
-                                    }
+                            Node * popped = (node_stack.empty() ? 0 : node_stack.top());
+                            while (popped && !popped->_right_sib) {
+                                node_stack.pop();
+                                if (node_stack.empty()) {
+                                    //newick += ")";
+                                    newick += boost::str(boost::format(internal_node_format) % lineage->_edge_length);
+                                    popped = 0;
                                 }
-                                if (popped && popped->_right_sib) {
-                                    node_stack.pop();
+                                else {
                                     newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
-                                    newick += ",";
+                                    popped = node_stack.top();
                                 }
                             }
-                        }   // leaf node
-                        nd = findNextPreorder(nd);
-                    }   // while (subnd)...
+                            if (popped && popped->_right_sib) {
+                                node_stack.pop();
+                                newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                                newick += ",";
+                            }
+                        }
+                    }   // leaf node
+                    nd = findNextPreorder(nd);
+                }   // while (subnd)...
 
-                    if (i < _lineages.size() - 1)
-                        newick += ",";
-                    ++i;
-                }
-                newick += ")";
-
-                return newick;
+                if (i < _lineages.size() - 1)
+                    newick += ",";
+                ++i;
             }
+            newick += ")";
+
+            return newick;
+        }
 
     inline void Forest::setNumTaxa(unsigned n){
         _ntaxa=n;
@@ -370,17 +375,17 @@ class Forest {
 
     inline double Forest::calcTransitionProbability(Node* child, double s, double s_child) {
         double child_transition_prob = 0.0;
-        
+
         if (_model == "JC" ) {
             double expterm = exp(-4.0*(child->_edge_length)/3.0);
             double prsame = 0.25+0.75*expterm;
             double prdif = 0.25 - 0.25*expterm;
-            
+
             child_transition_prob = (s == s_child ? prsame : prdif);
             assert (child_transition_prob > 0.0);
             return child_transition_prob;
         }
-        
+
         if (_model == "HKY") {
             // s = 0: A
             // s = 1: C
@@ -419,13 +424,13 @@ class Forest {
             double pi_C = _base_frequencies[1];
             double pi_G = _base_frequencies[2];
             double pi_T = _base_frequencies[3];
-            
+
             double pi_j = 0.0;
             double PI_J = 0.0;
-            
+
             double phi = (pi_A+pi_G)*(pi_C+pi_T)+_kappa*(pi_A*pi_G+pi_C*pi_T);
             double beta_t = 0.5*(child->_edge_length)/phi;
-            
+
             // transition prob depends only on ending state
             if (s_child == 0) {
                 // purine
@@ -447,7 +452,7 @@ class Forest {
                 pi_j = pi_T;
                 PI_J = pi_C + pi_T;
             }
-            
+
             while (true) {
                 if (s == s_child) {
                     // no transition or transversion
@@ -456,7 +461,7 @@ class Forest {
                     child_transition_prob = pi_j*first_term+second_term;
                     break;
                 }
-            
+
                 else if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
                     // transition
                     double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
@@ -464,7 +469,7 @@ class Forest {
                     child_transition_prob = pi_j*(first_term-second_term);
                     break;
                 }
-            
+
                 else {
                     // transversion
                     child_transition_prob = pi_j*(1-exp(-beta_t));
@@ -472,7 +477,7 @@ class Forest {
                 }
             }
         }
-        
+
         assert (child_transition_prob > 0.0);
         return child_transition_prob;
     }
@@ -603,7 +608,7 @@ class Forest {
             }
             a++;
         }
-        
+
         pair<Node*, Node*> s = make_pair(subtree1, subtree2);
         _node_choices.push_back(s);
 
@@ -643,6 +648,7 @@ class Forest {
     }
 
     inline void Forest::debugLogLikelihood(Node* nd, double log_like) {
+        cout << "debugging likelihood" << endl;
         cout << "gene: " << _index << endl;
         cout << "calculating likelihood for node : " << endl;
         cout << "\t" << "name: " << nd->_name << endl;
@@ -836,7 +842,6 @@ class Forest {
         }
     }
 
-
     inline void Forest::setUpGeneForest(map<string, string> &taxon_map) {
         assert (_index >0);
         _species_partition.clear();
@@ -858,80 +863,111 @@ class Forest {
         while (!done) {
             double s = nodes.size();
             double coalescence_rate = s*(s-1)/_theta;
-            double increment = rng.gamma(1.0, 1.0/coalescence_rate);
+//            double increment = rng.gamma(1.0, 1.0/coalescence_rate);
+            double increment = rng.gamma(1.0, 1.0/(coalescence_rate+_migration_rate));
+            
+            double migration_prob = _migration_rate/(_migration_rate+coalescence_rate);
+            double coalescence_prob = coalescence_rate/(_migration_rate+coalescence_rate);
+            
+//            cout << "migration prob: " << migration_prob << endl;
+//           cout << "coalescence prob: " << coalescence_prob << endl;
+            
+//             draw random number to determine coalescent or migration event
+            vector<double> prob_vec;
+            prob_vec.push_back(coalescence_prob);
+            prob_vec.push_back(migration_prob);
 
-            bool time_limited = species_tree_increment > 0.0;
-            bool lineages_left_to_join = s > 1;
-            bool time_limit_reached = cum_time+increment > species_tree_increment;
-            if ((time_limited && time_limit_reached) || !lineages_left_to_join)  {
-                done = true;
-                increment = species_tree_increment - cum_time;
-            }
+            double u = rng.uniform();
+            string event;
 
-            //add increment to each lineage
-            for (auto nd:nodes) {
-                nd->_edge_length += increment; //add most recently chosen branch length to each node whose parent is subroot
-            }
-
-            if (!done) {
-
-                Node *subtree1;
-                Node *subtree2;
-
-                if (nodes.size()>2) {
-
-// prior-prior proposal
-                    if (_proposal == "prior-prior") {
-                        pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
-                        auto it1 = std::next(nodes.begin(), t.first);
-                        subtree1 = *it1;
-
-                        auto it2 = std::next(nodes.begin(), t.second);
-                        subtree2 = *it2;
-                        assert (t.first < nodes.size() && t.second < nodes.size());
-                    }
-
-// prior-post proposal
-                    if (_proposal == "prior-post") {
-                        pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
-
-                        subtree1 = t.first;
-                        subtree2 = t.second;
-                    }
+            double cum_prob = 0.0;
+            for (int i = 0; i<2; i++) {
+                cum_prob += prob_vec[i];
+                if (u <= cum_prob) {
+                    if (i == 0) {event = "coalescence";}
+                    if (i == 1) {event = "migration";}
+                    break;
                 }
-                else {
-                    // if there are only two lineages left, there is only one choice
-                    // prior-prior and prior-post proposals will return the same thing
-                    subtree1 = nodes.front();
-                    subtree2 = nodes.back();
+            }
+            
+            if (event == "coalescence" || nodes.size() == 1) {
+                bool time_limited = species_tree_increment > 0.0;
+                bool lineages_left_to_join = s > 1;
+                bool time_limit_reached = cum_time+increment > species_tree_increment;
+                if ((time_limited && time_limit_reached) || !lineages_left_to_join)  {
+                    done = true;
+                    increment = species_tree_increment - cum_time;
                 }
 
-                //new node is always needed
-                Node* new_nd=&_nodes[_nleaves+_ninternals];
+                //add increment to each lineage
+                for (auto nd:nodes) {
+                    nd->_edge_length += increment; //add most recently chosen branch length to each node in lineage
+                }
 
-                new_nd->_parent=0;
-                new_nd->_number=_nleaves+_ninternals;
-                new_nd->_edge_length=0.0;
-                _ninternals++;
-                new_nd->_right_sib=0;
+                if (!done) {
+                    Node *subtree1;
+                    Node *subtree2;
 
-                new_nd->_left_child=subtree1;
-                subtree1->_right_sib=subtree2;
+                    if (nodes.size()>2) {
+                        // prior-prior proposal
+                        if (_proposal == "prior-prior") {
+                            pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+                            auto it1 = std::next(nodes.begin(), t.first);
+                            subtree1 = *it1;
 
-                subtree1->_parent=new_nd;
-                subtree2->_parent=new_nd;
+                            auto it2 = std::next(nodes.begin(), t.second);
+                            subtree2 = *it2;
+                            assert (t.first < nodes.size() && t.second < nodes.size());
+                        }
 
-                //always calculating partials now
-                assert (new_nd->_partial == nullptr);
-                new_nd->_partial=ps.getPartial(_npatterns*4);
-                assert(new_nd->_left_child->_right_sib);
-                calcPartialArray(new_nd);
+                        // prior-post proposal
+                        if (_proposal == "prior-post") {
+                            pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
 
-                //update species list
-                updateNodeList(nodes, subtree1, subtree2, new_nd);
-                updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+                            subtree1 = t.first;
+                            subtree2 = t.second;
+                        }
+                    }
+                    else {
+                        // if there are only two lineages left, there is only one choice
+                        // prior-prior and prior-post proposals will return the same thing
+                        subtree1 = nodes.front();
+                        subtree2 = nodes.back();
+                    }
+
+                    //new node is always needed
+                    Node* new_nd=&_nodes[_nleaves+_ninternals];
+
+                    new_nd->_parent=0;
+                    new_nd->_number=_nleaves+_ninternals;
+                    new_nd->_edge_length=0.0;
+                    _ninternals++;
+                    new_nd->_right_sib=0;
+
+                    new_nd->_left_child=subtree1;
+                    subtree1->_right_sib=subtree2;
+
+                    subtree1->_parent=new_nd;
+                    subtree2->_parent=new_nd;
+
+                    //always calculating partials now
+                    assert (new_nd->_partial == nullptr);
+                    new_nd->_partial=ps.getPartial(_npatterns*4);
+                    assert(new_nd->_left_child->_right_sib);
+                    calcPartialArray(new_nd);
+
+                    //update species list
+                    updateNodeList(nodes, subtree1, subtree2, new_nd);
+                    updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+                }
+                cum_time += increment;
             }
-            cum_time += increment;
+            else if (event == "migration" && nodes.size()>1) {
+                // TODO: not sure about this
+                // if there's only one individual in a lineage, don't allow migration b/c then there will be no individuals in the lineage, which we know is not true
+                assert(nodes.size()>1);
+                allowMigration(nodes);
+            }
         }
     }
 
@@ -956,7 +992,7 @@ class Forest {
                 }
                 Node* subtree1;
                 Node *subtree2;
-                
+
                 if (nodes.size()>2) {
 
 // prior-prior proposal
@@ -977,14 +1013,14 @@ class Forest {
                         subtree2 = t.second;
                     }
                 }
-                
+
                 else {
                     // if there are only two lineages left, there is only one choice
                     // prior-prior and prior-post proposals will return the same thing
                     subtree1 = nodes.front();
                     subtree2 = nodes.back();
                 }
-                
+
 
                 Node* new_nd=&_nodes[_nleaves+_ninternals];
 
@@ -1032,8 +1068,6 @@ class Forest {
         }
         else {
             for (auto & s:_species_partition) {
-                if (s.second.size() == 0) {
-                }
                 assert (s.second.size()>0);
                 evolveSpeciesFor(s.second, time_increment);
             }
@@ -1132,6 +1166,130 @@ class Forest {
         // reset _position_in_lineages
         for (int i=0; i<_lineages.size(); i++) {
             _lineages[i] -> _position_in_lineages=i;
+        }
+    }
+
+    inline void Forest::allowMigration(list<Node*> &nodes) {
+//        showForest();
+        bool choose = true;
+        unsigned taxon_choice;
+        Node* taxon_to_migrate;
+        taxon_choice = chooseTaxonToMigrate(nodes.size());
+        auto iter = std::next(nodes.begin(), taxon_choice);
+        taxon_to_migrate = *iter;
+
+        // reset edge length to 0
+        taxon_to_migrate->_edge_length = 0.0;
+
+        // find taxa to delete and lineage to add to
+        string key_to_del = findKeyToDel(taxon_to_migrate);
+
+        // delete migrating taxon from its original lineage and add to new lineage
+        migrateTaxon(taxon_choice, key_to_del, taxon_to_migrate);
+    }
+
+    inline double Forest::chooseTaxonToMigrate(double s) {
+        mtx.lock();
+        unsigned taxon_choice = ::rng.randint(0, s-1);
+        mtx.unlock();
+        return taxon_choice;
+    }
+
+    inline string Forest::findKeyToDel(Node* taxon_to_migrate) {
+        string key_to_del;
+
+        // find taxon to migrate in species partition
+        // then key_to_del is s.first
+
+        bool done = false;
+        while (!done) {
+        for (auto &s:_species_partition) {
+            for (auto &t:s.second) {
+                if (t == taxon_to_migrate) {
+                    key_to_del = s.first;
+                    done = true;
+                    }
+                }
+            }
+        }
+        return key_to_del;
+    }
+
+    inline void Forest::migrateTaxon(unsigned taxon_choice, string key_to_del, Node* taxon_to_migrate) {
+        // create vector of species names
+        vector<string> species_names;
+        for (auto & s:_species_partition) {
+            species_names.push_back(s.first);
+        }
+
+        string key_to_add;
+
+        // choose lineage to migrate into an add migrating taxon to chosen lineage
+        bool choose_lineage = true;
+        while (choose_lineage) {
+            mtx.lock();
+            double lineage_choice = ::rng.randint(0, _species_partition.size()-1);
+            mtx.unlock();
+
+            // find lineage to migrate to in species partition
+            key_to_add = species_names[lineage_choice];
+
+            // make sure chosen lineage is different from original lineage (otherwise, migration isn't really happening)
+            if (key_to_add != key_to_del) {
+                // add migrating taxon to the chosen lineage
+                _species_partition[key_to_add].push_back(taxon_to_migrate);
+                choose_lineage = false;
+            }
+        }
+
+        // delete migrating taxon from its original lineage
+        bool done = false;
+        while (!done) {
+            for (auto &s:_species_partition) {
+                if (done) {break;}
+                if (s.first == key_to_del) {
+                    unsigned i = -1;
+                    for (auto itr = s.second.begin(); itr != s.second.end(); itr++) {
+                        i++;
+                        if (i == taxon_choice) {
+                            s.second.erase(itr);
+                            done = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // set migrating taxon edge length
+        for (auto & s:_species_partition) {
+            // find new lineage and check if edge length has already been set
+            double total_edge_length = 0.0;
+            if (s.first == key_to_add) {
+                // if edge length has not already been set, reset taxon_to_migrate edge length
+                if (s.second.front()->_edge_length != 0.0) {
+                    // if migrating taxon is the only one in its new lineage, get edge length from another lineage
+                    if (s.second.size() == 1) {
+                        for (auto & t:_species_partition) {
+                            if (t.second.front() != taxon_to_migrate) {
+                                for (Node* child = t.second.front(); child; child=child->_left_child){
+                                    total_edge_length += child->_edge_length;
+                                }
+                            }
+                        }
+                    }
+                    for (Node* child = s.second.front(); child; child=child->_left_child) {
+                        total_edge_length += child->_edge_length;
+                    }
+                    if (taxon_to_migrate->_left_child) {
+                        taxon_to_migrate->_edge_length = total_edge_length - taxon_to_migrate->_left_child->_edge_length;
+                    }
+                    else {
+                        taxon_to_migrate->_edge_length = total_edge_length;
+                    }
+                    break;
+                }
+            }
         }
     }
 }

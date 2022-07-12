@@ -60,9 +60,9 @@ class Particle {
     private:
 
         static unsigned                         _nsubsets;
-        vector<Forest>                         _forests;
+        vector<Forest>                          _forests;
         double                                  _log_weight;
-        Data::SharedPtr                          _data;
+        Data::SharedPtr                         _data;
         double                                  _log_likelihood;
         int                                     _generation = 0;
 };
@@ -97,6 +97,7 @@ class Particle {
 
     //more detailed version of showParticle
     inline void Particle::debugParticle(std::string name) {
+        cout << "debugging particle" << endl;
         //print out weight of each particle
         cout << "\nParticle " << name << ":\n";
         for (auto &_forest:_forests) {
@@ -125,6 +126,11 @@ class Particle {
         }
 //        cout << "total log like: " << log_likelihood << endl;
         _generation++;
+        
+        // set _generation for each forest
+        for (int i=0; i<_forests.size(); i++ ){
+            _forests[i].setGeneration(_generation);
+        }
         return log_likelihood;
     }
 
