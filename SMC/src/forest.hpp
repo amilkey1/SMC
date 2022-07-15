@@ -80,6 +80,9 @@ class Forest {
         double                      chooseTaxonToMigrate(double s);
         string                      findKeyToDel(Node* taxon_to_migrate);
         void                        migrateTaxon(unsigned taxon_choice, string key_to_del, Node* taxon_to_migrate);
+        void                        allowHybridization(list<Node*> &nodes);
+        string                      chooseLineage(vector<string> species_names, Node* taxon_to_migrate, string key_to_del);
+        void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
 
         std::vector<Node *>         _lineages;
         std::vector<Node>           _nodes;
@@ -118,6 +121,7 @@ class Forest {
         static vector<double>       _base_frequencies;
         static string               _string_base_frequencies;
         static double               _migration_rate;
+        double                      _hybridization_rate;
 };
 
 
@@ -387,39 +391,6 @@ class Forest {
         }
 
         if (_model == "HKY") {
-            // s = 0: A
-            // s = 1: C
-            // s = 2: G
-            // s = 3: T
-//            double pi_A = 0.0;
-//            double pi_C = 0.0;
-//            double pi_G = 0.0;
-//            double pi_T = 0.0;
-//
-//            double _kappa = 0.0;
-//
-//            if (_index == 1) {
-//                pi_A = 0.40773;
-//                pi_C = 0.20916;
-//                pi_G = 0.19045;
-//                pi_T = 0.19266;
-//                _kappa = 4.512;
-//            }
-//            else if (_index == 2) {
-//                pi_A = 0.24545;
-//                pi_C = 0.21384;
-//                pi_G = 0.23701;
-//                pi_T = 0.30370;
-//                _kappa = 4.153;
-//            }
-//            else if (_index == 3) {
-//                pi_A = 0.20170;
-//                pi_C = 0.21367;
-//                pi_G = 0.21209;
-//                pi_T = 0.37254;
-//                _kappa = 3.58;
-//            }
-
             double pi_A = _base_frequencies[0];
             double pi_C = _base_frequencies[1];
             double pi_G = _base_frequencies[2];
@@ -861,24 +832,46 @@ class Forest {
         double cum_time = 0.0;
 
         while (!done) {
+            bool migration;
+            if (_migration_rate > 0) {migration = true;}
+            string event;
+            double increment;
+
             double s = nodes.size();
             double coalescence_rate = s*(s-1)/_theta;
+//            _hybridization_rate = 0.0;
+//            increment = rng.gamma(1.0, 1.0/(coalescence_rate + _hybridization_rate));
 //            double increment = rng.gamma(1.0, 1.0/coalescence_rate);
-            double increment = rng.gamma(1.0, 1.0/(coalescence_rate+_migration_rate));
-            
+//            double coalescence_prob = coalescence_rate/(_hybridization_rate + coalescence_rate);
+//            double hybridization_prob = _hybridization_rate/(_hybridization_rate + coalescence_rate);
+
+//          draw random number to determine coalescent or hybridization event
+//            vector<double> prob_vec_h;
+//            prob_vec_h.push_back(coalescence_prob);
+//            prob_vec_h.push_back(hybridization_prob);
+//
+//            double r = rng.uniform();
+//            double cum_prob = 0.0;
+//            for (int j = 0; j<2; j++) {
+//                cum_prob += prob_vec_h[j];
+//                if (r <= cum_prob) {
+//                    if (j == 0) {event = "coalescence";}
+//                    if (j == 1) {event = "hybridization";}
+//                    break;
+//                }
+//            }
+
+//# if migration
+            increment = rng.gamma(1.0, 1.0/(coalescence_rate+_migration_rate));
             double migration_prob = _migration_rate/(_migration_rate+coalescence_rate);
             double coalescence_prob = coalescence_rate/(_migration_rate+coalescence_rate);
-            
-//            cout << "migration prob: " << migration_prob << endl;
-//           cout << "coalescence prob: " << coalescence_prob << endl;
-            
+
 //             draw random number to determine coalescent or migration event
             vector<double> prob_vec;
             prob_vec.push_back(coalescence_prob);
             prob_vec.push_back(migration_prob);
 
             double u = rng.uniform();
-            string event;
 
             double cum_prob = 0.0;
             for (int i = 0; i<2; i++) {
@@ -889,7 +882,7 @@ class Forest {
                     break;
                 }
             }
-            
+//# endif
             if (event == "coalescence" || nodes.size() == 1) {
                 bool time_limited = species_tree_increment > 0.0;
                 bool lineages_left_to_join = s > 1;
@@ -967,6 +960,9 @@ class Forest {
                 // if there's only one individual in a lineage, don't allow migration b/c then there will be no individuals in the lineage, which we know is not true
                 assert(nodes.size()>1);
                 allowMigration(nodes);
+            }
+            else if (event == "hybridization") {
+                allowHybridization(nodes);
             }
         }
     }
@@ -1170,8 +1166,6 @@ class Forest {
     }
 
     inline void Forest::allowMigration(list<Node*> &nodes) {
-//        showForest();
-        bool choose = true;
         unsigned taxon_choice;
         Node* taxon_to_migrate;
         taxon_choice = chooseTaxonToMigrate(nodes.size());
@@ -1215,81 +1209,110 @@ class Forest {
         return key_to_del;
     }
 
-    inline void Forest::migrateTaxon(unsigned taxon_choice, string key_to_del, Node* taxon_to_migrate) {
-        // create vector of species names
-        vector<string> species_names;
-        for (auto & s:_species_partition) {
-            species_names.push_back(s.first);
+inline void Forest::migrateTaxon(unsigned taxon_choice, string key_to_del, Node* taxon_to_migrate) {
+    // create vector of species names
+    vector<string> species_names;
+    for (auto & s:_species_partition) {
+        species_names.push_back(s.first);
+    }
+    
+    string key_to_add;
+    
+    // choose lineage to migrate into an add migrating taxon to chosen lineage
+    bool choose_lineage = true;
+    while (choose_lineage) {
+        key_to_add = chooseLineage(species_names, taxon_to_migrate, key_to_del);
+        // make sure chosen lineage is different from original lineage (otherwise, migration isn't really happening)
+        if (key_to_add != key_to_del) {
+            addMigratingTaxon(key_to_add, key_to_del, taxon_to_migrate);
+            choose_lineage = false;
         }
+    }
 
-        string key_to_add;
-
-        // choose lineage to migrate into an add migrating taxon to chosen lineage
-        bool choose_lineage = true;
-        while (choose_lineage) {
-            mtx.lock();
-            double lineage_choice = ::rng.randint(0, _species_partition.size()-1);
-            mtx.unlock();
-
-            // find lineage to migrate to in species partition
-            key_to_add = species_names[lineage_choice];
-
-            // make sure chosen lineage is different from original lineage (otherwise, migration isn't really happening)
-            if (key_to_add != key_to_del) {
-                // add migrating taxon to the chosen lineage
-                _species_partition[key_to_add].push_back(taxon_to_migrate);
-                choose_lineage = false;
-            }
-        }
-
-        // delete migrating taxon from its original lineage
-        bool done = false;
-        while (!done) {
-            for (auto &s:_species_partition) {
-                if (done) {break;}
-                if (s.first == key_to_del) {
-                    unsigned i = -1;
-                    for (auto itr = s.second.begin(); itr != s.second.end(); itr++) {
-                        i++;
-                        if (i == taxon_choice) {
-                            s.second.erase(itr);
-                            done = true;
-                            break;
-                        }
+    // delete migrating taxon from its original lineage
+    bool done = false;
+    while (!done) {
+        for (auto &s:_species_partition) {
+            if (done) {break;}
+            if (s.first == key_to_del) {
+                unsigned i = -1;
+                for (auto itr = s.second.begin(); itr != s.second.end(); itr++) {
+                    i++;
+                    if (i == taxon_choice) {
+                        s.second.erase(itr);
+                        done = true;
+                        break;
                     }
                 }
             }
         }
-        
-        // set migrating taxon edge length
-        for (auto & s:_species_partition) {
-            // find new lineage and check if edge length has already been set
-            double total_edge_length = 0.0;
-            if (s.first == key_to_add) {
-                // if edge length has not already been set, reset taxon_to_migrate edge length
-                if (s.second.front()->_edge_length != 0.0) {
-                    // if migrating taxon is the only one in its new lineage, get edge length from another lineage
-                    if (s.second.size() == 1) {
-                        for (auto & t:_species_partition) {
-                            if (t.second.front() != taxon_to_migrate) {
-                                for (Node* child = t.second.front(); child; child=child->_left_child){
-                                    total_edge_length += child->_edge_length;
-                                }
+    }
+    
+    // set migrating taxon edge length
+    for (auto & s:_species_partition) {
+        // find new lineage and check if edge length has already been set
+        double total_edge_length = 0.0;
+        if (s.first == key_to_add) {
+            // if edge length has not already been set, reset taxon_to_migrate edge length
+            if (s.second.front()->_edge_length != 0.0) {
+                // if migrating taxon is the only one in its new lineage, get edge length from another lineage
+                if (s.second.size() == 1) {
+                    for (auto & t:_species_partition) {
+                        if (t.second.front() != taxon_to_migrate) {
+                            for (Node* child = t.second.front(); child; child=child->_left_child){
+                                total_edge_length += child->_edge_length;
                             }
                         }
                     }
+                }
+                else {
                     for (Node* child = s.second.front(); child; child=child->_left_child) {
                         total_edge_length += child->_edge_length;
                     }
-                    if (taxon_to_migrate->_left_child) {
-                        taxon_to_migrate->_edge_length = total_edge_length - taxon_to_migrate->_left_child->_edge_length;
-                    }
-                    else {
-                        taxon_to_migrate->_edge_length = total_edge_length;
-                    }
-                    break;
                 }
+                double migrating_edge_length = 0.0;
+                for (Node* child = taxon_to_migrate->_left_child; child; child=child->_left_child) {
+                   migrating_edge_length += child->_edge_length;
+               }
+                double difference = total_edge_length - migrating_edge_length;
+                if (difference > 0.0) {
+                    taxon_to_migrate->_edge_length = difference;
+                }
+                else {
+                    // if migrating taxon lineage is longer than lineage being migrated into, extend the lineage being migrated into
+                    for (auto &s:_species_partition) {
+                        if (s.first == key_to_add) {
+                            for (auto iter=s.second.begin(); iter != s.second.end(); iter++) {
+                                Node* subtree1 = *iter;
+                                subtree1->_edge_length += -1*difference;
+                            }
+                        }
+                    }
+                }
+                break;
             }
         }
+    }
+}
+
+    inline string Forest::chooseLineage (vector<string> species_names, Node* taxon_to_migrate, string key_to_del) {
+        // choose lineage to migrate into
+        string key_to_add;
+        mtx.lock();
+        double lineage_choice = ::rng.randint(0, _species_partition.size()-1);
+        mtx.unlock();
+
+        // find lineage to migrate to in species partition
+        key_to_add = species_names[lineage_choice];
+
+        return key_to_add;
+    }
+
+    inline void Forest::addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate) {
+         // add migrating taxon to the chosen lineage
+        _species_partition[key_to_add].push_back(taxon_to_migrate);
+    }
+
+    inline void Forest::allowHybridization(list<Node*> &nodes) {
     }
 }
