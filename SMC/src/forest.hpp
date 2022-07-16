@@ -830,38 +830,25 @@ class Forest {
         _prev_log_likelihood = 0.0;
         bool done = false;
         double cum_time = 0.0;
+        bool migration;
+        if (_migration_rate > 0) {migration = true;}
 
         while (!done) {
-            bool migration;
-            if (_migration_rate > 0) {migration = true;}
             string event;
             double increment;
 
             double s = nodes.size();
             double coalescence_rate = s*(s-1)/_theta;
-//            _hybridization_rate = 0.0;
-//            increment = rng.gamma(1.0, 1.0/(coalescence_rate + _hybridization_rate));
-//            double increment = rng.gamma(1.0, 1.0/coalescence_rate);
-//            double coalescence_prob = coalescence_rate/(_hybridization_rate + coalescence_rate);
-//            double hybridization_prob = _hybridization_rate/(_hybridization_rate + coalescence_rate);
+            _hybridization_rate = 0.1;
+            increment = rng.gamma(1.0, 1.0/(coalescence_rate + _hybridization_rate));
 
-//          draw random number to determine coalescent or hybridization event
-//            vector<double> prob_vec_h;
-//            prob_vec_h.push_back(coalescence_prob);
-//            prob_vec_h.push_back(hybridization_prob);
-//
-//            double r = rng.uniform();
-//            double cum_prob = 0.0;
-//            for (int j = 0; j<2; j++) {
-//                cum_prob += prob_vec_h[j];
-//                if (r <= cum_prob) {
-//                    if (j == 0) {event = "coalescence";}
-//                    if (j == 1) {event = "hybridization";}
-//                    break;
-//                }
-//            }
+            // _hybridization_rate chance of of staying in lineage
+            // (1-_hybridization_rate) chance of moving to another lineage
+            double r = rng.uniform();
+            if (r < _hybridization_rate) {event = "hybridization";}
+            else if (r > _hybridization_rate) {event = "coalescence";}
 
-//# if migration
+# if migration == true
             increment = rng.gamma(1.0, 1.0/(coalescence_rate+_migration_rate));
             double migration_prob = _migration_rate/(_migration_rate+coalescence_rate);
             double coalescence_prob = coalescence_rate/(_migration_rate+coalescence_rate);
@@ -882,7 +869,7 @@ class Forest {
                     break;
                 }
             }
-//# endif
+# endif
             if (event == "coalescence" || nodes.size() == 1) {
                 bool time_limited = species_tree_increment > 0.0;
                 bool lineages_left_to_join = s > 1;
@@ -1172,9 +1159,6 @@ class Forest {
         auto iter = std::next(nodes.begin(), taxon_choice);
         taxon_to_migrate = *iter;
 
-        // reset edge length to 0
-        taxon_to_migrate->_edge_length = 0.0;
-
         // find taxa to delete and lineage to add to
         string key_to_del = findKeyToDel(taxon_to_migrate);
 
@@ -1209,91 +1193,90 @@ class Forest {
         return key_to_del;
     }
 
-inline void Forest::migrateTaxon(unsigned taxon_choice, string key_to_del, Node* taxon_to_migrate) {
-    // create vector of species names
-    vector<string> species_names;
-    for (auto & s:_species_partition) {
-        species_names.push_back(s.first);
-    }
-    
-    string key_to_add;
-    
-    // choose lineage to migrate into an add migrating taxon to chosen lineage
-    bool choose_lineage = true;
-    while (choose_lineage) {
-        key_to_add = chooseLineage(species_names, taxon_to_migrate, key_to_del);
-        // make sure chosen lineage is different from original lineage (otherwise, migration isn't really happening)
-        if (key_to_add != key_to_del) {
-            addMigratingTaxon(key_to_add, key_to_del, taxon_to_migrate);
-            choose_lineage = false;
+    inline void Forest::migrateTaxon(unsigned taxon_choice, string key_to_del, Node* taxon_to_migrate) {
+        // create vector of species names
+        vector<string> species_names;
+        for (auto & s:_species_partition) {
+            species_names.push_back(s.first);
         }
-    }
+        
+        string key_to_add;
+        
+        // choose lineage to migrate into and add migrating taxon to chosen lineage
+        bool choose_lineage = true;
+        while (choose_lineage) {
+            key_to_add = chooseLineage(species_names, taxon_to_migrate, key_to_del);
+            // make sure chosen lineage is different from original lineage (otherwise, migration isn't really happening)
+            if (key_to_add != key_to_del) {
+                addMigratingTaxon(key_to_add, key_to_del, taxon_to_migrate);
+                choose_lineage = false;
+            }
+        }
 
-    // delete migrating taxon from its original lineage
-    bool done = false;
-    while (!done) {
+    // TODO: make this a separate function
+        // delete migrating taxon from its original lineage
+        bool done = false;
+        while (!done) {
+            for (auto &s:_species_partition) {
+                if (done) {break;}
+                if (s.first == key_to_del) {
+                    unsigned i = -1;
+                    for (auto itr = s.second.begin(); itr != s.second.end(); itr++) {
+                        i++;
+                        if (i == taxon_choice) {
+                            s.second.erase(itr);
+                            done = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // set edge length of migrating taxon or target edge length (lineage taxon is migrating into)
+        
+        // find target lineage
+        Node* taxon_in_target_lineage;
+        double target_edge_length = 0.0;
         for (auto &s:_species_partition) {
-            if (done) {break;}
-            if (s.first == key_to_del) {
-                unsigned i = -1;
-                for (auto itr = s.second.begin(); itr != s.second.end(); itr++) {
-                    i++;
-                    if (i == taxon_choice) {
-                        s.second.erase(itr);
-                        done = true;
-                        break;
+            if (s.first == key_to_add) {
+                // TODO: check that this works if migrating taxon is the only taxon in the lineage
+                taxon_in_target_lineage = s.second.front();
+            }
+        }
+        
+        // get target lineage edge length
+        for (Node* child = taxon_in_target_lineage; child; child=child->_left_child) {
+            target_edge_length += child->_edge_length;
+        }
+        
+        // get edge length of migrating lineage
+        double migrating_edge_length = 0.0;
+        for (Node* child = taxon_to_migrate; child; child = child->_left_child) {
+            migrating_edge_length += child->_edge_length;
+        }
+            
+        // compare target edge length to migrating edge length
+        double difference = target_edge_length - migrating_edge_length;
+        
+        // if migrating lineage is shorter than target lineage, extend migrating taxon edge length
+        if (difference > 0.0) {
+            taxon_to_migrate->_edge_length = difference;
+        }
+        
+        // if migrating lineage is longer than target lineage, extend target edge length
+        // TODO: can this be simplified?
+        else if (difference < 0.0) {
+            for (auto &s:_species_partition) {
+                if (s.first == key_to_add) {
+                    for (auto iter = s.second.begin(); iter != s.second.end(); iter++) {
+                    Node* taxon = *iter;
+                    taxon->_edge_length += -1.0*difference;
                     }
                 }
             }
         }
     }
-    
-    // set migrating taxon edge length
-    for (auto & s:_species_partition) {
-        // find new lineage and check if edge length has already been set
-        double total_edge_length = 0.0;
-        if (s.first == key_to_add) {
-            // if edge length has not already been set, reset taxon_to_migrate edge length
-            if (s.second.front()->_edge_length != 0.0) {
-                // if migrating taxon is the only one in its new lineage, get edge length from another lineage
-                if (s.second.size() == 1) {
-                    for (auto & t:_species_partition) {
-                        if (t.second.front() != taxon_to_migrate) {
-                            for (Node* child = t.second.front(); child; child=child->_left_child){
-                                total_edge_length += child->_edge_length;
-                            }
-                        }
-                    }
-                }
-                else {
-                    for (Node* child = s.second.front(); child; child=child->_left_child) {
-                        total_edge_length += child->_edge_length;
-                    }
-                }
-                double migrating_edge_length = 0.0;
-                for (Node* child = taxon_to_migrate->_left_child; child; child=child->_left_child) {
-                   migrating_edge_length += child->_edge_length;
-               }
-                double difference = total_edge_length - migrating_edge_length;
-                if (difference > 0.0) {
-                    taxon_to_migrate->_edge_length = difference;
-                }
-                else {
-                    // if migrating taxon lineage is longer than lineage being migrated into, extend the lineage being migrated into
-                    for (auto &s:_species_partition) {
-                        if (s.first == key_to_add) {
-                            for (auto iter=s.second.begin(); iter != s.second.end(); iter++) {
-                                Node* subtree1 = *iter;
-                                subtree1->_edge_length += -1*difference;
-                            }
-                        }
-                    }
-                }
-                break;
-            }
-        }
-    }
-}
 
     inline string Forest::chooseLineage (vector<string> species_names, Node* taxon_to_migrate, string key_to_del) {
         // choose lineage to migrate into
@@ -1314,5 +1297,16 @@ inline void Forest::migrateTaxon(unsigned taxon_choice, string key_to_del, Node*
     }
 
     inline void Forest::allowHybridization(list<Node*> &nodes) {
+        unsigned taxon_choice;
+        Node* taxon_to_hybridize;
+        taxon_choice = chooseTaxonToMigrate(nodes.size());
+        auto iter = std::next(nodes.begin(), taxon_choice);
+        taxon_to_hybridize = *iter;
+
+        // find taxa to delete and lineage to add to
+        string key_to_del = findKeyToDel(taxon_to_hybridize);
+
+        // delete hybridizing taxon from its original lineage and add to new lineage
+        migrateTaxon(taxon_choice, key_to_del, taxon_to_hybridize);
     }
 }
