@@ -108,7 +108,8 @@ class Forest {
         double                      _generation = 0;
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
-        void                        calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
+        double                      calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
+        void                        setNewEdgeLength(double difference, Node* taxon_to_migrate, string key_to_add);
 
 
     public:
@@ -1216,52 +1217,11 @@ class Forest {
 
         deleteTaxon(key_to_del, taxon_choice);
         
-        // set edge length of migrating taxon or target edge length (lineage taxon is migrating into)
-        calculateNewEdgeLength(key_to_add, taxon_to_migrate);
+        // calculate difference between lineage length of migrating taxon and target edge length (lineage taxon is migrating into)
+        double difference = calculateNewEdgeLength(key_to_add, taxon_to_migrate);
         
         // set edge length of migrating taxon or target edge length (lineage taxon is migrating into)
-        
-//        // find target lineage
-//        Node* taxon_in_target_lineage;
-//        double target_edge_length = 0.0;
-//        for (auto &s:_species_partition) {
-//            if (s.first == key_to_add) {
-//                // TODO: check that this works if migrating taxon is the only taxon in the lineage
-//                taxon_in_target_lineage = s.second.front();
-//            }
-//        }
-        
-//        // get target lineage edge length
-//        for (Node* child = taxon_in_target_lineage; child; child=child->_left_child) {
-//            target_edge_length += child->_edge_length;
-//        }
-        
-        // get edge length of migrating lineage
-//        double migrating_edge_length = 0.0;
-//        for (Node* child = taxon_to_migrate; child; child = child->_left_child) {
-//            migrating_edge_length += child->_edge_length;
-//        }
-//
-//        // compare target edge length to migrating edge length
-//        double difference = target_edge_length - migrating_edge_length;
-//
-//        // if migrating lineage is shorter than target lineage, extend migrating taxon edge length
-//        if (difference > 0.0) {
-//            taxon_to_migrate->_edge_length = difference;
-//        }
-//
-//        // if migrating lineage is longer than target lineage, extend target edge length
-//        // TODO: can this be simplified?
-//        else if (difference < 0.0) {
-//            for (auto &s:_species_partition) {
-//                if (s.first == key_to_add) {
-//                    for (auto iter = s.second.begin(); iter != s.second.end(); iter++) {
-//                    Node* taxon = *iter;
-//                    taxon->_edge_length += -1.0*difference;
-//                    }
-//                }
-//            }
-//        }
+        setNewEdgeLength(difference, taxon_to_migrate, key_to_add);
     }
 
     inline string Forest::chooseLineage (Node* taxon_to_migrate, string key_to_del) {
@@ -1310,13 +1270,12 @@ class Forest {
         }
     }
 
-    inline void Forest::calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate) {
+    inline double Forest::calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate) {
         // find target lineage
         Node* taxon_in_target_lineage;
         double target_edge_length = 0.0;
         for (auto &s:_species_partition) {
             if (s.first == key_to_add) {
-                // TODO: check that this works if migrating taxon is the only taxon in the lineage
                 taxon_in_target_lineage = s.second.front();
             }
         }
@@ -1334,7 +1293,10 @@ class Forest {
             
         // compare target edge length to migrating edge length
         double difference = target_edge_length - migrating_edge_length;
-        
+        return difference;
+    }
+
+    inline void Forest::setNewEdgeLength(double difference, Node* taxon_to_migrate, string key_to_add) {
         // if migrating lineage is shorter than target lineage, extend migrating taxon edge length
         if (difference > 0.0) {
             taxon_to_migrate->_edge_length = difference;
@@ -1344,11 +1306,13 @@ class Forest {
         // TODO: can this be simplified?
         else if (difference < 0.0) {
             for (auto &s:_species_partition) {
+                // find target species and extend each lineage
                 if (s.first == key_to_add) {
                     for (auto iter = s.second.begin(); iter != s.second.end(); iter++) {
-                    Node* taxon = *iter;
-                    taxon->_edge_length += -1.0*difference;
+                        Node* taxon = *iter;
+                        taxon->_edge_length += -1.0*difference;
                     }
+                    break;
                 }
             }
         }
