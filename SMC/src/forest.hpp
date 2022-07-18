@@ -83,6 +83,7 @@ class Forest {
         string                      chooseLineage(Node* taxon_to_migrate, string key_to_del);
         void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
         void                        deleteTaxon(string key_to_del, unsigned taxon_choice);
+        void                        allowCoalescence(list<Node*> &nodes, double increment);
 
         std::vector<Node *>         _lineages;
         std::vector<Node>           _nodes;
@@ -887,60 +888,7 @@ class Forest {
                 }
 
                 if (!done) {
-                    Node *subtree1;
-                    Node *subtree2;
-
-                    if (nodes.size()>2) {
-                        // prior-prior proposal
-                        if (_proposal == "prior-prior") {
-                            pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
-                            auto it1 = std::next(nodes.begin(), t.first);
-                            subtree1 = *it1;
-
-                            auto it2 = std::next(nodes.begin(), t.second);
-                            subtree2 = *it2;
-                            assert (t.first < nodes.size() && t.second < nodes.size());
-                        }
-
-                        // prior-post proposal
-                        if (_proposal == "prior-post") {
-                            pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
-
-                            subtree1 = t.first;
-                            subtree2 = t.second;
-                        }
-                    }
-                    else {
-                        // if there are only two lineages left, there is only one choice
-                        // prior-prior and prior-post proposals will return the same thing
-                        subtree1 = nodes.front();
-                        subtree2 = nodes.back();
-                    }
-
-                    //new node is always needed
-                    Node* new_nd=&_nodes[_nleaves+_ninternals];
-
-                    new_nd->_parent=0;
-                    new_nd->_number=_nleaves+_ninternals;
-                    new_nd->_edge_length=0.0;
-                    _ninternals++;
-                    new_nd->_right_sib=0;
-
-                    new_nd->_left_child=subtree1;
-                    subtree1->_right_sib=subtree2;
-
-                    subtree1->_parent=new_nd;
-                    subtree2->_parent=new_nd;
-
-                    //always calculating partials now
-                    assert (new_nd->_partial == nullptr);
-                    new_nd->_partial=ps.getPartial(_npatterns*4);
-                    assert(new_nd->_left_child->_right_sib);
-                    calcPartialArray(new_nd);
-
-                    //update species list
-                    updateNodeList(nodes, subtree1, subtree2, new_nd);
-                    updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+                    allowCoalescence(nodes, increment);
                 }
                 cum_time += increment;
             }
@@ -954,6 +902,64 @@ class Forest {
                 allowHybridization(nodes);
             }
         }
+    }
+
+    inline void Forest::allowCoalescence(list<Node*> &nodes, double increment) {
+        Node *subtree1;
+        Node *subtree2;
+        unsigned s = nodes.size();
+
+        if (nodes.size()>2) {
+            // prior-prior proposal
+            if (_proposal == "prior-prior") {
+                pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+                auto it1 = std::next(nodes.begin(), t.first);
+                subtree1 = *it1;
+
+                auto it2 = std::next(nodes.begin(), t.second);
+                subtree2 = *it2;
+                assert (t.first < nodes.size() && t.second < nodes.size());
+            }
+
+            // prior-post proposal
+            if (_proposal == "prior-post") {
+                pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
+
+                subtree1 = t.first;
+                subtree2 = t.second;
+            }
+        }
+        else {
+            // if there are only two lineages left, there is only one choice
+            // prior-prior and prior-post proposals will return the same thing
+            subtree1 = nodes.front();
+            subtree2 = nodes.back();
+        }
+
+        //new node is always needed
+        Node* new_nd=&_nodes[_nleaves+_ninternals];
+
+        new_nd->_parent=0;
+        new_nd->_number=_nleaves+_ninternals;
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+        new_nd->_right_sib=0;
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+
+        //always calculating partials now
+        assert (new_nd->_partial == nullptr);
+        new_nd->_partial=ps.getPartial(_npatterns*4);
+        assert(new_nd->_left_child->_right_sib);
+        calcPartialArray(new_nd);
+
+        //update species list
+        updateNodeList(nodes, subtree1, subtree2, new_nd);
+        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
     }
 
     inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
@@ -1176,34 +1182,22 @@ class Forest {
     }
 
     inline string Forest::findKeyToDel(Node* taxon_to_migrate) {
+        // find lineage to move taxon from in species partition
         string key_to_del;
-
-        // find taxon to migrate in species partition
-        // then key_to_del is s.first
-
-        bool done = false;
-        while (!done) {
+        // TODO: is there a better way to do this?
         for (auto &s:_species_partition) {
             for (auto &t:s.second) {
                 if (t == taxon_to_migrate) {
                     key_to_del = s.first;
-                    done = true;
+                    break;
                     }
                 }
             }
-        }
         return key_to_del;
     }
 
     inline void Forest::migrateTaxon(unsigned taxon_choice, string key_to_del, Node* taxon_to_migrate) {
-        // create vector of species names
-        vector<string> species_names;
-//        for (auto & s:_species_partition) {
-//            species_names.push_back(s.first);
-//        }
-        
         string key_to_add;
-        
         // choose lineage to migrate into and add migrating taxon to chosen lineage
         bool choose_lineage = true;
         while (choose_lineage) {
@@ -1235,7 +1229,7 @@ class Forest {
         // choose lineage to migrate into
         string key_to_add;
         mtx.lock();
-        double lineage_choice = ::rng.randint(0, _species_partition.size()-1);
+        unsigned lineage_choice = ::rng.randint(0, _species_partition.size()-1);
         mtx.unlock();
 
         // find lineage to migrate to in species partition
