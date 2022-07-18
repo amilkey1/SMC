@@ -124,7 +124,7 @@ class Forest {
         static vector<double>       _base_frequencies;
         static string               _string_base_frequencies;
         static double               _migration_rate;
-        double                      _hybridization_rate;
+        static double               _hybridization_rate;
 };
 
 
@@ -842,7 +842,6 @@ class Forest {
 
             double s = nodes.size();
             double coalescence_rate = s*(s-1)/_theta;
-            _hybridization_rate = 0.1;
             increment = rng.gamma(1.0, 1.0/(coalescence_rate + _hybridization_rate));
 
             // _hybridization_rate chance of of staying in lineage
@@ -1271,6 +1270,7 @@ class Forest {
         for (auto &s:_species_partition) {
             if (s.first == key_to_add) {
                 taxon_in_target_lineage = s.second.front();
+                break;
             }
         }
         
@@ -1293,10 +1293,11 @@ class Forest {
     inline void Forest::setNewEdgeLength(double difference, Node* taxon_to_migrate, string key_to_add) {
         // if migrating lineage is shorter than target lineage, extend migrating taxon edge length
         if (difference > 0.0) {
-            taxon_to_migrate->_edge_length = difference;
+            taxon_to_migrate->_edge_length += difference;
         }
         
         // if migrating lineage is longer than target lineage, extend target edge length
+        // TODO: this doesn't work if migrating taxon has edge length 0 but its children do not
         // TODO: can this be simplified?
         else if (difference < 0.0) {
             for (auto &s:_species_partition) {
@@ -1304,6 +1305,9 @@ class Forest {
                 if (s.first == key_to_add) {
                     for (auto iter = s.second.begin(); iter != s.second.end(); iter++) {
                         Node* taxon = *iter;
+                        if (taxon == taxon_to_migrate) {
+                            break;
+                        }
                         taxon->_edge_length += -1.0*difference;
                     }
                     break;
