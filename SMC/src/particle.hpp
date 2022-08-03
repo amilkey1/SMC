@@ -56,6 +56,7 @@ class Particle {
         void                                            showSpeciesIncrement();
         void                                            showSpeciesJoined();
         void                                            showSpeciesTree();
+        void                                            showHybridNodes();
 
     private:
 
@@ -118,8 +119,6 @@ class Particle {
         for (unsigned i=1; i<_forests.size(); i++) {
             double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
             assert(!isnan (log_likelihood));
-//            cout << "gene tree log like: " << gene_tree_log_likelihood << endl;
-
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
         }
@@ -133,31 +132,44 @@ class Particle {
     }
 
     inline double Particle::proposal() {
-        //species tree
-        
-        // don't choose species to join for generation 0
+        string event;
         if (_generation == 0) {
             _forests[0].chooseSpeciesIncrement();
-            tuple <string, string, string> t = make_tuple("null", "null", "null");
-            for (unsigned i=1; i<_forests.size(); i++){
-    //            cout << "gene " << i << endl;
-                _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
-            }
+                tuple <string, string, string> t = make_tuple("null", "null", "null");
+                for (unsigned i=1; i<_forests.size(); i++){
+                    _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
+                }
         }
-
         else {
-            tuple<string, string, string> t = _forests[0].speciesTreeProposal();
-            //gene trees
-            for (unsigned i=1; i<_forests.size(); i++){
-    //            cout << "gene " << i << endl;
-                _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
+            event = _forests[0].chooseEvent();
+            if (event == "hybridization") {
+                vector<string> hybridized_nodes = _forests[0].hybridizeSpecies();
+                for (unsigned i=1; i<_forests.size(); i++) {
+                    _forests[i].hybridizeGene(hybridized_nodes, _forests[0]._last_edge_length);
+                }
+                string new_nd3 = _forests[0].finishHybridizingSpecies();
+                
+                for (unsigned i=1; i<_forests.size(); i++) {
+                    _forests[i].finishHybridizingGene(hybridized_nodes, new_nd3, _forests[0]._last_edge_length);
+                }
+            }
+            if (event == "speciation") {
+                tuple<string, string, string> t = _forests[0].speciesTreeProposal();
+                if (_forests[0]._lineages.size()>1) {
+                    _forests[0].addSpeciesIncrement();
+                }
+                for (unsigned i=1; i<_forests.size(); i++){
+                    _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
+                }
             }
         }
-
-        double prev_log_likelihood = _log_likelihood;
-        _log_likelihood = calcLogLikelihood();
-        _log_weight = _log_likelihood - prev_log_likelihood;
-//        cout << "\t" << "particle weight is: " << _log_weight << endl;
+        // if tree is finished, don't need to recalculate likelihood
+        if (event != "" || _generation == 0) {
+            double prev_log_likelihood = _log_likelihood;
+            _log_likelihood = calcLogLikelihood();
+            _log_weight = _log_likelihood - prev_log_likelihood;
+//            return _log_weight;
+        }
         return _log_weight;
     }
 
@@ -223,6 +235,29 @@ class Particle {
 
     inline void Particle::showSpeciesJoined(){
         _forests[0].showSpeciesJoined();
+    }
+    
+    inline void Particle::showHybridNodes() {
+        cout << "particle" << endl;
+        for (auto &nd:_forests[0]._nodes) {
+            if (nd._parent2) {
+                cout << "       " << "hybridized node is: " << nd._name << " with minor parent " << nd._minor_parent->_name << " and major parent " << nd._major_parent->_name << endl;
+            }
+        }
+        //        for (auto &nd:_forests[0]._nodes) {
+//            if (nd._parent2) {
+//                Node* major_parent;
+//                for (Node * major=nd._parent; major; major=major->_left_child) {
+//                    major_parent = major;
+//                }
+//
+//                Node* minor_parent;
+//                for (Node * minor=nd._parent2; minor; minor=minor->_left_child) {
+//                    minor_parent = minor;
+//                }
+//                cout << "       " << "hybridized node is: " << nd._name << " with major parent " << major_parent->_name << " and minor parent " << minor_parent->_name << endl;
+//            }
+//        }
     }
 
     inline void Particle::operator=(const Particle & other) {

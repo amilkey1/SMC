@@ -56,6 +56,9 @@ namespace proj {
             Node *              _left_child;
             Node *              _right_sib;
             Node *              _parent;
+            Node *              _parent2 = 0;
+            Node *              _major_parent = 0;
+            Node *              _minor_parent = 0;
             int                 _number;
             std::string         _name;
             double              _edge_length;
@@ -63,6 +66,7 @@ namespace proj {
             int                 _flags;
             PartialStore::partial_t _partial;
             int                 _position_in_lineages;
+            bool                _visited = false;
     };
     
     

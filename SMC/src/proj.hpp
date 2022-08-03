@@ -500,7 +500,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         cout << "theta = " << Forest::_theta << endl;
         cout << "speciation rate = " << Forest::_speciation_rate << endl;
 
-        saveAllForests(my_vec);
+//        saveAllForests(my_vec);
     }
 
     inline void Proj::proposeParticles(vector<Particle> &particles) {
@@ -664,6 +664,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     // reset marginal likelihood
                     _log_marginal_likelihood = 0.0;
                     //run through each generation of particles
+                    
                     for (unsigned g=0; g<nspecies; g++){
                         //taxon joining and reweighting step
                         proposeParticles(my_vec);
@@ -692,6 +693,10 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         _accepted_particle_vec = my_vec;
                     } // g loop
                     
+                    for (auto &p:my_vec) {
+                        p.showHybridNodes();
+                    }
+                    
                     if (number_of_sampling_loops == 2.0) {
                         if (z == 0) {estimateTheta(my_vec);}
                         if (z == 1) {estimateSpeciationRate(my_vec);}
@@ -705,6 +710,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             } // z loop - theta or speciation rate
             
             showFinal(_accepted_particle_vec);
+            cout << "marginal likelihood: " << _log_marginal_likelihood << endl;
             
             if (_estimate_theta) {
                 cout << "number of accepted theta proposals: " << _theta_accepted_number << endl;
