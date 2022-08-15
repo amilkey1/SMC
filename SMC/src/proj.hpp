@@ -691,6 +691,10 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         }
                         resetWeights(my_vec);
                         _accepted_particle_vec = my_vec;
+                        
+                        if (g == nspecies-1) {
+                            my_vec[0].showParticle();
+                        }
                     } // g loop
                     
                     for (auto &p:my_vec) {
@@ -709,7 +713,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 } // _nsamples loop - number of samples
             } // z loop - theta or speciation rate
             
-            showFinal(_accepted_particle_vec);
+//            showFinal(_accepted_particle_vec);
             cout << "marginal likelihood: " << _log_marginal_likelihood << endl;
             
             if (_estimate_theta) {

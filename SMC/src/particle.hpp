@@ -57,6 +57,7 @@ class Particle {
         void                                            showSpeciesJoined();
         void                                            showSpeciesTree();
         void                                            showHybridNodes();
+        void                                            showGamma();
 
     private:
 
@@ -152,6 +153,7 @@ class Particle {
                 for (unsigned i=1; i<_forests.size(); i++) {
                     _forests[i].finishHybridizingGene(hybridized_nodes, new_nd3, _forests[0]._last_edge_length);
                 }
+                showGamma();
             }
             if (event == "speciation") {
                 tuple<string, string, string> t = _forests[0].speciesTreeProposal();
@@ -168,8 +170,10 @@ class Particle {
             double prev_log_likelihood = _log_likelihood;
             _log_likelihood = calcLogLikelihood();
             _log_weight = _log_likelihood - prev_log_likelihood;
-//            return _log_weight;
         }
+//        if (_generation == Forest::_nspecies) {
+//            showGamma();
+//        }
         return _log_weight;
     }
 
@@ -244,22 +248,23 @@ class Particle {
                 cout << "       " << "hybridized node is: " << nd._name << " with minor parent " << nd._minor_parent->_name << " and major parent " << nd._major_parent->_name << endl;
             }
         }
-        //        for (auto &nd:_forests[0]._nodes) {
-//            if (nd._parent2) {
-//                Node* major_parent;
-//                for (Node * major=nd._parent; major; major=major->_left_child) {
-//                    major_parent = major;
-//                }
-//
-//                Node* minor_parent;
-//                for (Node * minor=nd._parent2; minor; minor=minor->_left_child) {
-//                    minor_parent = minor;
-//                }
-//                cout << "       " << "hybridized node is: " << nd._name << " with major parent " << major_parent->_name << " and minor parent " << minor_parent->_name << endl;
-//            }
-//        }
     }
 
+    inline void Particle::showGamma() {
+        double major = 0;
+        double total = _forests.size()-1;
+        for (int i=1; i<_forests.size(); i++) {
+            if (_forests[i]._direction == "major") {
+                major ++;
+            }
+//            double major = _forests[i]._gamma_major;
+//            double total = _forests[i]._gamma_total;
+//            cout << "gene " << i << endl;
+//            cout << "    " << "gamma = " << major / total << endl;
+        }
+        double gamma = major / total;
+        cout << "   " << "gamma = " << gamma << endl;
+    }
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_likelihood = other._log_likelihood;
