@@ -701,6 +701,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         p.showHybridNodes();
                     }
                     
+                    
                     if (number_of_sampling_loops == 2.0) {
                         if (z == 0) {estimateTheta(my_vec);}
                         if (z == 1) {estimateSpeciationRate(my_vec);}

@@ -58,6 +58,7 @@ class Particle {
         void                                            showSpeciesTree();
         void                                            showHybridNodes();
         void                                            showGamma();
+        void                                            calculateGamma();
 
     private:
 
@@ -153,7 +154,7 @@ class Particle {
                 for (unsigned i=1; i<_forests.size(); i++) {
                     _forests[i].finishHybridizingGene(hybridized_nodes, new_nd3, _forests[0]._last_edge_length);
                 }
-                showGamma();
+                calculateGamma();
             }
             if (event == "speciation") {
                 tuple<string, string, string> t = _forests[0].speciesTreeProposal();
@@ -171,14 +172,27 @@ class Particle {
             _log_likelihood = calcLogLikelihood();
             _log_weight = _log_likelihood - prev_log_likelihood;
         }
-//        if (_generation == Forest::_nspecies) {
-//            showGamma();
-//        }
+        if (_generation == Forest::_nspecies) {
+            showGamma();
+        }
         return _log_weight;
     }
 
     inline Particle::Particle(const Particle & other) {
         *this = other;
+    }
+
+    inline void Particle::calculateGamma() {
+        // TODO: also this might not work with multiple hybrid nodes....
+        double major = 0.0;
+        double total = _forests.size();
+        for (int i=1; i<_forests.size(); i++) {
+            if (_forests[i]._direction == "major") {
+                major++;
+            }
+        }
+        double gamma = major / total;
+        _forests[0]._gamma.push_back(gamma);
     }
 
     inline void Particle::saveForest(std::string treefilename)  {
@@ -251,19 +265,24 @@ class Particle {
     }
 
     inline void Particle::showGamma() {
-        double major = 0;
-        double total = _forests.size()-1;
-        for (int i=1; i<_forests.size(); i++) {
-            if (_forests[i]._direction == "major") {
-                major ++;
+        cout << "\n";
+        cout << "particle " << endl;
+        if (_forests[0]._gamma.size() > 0) {
+            cout << "gamma is: " << endl;
+            for (auto &g:_forests[0]._gamma) {
+                cout << g << "   ";
             }
-//            double major = _forests[i]._gamma_major;
-//            double total = _forests[i]._gamma_total;
-//            cout << "gene " << i << endl;
-//            cout << "    " << "gamma = " << major / total << endl;
         }
-        double gamma = major / total;
-        cout << "   " << "gamma = " << gamma << endl;
+        cout << "\n";
+//        double major = 0.0;
+//        double total = _forests.size()-1;
+//        for (int i=1; i<_forests.size(); i++) {
+//            if (_forests[i]._direction == "major") {
+//                major ++;
+//            }
+//        }
+//        double gamma = major / total;
+//        cout << "   " << "gamma = " << gamma << endl;
     }
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;

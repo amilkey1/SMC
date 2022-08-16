@@ -105,6 +105,7 @@ class Forest {
         unsigned                    _npatterns;
         unsigned                    _nstates;
         double                      _last_edge_length;
+        vector<double>              _gamma;
 
         Data::SharedPtr             _data;
         static unsigned             _nspecies;
@@ -1728,6 +1729,9 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         log_weight_choices.push_back(likelihood_vec[0]-log(.15));
         log_weight_choices.push_back(likelihood_vec[1]-log(.85));
         
+//        log_weight_choices.push_back(likelihood_vec[0]);
+//        log_weight_choices.push_back(likelihood_vec[1]);
+        
         // normalize weights
         double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
         for (int b=0; b<log_weight_choices.size(); b++) {
@@ -1823,7 +1827,6 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
             
             // don't reset _ninternals, otherwise will be accessing the unused node
             
-            _gamma_total++;
             _gamma_major++;
         }
     }
