@@ -185,7 +185,7 @@ class Particle {
     inline void Particle::calculateGamma() {
         // TODO: also this might not work with multiple hybrid nodes....
         double major = 0.0;
-        double total = _forests.size();
+        double total = _forests.size()-1;
         for (int i=1; i<_forests.size(); i++) {
             if (_forests[i]._direction == "major") {
                 major++;
@@ -265,15 +265,15 @@ class Particle {
     }
 
     inline void Particle::showGamma() {
-        cout << "\n";
-        cout << "particle " << endl;
         if (_forests[0]._gamma.size() > 0) {
-            cout << "gamma is: " << endl;
+            cout << "\n";
+            cout << "particle: " << endl;
+            cout << "   " << "gamma is: " << endl;
             for (auto &g:_forests[0]._gamma) {
                 cout << g << "   ";
             }
+            cout << "\n";
         }
-        cout << "\n";
 //        double major = 0.0;
 //        double total = _forests.size()-1;
 //        for (int i=1; i<_forests.size(); i++) {

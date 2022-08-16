@@ -813,6 +813,7 @@ class Forest {
         _generationf = other._generationf;
         _gamma_total = other._gamma_total;
         _gamma_major = other._gamma_major;
+        _gamma = other._gamma;
 
         // copy tree itself
 
