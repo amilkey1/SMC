@@ -473,6 +473,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             regex re(".+\\^(.+)");
             smatch match_obj;
             bool matched=regex_match(name, match_obj, re); //search name for regular expression, store result in match_obj
+            cout << "taxon name: " << name << endl;
             if (matched) {
                 string species_name = match_obj[1];
                 string taxon_name = name;
@@ -666,6 +667,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     //run through each generation of particles
                     
                     for (unsigned g=0; g<nspecies; g++){
+//                        cout << "\n";
+//                        cout << "\n";
+//                        cout << "generation: " << g << endl;
                         //taxon joining and reweighting step
                         proposeParticles(my_vec);
 //                        debugSpeciesTree(my_vec);
