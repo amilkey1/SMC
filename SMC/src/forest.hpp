@@ -61,10 +61,9 @@ class Forest {
         void                        calcPartialArray(Node* new_nd);
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
-//        tuple<string,string, string> speciesTreeProposal();
-        tuple<Node*, Node*, Node*> speciesTreeProposal();
+        tuple<string,string, string> speciesTreeProposal();
         void                        firstGeneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment);
-        void                        geneTreeProposal(tuple<Node*, Node*, Node*> &species_merge_info, double time_increment);
+        void                        geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment);
         void                        evolveSpeciesFor(list <Node*> &nodes, double time_increment);
         void                        fullyCoalesceGeneTree(list<Node*> &nodes);
 //        void                        finishGeneTree();
@@ -93,8 +92,8 @@ class Forest {
         tuple<string,string, string> hybridizationProposal();
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
         void                        removeHybridNode(string hybrid_node_name);
-//        vector<string>                hybridizeSpecies();
-    vector<Node*> hybridizeSpecies();
+        vector<string>                hybridizeSpecies();
+//    vector<Node*> hybridizeSpecies();
         void                        moveGene(string new_nd, string parent, string hybrid, map<string, list<Node*>> &species_partition);
         string                      finishHybridizingSpecies();
         void                        finishHybridizingGene(vector<string> hybridized_nodes, string new_nd3, double species_tree_increment);
@@ -131,8 +130,7 @@ class Forest {
         double                      calcTransitionProbability(Node* child, double s, double s_child);
         double                      calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
         void                        setNewEdgeLength(double difference, Node* taxon_to_migrate, string key_to_add);
-//        void                        hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment);
-    void                        hybridizeGene(vector<Node*> hybridized_nds, double species_tree_increment);
+        void                        hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment);
 
     public:
 
@@ -1014,28 +1012,14 @@ inline string Forest::chooseEvent() {
         }
     }
 
-//    inline tuple<string,string, string> Forest::speciesTreeProposal() {
-    inline tuple<Node*, Node*, Node*> Forest::speciesTreeProposal() {
+    inline tuple<string,string, string> Forest::speciesTreeProposal() {
         // this function creates a new node and joins two species
         
         pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
         Node *subtree1=_lineages[t.first];
         Node *subtree2=_lineages[t.second];
         assert(!subtree1->_parent && !subtree2->_parent);
-//        assert(!subtree1->_right_sib && !subtree2->_right_sib);
-        
-        // if nodes in hybrid triple have been chosen, try again
-//        bool done = false;
-//        while (!done) {
-//            if (subtree1->_right_sib == subtree2 || subtree2->_right_sib == subtree1) {
-//                pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
-//                Node *subtree1=_lineages[t.first];
-//                Node *subtree2=_lineages[t.second];
-////                assert(!subtree1->_parent && !subtree2->_parent);
-////                assert(!subtree1->_right_sib && !subtree2->_right_sib);
-//            }
-//            done = true;
-//        }
+        assert(!subtree1->_right_sib && !subtree2->_right_sib);
 
         Node* new_nd = &_nodes[_nleaves+_ninternals];
         new_nd->_parent=0;
@@ -1055,8 +1039,7 @@ inline string Forest::chooseEvent() {
 
         _species_joined = make_pair(subtree1, subtree2);
 
-//        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
-        return make_tuple(subtree1, subtree2, new_nd);
+        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
     }
 
     inline void Forest::showSpeciesJoined() {
@@ -1381,20 +1364,11 @@ inline void Forest::firstGeneTreeProposal(tuple<string, string, string> &species
         }
     }
 }
-//    inline void Forest::geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment) {
-    inline void Forest::geneTreeProposal(tuple<Node*, Node*, Node*> &species_merge_info, double time_increment) {
+    inline void Forest::geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment) {
         //update species partition
-//        string new_name = get<2>(species_merge_info);
-//        string species1 = get<0>(species_merge_info);
-//        string species2 = get<1>(species_merge_info);
-        
-        Node* new_nd = get<2>(species_merge_info);
-        Node* species1_nd = get<0>(species_merge_info);
-        Node* species2_nd = get<1>(species_merge_info);
-        
-        string new_name = new_nd->_name;
-        string species1 = species1_nd->_name;
-        string species2 = species2_nd->_name;
+        string new_name = get<2>(species_merge_info);
+        string species1 = get<0>(species_merge_info);
+        string species2 = get<1>(species_merge_info);
 
         if (new_name != "null" ){
             // skip this for generation 0, no species have been joined yet
@@ -1747,26 +1721,13 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         }
     }
 
-//    inline void Forest::hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment) {
-    inline void Forest::hybridizeGene(vector<Node*> hybridized_nds, double species_tree_increment) {
+    inline void Forest::hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment) {
         // parent, parent2, hybrid_node, new_nd
-//        string parent = hybridized_nodes[0];
-//        string parent2 = hybridized_nodes[1];
-//        string hybrid = hybridized_nodes[2];
-//        string new_nd = hybridized_nodes[3];
-//        string new_nd2 = hybridized_nodes[4];
-        
-        Node* parent_nd = hybridized_nds[0];
-        Node* parent2_nd = hybridized_nds[1];
-        Node* hybrid_nd = hybridized_nds[2];
-        Node* new_nd_nd = hybridized_nds[3];
-        Node* new_nd2_nd = hybridized_nds[4];
-
-        string parent = hybridized_nds[0]->_name;
-        string parent2 = hybridized_nds[1]->_name;
-        string hybrid = hybridized_nds[2]->_name;
-        string new_nd = hybridized_nds[3]->_name;
-        string new_nd2 = hybridized_nds[4]->_name;
+        string parent = hybridized_nodes[0];
+        string parent2 = hybridized_nodes[1];
+        string hybrid = hybridized_nodes[2];
+        string new_nd = hybridized_nodes[3];
+        string new_nd2 = hybridized_nodes[4];
 
         // find hybridizing lineage
         // move the gene in the hybrid node left or right
@@ -2029,8 +1990,8 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         assert(nodes.size()>0);
     }
 
-//    inline vector<string> Forest::hybridizeSpecies() {
-    inline vector<Node*> Forest::hybridizeSpecies() {
+    inline vector<string> Forest::hybridizeSpecies() {
+//    inline vector<Node*> Forest::hybridizeSpecies() {
         tuple<unsigned, unsigned, unsigned> t = chooseTaxaToHybridize();
         Node* parent = _lineages[get<0>(t)];
         Node* parent2 = _lineages[get<1>(t)];
@@ -2094,8 +2055,8 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         hybrid_node->_minor_parent = parent2;
         
         // update _lineages vector with major new_nd
-//        return hybridized_nodes;
-        return hybridized_nds;
+        return hybridized_nodes;
+//        return hybridized_nds;
     }
 
     inline string Forest::finishHybridizingSpecies() {

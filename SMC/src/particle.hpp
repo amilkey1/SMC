@@ -152,20 +152,17 @@ class Particle {
         else {
             event = _forests[0].chooseEvent();
             if (event == "hybridization") {
-//                vector<string> hybridized_nodes = _forests[0].hybridizeSpecies();
-                vector<Node*> hybridized_nds = _forests[0].hybridizeSpecies();
+                vector<string> hybridized_nodes = _forests[0].hybridizeSpecies();
                 if (_forests[0]._lineages.size()>1) {
                     _forests[0].addSpeciesIncrement();
                 }
                 for (unsigned i=1; i<_forests.size(); i++) {
-//                    _forests[i].hybridizeGene(hybridized_nodes, _forests[0]._last_edge_length);
-                    _forests[i].hybridizeGene(hybridized_nds, _forests[0]._last_edge_length);
+                    _forests[i].hybridizeGene(hybridized_nodes, _forests[0]._last_edge_length);
                 }
                 calculateGamma();
             }
             else if (event == "speciation") {
-//                tuple<string, string, string> t = _forests[0].speciesTreeProposal();
-                tuple<Node*, Node*, Node*> t = _forests[0].speciesTreeProposal();
+                tuple<string, string, string> t = _forests[0].speciesTreeProposal();
                 if (_forests[0]._lineages.size()>1) {
                     _forests[0].addSpeciesIncrement();
                 }
