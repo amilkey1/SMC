@@ -68,7 +68,6 @@ namespace proj {
             int                 _position_in_lineages;
             bool                _visited = false;
             std::string         _direction;
-            std::vector<std::string>         _alt;
     };
     
     

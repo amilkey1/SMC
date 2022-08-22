@@ -127,9 +127,6 @@ class Forest {
     tuple<Node*, Node*, Node*>  _hybrid_species_joined;
         double                      _generationf = 0;
         string                      _last_direction;
-        unsigned                    _gamma_total;
-        unsigned                    _gamma_major;
-        unsigned                    _num_hybrid_events = 0;
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
         double                      calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
@@ -868,10 +865,7 @@ class Forest {
         _hybridization_rate = other._hybridization_rate;
         _last_direction = other._last_direction;
         _generationf = other._generationf;
-        _gamma_total = other._gamma_total;
-        _gamma_major = other._gamma_major;
         _gamma = other._gamma;
-        _num_hybrid_events = other._num_hybrid_events;
 
         // copy tree itself
 
@@ -937,7 +931,6 @@ class Forest {
             _nodes[k]._partial = othernd._partial;
             _nodes[k]._visited = othernd._visited;
             _nodes[k]._direction = othernd._direction;
-            _nodes[k]._alt = othernd._alt;
             }
         }
 
@@ -1091,8 +1084,6 @@ inline string Forest::chooseEvent() {
             }
         }
         assert (_species_partition.size() > 0);
-        _gamma_total = 0;
-        _gamma_major = 0;
     }
 
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double species_tree_increment) {
@@ -1407,61 +1398,6 @@ inline void Forest::firstGeneTreeProposal(tuple<string, string, string> &species
 
         if (new_name != "null" ){
             // skip this for generation 0, no species have been joined yet
-            
-            // if forest underwent a minor hybridization event, switch species name
-            bool spp1_reached = false;
-            bool spp2_reached = false;
-            
-            for (auto &s:_species_partition) {
-                if (s.first == species1) {
-                    spp1_reached = true;
-                }
-                if (s.first == species2) {
-                    spp2_reached = true;
-                }
-            }
-            
-            assert (spp1_reached && spp2_reached);
-//            if (!spp1_reached) {
-//                if (species1_nd->_parent) {
-//                    species1_nd = species1_nd->_parent;
-//                    species1 = species1_nd->_name;
-//                }
-//                else {
-//                    species1 = species1_nd->_alt[_num_hybrid_events-1];
-//                }
-//                if (species1_nd->_parent2) {
-//                    species1_nd = species1_nd->_parent2;
-//                }
-//                else if (species1_nd->_left_child) {
-//                    species1_nd = species1_nd->_left_child->_right_sib->_parent2;
-//                }
-//                else {
-//                    species1_nd = species1_nd->_parent2->_right_sib->_left_child; // TODO: don't think this will always work
-//                }
-//                species1 = species1_nd->_name;
-//            }
-//            if (!spp2_reached) {
-//                if (species2_nd->_parent) {
-////                    species2_nd = species2_nd->_parent;
-////                    species2 = species2_nd->_name;
-////                }
-////                else {
-//                    species2 = species2_nd->_alt[_num_hybrid_events-1];
-////                }
-////                if (species2_nd->_parent2) {
-////                    species2_nd = species2_nd->_parent2;
-////                }
-////                if (species2_nd->_left_child) {
-////                    species2_nd = species2_nd->_left_child->_right_sib->_parent2;
-////                }
-////                else {
-////                    species2_nd = species2_nd->_parent2->_right_sib->_left_child; // TODO: don't think this will always work
-////
-//                }
-////                species2 = species2_nd->_name;
-//            }
-            
             list<Node*> &nodes = _species_partition[new_name];
             copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
             copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
@@ -1831,54 +1767,6 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         string hybrid = hybridized_nds[2]->_name;
         string new_nd = hybridized_nds[3]->_name;
         string new_nd2 = hybridized_nds[4]->_name;
-        
-        
-        // make sure correct nodes are being used
-//        bool parent_reached = false;
-//        bool parent2_reached = false;
-//        bool hybrid_reached = false;
-//        bool new_nd_reached = false;
-//        bool new_nd2_reached = false;
-//
-//        for (auto &s:_species_partition) {
-//            if (s.first == parent) {
-//                parent_reached = true;
-//            }
-//            if (s.first == parent2) {
-//                parent2_reached = true;
-//            }
-//            if (s.first == hybrid) {
-//                hybrid_reached = true;
-//            }
-//        }
-//        if (!parent_reached) {
-////            if (parent_nd->_parent) {
-////                parent_nd = parent_nd->_parent;
-////                parent = parent_nd->_name;
-////            }
-////            else {
-//                parent = parent_nd->_alt[_num_hybrid_events-1];
-////            }
-////            parent_nd = hybridized_nds[0]->_left_child->_right_sib->_parent2;
-////            assert(parent_nd->_direction == "minor");
-////            parent = parent_nd->_name;
-//        }
-//        if (!parent2_reached) {
-////            if (parent2_nd->_parent) {
-////                parent2_nd = parent2_nd->_parent;
-////                parent2 = parent2_nd->_name;
-////            }
-//            parent2 = parent2_nd->_alt[_num_hybrid_events-1];
-////            parent2_nd = hybridized_nds[1]->_left_child->_right_sib->_parent2;
-////            assert(parent2_nd->_direction == "minor");
-////            parent2 = parent2_nd->_name;
-//        }
-////        if (!hybrid_reached) {
-////            hybrid_nd = hybridized_nds[2]->_left_child->_right_sib->_parent2;
-////            assert(hybrid_nd->_direction == "minor");
-////            hybrid = hybrid_nd->_name;
-////        }
-//        assert (hybrid_reached);
 
         // find hybridizing lineage
         // move the gene in the hybrid node left or right
@@ -2025,7 +1913,6 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         
         // select a direction
         int index_of_choice = selectPair(log_weight_choices);
-        _num_hybrid_events++;
         if (index_of_choice == 0) {
             // minor choice
             _last_direction = "minor";
@@ -2182,38 +2069,11 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         hybrid_node->_parent2=new_nd2;
         new_nd2->_left_child->_right_sib = hybrid_node; // TODO: not sure
         
-//        assert (new_nd->_alt == "");
-//        assert (!new_nd2->_alt == "");
-        new_nd->_alt.push_back(new_nd2->_name);
-        new_nd2->_alt.push_back(new_nd->_name);
-        
-//        assert (!parent->_alt == "");
-//        assert (!parent2->_alt == "");
-        parent->_alt.push_back(parent2->_name);
-        parent2->_alt.push_back(parent->_name);
-        
-        
         new_nd->_direction = "major";
         new_nd2->_direction = "minor";
         
 //        hybridizeNodeVector(_lineages, parent, parent2, hybrid_node, new_nd);
         updateNodeVector(_lineages, parent, hybrid_node, new_nd);
-
-//        if (_lineages.size()>1) {
-//        for (auto &nd:_lineages) {
-//                nd->_edge_length += _last_edge_length;
-//            }
-//            new_nd2->_edge_length = _last_edge_length;
-//        }
-        
-//        new_nd->_edge_length = _last_edge_length;
-//        new_nd2->_edge_length = _last_edge_length;
-//
-//        for (auto &nd:_lineages) { // TODO: double check this is the best way to do this
-//            if (nd->_name != parent->_name && nd->_name != parent2->_name && nd->_name !=hybrid_node->_name) {
-//                nd ->_edge_length += _last_edge_length;
-//            }
-//        }
         
         vector<string> hybridized_nodes;
         vector<Node*> hybridized_nds;
@@ -2232,8 +2092,6 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         
         hybrid_node->_major_parent = parent;
         hybrid_node->_minor_parent = parent2;
-        
-        _num_hybrid_events++;
         
         // update _lineages vector with major new_nd
 //        return hybridized_nodes;
