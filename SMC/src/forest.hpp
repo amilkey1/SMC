@@ -1019,7 +1019,7 @@ inline string Forest::chooseEvent() {
         Node *subtree1=_lineages[t.first];
         Node *subtree2=_lineages[t.second];
         assert(!subtree1->_parent && !subtree2->_parent);
-        assert(!subtree1->_right_sib && !subtree2->_right_sib);
+//        assert(!subtree1->_right_sib && !subtree2->_right_sib);
 
         Node* new_nd = &_nodes[_nleaves+_ninternals];
         new_nd->_parent=0;
@@ -1991,7 +1991,6 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
     }
 
     inline vector<string> Forest::hybridizeSpecies() {
-//    inline vector<Node*> Forest::hybridizeSpecies() {
         tuple<unsigned, unsigned, unsigned> t = chooseTaxaToHybridize();
         Node* parent = _lineages[get<0>(t)];
         Node* parent2 = _lineages[get<1>(t)];
@@ -1999,7 +1998,7 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         
         _hybrid_species_joined = make_tuple(hybrid_node, parent, parent2);
 
-//        assert (!parent->_parent && !hybrid_node->_parent && !parent2->_parent);
+        assert (!parent->_parent && !hybrid_node->_parent && !parent2->_parent);
 //        assert (!parent->_right_sib && !hybrid_node->_right_sib && !parent2->_parent);
 
 //        create a new node
@@ -2022,7 +2021,7 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         new_nd2->_name=boost::str(boost::format("node-%d")%new_nd2->_number);
         new_nd2->_edge_length=0.0;
         _ninternals++;
-        new_nd2->_right_sib=new_nd;
+//        new_nd2->_right_sib=new_nd;
         new_nd2->_left_child=parent2;
         hybrid_node->_right_sib = parent2;
 //        parent2->_right_sib=hybrid_node; // TODO: check this
@@ -2033,17 +2032,9 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         new_nd->_direction = "major";
         new_nd2->_direction = "minor";
         
-//        hybridizeNodeVector(_lineages, parent, parent2, hybrid_node, new_nd);
         updateNodeVector(_lineages, parent, hybrid_node, new_nd);
         
         vector<string> hybridized_nodes;
-        vector<Node*> hybridized_nds;
-        
-        hybridized_nds.push_back(parent);
-        hybridized_nds.push_back(parent2);
-        hybridized_nds.push_back(hybrid_node);
-        hybridized_nds.push_back(new_nd);
-        hybridized_nds.push_back(new_nd2);
         
         hybridized_nodes.push_back(parent->_name);
         hybridized_nodes.push_back(parent2->_name);
