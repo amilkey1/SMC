@@ -1759,10 +1759,17 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         list<Node*> nodes1 = _species_partition[parent];
         list<Node*> nodes2 = _species_partition[hybrid];
         list<Node*> nodes3 = _species_partition[parent2];
-        
+
         assert(nodes1.size()>0);
         assert(nodes2.size()>0);
         assert(nodes3.size()>0);
+        
+        vector<list<Node*>> original_nodes;
+        vector<string> original_names;
+        for (auto &s:_species_partition) {
+            original_names.push_back(s.first);
+            original_nodes.push_back(_species_partition[s.first]);
+        }
         
         // save branch lengths of original _lineages vector
         vector<double> branch_lengths;
@@ -1772,14 +1779,15 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         
         _new_nodes.clear();
         // move towards minor parent
-        moveGene(new_nd2, parent2, hybrid, _species_partition);
+        moveGene(new_nd, parent2, hybrid, _species_partition);
         
         // go through coalescence
         if (_species_partition.size() == 1) {
             fullyCoalesceGeneTree(_species_partition.begin()->second);
         }
         
-        else {
+        else { // TODO: here, make sure you are in the target lineage before saving minor nodes
+            // TODO: make another vector to save non-target nodes?
             for (auto &s:_species_partition) {
                 assert (s.second.size()>0);
                 evolveSpeciesFor(s.second, species_tree_increment);
@@ -1813,6 +1821,14 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
             minor_right_edge_lengths.push_back(nd->_left_child->_right_sib->_edge_length);
         }
         
+        // save minor spp partition
+        vector<list<Node*>> minor_partition;
+        vector<string> minor_names;
+        for (auto &s:_species_partition) {
+            minor_names.push_back(s.first);
+            minor_partition.push_back(_species_partition[s.first]);
+        }
+        
         for (int a = _new_nodes.size()-1; a >= 0; a--) {
             for (auto &lineage_nd:_lineages) {
                 if (lineage_nd == _new_nodes[a]) {
@@ -1820,7 +1836,6 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
                 }
             }
         }
-        
         // reset edge lengths
         for (int i=0; i<_lineages.size(); i++) {
             _lineages[i]->_edge_length=branch_lengths[i];
@@ -1828,21 +1843,19 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
             _lineages[i]->_parent = 0;
         }
         
-        // reset species partition
-//        for (auto &nd:nodes2) {
-//            nd->_right_sib = 0;
-//            nd->_parent = 0;
-//        }
-//        for (auto &nd:nodes3) {
-//            nd->_right_sib = 0;
-//            nd->_parent = 0;
-//        }
-        
-        _species_partition[parent2] = nodes3;
-        _species_partition[hybrid] = nodes2;
-        _species_partition.erase(new_nd2);
+        // rebuild species partition
+        _species_partition.clear();
+        assert(_species_partition.size() == 0);
+        int i = 0;
+        for (auto &name:original_names) {
+            _species_partition[name] = original_nodes[i];
+            i++;
+        }
         
         _new_nodes.clear();
+        for (auto &s:_species_partition) {
+            cout << "x";
+        }
         // move towards major parent
         moveGene(new_nd, parent, hybrid, _species_partition);
         
@@ -1878,11 +1891,15 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
             // minor choice
             _last_direction = "minor";
             
-            // reset species partition // TODO: not sure of the order
-            _species_partition[parent] = nodes1;
-            _species_partition[hybrid] = nodes2;
-            _species_partition.erase(new_nd);
-    
+            // rebuild species partition
+            _species_partition.clear();
+            assert(_species_partition.size() == 0);
+            int i = 0;
+            for (auto &name:original_names) {
+                _species_partition[name] = original_nodes[i];
+                i++;
+            }
+            
             // revert species partition, then move hybrid node back with minor parent
             
             // revert _lineages first
@@ -1929,24 +1946,30 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
                 }
             }
             
-            // revert all _lineages edge lengths to minor nodes
+//            // revert all _lineages edge lengths to minor nodes
             for (int i=0; i<_lineages.size(); i++) {
                 _lineages[i]->_edge_length = minor_branch_lengths[i];
             }
-            
             if (minor_nodes.size() > 0) {
-                list<Node*> minor_node_list;
-                for (auto &minor_nd:minor_nodes) {
-                    for (auto &lineage_nd:_lineages) {
-                        if (minor_nd == lineage_nd) {
-                            minor_node_list.push_back(minor_nd);
-                        }
-                    }
+                // rebuild species partition
+                _species_partition.clear();
+                int i = 0;
+                for (auto &name:minor_names) {
+                    _species_partition[name] = minor_partition[i];
+                    i++;
                 }
-                // TODO: trying this
-                // call the species partition node the same name as the major species partition, but nodes in that species will be different
-//                _species_partition[new_nd2] = minor_node_list;
-                _species_partition[new_nd] = minor_node_list;
+                
+                list<Node*> &nodes = _species_partition[parent2];
+                copy(_species_partition[parent].begin(), _species_partition[parent].end(), back_inserter(nodes));
+                _species_partition.erase(parent);
+                assert(nodes.size()>0);
+            }
+            else {
+                int i = 0;
+                for (auto &name:minor_names) {
+                    _species_partition[name] = minor_partition[i];
+                    i++;
+                }
                 _species_partition.erase(parent2);
                 _species_partition.erase(hybrid);
                 
@@ -1954,15 +1977,14 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
                 copy(_species_partition[parent].begin(), _species_partition[parent].end(), back_inserter(nodes));
                 _species_partition.erase(parent);
                 assert(nodes.size()>0);
-                
-//                for (auto &s:_species_partition) {
-//                    cout << "x";
-//                }
             }
         }
         else {
             // major choice
             _last_direction = "major";
+            for (auto &s:_species_partition) {
+                cout << "x";
+            }
             for (auto &nd:minor_nodes) {
                 nd->_left_child = 0;
                 nd->_name = "unused_minor_node";
