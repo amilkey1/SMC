@@ -66,7 +66,6 @@ class Forest {
         void                        geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment);
         void                        evolveSpeciesFor(list <Node*> &nodes, double time_increment);
         void                        fullyCoalesceGeneTree(list<Node*> &nodes);
-//        void                        finishGeneTree();
         void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
         void                        hybridizeNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node* delnode3, Node * addnode1);
@@ -74,7 +73,6 @@ class Forest {
         double                      getRunningSumChoices(vector<double> &log_weight_choices);
         vector<double>              reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
         pair<Node*, Node*>          chooseAllPairs(list<Node *> &node_list, double increment);
-//        pair<Node*, Node*>          chooseAllPairs(vector<Node *> &node_list, double increment);
         pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
         int                         selectPair(vector<double> weight_vec);
         void                        chooseSpeciesIncrement();
@@ -92,9 +90,8 @@ class Forest {
         tuple<string,string, string> hybridizationProposal();
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
         void                        removeHybridNode(string hybrid_node_name);
-        vector<string>                hybridizeSpecies();
-//    vector<Node*> hybridizeSpecies();
-        void                        moveGene(string new_nd, string parent, string hybrid, map<string, list<Node*>> &species_partition);
+        vector<string>              hybridizeSpecies();
+        void                        moveGene(string new_nd, string parent, string hybrid);
         string                      finishHybridizingSpecies();
         void                        finishHybridizingGene(vector<string> hybridized_nodes, string new_nd3, double species_tree_increment);
         void                        tryBothDirections(list<Node*> nodes, double species_tree_increment, double gene_tree_increment);
@@ -655,56 +652,6 @@ class Forest {
         return make_pair(subtree1, subtree2);
     }
 
-//    inline pair<Node*, Node*> Forest::chooseAllPairs(vector<Node*> &node_list, double increment) {
-//        _node_choices.clear();
-//
-//        // reset _log_likelihood_choices to 0 if we are in a new lineage
-//        if (_log_likelihood_choices.size() == 0) {
-//            _prev_log_likelihood = 0.0;
-//        }
-//        else {
-//            _prev_log_likelihood = _log_likelihood_choices[_index_of_choice];
-//        }
-//        _log_likelihood_choices.clear();
-//
-//        //choose pair of nodes to try
-//        for (int i = 0; i < node_list.size()-1; i++) {
-//            for (int j = i+1; j < node_list.size(); j++) {
-//                // createNewSubtree returns subtree1, subtree2, new_nd
-//                tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment);
-//                _log_likelihood_choices.push_back(calcLogLikelihood());
-//
-//                // revert _lineages
-//                revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
-//
-//                //reset siblings and parents of original nodes back to 0
-//                get<0>(t)->resetNode(); //subtree1
-//                get<1>(t)->resetNode(); //subtree2
-//
-//                // clear new node from _nodes
-//                //clear new node that was just created
-//                get<2>(t)->clear(); //new_nd
-//            }
-//        }
-//
-//        // reweight each choice of pairs
-//        vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_log_likelihood);
-//
-//        // normalize weights
-//        double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-//        for (int b=0; b<log_weight_choices.size(); b++) {
-//            log_weight_choices[b] -= log_weight_choices_sum;
-//        }
-//
-//        // randomly select a pair
-//        _index_of_choice = selectPair(log_weight_choices);
-//
-//        // find nodes to join in node_list
-//        Node *subtree1 = _node_choices[_index_of_choice].first;
-//        Node *subtree2 = _node_choices[_index_of_choice].second;
-//        return make_pair(subtree1, subtree2);
-//    }
-
     inline int Forest::selectPair(vector<double> weight_vec) {
         // choose a random number [0,1]
         double u = rng.uniform();
@@ -928,7 +875,6 @@ class Forest {
             _nodes[k]._position_in_lineages = othernd._position_in_lineages;
             _nodes[k]._partial = othernd._partial;
             _nodes[k]._visited = othernd._visited;
-            _nodes[k]._direction = othernd._direction;
             }
         }
 
@@ -1198,82 +1144,6 @@ inline string Forest::chooseEvent() {
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
     }
-
-//    inline void Forest::finishGeneTree() {
-//        _prev_log_likelihood = 0.0;
-//        bool done = false;
-//
-//        while (!done) {
-//            double s = _lineages.size();
-//            double coalescence_rate = s*(s-1)/_theta;
-//            double increment = rng.gamma(1.0, 1.0/coalescence_rate);
-//
-//            bool lineages_left_to_join = s > 1;
-//            if (!lineages_left_to_join)  {
-//                done = true;
-//            }
-//
-//            //add increment to each lineage
-//            if (!done) {
-//                for (auto nd:_lineages) {
-//                    nd->_edge_length += increment;
-//                }
-//                Node* subtree1;
-//                Node *subtree2;
-//
-//                if (_lineages.size()>2) {
-//
-//// prior-prior proposal
-//                    if (_proposal == "prior-prior") {
-//                        pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
-//                        auto it1 = std::next(_lineages.begin(), t.first);
-//                        subtree1 = *it1;
-//
-//                        auto it2 = std::next(_lineages.begin(), t.second);
-//                        subtree2 = *it2;
-//                    }
-//
-//// prior-post proposal
-//                    if (_proposal == "prior-post") {
-//                        pair<Node*, Node*> t = chooseAllPairs(_lineages, increment);
-//
-//                        subtree1 = t.first;
-//                        subtree2 = t.second;
-//                    }
-//                }
-//
-//                else {
-//                    // if there are only two lineages left, there is only one choice
-//                    // prior-prior and prior-post proposals will return the same thing
-//                    subtree1 = _lineages.front();
-//                    subtree2 = _lineages.back();
-//                }
-//
-//
-//                Node* new_nd=&_nodes[_nleaves+_ninternals];
-//
-//                new_nd->_parent=0;
-//                new_nd->_number=_nleaves+_ninternals;
-//                new_nd->_edge_length=0.0;
-//                _ninternals++;
-//                new_nd->_right_sib=0;
-//
-//                new_nd->_left_child=subtree1;
-//                subtree1->_right_sib=subtree2;
-//
-//                subtree1->_parent=new_nd;
-//                subtree2->_parent=new_nd;
-//
-//                assert (new_nd->_partial == nullptr);
-//                new_nd->_partial=ps.getPartial(_npatterns*4);
-//                assert(new_nd->_left_child->_right_sib);
-//                calcPartialArray(new_nd);
-//
-//                //update species list
-//                updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-//            }
-//        }
-//    }
 
     inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
         _prev_log_likelihood = 0.0;
@@ -1739,12 +1609,12 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
             double u = rng.uniform();
             // move gene in direction of major parent
             _last_direction = "major";
-            moveGene(new_nd, parent, hybrid, _species_partition);
+            moveGene(new_nd, parent, hybrid);
         }
         else {
             // move gene in direction of minor parent
             _last_direction = "minor";
-            moveGene(new_nd2, parent2, hybrid, _species_partition);
+            moveGene(new_nd2, parent2, hybrid);
         }
 
         for (auto & s:_species_partition) {
@@ -1754,15 +1624,6 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
 # endif
         // prior-post
         // move gene both ways, save likelihood of each, reweight, then draw random number to decide which way to move
-        
-        // save initial species partition information
-        list<Node*> nodes1 = _species_partition[parent];
-        list<Node*> nodes2 = _species_partition[hybrid];
-        list<Node*> nodes3 = _species_partition[parent2];
-
-        assert(nodes1.size()>0);
-        assert(nodes2.size()>0);
-        assert(nodes3.size()>0);
         
         vector<list<Node*>> original_nodes;
         vector<string> original_names;
@@ -1779,15 +1640,14 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         
         _new_nodes.clear();
         // move towards minor parent
-        moveGene(new_nd, parent2, hybrid, _species_partition);
+        moveGene(new_nd, parent2, hybrid);
         
         // go through coalescence
         if (_species_partition.size() == 1) {
             fullyCoalesceGeneTree(_species_partition.begin()->second);
         }
         
-        else { // TODO: here, make sure you are in the target lineage before saving minor nodes
-            // TODO: make another vector to save non-target nodes?
+        else {
             for (auto &s:_species_partition) {
                 assert (s.second.size()>0);
                 evolveSpeciesFor(s.second, species_tree_increment);
@@ -1853,11 +1713,8 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         }
         
         _new_nodes.clear();
-        for (auto &s:_species_partition) {
-            cout << "x";
-        }
         // move towards major parent
-        moveGene(new_nd, parent, hybrid, _species_partition);
+        moveGene(new_nd, parent, hybrid);
         
         // go through coalescence
         if (_species_partition.size() == 1) {
@@ -1941,7 +1798,6 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
                         minor_nodes[k]->_right_sib = 0;
                         minor_nodes[k]->_left_child->_edge_length = minor_left_edge_lengths[k];
                         minor_nodes[k]->_left_child->_right_sib->_edge_length = minor_right_edge_lengths[k];
-                        minor_nodes[k]->_direction = "minor";
                     }
                 }
             }
@@ -1982,33 +1838,25 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         else {
             // major choice
             _last_direction = "major";
-            for (auto &s:_species_partition) {
-                cout << "x";
-            }
             for (auto &nd:minor_nodes) {
                 nd->_left_child = 0;
                 nd->_name = "unused_minor_node";
                 nd->_edge_length = 0;
                 nd->_partial->clear();
                 nd->_position_in_lineages = -1;
-                nd->_direction = "minor";
-            }
-            
-            for (auto &nd:_new_nodes){
-                nd->_direction = "major";
             }
             
             // don't reset _ninternals, otherwise will be accessing the unused node
         }
     }
     
-    inline void Forest::moveGene(string new_nd, string parent, string hybrid, map<string, list<Node*>> &species_partition) {
+    inline void Forest::moveGene(string new_nd, string parent, string hybrid) {
         // update species partition
-        list<Node*> &nodes = species_partition[new_nd];
-        copy(species_partition[parent].begin(), species_partition[parent].end(), back_inserter(nodes));
-        copy(species_partition[hybrid].begin(), species_partition[hybrid].end(), back_inserter(nodes));
-        species_partition.erase(parent);
-        species_partition.erase(hybrid);
+        list<Node*> &nodes = _species_partition[new_nd];
+        copy(_species_partition[parent].begin(), _species_partition[parent].end(), back_inserter(nodes));
+        copy(_species_partition[hybrid].begin(), _species_partition[hybrid].end(), back_inserter(nodes));
+        _species_partition.erase(parent);
+        _species_partition.erase(hybrid);
         assert(nodes.size()>0);
     }
 
@@ -2043,16 +1891,10 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         new_nd2->_name=boost::str(boost::format("node-%d")%new_nd2->_number);
         new_nd2->_edge_length=0.0;
         _ninternals++;
-//        new_nd2->_right_sib=new_nd;
         new_nd2->_left_child=parent2;
         hybrid_node->_right_sib = parent2;
-//        parent2->_right_sib=hybrid_node; // TODO: check this
-//        parent2->_parent2=new_nd2; // TODO: and this
         hybrid_node->_parent2=new_nd2;
-        new_nd2->_left_child->_right_sib = hybrid_node; // TODO: not sure
-        
-        new_nd->_direction = "major";
-        new_nd2->_direction = "minor";
+        new_nd2->_left_child->_right_sib = hybrid_node;
         
         updateNodeVector(_lineages, parent, hybrid_node, new_nd);
         
@@ -2069,7 +1911,6 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         
         // update _lineages vector with major new_nd
         return hybridized_nodes;
-//        return hybridized_nds;
     }
 
     inline string Forest::finishHybridizingSpecies() {

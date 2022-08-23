@@ -667,12 +667,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     //run through each generation of particles
                     
                     for (unsigned g=0; g<nspecies; g++){
-//                        cout << "\n";
-//                        cout << "\n";
-//                        cout << "generation: " << g << endl;
                         //taxon joining and reweighting step
                         proposeParticles(my_vec);
-//                        debugSpeciesTree(my_vec);
                         
                         double ess_inverse = 0.0;
                         normalizeWeights(my_vec);

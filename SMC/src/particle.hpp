@@ -171,14 +171,9 @@ class Particle {
                 }
             }
         }
-        // if tree is finished, don't need to recalculate likelihood
-//        if (event != "" || _generation == 0) {
             double prev_log_likelihood = _log_likelihood;
             _log_likelihood = calcLogLikelihood();
             _log_weight = _log_likelihood - prev_log_likelihood;
-//        }
-//        showSpeciesJoined();
-//        cout << "gene 1 forest likelihood: " << _forests[1]._gene_tree_log_likelihood << endl;
         
         return _log_weight;
     }
