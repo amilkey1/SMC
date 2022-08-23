@@ -129,6 +129,7 @@ class Forest {
         double                      calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
         void                        setNewEdgeLength(double difference, Node* taxon_to_migrate, string key_to_add);
         void                        hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment);
+        void                        resetToMinor(vector<Node*> minor_nodes, vector<Node*> minor_left_children, vector<Node*> minor_right_children, vector<double> minor_left_edge_lengths, vector<double> minor_right_edge_lengths);
 
     public:
 
@@ -1590,9 +1591,6 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
         for (auto &nd:minor_nodes) {
             minor_left_children.push_back(nd->_left_child);
             minor_right_children.push_back(nd->_left_child->_right_sib);
-        }
-        
-        for (auto &nd:minor_nodes) {
             minor_left_edge_lengths.push_back(nd->_left_child->_edge_length);
             minor_right_edge_lengths.push_back(nd->_left_child->_right_sib->_edge_length);
         }
@@ -1636,32 +1634,16 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
             
             // clear major nodes
             for (auto &nd:_new_nodes) {
-                _nodes[nd->_number].clear();
+                nd->_left_child = 0;
+                nd->_name = "unused_major_node";
+                nd->_edge_length = 0;
+                nd->_partial->clear();
+                nd->_position_in_lineages = -1;
             }
+            _new_nodes.clear();
             
-            // reset _ninternals
-            _ninternals -= _new_nodes.size();
-            
-            // find new nodes
-            int k = -1;
-            // reset _lineages to minor coalescence
-            for (auto &minor_node:minor_nodes) {
-                k++;
-                for (auto &nd:_lineages) {
-                    if (minor_node->_left_child == nd) {
-                        updateNodeVector(_lineages, minor_left_children[k], minor_right_children[k], minor_nodes[k]);
-                        minor_nodes[k]->_parent = 0;
-                        minor_nodes[k]->_left_child = minor_left_children[k];
-                        minor_nodes[k]->_left_child->_right_sib = minor_right_children[k];
-                        minor_left_children[k]->_parent = minor_nodes[k];
-                        minor_right_children[k]->_parent = minor_nodes[k];
-                        minor_nodes[k]->_right_sib = 0;
-                        minor_nodes[k]->_left_child->_edge_length = minor_left_edge_lengths[k];
-                        minor_nodes[k]->_left_child->_right_sib->_edge_length = minor_right_edge_lengths[k];
-                    }
-                }
-            }
-            
+            resetToMinor(minor_nodes, minor_left_children, minor_right_children, minor_left_edge_lengths, minor_right_edge_lengths);
+
             // revert all _lineages edge lengths to minor nodes
             for (int i=0; i<_lineages.size(); i++) {
                 _lineages[i]->_edge_length = minor_branch_lengths[i];
@@ -1687,7 +1669,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
         }
     }
 
-inline void Forest::hybridGeneTreeProposal(double species_tree_increment) {
+    inline void Forest::hybridGeneTreeProposal(double species_tree_increment) {
         if (_species_partition.size() == 1) {
             fullyCoalesceGeneTree(_species_partition.begin()->second);
         }
@@ -1698,8 +1680,30 @@ inline void Forest::hybridGeneTreeProposal(double species_tree_increment) {
                 evolveSpeciesFor(s.second, species_tree_increment);
             }
         }
-}
-    
+    }
+
+    inline void Forest::resetToMinor(vector<Node*> minor_nodes, vector<Node*>minor_left_children, vector<Node*>minor_right_children, vector<double> minor_left_edge_lengths, vector<double> minor_right_edge_lengths) {
+        // find new nodes
+        int k = -1;
+        // reset _lineages to minor coalescence
+        for (auto &minor_node:minor_nodes) {
+            k++;
+            for (auto &nd:_lineages) {
+                if (minor_node->_left_child == nd) {
+                    updateNodeVector(_lineages, minor_left_children[k], minor_right_children[k], minor_nodes[k]);
+                    minor_nodes[k]->_parent = 0;
+                    minor_nodes[k]->_left_child = minor_left_children[k];
+                    minor_nodes[k]->_left_child->_right_sib = minor_right_children[k];
+                    minor_left_children[k]->_parent = minor_nodes[k];
+                    minor_right_children[k]->_parent = minor_nodes[k];
+                    minor_nodes[k]->_right_sib = 0;
+                    minor_nodes[k]->_left_child->_edge_length = minor_left_edge_lengths[k];
+                    minor_nodes[k]->_left_child->_right_sib->_edge_length = minor_right_edge_lengths[k];
+                }
+            }
+        }
+    }
+
     inline void Forest::moveGene(string new_nd, string parent, string hybrid) {
         // update species partition
         list<Node*> &nodes = _species_partition[new_nd];
