@@ -62,7 +62,7 @@ class Forest {
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
         tuple<string,string, string> speciesTreeProposal();
-        void                        firstGeneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment);
+        void                        firstGeneTreeProposal(double time_increment);
         void                        geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment);
         void                        evolveSpeciesFor(list <Node*> &nodes, double time_increment);
         void                        fullyCoalesceGeneTree(list<Node*> &nodes);
@@ -87,14 +87,9 @@ class Forest {
         void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
         void                        deleteTaxon(string key_to_del, unsigned taxon_choice);
         void                        allowCoalescence(list<Node*> &nodes, double increment);
-        tuple<string,string, string> hybridizationProposal();
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
-        void                        removeHybridNode(string hybrid_node_name);
         vector<string>              hybridizeSpecies();
         void                        moveGene(string new_nd, string parent, string hybrid);
-        string                      finishHybridizingSpecies();
-        void                        finishHybridizingGene(vector<string> hybridized_nodes, string new_nd3, double species_tree_increment);
-        void                        tryBothDirections(list<Node*> nodes, double species_tree_increment, double gene_tree_increment);
 
         std::vector<Node *>         _lineages;
     
@@ -884,21 +879,12 @@ class Forest {
             _lineages[i] = &_nodes[k];
             i++;
         }
-        
-        // TODO: not sure if _new_nodes needs to be copied, since it is reset every time it's used
-//        unsigned j = 0;
-//        for (auto othernd : other._new_nodes) {
-//            unsigned k = othernd->_number;
-//            _new_nodes[j] = &_nodes[k];
-//            j++;
-//        }
     }
 
     inline void Forest::setUpSpeciesForest(vector<string> &species_names) {
         assert (_index==0);
         assert (_nspecies = (unsigned) species_names.size());
         clear();
-//        _nodes.reserve(_nspecies*3);
         //create species
         double edge_length = 0.0;
         for (unsigned i = 0; i < _nspecies; i++) {
@@ -949,8 +935,6 @@ inline string Forest::chooseEvent() {
         // hybridization prior
         double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
         
-//        double hybridization_prob = _hybridization_rate/(_hybridization_rate+_speciation_rate);
-        
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
         for (auto nd:_lineages) {
@@ -965,7 +949,6 @@ inline string Forest::chooseEvent() {
         Node *subtree1=_lineages[t.first];
         Node *subtree2=_lineages[t.second];
         assert(!subtree1->_parent && !subtree2->_parent);
-//        assert(!subtree1->_right_sib && !subtree2->_right_sib);
 
         Node* new_nd = &_nodes[_nleaves+_ninternals];
         new_nd->_parent=0;
@@ -1222,7 +1205,7 @@ inline string Forest::chooseEvent() {
         }
     }
 
-inline void Forest::firstGeneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment) {
+inline void Forest::firstGeneTreeProposal(double time_increment) {
     if (_species_partition.size() == 1) {
         fullyCoalesceGeneTree(_species_partition.begin()->second);
     }
@@ -1304,33 +1287,30 @@ inline void Forest::firstGeneTreeProposal(tuple<string, string, string> &species
         }
     }
 
-inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * delnode3, Node * addnode1) {
-    // Delete delnode1 from node_vector
-    auto it1 = find(node_vector.begin(), node_vector.end(), delnode1);
-    assert(it1 != node_vector.end());
-    node_vector.erase(it1);
+    inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * delnode3, Node * addnode1) {
+        // Delete delnode1 from node_vector
+        auto it1 = find(node_vector.begin(), node_vector.end(), delnode1);
+        assert(it1 != node_vector.end());
+        node_vector.erase(it1);
 
-    // Delete delnode2 from node_vector
-    auto it2 = find(node_vector.begin(), node_vector.end(), delnode2);
-    assert(it2 != node_vector.end());
-    node_vector.erase(it2);
-    
-    // Delete delnode3 from node_vector
-    auto it3 = find(node_vector.begin(), node_vector.end(), delnode3);
-    assert(it3 != node_vector.end());
-    node_vector.erase(it3);
+        // Delete delnode2 from node_vector
+        auto it2 = find(node_vector.begin(), node_vector.end(), delnode2);
+        assert(it2 != node_vector.end());
+        node_vector.erase(it2);
+        
+        // Delete delnode3 from node_vector
+        auto it3 = find(node_vector.begin(), node_vector.end(), delnode3);
+        assert(it3 != node_vector.end());
+        node_vector.erase(it3);
 
-    // Add addnode1 to node_vector
-    node_vector.push_back(addnode1);
-    
-    // Add addnoe2 to node_vector
-//    node_vector.push_back(addnode2);
+        // Add addnode1 to node_vector
+        node_vector.push_back(addnode1);
 
-    // reset _position_in_lineages
-    for (int i=0; i<_lineages.size(); i++) {
-        _lineages[i] -> _position_in_lineages=i;
+        // reset _position_in_lineages
+        for (int i=0; i<_lineages.size(); i++) {
+            _lineages[i] -> _position_in_lineages=i;
+        }
     }
-}
 
     inline void Forest::revertNodeVector(vector<Node *> &node_vector, Node *addnode1, Node *addnode2, Node *delnode1) {
         // Delete delnode1 from node_vector
@@ -1377,11 +1357,6 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
 
         // Add addnode to node_list
         node_list.push_back(addnode);
-
-        // reset _position_in_lineages if node_list is _lineages TODO: not sure about this
-//            for (int i=0; i<_lineages.size(); i++) {
-//                _lineages[i] -> _position_in_lineages=i;
-//            }
     }
 
     inline void Forest::allowMigration(list<Node*> &nodes) {
@@ -1538,56 +1513,6 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
                     break;
                 }
             }
-        }
-    }
-    
-//    inline void Forest::removeHybridNode(string hybrid_node_name) {
-//        for (int i=0; i<_lineages.size(); i++) {
-//            string x = _lineages[i]->_name;
-//            string substr = hybrid_node_name;
-//            string a = x.substr(x.find('^')+1);
-//            // once hybrid node is found in _lineages, remove it
-//            if (a == substr) {
-//                _lineages.erase(_lineages.begin()+i);
-//            }
-//        }
-////        reset _position_in_lineages
-//        for (int i=0; i<_lineages.size(); i++) {
-//            _lineages[i]->_position_in_lineages = i;
-//        }
-//    }
-
-    inline void Forest::tryBothDirections(list<Node*> nodes, double species_tree_increment, double gene_tree_increment) {
-        double increment;
-//        bool choose = true;
-//        while (choose) {
-//            double s = nodes.size();
-//            double coalescence_rate = s*(s-1)/_theta;
-//            increment = rng.gamma(1.0, 1.0/(coalescence_rate));
-//            if (increment < species_tree_increment || nodes.size() == 1) {
-//                choose = false;
-//            }
-//        }
-
-        if (nodes.size() == 1)  {
-            increment = species_tree_increment;
-        }
-        
-        else {
-            increment = gene_tree_increment;
-        }
-
-        //add increment to each lineage
-        for (auto nd:nodes) {
-            nd->_edge_length += increment; //add most recently chosen branch length to each node in lineage
-        }
-
-        if (nodes.size() > 1) {
-            allowCoalescence(nodes, increment);
-        } // TODO: need to fix this for >2 nodes
-        
-        for (auto nd:nodes) { // finish extending existing lineages
-            nd->_edge_length += (species_tree_increment - increment);
         }
     }
 
@@ -1773,7 +1698,7 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
             }
             
             // reset _lineages and _species_partition to what we got from the minor coalescence
-            // find new nodes // TODO: double check all this
+            // find new nodes
             int k = -1;
             
             // clear major nodes
@@ -1911,98 +1836,6 @@ inline void Forest::hybridizeNodeVector(vector<Node *> & node_vector, Node * del
         
         // update _lineages vector with major new_nd
         return hybridized_nodes;
-    }
-
-    inline string Forest::finishHybridizingSpecies() {
-        // create a new node to finish off the hybrid triplet
-        Node* hybrid_node;
-        Node* new_nd;
-        Node* new_nd2;
-        Node* parent;
-        Node* parent2;
-        for (auto &nd:_lineages) {
-            if (nd->_parent2) {
-                hybrid_node = nd;
-                new_nd = nd->_parent;
-                new_nd2 = nd->_parent2;
-                parent = nd->_major_parent;
-                parent2 = nd->_minor_parent;
-            }
-        }
-        
-        Node* new_nd3 = &_nodes[_nleaves+_ninternals];
-        new_nd3->_parent = 0;
-        new_nd3->_number = _nleaves+_ninternals;
-        new_nd3->_name=boost::str(boost::format("node-%d")%new_nd3->_number);
-        new_nd3->_edge_length = 0.0;
-        _ninternals++;
-        new_nd3->_right_sib=0;
-        new_nd3->_left_child=new_nd;
-        new_nd->_right_sib=new_nd2;
-        new_nd->_parent=new_nd3;
-        new_nd2->_parent=new_nd3;
-
-//        hybridizeNodeVector(_lineages, parent, parent2, hybrid_node, new_nd3);
-//        _species_joined = make_pair(parent, hybrid_node);
-//        _hybrid_species_joined = make_tuple(hybrid_node, parent, parent2);
-        
-//         choose a new species increment to finish off the cycle
-        if (_lineages.size()>1) {
-            // TODO: not sure if we use speciation rate here
-            double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
-            _last_edge_length = rng.gamma(1.0, 1.0/rate);
-
-            for (auto &nd:_lineages) {
-                nd ->_edge_length += _last_edge_length;
-            }
-        }
-        
-        return new_nd3->_name;
-    }
-
-    inline void Forest::finishHybridizingGene(vector<string> hybridized_nodes, string new_nd3, double species_tree_increment) {
-        string parent = hybridized_nodes[0];
-        string parent2 = hybridized_nodes[1];
-        string hybrid = hybridized_nodes[2];
-        string new_nd = hybridized_nodes[3];
-        string new_nd2 = hybridized_nodes[4];
-        
-        if (_last_direction == "major") {
-            // now update species partition with new node 3 to finish off hybrid cycle
-            list<Node*> &nodes = _species_partition[new_nd3];
-            copy(_species_partition[new_nd].begin(), _species_partition[new_nd].end(), back_inserter(nodes));
-            // if there is deep coalescence, join the hybrid triplet into new_nd3
-            if (nodes.size() == 0) {
-                copy(_species_partition[hybrid].begin(), _species_partition[hybrid].end(), back_inserter(nodes));
-                _species_partition.erase(hybrid);
-            }
-            copy(_species_partition[parent2].begin(), _species_partition[parent2].end(), back_inserter(nodes));
-            _species_partition.erase(new_nd);
-            _species_partition.erase(parent2);
-        }
-        else {
-            list<Node*> &nodes = _species_partition[new_nd3];
-            copy(_species_partition[new_nd2].begin(), _species_partition[new_nd2].end(), back_inserter(nodes));
-            // if there is deep coalescence, join the hybrid triplet into new_nd3
-            if (nodes.size() == 0) {
-                copy(_species_partition[hybrid].begin(), _species_partition[hybrid].end(), back_inserter(nodes));
-                _species_partition.erase(hybrid);
-            }
-            copy(_species_partition[parent].begin(), _species_partition[parent].end(), back_inserter(nodes));
-            _species_partition.erase(new_nd2);
-            _species_partition.erase(parent);
-        }
-        
-        if (_species_partition.size() == 1) {
-            fullyCoalesceGeneTree(_species_partition.begin()->second);
-        }
-        
-        else {
-            for (auto & s:_species_partition) {
-                assert (s.second.size()>0);
-                evolveSpeciesFor(s.second, species_tree_increment);
-            }
-        }
     }
 
     inline void Forest::addSpeciesIncrement() {

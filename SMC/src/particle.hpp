@@ -138,9 +138,8 @@ class Particle {
         string event;
         if (_generation == 0) {
             _forests[0].chooseSpeciesIncrement();
-            tuple <string, string, string> t = make_tuple("null", "null", "null");
             for (unsigned i=1; i<_forests.size(); i++){
-                _forests[i].firstGeneTreeProposal(t, _forests[0]._last_edge_length);
+                _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
             }
         }
         else if (_forests[0]._lineages.size()==1) {
