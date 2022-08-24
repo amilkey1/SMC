@@ -71,6 +71,7 @@ class Forest {
         void                        hybridizeNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node* delnode3, Node * addnode1);
         void                        revertNodeVector(vector<Node *> & node_vector, Node * addnode1, Node * addnode2, Node * delnode1);
         double                      getRunningSumChoices(vector<double> &log_weight_choices);
+        double                      getRunningSumHybridChoices(vector<double> &log_weight_choices);
         vector<double>              reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
         pair<Node*, Node*>          chooseAllPairs(list<Node *> &node_list, double increment);
         pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
@@ -685,6 +686,24 @@ class Forest {
         for (auto & i:log_weight_choices) {
             running_sum += exp(i - log_max_weight);
         }
+        log_weight_choices_sum = log(running_sum) + log_max_weight;
+        return log_weight_choices_sum;
+    }
+
+    inline double Forest::getRunningSumHybridChoices(vector<double> &log_weight_choices) {
+        double running_sum = 0.0;
+        double log_weight_choices_sum = 0.0;
+        vector<double> adjustedLogLikelihood;
+        
+        // multiply major likelihood * gamma, multiply minor likelihood * (1 - gamma)
+        adjustedLogLikelihood.push_back(log_weight_choices[0]+0.15);
+        adjustedLogLikelihood.push_back(log_weight_choices[1]+0.85);
+        
+        double log_max_weight = *max_element(adjustedLogLikelihood.begin(), adjustedLogLikelihood.end());
+        for (auto & i:adjustedLogLikelihood) {
+            running_sum += exp(i - log_max_weight);
+        }
+        
         log_weight_choices_sum = log(running_sum) + log_max_weight;
         return log_weight_choices_sum;
     }
@@ -1727,11 +1746,12 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
         // choose a direction
         vector<double> log_weight_choices;
         
-        log_weight_choices.push_back(likelihood_vec[0]-log(.15));
-        log_weight_choices.push_back(likelihood_vec[1]-log(.85));
+        log_weight_choices.push_back(likelihood_vec[0]+log(.15)); // multiply minor likelihood by (1-gamma)
+        log_weight_choices.push_back(likelihood_vec[1]+log(.85)); // multiply major likelihood by (gamma)
         
         // normalize weights
-        double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
+//        double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
+        double log_weight_choices_sum = getRunningSumHybridChoices(log_weight_choices);
         for (int b=0; b < (int) log_weight_choices.size(); b++) {
             log_weight_choices[b] -= log_weight_choices_sum;
         }
