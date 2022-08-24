@@ -1073,9 +1073,9 @@ inline string Forest::chooseEvent() {
     }
 
     inline void Forest::allowCoalescence(list<Node*> &nodes, double increment) {
-        Node *subtree1;
-        Node *subtree2;
-        unsigned s = nodes.size();
+        Node *subtree1 = nullptr;
+        Node *subtree2 = nullptr;
+        unsigned s = (unsigned) nodes.size();
 
         if (nodes.size()>2) {
             // prior-prior proposal
@@ -1154,8 +1154,8 @@ inline string Forest::chooseEvent() {
                 for (auto nd:nodes) {
                     nd->_edge_length += increment;
                 }
-                Node* subtree1;
-                Node *subtree2;
+                Node* subtree1 = nullptr;
+                Node *subtree2 = nullptr;
 
                 if (nodes.size()>2) {
 
@@ -1435,7 +1435,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
         // choose lineage to migrate into
         string key_to_add;
         mtx.lock();
-        unsigned lineage_choice = ::rng.randint(0, _species_partition.size()-1);
+        unsigned lineage_choice = ::rng.randint(0, (unsigned) _species_partition.size()-1);
         mtx.unlock();
 
         // find lineage to migrate to in species partition
@@ -1472,7 +1472,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
 
     inline double Forest::calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate) {
         // find target lineage
-        Node* taxon_in_target_lineage;
+        Node* taxon_in_target_lineage = nullptr;
         double target_edge_length = 0.0;
         for (auto &s:_species_partition) {
             if (s.first == key_to_add) {
@@ -1757,7 +1757,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
     }
 
     inline void Forest::resetLineages(vector<double> branch_lengths) {
-        for (int a = _new_nodes.size()-1; a>=0; a--) {
+        for (int a = (int) _new_nodes.size()-1; a>=0; a--) {
             revertNodeVector(_lineages, _new_nodes[a]->_left_child, _new_nodes[a]->_left_child->_right_sib, _new_nodes[a]);
         }
         

@@ -608,7 +608,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
             //set number of species to number in data file
             setNumberTaxa(_data);
-            unsigned nspecies = _species_names.size();
+            unsigned nspecies = (unsigned) _species_names.size();
             Forest::setNumSpecies(nspecies);
             rng.setSeed(_random_seed);
 
