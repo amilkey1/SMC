@@ -181,7 +181,7 @@ class Forest {
 
         _lineages.reserve(_nodes.size()); //no root or subroot anymore
 
-        for (int i=0; i < _ntaxa; i++) {
+        for (int i=0; i < (int) _ntaxa; i++) {
             _lineages.push_back(&_nodes[i]);
         }
     }
@@ -617,8 +617,8 @@ class Forest {
         _log_likelihood_choices.clear();
 
         //choose pair of nodes to try
-        for (int i = 0; i < node_list.size()-1; i++) {
-            for (int j = i+1; j < node_list.size(); j++) {
+        for (int i = 0; i < (int) node_list.size()-1; i++) {
+            for (int j = i+1; j < (int) node_list.size(); j++) {
                 // createNewSubtree returns subtree1, subtree2, new_nd
                 tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment);
                 _log_likelihood_choices.push_back(calcLogLikelihood());
@@ -641,7 +641,7 @@ class Forest {
 
         // normalize weights
         double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-        for (int b=0; b<log_weight_choices.size(); b++) {
+        for (int b=0; b < (int) log_weight_choices.size(); b++) {
             log_weight_choices[b] -= log_weight_choices_sum;
         }
 
@@ -659,7 +659,7 @@ class Forest {
         double u = rng.uniform();
         double cum_prob = 0.0;
         int index = 0.0;
-        for (int i=0; i<weight_vec.size(); i++) {
+        for (int i=0; i < (int) weight_vec.size(); i++) {
             cum_prob += exp(weight_vec[i]);
             if (u <= cum_prob) {
                 index = i;
@@ -672,7 +672,7 @@ class Forest {
 
     inline vector<double> Forest::reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood) {
         vector<double> weight_vec;
-        for (int a = 0; a<likelihood_vec.size(); a++) {
+        for (int a = 0; a < (int) likelihood_vec.size(); a++) {
             weight_vec.push_back(likelihood_vec[a]-prev_log_likelihood);
         }
         return weight_vec;
@@ -1011,7 +1011,7 @@ inline string Forest::chooseEvent() {
         _prev_log_likelihood = 0.0;
         bool done = false;
         double cum_time = 0.0;
-        bool migration;
+        bool migration = false;
         if (_migration_rate > 0) {migration = true;}
 
         while (!done) {
@@ -1289,7 +1289,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
         node_vector.push_back(addnode);
 
         // reset _position_in_lineages
-        for (int i=0; i<_lineages.size(); i++) {
+        for (int i=0; i < (int) _lineages.size(); i++) {
             _lineages[i] -> _position_in_lineages=i;
         }
     }
@@ -1314,7 +1314,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
         node_vector.push_back(addnode1);
 
         // reset _position_in_lineages
-        for (int i=0; i<_lineages.size(); i++) {
+        for (int i=0; i < (int) _lineages.size(); i++) {
             _lineages[i] -> _position_in_lineages=i;
         }
     }
@@ -1346,7 +1346,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
         assert(_lineages[addnode2->_position_in_lineages] == addnode2);
 
         // reset _position_in_lineages
-        for (int i=0; i<_lineages.size(); i++) {
+        for (int i=0; i < (int) _lineages.size(); i++) {
             _lineages[i] -> _position_in_lineages=i;
         }
     }
@@ -1645,7 +1645,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
             resetToMinor(minor_nodes, minor_left_children, minor_right_children, minor_left_edge_lengths, minor_right_edge_lengths);
 
             // revert all _lineages edge lengths to minor nodes
-            for (int i=0; i<_lineages.size(); i++) {
+            for (int i=0; i < (int) _lineages.size(); i++) {
                 _lineages[i]->_edge_length = minor_branch_lengths[i];
             }
             // rebuild species partition
@@ -1732,7 +1732,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
         
         // normalize weights
         double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-        for (int b=0; b<log_weight_choices.size(); b++) {
+        for (int b=0; b < (int) log_weight_choices.size(); b++) {
             log_weight_choices[b] -= log_weight_choices_sum;
         }
         
@@ -1763,7 +1763,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
         
         // reset _lineages edge lengths
         assert (_lineages.size() == branch_lengths.size());
-        for (int i=0; i<_lineages.size(); i++) {
+        for (int i=0; i < (int) _lineages.size(); i++) {
             _lineages[i]->_edge_length = branch_lengths[i];
             _lineages[i]->_parent = 0;
             _lineages[i]->_right_sib = 0;

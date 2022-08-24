@@ -128,7 +128,7 @@ class Particle {
         _generation++;
         
         // set _generation for each forest
-        for (int i=0; i<_forests.size(); i++ ){
+        for (int i=0; i < (int) _forests.size(); i++ ){
             _forests[i].setGeneration(_generation);
         }
         return log_likelihood;
@@ -184,7 +184,7 @@ class Particle {
     inline void Particle::calculateGamma() {
         double major = 0.0;
         double total = _forests.size()-1;
-        for (int i=1; i<_forests.size(); i++) {
+        for (int i=1; i < (int) _forests.size(); i++) {
             if (_forests[i]._last_direction == "major") {
                 major++;
             }

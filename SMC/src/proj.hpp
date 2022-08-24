@@ -89,7 +89,7 @@ namespace proj {
             bool                        _estimate_theta;
             bool                        _estimate_speciation_rate;
             unsigned                    _nsamples; // number of total samples
-            int                         _sample = 0; // index of current sample
+            unsigned                    _sample = 0; // index of current sample
             void                        handleBaseFrequencies();
             void                        debugSpeciesTree(vector<Particle> &particles);
             void                        estimateTheta(vector<Particle> &particles);
