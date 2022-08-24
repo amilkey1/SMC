@@ -57,7 +57,9 @@ class Particle {
         void                                            showSpeciesJoined();
         void                                            showSpeciesTree();
         void                                            showHybridNodes();
+        string                                          saveHybridNodes();
         void                                            showGamma();
+        string                                          saveGamma();
         void                                            calculateGamma();
 
     private:
@@ -264,10 +266,21 @@ class Particle {
         }
     }
 
+    inline string Particle::saveHybridNodes() {
+        string nodes = "";
+        int i = 0;
+        for (auto &nd:_forests[0]._nodes) {
+            if (nd._major_parent) {
+                string gammastr = to_string(_forests[0]._gamma[i]);
+                nodes +=  "hybridized node is: " + nd._name + " with minor parent " + nd._minor_parent->_name + " and major parent " + nd._major_parent->_name + "\n" + "gamma is: " + gammastr + "\n";
+                i++;
+            }
+        }
+        return nodes;
+    }
+
     inline void Particle::showGamma() {
         if (_forests[0]._gamma.size() > 0) {
-//            cout << "\n";
-//            cout << "particle: " << endl;
             cout << "   " << "gamma is: " << endl;
             for (auto &g:_forests[0]._gamma) {
                 cout << g << "   ";
@@ -275,6 +288,7 @@ class Particle {
             cout << "\n";
         }
     }
+
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_likelihood = other._log_likelihood;

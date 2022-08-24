@@ -51,6 +51,7 @@ namespace proj {
             void                proposeParticles(vector<Particle> &particles);
             void                printSpeciationRates();
             void                printThetas();
+            void                saveAllHybridNodes(vector<Particle> &v) const;
 
         private:
 
@@ -124,6 +125,15 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
         treef << "end;\n";
         treef.close();
+    }
+
+    inline void Proj::saveAllHybridNodes(vector<Particle> &v) const {
+        ofstream nodef("nodes.txt");
+        for (auto &p:v) {
+            nodef << "particle\n";
+            nodef << p.saveHybridNodes()  << "\n";
+        }
+        nodef.close();
     }
 
     inline void Proj::processCommandLineOptions(int argc, const char * argv[]) {
@@ -697,10 +707,10 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         }
                     } // g loop
                     
+                    saveAllHybridNodes(my_vec);
                     for (auto &p:my_vec) {
                         p.showHybridNodes();
                     }
-                    
                     
                     if (number_of_sampling_loops == 2.0) {
                         if (z == 0) {estimateTheta(my_vec);}
@@ -713,7 +723,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     }
                 } // _nsamples loop - number of samples
             } // z loop - theta or speciation rate
-            
 //            showFinal(_accepted_particle_vec);
             cout << "marginal likelihood: " << _log_marginal_likelihood << endl;
             
