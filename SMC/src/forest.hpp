@@ -247,7 +247,10 @@ class Forest {
     inline Node * Forest::findNextPreorder(Node * nd) {
         assert(nd);
         Node * next = 0;
-        if (!nd->_left_child && !nd->_right_sib) {
+        if (nd->_major_parent) { // TODO: not sure
+            next = nd->_parent->_right_sib;
+        }
+        else if (!nd->_left_child && !nd->_right_sib) {
             // nd has no children and no siblings, so next preorder is the right sibling of
             // the first ancestral node that has a right sibling.
             Node * anc = nd->_parent;
@@ -298,9 +301,13 @@ class Forest {
         
         // find hybrid nodes, don't visit minor or major parent until hybrid node is visited
         vector<Node*> hybrid_nodes;
+        int n = _nspecies + 1;
         for (auto &node:_nodes) {
             if (node._parent2) {
                 hybrid_nodes.push_back(&node);
+                string name = "#H" + to_string(n);
+                node._hybrid_newick_name = name;
+                n++;
             }
         }
 
@@ -323,17 +330,12 @@ class Forest {
                             newick += boost::str(boost::format(tip_node_name_format)
                                 % nd->_minor_parent->_name
                                 % nd->_minor_parent->_edge_length);
-                            newick += ")";
-                            newick += "#H_";
+                            newick += ",";
                             newick += boost::str(boost::format(tip_node_name_format)
-                                % nd->_name
+                                % nd->_hybrid_newick_name
                                 % nd->_edge_length);
-                            
-//                            nd->_minor_parent->_visited = true;
-
-                        }
-                        else {
-
+                                nd->_minor_parent->_visited = true;
+                            newick += ")";
                         }
 
                         // hybrid node with major parent
@@ -342,14 +344,16 @@ class Forest {
                             newick += boost::str(boost::format(tip_node_name_format)
                                 % nd->_major_parent->_name
                                 % nd->_major_parent->_edge_length);
-                            newick += ",";
-                            newick += "#H_";
+                            newick += ",(";
+//                            newick += "#H_";
                             newick += boost::str(boost::format(tip_node_name_format)
                                 % nd->_name
                                 % nd->_edge_length);
                             newick += "),";
-                            
-//                            nd->_major_parent->_visited = true; // TODO: i think this only works if major and minor parents are tip nodes
+                            newick += boost::str(boost::format(tip_node_name_format)
+                                % nd->_hybrid_newick_name
+                                % nd->_edge_length);
+                                nd->_major_parent->_visited = true; // TODO: I think this only works if major and minor parents are tip nodes
                         }
                         
                         else {
@@ -357,7 +361,7 @@ class Forest {
                         }
 
                     }
-//                    else if (nd->_left_child && !nd->_visited && !skip) {
+    //                    else if (nd->_left_child && !nd->_visited && !skip) {
                     if (nd->_left_child) {
                         a++;
                         nd->_visited = true;
@@ -365,7 +369,7 @@ class Forest {
                         newick += "(";
                         node_stack.push(nd);
                     }
-//                    else if (!nd->_left_child && !nd->_visited && !skip) {
+    //                    else if (!nd->_left_child && !nd->_visited && !skip) {
                     else {
                         a++;
                         nd->_visited = true;
@@ -896,6 +900,7 @@ class Forest {
             _nodes[k]._position_in_lineages = othernd._position_in_lineages;
             _nodes[k]._partial = othernd._partial;
             _nodes[k]._visited = othernd._visited;
+            _nodes[k]._hybrid_newick_name = othernd._hybrid_newick_name;
             }
         }
 

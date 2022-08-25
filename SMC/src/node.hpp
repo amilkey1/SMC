@@ -67,6 +67,7 @@ namespace proj {
             PartialStore::partial_t _partial;
             int                 _position_in_lineages;
             bool                _visited = false;
+        std::string              _hybrid_newick_name;
     };
     
     
