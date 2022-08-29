@@ -51,6 +51,7 @@
 		22A40D872715F29100DFFCA0 /* likelihood.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = likelihood.hpp; sourceTree = "<group>"; };
 		22BD6F8F2707555A00DEB698 /* forest.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = forest.hpp; sourceTree = "<group>"; };
 		22BD6F902710806700DEB698 /* proj.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = proj.hpp; sourceTree = "<group>"; };
+		22C2897528B7CFC70030F44E /* node_manager.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = node_manager.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,6 +98,7 @@
 			isa = PBXGroup;
 			children = (
 				22BD6F8F2707555A00DEB698 /* forest.hpp */,
+				22C2897528B7CFC70030F44E /* node_manager.hpp */,
 				22BD6F902710806700DEB698 /* proj.hpp */,
 				22A40D852713541300DFFCA0 /* rbcl10.nex */,
 				2286C5BA2704BE49001BF8AA /* xproj.hpp */,

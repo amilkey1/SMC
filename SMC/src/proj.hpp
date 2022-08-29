@@ -18,6 +18,9 @@ using namespace boost::algorithm;
 #include "partial_store.hpp"
 extern proj::PartialStore ps;
 
+//#include "node_manager.hpp"
+//extern proj::NodeManager nm;
+
 namespace proj {
 
     class Proj {
@@ -708,9 +711,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     } // g loop
                     
                     saveAllHybridNodes(my_vec);
-                    for (auto &p:my_vec) {
-                        p.showHybridNodes();
-                    }
+//                    for (auto &p:my_vec) {
+//                        p.showHybridNodes();
+//                    }
                     
                     if (number_of_sampling_loops == 2.0) {
                         if (z == 0) {estimateTheta(my_vec);}

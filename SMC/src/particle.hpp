@@ -255,21 +255,23 @@ class Particle {
         _forests[0].showSpeciesJoined();
     }
     
-    inline void Particle::showHybridNodes() {
-        cout << "particle" << endl;
-        showGamma();
-        for (auto &nd:_forests[0]._nodes) {
-//            if (nd._parent2) {
-            if (nd._major_parent) {
-                cout << "       " << "hybridized node is: " << nd._name << " with minor parent " << nd._minor_parent->_name << " and major parent " << nd._major_parent->_name << endl;
-            }
-        }
-    }
+//    inline void Particle::showHybridNodes() {
+//        cout << "particle" << endl;
+//        showGamma();
+//        for (auto &nd:_forests[0]._nodes) {
+////            if (nd._parent2) {
+//            if (nd._major_parent) {
+//                cout << "       " << "hybridized node is: " << nd._name << " with minor parent " << nd._minor_parent->_name << " and major parent " << nd._major_parent->_name << endl;
+//            }
+//        }
+//    }
 
     inline string Particle::saveHybridNodes() {
         string nodes = "";
         int i = 0;
         for (auto &nd:_forests[0]._nodes) {
+//        for (Node* nd = _forests[0]._lineages[0]; nd; nd=nd->_left_child->_right_sib) {
+//            for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
             if (nd._major_parent) {
                 string gammastr = to_string(_forests[0]._gamma[i]);
                 nodes +=  "hybridized node is: " + nd._name + " with minor parent " + nd._minor_parent->_name + " and major parent " + nd._major_parent->_name + "\n" + "gamma is: " + gammastr + "\n";
