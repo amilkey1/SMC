@@ -803,9 +803,6 @@ class Forest {
         
         for (unsigned i = 0; i < _ntaxa; i++) {
             Node* nd = &*next(_nodes.begin(), i);
-//            auto it = find(_nodes.begin(), _nodes.end(), i);
-//            Node* nd = &*it;
-//            Node* nd=&_nodes[i];
             nd->_right_sib=0;
             nd->_name="";
             nd->_left_child=0;
@@ -851,7 +848,6 @@ class Forest {
         // copy tree itself
 
         _species_partition.clear();
-//        int i = 0; // TODO: double check this
         for (auto spiter : other._species_partition) {
             for (auto s : spiter.second) {
                 unsigned number = s->_number;
@@ -859,15 +855,6 @@ class Forest {
                 _species_partition[spiter.first].push_back(nd);
             }
         }
-//            for (auto s : spiter.second) {
-//                unsigned number = nd->_number;
-//                Node* nd = &*next(_nodes.begin(), i);
-//                auto it = find(_nodes.begin(), _nodes.end(), i);
-//                Node* nd = &*it;
-//                _species_partition[spiter.first].push_back(nd);
-//                _species_partition[spiter.first].push_back(&_nodes[number]);
-//                i++;
-//            }
 
         for (auto othernd : other._nodes) {
             // get number of next node in preorder sequence (serves as index of node in _nodes vector)
@@ -875,73 +862,51 @@ class Forest {
 
             if (k>-1) {
                 Node* nd = &*next(_nodes.begin(), k);
-//                auto it1 = find(_nodes.begin(), _nodes.end(), k);
-//                Node nd = *it1;
 
             // copy parent
                 if (othernd._parent) {
                     unsigned parent_number = othernd._parent->_number;
                     Node* parent = &*next(_nodes.begin(), parent_number);
-//                    auto it2 = find(_nodes.begin(), _nodes.end(), parent_number);
-//                    Node* parent = &*it2;
                     nd->_parent = parent;
-//                _nodes[k]._parent = &_nodes[parent_number];
                 }
 
             // copy parent2
                 if (othernd._parent2) {
                     unsigned parent2_number = othernd._parent2->_number;
                     Node* parent2 = &*next(_nodes.begin(), parent2_number);
-//                    auto it2 = find(_nodes.begin(), _nodes.end(), parent2_number);
-//                    Node* parent2 = &*it2;
                     nd->_parent2 = parent2;
-//                    _nodes[k]._parent2 = &_nodes[parent2_number];
                 }
 
             // copy major parent
                 if (othernd._major_parent) {
                     unsigned major_parent_number = othernd._major_parent->_number;
                     Node* major_parent = &*next(_nodes.begin(), major_parent_number);
-//                    auto it2 = find(_nodes.begin(), _nodes.end(), major_parent_number);
-//                    Node* major_parent = &*it2;
                     nd->_major_parent = major_parent;
-//                    _nodes[k]._major_parent = &_nodes[major_parent_number];
                 }
 
                 if (othernd._minor_parent) {
                     unsigned minor_parent_number = othernd._minor_parent->_number;
                     Node* minor_parent = &*next(_nodes.begin(), minor_parent_number);
-//                    auto it2 = find(_nodes.begin(), _nodes.end(), minor_parent_number);
-//                    Node* minor_parent = &*it2;
                     nd->_minor_parent = minor_parent;
-//                    _nodes[k]._minor_parent = &_nodes[minor_parent_number];
                 }
 
             // copy left child
                 if (othernd._left_child) {
                 unsigned left_child_number = othernd._left_child->_number;
                     Node* left_child = &*next(_nodes.begin(), left_child_number);
-//                    auto it2 = find(_nodes.begin(), _nodes.end(), left_child_number);
-//                    Node* left_child = &*it2;
                     nd->_left_child = left_child;
-//                _nodes[k]._left_child = &_nodes[left_child_number];
             }
                 else {
                     nd->_left_child = 0;
-    //                _nodes[k]._left_child = 0;
                 }
 
             // copy right sibling
             if (othernd._right_sib) {
                 unsigned right_sib_number = othernd._right_sib->_number;
                 Node* right_sib = &*next(_nodes.begin(), right_sib_number);
-//                auto it2 = find(_nodes.begin(), _nodes.end(), right_sib_number);
-//                Node* right_sib = &*it2;
                 nd->_right_sib = right_sib;
-//                _nodes[k]._right_sib = &_nodes[right_sib_number];
             }
             else
-//                _nodes[k]._right_sib = 0;
                 nd->_right_sib = 0;
 
                 nd->_number = othernd._number;
@@ -951,14 +916,6 @@ class Forest {
                 nd->_partial = othernd._partial;
                 nd->_visited = othernd._visited;
                 nd->_hybrid_newick_name = othernd._hybrid_newick_name;
-                
-//            _nodes[k]._number      = othernd._number;
-//            _nodes[k]._name        = othernd._name;
-//            _nodes[k]._edge_length = othernd._edge_length;
-//            _nodes[k]._position_in_lineages = othernd._position_in_lineages;
-//            _nodes[k]._partial = othernd._partial;
-//            _nodes[k]._visited = othernd._visited;
-//            _nodes[k]._hybrid_newick_name = othernd._hybrid_newick_name;
             }
         }
 
@@ -966,9 +923,6 @@ class Forest {
         for (auto othernd : other._lineages) {
             unsigned k = othernd->_number;
             Node* nd = &*next(_nodes.begin(), k);
-//            auto it1 = find(_nodes.begin(), _nodes.end(), k);
-//            Node* nd = &*it1;
-//            _lineages[j] = &_nodes[k];
             _lineages[j] = nd;
             j++;
         }
@@ -981,9 +935,6 @@ class Forest {
         //create species
         double edge_length = 0.0;
         for (unsigned i = 0; i < _nspecies; i++) {
-//            Node* nd=&_nodes[i];
-//            auto it = find(_nodes.begin(), _nodes.end(), i);
-//            Node* nd = &*it;
             Node* nd = &*next(_nodes.begin(), i);
             nd->_right_sib=0;
             nd->_name=species_names[i];
@@ -1007,7 +958,6 @@ inline string Forest::chooseEvent() {
     double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
     
     double hybridization_prob = _hybridization_rate/(_hybridization_rate+_speciation_rate);
-//        double speciation_prob = _speciation_rate/(_hybridization_rate+_speciation_rate);
     
     double u = rng.uniform();
     if (u<hybridization_prob && _lineages.size()>2) {
@@ -1731,7 +1681,6 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
             // clear major nodes
             for (auto &nd:_new_nodes) {
                 nd->_left_child = 0;
-//                nd->_name = "unused_major_node";
                 nd->_name = "unused";
                 nd->_edge_length = 0;
                 nd->_partial->clear();
@@ -1751,35 +1700,52 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
 
             // switch parent and parent2
             switchParents(parent, parent2);
-            
-//            for (auto &nd:_nodes) {
-//                if (nd._name == "unused") {
-//                    _nodes.remove(nd);
-//                    _ninternals--;
-//                }
-////                _nodes.remove_if(_name == "unused");
-//            }
         }
         else {
             // major choice
             _last_direction = "major";
             for (auto &nd:minor_nodes) {
                 nd->_left_child = 0;
-//                nd->_name = "unused_minor_node";
                 nd->_name = "unused";
                 nd->_edge_length = 0;
                 nd->_partial->clear();
                 nd->_position_in_lineages = -1;
             }
-            // don't reset _ninternals, otherwise will be accessing the unused node
-//            for (auto &nd:_nodes) {
-//                if (nd._name == "unused") {
-//                    _nodes.remove(nd);
-//                    _ninternals--;
-//                }
-////                _nodes.remove_if(_name == "unused");
-//            }
         }
+        // remove unused nodes
+        // move unused nodes to end of list for easier removal
+        int test = 0;
+        for (auto &nd:_nodes) {
+            if (nd._name == "unused") {
+                auto iter = _nodes.begin();
+                advance(iter, test);
+//                auto iter = find(_nodes.begin(), _nodes.end(), **nd);
+                _nodes.splice(_nodes.end(), _nodes, iter);
+            }
+            test++;
+        }
+        int size = (int) _nodes.size();
+        int pos = 0;
+        for (auto &nd:_nodes) {
+            if (nd._name == "unused") {
+                auto it = _nodes.begin();
+                advance(it, pos);
+                _nodes.erase(it);
+                _ninternals--;
+                size--;
+            }
+            if (pos >= size) {
+                break;
+            }
+            pos++;
+        }
+        // reset node numbers
+        int n = 0;
+        for (auto &nd:_nodes) {
+            nd._number = n;
+            n++;
+        }
+        assert(_nodes.size() > 0);
     }
 
     inline void Forest::hybridGeneTreeProposal(double species_tree_increment) {

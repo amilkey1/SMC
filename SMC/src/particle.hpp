@@ -255,16 +255,15 @@ class Particle {
         _forests[0].showSpeciesJoined();
     }
     
-//    inline void Particle::showHybridNodes() {
-//        cout << "particle" << endl;
-//        showGamma();
-//        for (auto &nd:_forests[0]._nodes) {
-////            if (nd._parent2) {
-//            if (nd._major_parent) {
-//                cout << "       " << "hybridized node is: " << nd._name << " with minor parent " << nd._minor_parent->_name << " and major parent " << nd._major_parent->_name << endl;
-//            }
-//        }
-//    }
+    inline void Particle::showHybridNodes() {
+        cout << "particle" << endl;
+        showGamma();
+        for (auto &nd:_forests[0]._nodes) {
+            if (nd._major_parent) {
+                cout << "       " << "hybridized node is: " << nd._name << " with minor parent " << nd._minor_parent->_name << " and major parent " << nd._major_parent->_name << endl;
+            }
+        }
+    }
 
     inline string Particle::saveHybridNodes() {
         string nodes = "";
