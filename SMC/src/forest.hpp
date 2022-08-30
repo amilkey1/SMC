@@ -660,6 +660,11 @@ class Forest {
         // find nodes to join in node_list
         Node *subtree1 = _node_choices[_index_of_choice].first;
         Node *subtree2 = _node_choices[_index_of_choice].second;
+        
+        // erase extra nodes created from node list
+        for (int i = 0; i < _node_choices.size(); i++) {
+            _nodes.pop_back();
+        }
         return make_pair(subtree1, subtree2);
     }
 
@@ -1622,6 +1627,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
         
         // save likelihood
         vector<double> likelihood_vec;
+        likelihood_vec.reserve(2);
         likelihood_vec.push_back(calcLogLikelihood());
         
         // save minor move information
@@ -1686,7 +1692,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
                 nd->_partial->clear();
                 nd->_position_in_lineages = -1;
             }
-            _new_nodes.clear();
+//            _new_nodes.clear();
             
             resetToMinor(minor_nodes, minor_left_children, minor_right_children, minor_left_edge_lengths, minor_right_edge_lengths);
 
@@ -1712,32 +1718,13 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
                 nd->_position_in_lineages = -1;
             }
         }
-        // remove unused nodes
-        // move unused nodes to end of list for easier removal
-        int test = 0;
-        for (auto &nd:_nodes) {
-            if (nd._name == "unused") {
-                auto iter = _nodes.begin();
-                advance(iter, test);
-//                auto iter = find(_nodes.begin(), _nodes.end(), **nd);
-                _nodes.splice(_nodes.end(), _nodes, iter);
-            }
-            test++;
-        }
-        int size = (int) _nodes.size();
-        int pos = 0;
-        for (auto &nd:_nodes) {
-            if (nd._name == "unused") {
-                auto it = _nodes.begin();
-                advance(it, pos);
-                _nodes.erase(it);
+            // remove unused nodes
+        for (auto iter = _nodes.begin(); iter != _nodes.end(); iter++) {
+            if (iter->_name == "unused") {
+                iter = _nodes.erase(iter);
+                --iter;
                 _ninternals--;
-                size--;
             }
-            if (pos >= size) {
-                break;
-            }
-            pos++;
         }
         // reset node numbers
         int n = 0;
@@ -1746,7 +1733,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
             n++;
         }
         assert(_nodes.size() > 0);
-    }
+        }
 
     inline void Forest::hybridGeneTreeProposal(double species_tree_increment) {
         if (_species_partition.size() == 1) {
@@ -1805,6 +1792,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
     inline int Forest::chooseDirectionOfHybridization(vector<double> likelihood_vec) {
         // choose a direction
         vector<double> log_weight_choices;
+        log_weight_choices.reserve(2);
         
         log_weight_choices.push_back(likelihood_vec[0]+log(.15)); // multiply minor likelihood by (1-gamma)
         log_weight_choices.push_back(likelihood_vec[1]+log(.85)); // multiply major likelihood by (gamma)

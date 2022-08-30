@@ -172,9 +172,9 @@ class Particle {
                 }
             }
         }
-            double prev_log_likelihood = _log_likelihood;
-            _log_likelihood = calcLogLikelihood();
-            _log_weight = _log_likelihood - prev_log_likelihood;
+        double prev_log_likelihood = _log_likelihood;
+        _log_likelihood = calcLogLikelihood();
+        _log_weight = _log_likelihood - prev_log_likelihood;
         
         return _log_weight;
     }

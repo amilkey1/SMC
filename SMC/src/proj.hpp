@@ -709,7 +709,18 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                             my_vec[0].showParticle();
                         }
                     } // g loop
-                    
+                    Forest f;
+                    cout << sizeof(f) << endl;
+                    Data d;
+                    cout << sizeof(d) << endl;
+                    Particle p;
+                    cout << sizeof(p) << endl;
+                    double x = 10.0;
+                    char c;
+                    cout << sizeof(c) << endl;
+                    cout << sizeof(x) << endl;
+                    int j = 1.0;
+                    cout << sizeof(j) << endl;
                     saveAllHybridNodes(my_vec);
 //                    for (auto &p:my_vec) {
 //                        p.showHybridNodes();
