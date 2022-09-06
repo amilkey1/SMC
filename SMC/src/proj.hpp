@@ -115,7 +115,6 @@ namespace proj {
         _data = nullptr;
     }
 
-//    inline void Proj::saveAllForests(const vector<Particle> &v) const {
 inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ofstream treef("forest.trees");
         treef << "#nexus\n\n";
@@ -730,22 +729,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 //                            my_vec[0].showParticle();
 //                        }
                     } // g loop
-                    Forest f;
-                    cout << sizeof(f) << endl;
-                    Data d;
-                    cout << sizeof(d) << endl;
-                    Particle p;
-                    cout << sizeof(p) << endl;
-                    double x = 10.0;
-                    char c;
-                    cout << sizeof(c) << endl;
-                    cout << sizeof(x) << endl;
-                    int j = 1.0;
-                    cout << sizeof(j) << endl;
-                    saveAllHybridNodes(my_vec);
-//                    for (auto &p:my_vec) {
-//                        p.showHybridNodes();
-//                    }
+                    for (auto &p:my_vec) {
+                        p->showHybridNodes();
+                        saveAllHybridNodes(my_vec);
+                    }
                     
                     if (number_of_sampling_loops == 2.0) {
                         if (z == 0) {estimateTheta(my_vec);}
