@@ -18,9 +18,6 @@ using namespace boost::algorithm;
 #include "partial_store.hpp"
 extern proj::PartialStore ps;
 
-//#include "node_manager.hpp"
-//extern proj::NodeManager nm;
-
 namespace proj {
 
     class Proj {
@@ -33,28 +30,28 @@ namespace proj {
             void                processCommandLineOptions(int argc, const char * argv[]);
             void                run();
 //            void                saveAllForests(const vector<Particle> &v) const ;
-            void                saveAllForests(vector<Particle> &v) const ;
+            void                saveAllForests(vector<Particle::SharedPtr> &v) const ;
 
-            void                normalizeWeights(vector<Particle> & particles);
-            unsigned            chooseRandomParticle(vector<Particle> & particles, vector<double> & cum_prob);
-            void                resampleParticles(vector<Particle> & from_particles, vector<Particle> & to_particles);
-            void                resetWeights(vector<Particle> & particles);
+            void                normalizeWeights(vector<Particle::SharedPtr> & particles);
+            unsigned            chooseRandomParticle(vector<Particle::SharedPtr> & particles, vector<double> & cum_prob);
+            void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
+            void                resetWeights(vector<Particle::SharedPtr> & particles);
             double              getWeightAverage(vector<double> log_weight_vec);
             void                createSpeciesMap(Data::SharedPtr);
-            void                showParticlesByWeight(vector<Particle> my_vec);
+            void                showParticlesByWeight(vector<Particle::SharedPtr> my_vec);
             void                proposeTheta();
             void                proposeSpeciationRate();
             double              logThetaPrior(double theta);
             double              logSpeciationRatePrior(double speciation_rate);
             string              acceptTheta();
             string              acceptSpeciationRate();
-            void                showFinal(vector<Particle>);
+            void                showFinal(vector<Particle::SharedPtr>);
             void                tune(bool accepted);
-            void                proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
-            void                proposeParticles(vector<Particle> &particles);
+            void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
+            void                proposeParticles(vector<Particle::SharedPtr> &particles);
             void                printSpeciationRates();
             void                printThetas();
-            void                saveAllHybridNodes(vector<Particle> &v) const;
+            void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
 
         private:
 
@@ -79,8 +76,8 @@ namespace proj {
             map<string, string>         _taxon_map;
             double                      _prev_theta = 0.0;
             double                      _prev_speciation_rate = 0.0;
-            vector<Particle>            _accepted_particle_vec;
-            vector<Particle>            _prev_particles;
+            vector<Particle::SharedPtr>            _accepted_particle_vec;
+            vector<Particle::SharedPtr>            _prev_particles;
             vector<pair<double, double>>  _theta_vector;
             vector<pair<double, double>>  _speciation_rate_vector;
             double                      _theta_accepted_number = 0.0;
@@ -95,9 +92,9 @@ namespace proj {
             unsigned                    _nsamples; // number of total samples
             unsigned                    _sample = 0; // index of current sample
             void                        handleBaseFrequencies();
-            void                        debugSpeciesTree(vector<Particle> &particles);
-            void                        estimateTheta(vector<Particle> &particles);
-            void                        estimateSpeciationRate(vector<Particle> &particles);
+            void                        debugSpeciesTree(vector<Particle::SharedPtr> &particles);
+            void                        estimateTheta(vector<Particle::SharedPtr> &particles);
+            void                        estimateSpeciationRate(vector<Particle::SharedPtr> &particles);
     };
 
     inline Proj::Proj() {
@@ -119,22 +116,22 @@ namespace proj {
     }
 
 //    inline void Proj::saveAllForests(const vector<Particle> &v) const {
-inline void Proj::saveAllForests(vector<Particle> &v) const {
+inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ofstream treef("forest.trees");
         treef << "#nexus\n\n";
         treef << "begin trees;\n";
         for (auto &p:v) {
-            treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
+            treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
         }
         treef << "end;\n";
         treef.close();
     }
 
-    inline void Proj::saveAllHybridNodes(vector<Particle> &v) const {
+    inline void Proj::saveAllHybridNodes(vector<Particle::SharedPtr> &v) const {
         ofstream nodef("nodes.txt");
         for (auto &p:v) {
             nodef << "particle\n";
-            nodef << p.saveHybridNodes()  << "\n";
+            nodef << p->saveHybridNodes()  << "\n";
         }
         nodef.close();
     }
@@ -257,21 +254,21 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         return log_particle_sum;
     }
 
-    inline void Proj::normalizeWeights(vector<Particle> & particles) {
+    inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles) {
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
         for (auto & p : particles) {
-            log_weight_vec[i++] = p.getLogWeight();
+            log_weight_vec[i++] = p->getLogWeight();
         }
 
         double log_particle_sum = getRunningSum(log_weight_vec);
 
         for (auto & p : particles) {
-            p.setLogWeight(p.getLogWeight() - log_particle_sum);
+            p->setLogWeight(p->getLogWeight() - log_particle_sum);
         }
         
         _log_marginal_likelihood += log_particle_sum - log(_nparticles);
-        sort(particles.begin(), particles.end(), greater<Particle>());
+        sort(particles.begin(), particles.end(), greater<Particle::SharedPtr>());
     }
 
     inline void Proj::tune(bool accepted) {
@@ -289,7 +286,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
     }
 
-    inline void Proj::estimateTheta(vector<Particle> &particles) {
+    inline void Proj::estimateTheta(vector<Particle::SharedPtr> &particles) {
         if (_sample == 0) {
             _theta_vector.push_back(make_pair(Forest::_theta, _log_marginal_likelihood));
             _prev_particles = particles;
@@ -323,7 +320,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         _accepted_particle_vec = particles;
     }
 
-    inline void Proj::estimateSpeciationRate(vector<Particle> &particles){
+    inline void Proj::estimateSpeciationRate(vector<Particle::SharedPtr> &particles){
         if (_sample == 0) {
             _prev_particles = particles;
             _prev_log_marginal_likelihood = 0.0;
@@ -424,7 +421,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         return (log(exponential_rate) - speciation_rate*exponential_rate);
     }
 
-    inline unsigned Proj::chooseRandomParticle(vector<Particle> & particles, vector<double> & cum_probs) {
+    inline unsigned Proj::chooseRandomParticle(vector<Particle::SharedPtr> & particles, vector<double> & cum_probs) {
         int chosen_index = -1;
         unsigned nparticles = (unsigned)particles.size();
         double u = rng.uniform();
@@ -432,7 +429,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         
         for(unsigned j = 0; j < nparticles; j++) {
             if (cum_probs[j]<0.0){
-                cum_prob += exp(particles[j].getLogWeight());
+                cum_prob += exp(particles[j]->getLogWeight());
                 cum_probs[j] = cum_prob;
             }
             else
@@ -447,7 +444,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         return chosen_index;
     }
 
-    inline void Proj::resampleParticles(vector<Particle> & from_particles, vector<Particle> & to_particles) {
+    inline void Proj::resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles) {
         unsigned nparticles = (unsigned)from_particles.size();
         vector<double> cum_probs(nparticles, -1.0);
         
@@ -466,16 +463,19 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         unsigned m = 0;
         for (unsigned i = 0; i < nparticles; i++) {
             for (unsigned k = 0; k < darts[i]; k++) {
-                to_particles[m++]=from_particles[i];
+                Particle::SharedPtr p0 = from_particles[i];
+                // dereference p0, create a new particle, create new shared pointer to that particle
+//                Particle::SharedPtr p = Particle::SharedPtr(new Particle(*p0));
+                to_particles[m++]=Particle::SharedPtr(new Particle(*p0));
             }
         }
         assert(nparticles == to_particles.size());
     }
 
-    inline void Proj::resetWeights(vector<Particle> & particles) {
+    inline void Proj::resetWeights(vector<Particle::SharedPtr> & particles) {
         double logw = -log(particles.size());
         for (auto & p : particles) {
-            p.setLogWeight(logw);
+            p->setLogWeight(logw);
         }
     }
     
@@ -498,14 +498,14 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
     }
     
-    inline void Proj::showFinal(vector<Particle> my_vec) {
+    inline void Proj::showFinal(vector<Particle::SharedPtr> my_vec) {
         for (auto &p:my_vec){
-            p.showParticle();
+            p->showParticle();
         }
         
         double sum_h = 0.0;
         for (auto & p:my_vec) {
-            double h = p.calcHeight();
+            double h = p->calcHeight();
             sum_h += h;
         }
         sum_h/=my_vec.size();
@@ -517,11 +517,11 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 //        saveAllForests(my_vec);
     }
 
-    inline void Proj::proposeParticles(vector<Particle> &particles) {
+    inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles) {
         assert(_nthreads > 0);
         if (_nthreads == 1) {
           for (auto & p : particles) {
-            p.proposal();
+              p->proposal();
           }
         }
         else {
@@ -554,34 +554,34 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
     }
 
-    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles) {
+    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles) {
         for (unsigned i=first; i<last; i++){
-            particles[i].proposal();
+            particles[i]->proposal();
         }
     }
 
-    inline void Proj::showParticlesByWeight(vector<Particle> my_vec) {
+    inline void Proj::showParticlesByWeight(vector<Particle::SharedPtr> my_vec) {
         vector <double> weights;
         
         //create weight vector
         for (auto & p:my_vec) {
-            weights.push_back(p.getLogWeight());
+            weights.push_back(p->getLogWeight());
         }
         
         //sort particles by weight
-        sort(my_vec.begin(), my_vec.end(), greater<Particle>());
+        sort(my_vec.begin(), my_vec.end(), greater<Particle::SharedPtr>());
         
         //print first particle
         cout << "\n" << "Heaviest particle: ";
-        my_vec[0].showParticle();
+        my_vec[0]->showParticle();
     }
 
-    inline void Proj::debugSpeciesTree(vector<Particle> &particles) {
+    inline void Proj::debugSpeciesTree(vector<Particle::SharedPtr> &particles) {
         cout << "debugging species tree" << endl;
         for (auto &p:particles) {
-            p.showSpeciesJoined();
-            p.showSpeciesIncrement();
-            p.showSpeciesTree();
+            p->showSpeciesJoined();
+            p->showSpeciesIncrement();
+            p->showSpeciesTree();
             cout << " _______ " << endl;
         }
     }
@@ -663,14 +663,19 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 }
             // loop for number of samples (either theta or speciation rate)
                 for (_sample=0; _sample<_nsamples; _sample++) {
-                    vector<Particle> my_vec_1(nparticles);
-                    vector<Particle> my_vec_2(nparticles);
-                    vector<Particle> &my_vec = my_vec_1;
+                    vector<Particle::SharedPtr> my_vec_1(nparticles);
+                    vector<Particle::SharedPtr> my_vec_2(nparticles);
+                    vector<Particle::SharedPtr> &my_vec = my_vec_1;
+                    
+                    for (unsigned i=0; i<nparticles; i++) {
+                        my_vec_1[i] = Particle::SharedPtr(new Particle);
+                        my_vec_2[i] = Particle::SharedPtr(new Particle);
+                    }
 
                     bool use_first = true;
                     for (auto & p:my_vec ) {
-                        p.setData(_data, _taxon_map);
-                        p.mapSpecies(_taxon_map, _species_names);
+                        p->setData(_data, _taxon_map);
+                        p->mapSpecies(_taxon_map, _species_names);
                     }
                     
                     _prev_log_marginal_likelihood = _log_marginal_likelihood;
@@ -681,18 +686,34 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     
                     for (unsigned g=0; g<nspecies; g++){
                         //taxon joining and reweighting step
+                        // save pointers to current particles ("parents" of particles about to be created)
+//                        vector<Particle*> parent_particles;
+//                        for (auto &p:my_vec) {
+//                            parent_particles.push_back(&p);
+//                        }
                         proposeParticles(my_vec);
                         
                         double ess_inverse = 0.0;
                         normalizeWeights(my_vec);
                         
                         for (auto & p:my_vec) {
-                            ess_inverse += exp(2.0*p.getLogWeight());
+                            ess_inverse += exp(2.0*p->getLogWeight());
                         }
                         
                         double ess = 1.0/ess_inverse;
                         
                         if (ess < 100) {
+                            // save particle weights
+//                            vector<double> particle_weights;
+//                            for (auto &p:my_vec) {
+//                                particle_weights.push_back(p.getLogWeight());
+//                            }
+                            
+                            // save random seeds
+//                            vector<map<int, vector<double>>> random_seeds;
+//                            for (auto &p:my_vec) {
+//                                random_seeds.push_back(p.getRandomSeeds());
+//                            }
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                             //if use_first is true, my_vec = my_vec_2
                             //if use_first is false, my_vec = my_vec_1
@@ -705,9 +726,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         resetWeights(my_vec);
                         _accepted_particle_vec = my_vec;
                         
-                        if (g == nspecies-1) {
-                            my_vec[0].showParticle();
-                        }
+//                        if (g == nspecies-1) {
+//                            my_vec[0].showParticle();
+//                        }
                     } // g loop
                     Forest f;
                     cout << sizeof(f) << endl;

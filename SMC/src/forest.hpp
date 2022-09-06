@@ -126,6 +126,7 @@ class Forest {
         tuple<Node*, Node*, Node*>  _hybrid_species_joined;
         double                      _generationf = 0;
         string                      _last_direction;
+        vector<double>              _rand_numbers;
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
         double                      calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
@@ -166,6 +167,7 @@ class Forest {
         _nstates = 4;
         _last_edge_length = 0.0;
         _lineages.reserve(_nodes.size());
+        _rand_numbers.clear();
 
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -443,6 +445,7 @@ class Forest {
     }
 
     inline pair<unsigned, unsigned> Forest::chooseTaxaToJoin(double s){
+        // save random numbers
         assert (s>1);
         double nsubtrees = s;
         unsigned t1=0;
@@ -453,10 +456,13 @@ class Forest {
         if (nsubtrees > 2) {
             t1 = ::rng.randint(0, nsubtrees-1);
             t2 = ::rng.randint(0, nsubtrees-1);
+            _rand_numbers.push_back(t1);
+            _rand_numbers.push_back(t2);
 
             //keep calling t2 until it doesn't equal t1
             while (t2 == t1) {
                 t2 = ::rng.randint(0, nsubtrees-1);
+                _rand_numbers.push_back(t2);
             }
         }
         mtx.unlock();
@@ -471,20 +477,23 @@ class Forest {
         //don't use this when there's only one choice (2 subtrees)
         // thread safe random number generator with mutex
         mtx.lock();
-//        if (nsubtrees > 3) {
-            t1 = ::rng.randint(0, nsubtrees-1);
-            t2 = ::rng.randint(0, nsubtrees-1);
-            t3 = ::rng.randint(0, nsubtrees-1);
+        t1 = ::rng.randint(0, nsubtrees-1);
+        t2 = ::rng.randint(0, nsubtrees-1);
+        t3 = ::rng.randint(0, nsubtrees-1);
+        _rand_numbers.push_back(t1);
+        _rand_numbers.push_back(t2);
+        _rand_numbers.push_back(t3);
 
-            //keep calling t2 until it doesn't equal t1 or t3
-            while (t2 == t1 || t2 == t3) {
-                t2 = ::rng.randint(0, nsubtrees-1);
-            }
-            // keep calling t3 until it doesn't equal t1 or t2
-            while (t3 == t1 || t3 == t2) {
-                t3 = ::rng.randint(0, nsubtrees-1);
-            }
-//        }
+        //keep calling t2 until it doesn't equal t1 or t3
+        while (t2 == t1 || t2 == t3) {
+            t2 = ::rng.randint(0, nsubtrees-1);
+            _rand_numbers.push_back(t2);
+        }
+        // keep calling t3 until it doesn't equal t1 or t2
+        while (t3 == t1 || t3 == t2) {
+            t3 = ::rng.randint(0, nsubtrees-1);
+            _rand_numbers.push_back(t3);
+        }
         mtx.unlock();
         return make_tuple(t1, t2, t3);
     }
@@ -671,6 +680,7 @@ class Forest {
     inline int Forest::selectPair(vector<double> weight_vec) {
         // choose a random number [0,1]
         double u = rng.uniform();
+        _rand_numbers.push_back(u);
         double cum_prob = 0.0;
         int index = 0.0;
         for (int i=0; i < (int) weight_vec.size(); i++) {
@@ -804,6 +814,7 @@ class Forest {
         clear();
         //create taxa
         double edge_length = rng.gamma(1.0, 1.0/_ntaxa);
+        _rand_numbers.push_back(edge_length);
         _lineages.reserve(_nodes.size());
         
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -849,6 +860,7 @@ class Forest {
         _last_direction = other._last_direction;
         _generationf = other._generationf;
         _gamma = other._gamma;
+        _rand_numbers = other._rand_numbers;
 
         // copy tree itself
 
@@ -965,6 +977,7 @@ inline string Forest::chooseEvent() {
     double hybridization_prob = _hybridization_rate/(_hybridization_rate+_speciation_rate);
     
     double u = rng.uniform();
+    _rand_numbers.push_back(u);
     if (u<hybridization_prob && _lineages.size()>2) {
         event = "hybridization";
     }
@@ -976,6 +989,7 @@ inline string Forest::chooseEvent() {
     }
     // choose edge length but don't add it yet
     _last_edge_length = rng.gamma(1.0, 1.0/rate);
+    _rand_numbers.push_back(_last_edge_length);
     
     return event;
 }
@@ -985,6 +999,7 @@ inline string Forest::chooseEvent() {
         double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
         
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
+        _rand_numbers.push_back(_last_edge_length);
 
         for (auto nd:_lineages) {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
@@ -1066,9 +1081,11 @@ inline string Forest::chooseEvent() {
             double s = nodes.size();
             double coalescence_rate = s*(s-1)/_theta;
             increment = rng.gamma(1.0, 1.0/(coalescence_rate));
+            _rand_numbers.push_back(increment);
 
 # if migration
             increment = rng.gamma(1.0, 1.0/(coalescence_rate+_migration_rate));
+            _rand_numbers.push_back(increment);
             double migration_prob = _migration_rate/(_migration_rate+coalescence_rate);
             double coalescence_prob = coalescence_rate/(_migration_rate+coalescence_rate);
 
@@ -1078,6 +1095,7 @@ inline string Forest::chooseEvent() {
             prob_vec.push_back(migration_prob);
 
             double u = rng.uniform();
+            _rand_numbers.push_back(u);
 
             double cum_prob = 0.0;
             for (int i = 0; i<2; i++) {
@@ -1192,6 +1210,7 @@ inline string Forest::chooseEvent() {
             double s = nodes.size();
             double coalescence_rate = s*(s-1)/_theta;
             double increment = rng.gamma(1.0, 1.0/coalescence_rate);
+            _rand_numbers.push_back(increment);
 
             bool lineages_left_to_join = s > 1;
             if (!lineages_left_to_join)  {
@@ -1434,6 +1453,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
     inline double Forest::chooseTaxonToMigrate(double s) {
         mtx.lock();
         unsigned taxon_choice = ::rng.randint(0, s-1);
+        _rand_numbers.push_back(taxon_choice);
         mtx.unlock();
         return taxon_choice;
     }
@@ -1487,6 +1507,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
         string key_to_add;
         mtx.lock();
         unsigned lineage_choice = ::rng.randint(0, (unsigned) _species_partition.size()-1);
+        _rand_numbers.push_back(lineage_choice);
         mtx.unlock();
 
         // find lineage to migrate to in species partition
@@ -1590,6 +1611,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
         if (u < gamma) {
             double gamma = 0.85;
             double u = rng.uniform();
+            _rand_numbers.push_back(u);
             // move gene in direction of major parent
             _last_direction = "major";
             moveGene(new_nd, parent, hybrid);

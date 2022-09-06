@@ -17,6 +17,9 @@ class Particle {
 
         Particle();
         Particle(const Particle & other);
+        ~Particle();
+        typedef std::shared_ptr<Particle>               SharedPtr;
+
 
         void                                    debugParticle(std::string name);
         void                                    showParticle();
@@ -37,18 +40,19 @@ class Particle {
         double                                  calcLogLikelihood();
         double                                  calcHeight();
         double                                  getLogWeight() const {return _log_weight;}
+        map<int, vector<double>>                     getRandomSeeds() {return _random_seeds;}
         void                                    setLogWeight(double w){_log_weight = w;}
         void                                    operator=(const Particle & other);
         const vector<Forest> &                  getForest() const {return _forests;}
         std::string                             saveForestNewick() {
             return _forests[0].makeNewick(8, true);
         }
-        bool operator<(const Particle & other) const {
-            return _log_weight<other._log_weight;
+        bool operator<(const Particle::SharedPtr & other) const {
+            return _log_weight<other->_log_weight;
         }
 
-        bool operator>(const Particle & other) const {
-            return _log_weight>other._log_weight;
+        bool operator>(const Particle::SharedPtr & other) const {
+            return _log_weight>other->_log_weight;
         }
 
         static void                                     setNumSubsets(unsigned n);
@@ -70,7 +74,8 @@ class Particle {
         Data::SharedPtr                         _data;
         double                                  _log_likelihood;
         int                                     _generation = 0;
-    vector<tuple<string, string, string>> _triple;
+        map<int, vector<double>>                     _random_seeds;
+        vector<tuple<string, string, string>> _triple;
 };
 
     inline Particle::Particle() {
@@ -79,6 +84,9 @@ class Particle {
         _log_likelihood = 0.0;
     };
 
+    inline Particle::~Particle() {
+//        cout << "destroying a particle" << endl;
+    }
     inline void Particle::showParticle() {
         //print out weight of each particle
         cout << "\nParticle:\n";
@@ -171,6 +179,12 @@ class Particle {
                     _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
                 }
             }
+        }
+        
+        // save random seeds
+        // key is forest number, values are random seeds
+        for (int i=0; i<_forests.size(); i++) {
+            _random_seeds[i] = _forests[i]._rand_numbers;
         }
         double prev_log_likelihood = _log_likelihood;
         _log_likelihood = calcLogLikelihood();
