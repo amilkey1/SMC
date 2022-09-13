@@ -99,8 +99,6 @@ class Forest {
         void                        hybridGeneTreeProposal(double species_tree_increment);
 
         std::vector<Node *>         _lineages;
-    
-//        std::vector<Node>           _nodes;
         std::list<Node>             _nodes;
         std::vector<Node*>          _new_nodes;
 
@@ -162,7 +160,6 @@ class Forest {
         _nodes.clear();
         _lineages.clear();
         _nodes.resize(_ntaxa);
-//        _nodes.resize(3*_ntaxa);
         _npatterns = 0;
         _nstates = 4;
         _last_edge_length = 0.0;
@@ -171,11 +168,7 @@ class Forest {
 
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
-//            auto it = _nodes.begin();
             Node* nd = &*next(_nodes.begin(), i);
-//            auto nd = *advance(it, i);
-//            auto it = find(_nodes.begin(), _nodes.end(), i);
-//            Node* nd = &*it;
             nd->_right_sib=0;
             nd->_name=" ";
             nd->_left_child=0;
@@ -188,13 +181,6 @@ class Forest {
             }
         _nleaves=_ntaxa;
         _ninternals=0;
-
-
-//        _lineages.reserve(_nodes.size()); //no root or subroot anymore
-//
-//        for (int i=0; i < (int) _ntaxa; i++) {
-//            _lineages.push_back(&_nodes[i]);
-//        }
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -762,7 +748,6 @@ class Forest {
         Node* subtree2 = p.second;
 
 //        new node is always needed
-//        Node* new_nd=&_nodes[_nleaves+_ninternals];
         Node nd;
         _nodes.push_back(nd);
         Node* new_nd = &_nodes.back();
@@ -965,34 +950,33 @@ class Forest {
         _nleaves=_nspecies;
         _ninternals=0;
         _nodes.resize(_nspecies);
-//        _nodes.resize(_nspecies*3);
         _lineages.resize(_nspecies);
     }
 
-inline string Forest::chooseEvent() {
-    string event;
-    // hybridization prior
-    double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
-    
-    double hybridization_prob = _hybridization_rate/(_hybridization_rate+_speciation_rate);
-    
-    double u = rng.uniform();
-    _rand_numbers.push_back(u);
-    if (u<hybridization_prob && _lineages.size()>2) {
-        event = "hybridization";
+    inline string Forest::chooseEvent() {
+        string event;
+        // hybridization prior
+        double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
+        
+        double hybridization_prob = _hybridization_rate/(_hybridization_rate+_speciation_rate);
+        
+        double u = rng.uniform();
+        _rand_numbers.push_back(u);
+        if (u<hybridization_prob && _lineages.size()>2) {
+            event = "hybridization";
+        }
+        else if (_lineages.size() == 1) {
+            event = "null";
+        }
+        else {
+            event = "speciation";
+        }
+        // choose edge length but don't add it yet
+        _last_edge_length = rng.gamma(1.0, 1.0/rate);
+        _rand_numbers.push_back(_last_edge_length);
+        
+        return event;
     }
-    else if (_lineages.size() == 1) {
-        event = "null";
-    }
-    else {
-        event = "speciation";
-    }
-    // choose edge length but don't add it yet
-    _last_edge_length = rng.gamma(1.0, 1.0/rate);
-    _rand_numbers.push_back(_last_edge_length);
-    
-    return event;
-}
 
     inline void Forest::chooseSpeciesIncrement() {
         // hybridization prior
@@ -1017,7 +1001,6 @@ inline string Forest::chooseEvent() {
         Node nd;
         _nodes.push_back(nd);
         Node* new_nd = &_nodes.back();
-//        Node* new_nd = &_nodes[_nleaves+_ninternals];
         new_nd->_parent=0;
         new_nd->_number=_nleaves+_ninternals;
         new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
@@ -1193,7 +1176,6 @@ inline string Forest::chooseEvent() {
         assert(new_nd->_left_child->_right_sib);
         
         _new_nodes.push_back(new_nd);
-        
         calcPartialArray(new_nd);
 
         //update species list
@@ -1755,6 +1737,10 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
             n++;
         }
         assert(_nodes.size() > 0);
+        for (auto &l:_lineages) {
+            assert (!l->_parent);
+            assert(!l->_right_sib);
+        }
         }
 
     inline void Forest::hybridGeneTreeProposal(double species_tree_increment) {
