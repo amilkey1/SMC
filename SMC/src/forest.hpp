@@ -702,14 +702,14 @@ class Forest {
     inline double Forest::getRunningSumHybridChoices(vector<double> &log_weight_choices) {
         double running_sum = 0.0;
         double log_weight_choices_sum = 0.0;
-        vector<double> adjustedLogLikelihood;
+//        vector<double> adjustedLogLikelihood;
         
-        // multiply major likelihood * gamma, multiply minor likelihood * (1 - gamma)
-        adjustedLogLikelihood.push_back(log_weight_choices[0]+0.15);
-        adjustedLogLikelihood.push_back(log_weight_choices[1]+0.85);
+//        // multiply major likelihood * gamma, multiply minor likelihood * (1 - gamma)
+//        adjustedLogLikelihood.push_back(log_weight_choices[0]+0.15);
+//        adjustedLogLikelihood.push_back(log_weight_choices[1]+0.85);
         
-        double log_max_weight = *max_element(adjustedLogLikelihood.begin(), adjustedLogLikelihood.end());
-        for (auto & i:adjustedLogLikelihood) {
+        double log_max_weight = *max_element(log_weight_choices.begin(), log_weight_choices.end());
+        for (auto & i:log_weight_choices) {
             running_sum += exp(i - log_max_weight);
         }
         
