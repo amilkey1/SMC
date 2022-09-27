@@ -36,6 +36,7 @@ class Particle {
                                                 }
         void                                    mapSpecies(map<string, string> &taxon_map, vector<string> &species_names);
         void                                    saveForest(std::string treefilename);
+        void                                    saveMSCTrees(string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
         double                                  calcHeight();
@@ -210,14 +211,24 @@ class Particle {
     }
 
     inline void Particle::saveForest(std::string treefilename)  {
-        for (auto &_forest:_forests) {
+//        for (auto &_forest:_forests) {
             ofstream treef(treefilename);
             treef << "#nexus\n\n";
             treef << "begin trees;\n";
-            treef << "  tree test = [&R] " << _forest.makeNewick(8, true)  << ";\n";
+            treef << "  tree test = [&R] " << _forests[0].makeNewick(8, true)  << ";\n";
             treef << "end;\n";
             treef.close();
-        }
+//        }
+    }
+
+    inline void Particle::saveMSCTrees(string treefilename) {
+        // this function writes the species tree all particles to the same file
+        ofstream treef(treefilename);
+        treef << "#nexus\n\n";
+        treef << "begin trees;\n";
+        treef << "  tree test = [&R] " << _forests[0].makeNewick(8, true)  << ";\n";
+        treef << "end;\n";
+        treef.close();
     }
 
     inline void Particle::savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const {
