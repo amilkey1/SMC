@@ -407,7 +407,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         double proposed_theta = _theta_lambda*u+(Forest::_theta-_theta_lambda/2.0);
 
         // make sure proposed theta is positive
-        if (proposed_theta < 0.0) {
+        if (proposed_theta < 0.0 ) {
             proposed_theta*=-1;
         }
         
@@ -515,22 +515,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         double u = rng.uniform();
         // TODO: check this is working when params not updated
         double log_acceptance_ratio = (_log_marginal_likelihood+logHybridizationRatePrior(Forest::_hybridization_rate)+logSpeciationRatePrior(Forest::_speciation_rate)+logThetaPrior(Forest::_theta))-(_prev_log_marginal_likelihood+logHybridizationRatePrior(_prev_hybridization_rate)+logThetaPrior(_prev_theta)+logSpeciationRatePrior(_prev_speciation_rate));
-        
-//        double first_term = _log_marginal_likelihood;
-//        double second_term = _prev_log_marginal_likelihood;
-//        if (_estimate_theta) {
-//            first_term += logThetaPrior(Forest::_theta);
-//            second_term += logThetaPrior(_prev_hybridization_rate);
-//        }
-//        if (_estimate_speciation_rate) {
-//            first_term += logSpeciationRatePrior(Forest::_speciation_rate);
-//            second_term += logSpeciationRatePrior(_prev_speciation_rate);
-//        }
-//        if (_estimate_hybridization_rate) {
-//            first_term += logHybridizationRatePrior(Forest::_hybridization_rate);
-//            second_term += logSpeciationRatePrior(_prev_speciation_rate);
-//        }
-//        double log_acceptance_ratio = first_term - second_term;
         if (log(u) > log_acceptance_ratio){
             // reject proposed theta
             bool accepted = false;
@@ -708,6 +692,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
         cout << "theta = " << Forest::_theta << endl;
         cout << "speciation rate = " << Forest::_speciation_rate << endl;
+        cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
 
 //        saveAllForests(my_vec);
     }
@@ -828,8 +813,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 
             // sampling both theta and speciation rate
             // set starting window size
-            if (_estimate_theta) {_theta_lambda = 0.001;}
-            if (_estimate_speciation_rate) {_speciation_rate_lambda = 25.0;}
+            _prev_theta = Forest::_theta;
+            _prev_speciation_rate = Forest::_speciation_rate;
+            _prev_hybridization_rate = Forest::_hybridization_rate;
+            if (_estimate_theta) {_theta_lambda = 0.1;}
+            if (_estimate_speciation_rate) {_speciation_rate_lambda = 5.0;}
             if (_estimate_hybridization_rate) {_hybrid_rate_lambda = 0.003;}
         // loop for number of samples (either theta or speciation rate)
             for (_sample=0; _sample<_nsamples; _sample++) {
@@ -898,6 +886,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 printSpeciationRates();
                 cout << "\n" << "Speciation rate: " << _speciation_rate_vector[_nsamples-1].first << endl;
             }
+            saveAllHybridNodes(_accepted_particle_vec);
             showFinal(_accepted_particle_vec);
         }
 
