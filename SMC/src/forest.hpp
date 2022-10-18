@@ -1054,19 +1054,20 @@ class Forest {
         _prev_log_likelihood = 0.0;
         bool done = false;
         double cum_time = 0.0;
-        bool migration = false;
-        if (_migration_rate > 0) {migration = true;}
+//        bool migration = false;
+//if (_migration_rate > 0) {migration = true;}
 
-        while (!done) {
-            string event;
-            double increment;
+    while (!done) {
+        string event = "coalescence";
+        double increment;
 
-            double s = nodes.size();
-            double coalescence_rate = s*(s-1)/_theta;
-            increment = rng.gamma(1.0, 1.0/(coalescence_rate));
-            _rand_numbers.push_back(increment);
+        double s = nodes.size();
+        double coalescence_rate = s*(s-1)/_theta;
+        increment = rng.gamma(1.0, 1.0/(coalescence_rate));
+        _rand_numbers.push_back(increment);
 
-# if migration
+//# if migration
+        if (_migration_rate > 0.0) {
             increment = rng.gamma(1.0, 1.0/(coalescence_rate+_migration_rate));
             _rand_numbers.push_back(increment);
             double migration_prob = _migration_rate/(_migration_rate+coalescence_rate);
@@ -1089,32 +1090,35 @@ class Forest {
                     break;
                 }
             }
-# endif
-                bool time_limited = species_tree_increment > 0.0;
-                bool lineages_left_to_join = s > 1;
-                bool time_limit_reached = cum_time+increment > species_tree_increment;
-                if ((time_limited && time_limit_reached) || !lineages_left_to_join)  {
-                    done = true;
-                    increment = species_tree_increment - cum_time;
-                }
+        }
+//# endif
+//        if (_migration_rate == 0.0 || event == "coalescence") {
+            bool time_limited = species_tree_increment > 0.0;
+            bool lineages_left_to_join = s > 1;
+            bool time_limit_reached = cum_time+increment > species_tree_increment;
+            if ((time_limited && time_limit_reached) || !lineages_left_to_join)  {
+                done = true;
+                increment = species_tree_increment - cum_time;
+            }
 
-                //add increment to each lineage
-                for (auto nd:nodes) {
-                    nd->_edge_length += increment; //add most recently chosen branch length to each node in lineage
-                }
-
-                if (!done) {
-                    allowCoalescence(nodes, increment);
-                }
-                cum_time += increment;
-# if migration
-            else if (event == "migration" && nodes.size()>1) {
-                // TODO: can this happen with only one individual in a lineage?
-                // if there's only one individual in a lineage, don't allow migration b/c then there will be no individuals in the lineage, which we know is not true
-                assert(nodes.size()>1);
+            //add increment to each lineage
+            for (auto nd:nodes) {
+                nd->_edge_length += increment; //add most recently chosen branch length to each node in lineage
+            }
+        if (_migration_rate == 0.0 || event == "coalescence") {
+            if (!done) {
+                allowCoalescence(nodes, increment);
+            }
+            cum_time += increment;
+        }
+        else if (event == "migration" && nodes.size() > 1) {
+            // TODO: can this happen with only one individual in a lineage?
+            // if there's only one individual in a lineage, don't allow migration b/c then there will be no individuals in the lineage, which we know is not true
+            assert(nodes.size()>1);
+            if (!done) {
                 allowMigration(nodes);
             }
-# endif
+        }
         }
     }
 
