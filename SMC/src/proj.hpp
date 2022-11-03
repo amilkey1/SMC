@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <fstream>
 #include "data.hpp"
 #include "partition.hpp"
 #include <boost/program_options.hpp>
@@ -31,8 +32,10 @@ namespace proj {
             void                run();
 //            void                saveAllForests(const vector<Particle> &v) const ;
             void                saveAllForests(vector<Particle::SharedPtr> &v) const ;
+            void                saveParticleWeights(vector<Particle::SharedPtr> &v) const;
+            void                saveParticleLikelihoods(vector<Particle::SharedPtr> &v) const;
 
-            void                normalizeWeights(vector<Particle::SharedPtr> & particles);
+            void                normalizeWeights(vector<Particle::SharedPtr> & particles, int g);
             unsigned            chooseRandomParticle(vector<Particle::SharedPtr> & particles, vector<double> & cum_prob);
             void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                resetWeights(vector<Particle::SharedPtr> & particles);
@@ -69,6 +72,7 @@ namespace proj {
             bool                        _ambig_missing;
             unsigned                    _nparticles;
             unsigned                    _random_seed;
+            double                      _avg_marg_like;
 
 
             static std::string          _program_name;
@@ -148,6 +152,24 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             nodef << p->saveHybridNodes()  << "\n";
         }
         nodef.close();
+    }
+
+    inline void Proj::saveParticleWeights(vector<Particle::SharedPtr> &v) const {
+        ofstream weightf("weights.txt");
+        for (auto &p:v) {
+            weightf << "particle\n";
+            weightf << p->saveParticleWeights() << "\n";
+        }
+        weightf.close();
+    }
+
+    inline void Proj::saveParticleLikelihoods(vector<Particle::SharedPtr> &v) const {
+        ofstream likelihoodf("likelihoods.txt");
+        for (auto &p:v) {
+            likelihoodf << "particle\n";
+            likelihoodf << p->saveParticleLikelihoods() << "\n";
+        }
+        likelihoodf.close();
     }
 
     inline void Proj::processCommandLineOptions(int argc, const char * argv[]) {
@@ -261,6 +283,13 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         double log_particle_sum = 0.0;
 
         double log_max_weight = *max_element(log_weight_vec.begin(), log_weight_vec.end());
+        
+        ofstream testf("test.txt");
+        for (auto &l:log_weight_vec) {
+            testf << l << "\n";
+        }
+        testf.close();
+        
         for (auto & i:log_weight_vec) {
             running_sum += exp(i - log_max_weight);
         }
@@ -269,17 +298,25 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         return log_particle_sum;
     }
 
-    inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles) {
+    inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles, int g) {
+        ofstream tempf(str(format("unnormalized_weights-%d.txt")%(g+1)), ios::out);
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
         for (auto & p : particles) {
-            log_weight_vec[i++] = p->getLogWeight();
+//            log_weight_vec[i++] = p->getLogWeight();
+            log_weight_vec[i++] = p->getGeneTreeMargLike();
+//            tempf << p->getLogWeight() << "\n";
+            tempf << p->getGeneTreeMargLike() << "\n";
         }
+        tempf.close();
+        
 
         double log_particle_sum = getRunningSum(log_weight_vec);
 
+        // TODO: not sure about this
         for (auto & p : particles) {
-            p->setLogWeight(p->getLogWeight() - log_particle_sum);
+//            p->setLogWeight(p->getLogWeight() - log_particle_sum);
+            p->setLogWeight(p->getGeneTreeMargLike() - log_particle_sum);
         }
         
         _log_marginal_likelihood += log_particle_sum - log(_nparticles);
@@ -819,12 +856,17 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             if (_estimate_theta) {_theta_lambda = 0.1;}
             if (_estimate_speciation_rate) {_speciation_rate_lambda = 5.0;}
             if (_estimate_hybridization_rate) {_hybrid_rate_lambda = 0.003;}
+            
         // loop for number of samples (either theta or speciation rate)
             for (_sample=0; _sample<_nsamples; _sample++) {
                 cout << "sample: " << _sample << endl;
                 vector<Particle::SharedPtr> my_vec_1(nparticles);
                 vector<Particle::SharedPtr> my_vec_2(nparticles);
                 vector<Particle::SharedPtr> &my_vec = my_vec_1;
+                
+                // reset marginal likelihood
+                _prev_log_marginal_likelihood = _log_marginal_likelihood;
+                _log_marginal_likelihood = 0.0;
                 
                 for (unsigned i=0; i<nparticles; i++) {
                     my_vec_1[i] = Particle::SharedPtr(new Particle);
@@ -835,19 +877,37 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 for (auto & p:my_vec ) {
                     p->setData(_data, _taxon_map);
                     p->mapSpecies(_taxon_map, _species_names);
+                    p->setParticleGeneration(-1);
+                    double logLikelihood = p->calcLogLikelihood();
+                    p->setLogLikelihood(logLikelihood);
+                    p->setLogWeight(logLikelihood); // at this stage, log weight = log likelihood
+                    p->setMarginalLikelihood(logLikelihood);
                 }
                 
-                _prev_log_marginal_likelihood = _log_marginal_likelihood;
+                normalizeWeights(my_vec, -1);
                 
-                // reset marginal likelihood
-                _log_marginal_likelihood = 0.0;
+                _avg_marg_like = 0.0;
+        
                 //run through each generation of particles
                 for (unsigned g=0; g<nspecies; g++){
+                    cout << "gen " << g << endl;
                     //taxon joining and reweighting step
                     proposeParticles(my_vec);
                     
+                    vector<double> total_marg_like;
+                    for (auto & p:my_vec) {
+                        total_marg_like.push_back(p->calcGeneTreeMarginalLikelihood());
+                    }
+                    
+                    _avg_marg_like = getRunningSum(total_marg_like) - log(_nparticles);
+                    
+//                    _avg_marg_like = total_marg_like;
+//                    _avg_marg_like = (total_marg_like)-log(my_vec.size());
+                    
+//                    _avg_marg_like = total_marg_like / log(my_vec.size()); // take average of gene tree marg likes
+                    
                     double ess_inverse = 0.0;
-                    normalizeWeights(my_vec);
+                    normalizeWeights(my_vec, g);
                     
                     for (auto & p:my_vec) {
                         ess_inverse += exp(2.0*p->getLogWeight());
@@ -856,6 +916,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     double ess = 1.0/ess_inverse;
                     
                     if (ess < 100) {
+                        // save particle random seeds
+                        
                         resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                         //if use_first is true, my_vec = my_vec_2
                         //if use_first is false, my_vec = my_vec_1
@@ -867,13 +929,16 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     }
                     resetWeights(my_vec);
                     _accepted_particle_vec = my_vec;
+                    cout << "standard marginal likelihood after gen: " << g << " is " << _log_marginal_likelihood << endl;
+                    cout << "gene tree marginal likelihood after gen: " << g << " is " << _avg_marg_like << endl;
                 } // g loop
                     cout << "\t" << "proposed marg like: " << _log_marginal_likelihood;
                     cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood << endl;
                 
                 estimateParameters(my_vec);
                 } // _nsamples loop - number of samples
-            cout << "marginal likelihood: " << _log_marginal_likelihood << endl;
+//            saveParticleWeights(_accepted_particle_vec);
+//            saveParticleLikelihoods(_accepted_particle_vec);
             
             if (_estimate_theta) {
                 cout << "number of accepted theta proposals: " << _theta_accepted_number << endl;
@@ -888,6 +953,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
             saveAllHybridNodes(_accepted_particle_vec);
             showFinal(_accepted_particle_vec);
+            
+            cout << "standard marginal likelihood: " << _log_marginal_likelihood << endl;
+            cout << "gene tree marginal likelihood: " << _avg_marg_like << endl;
         }
 
         catch (XProj & x) {

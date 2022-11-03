@@ -39,6 +39,8 @@ class Particle {
         void                                    saveMSCTrees(string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
+        void                                    setLogLikelihood(double log_likelihood);
+        void                                    setParticleGeneration(int n);
         double                                  calcHeight();
         double                                  getLogWeight() const {return _log_weight;}
         map<int, vector<double>>                     getRandomSeeds() {return _random_seeds;}
@@ -63,9 +65,14 @@ class Particle {
         void                                            showSpeciesTree();
         void                                            showHybridNodes();
         string                                          saveHybridNodes();
+        double                                          saveParticleWeights();
+        double                                          saveParticleLikelihoods();
         void                                            showGamma();
         string                                          saveGamma();
         void                                            calculateGamma();
+        double                                          calcGeneTreeMarginalLikelihood();
+        double                                          getGeneTreeMargLike() {return _gene_tree_marg_like;}
+        void                                            setMarginalLikelihood(double ml) {_gene_tree_marg_like = ml;}
 
     private:
 
@@ -75,6 +82,8 @@ class Particle {
         Data::SharedPtr                         _data;
         double                                  _log_likelihood;
         int                                     _generation = 0;
+        double                                  _gene_tree_marg_like;
+        double                                  _prev_gene_tree_marg_like;
         map<int, vector<double>>                     _random_seeds;
         vector<tuple<string, string, string>> _triple;
 };
@@ -133,6 +142,7 @@ class Particle {
         for (unsigned i=1; i<_forests.size(); i++) {
             double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
             assert(!isnan (log_likelihood));
+            assert(!isnan (gene_tree_log_likelihood));
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
         }
@@ -148,6 +158,9 @@ class Particle {
     inline double Particle::proposal() {
         string event;
         if (_generation == 0) {
+            for (unsigned i=1; i<_forests.size(); i++) {
+                _forests[i]._gene_tree_marginal_likelihood = _forests[i]._gene_tree_log_likelihood;
+            }
             _forests[0].chooseSpeciesIncrement();
             for (unsigned i=1; i<_forests.size(); i++){
                 _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
@@ -184,14 +197,46 @@ class Particle {
         
         // save random seeds
         // key is forest number, values are random seeds
-        for (int i=0; i<_forests.size(); i++) {
-            _random_seeds[i] = _forests[i]._rand_numbers;
-        }
-        double prev_log_likelihood = _log_likelihood;
-        _log_likelihood = calcLogLikelihood();
-        _log_weight = _log_likelihood - prev_log_likelihood;
+//        for (int i=0; i<_forests.size(); i++) {
+//            _random_seeds[i] = _forests[i]._rand_numbers;
+//        }
+//        vector<double> mean_forest_weights;
+//
+//        for (int i=1; i<_forests.size(); i++) {
+//            double average_weight = 0.0;
+//            for (int a=0; a<_forests[i]._log_weight_vec.size(); a++) {
+//                average_weight += _forests[i]._log_weight_vec[a];
+//            }
+//            mean_forest_weights.push_back(average_weight);
+//        }
+        
+//        assert(mean_forest_weights.size() == _forests.size()-1);
+//        double prev_log_likelihood = _log_likelihood;
+//        _log_likelihood = calcLogLikelihood();
+//        _log_weight = _log_likelihood - prev_log_likelihood;
+        
+//        double gene_tree_marg_like = calcGeneTreeMarginalLikelihood();
+//        cout << "gene tree marginal likelihood: " << gene_tree_marg_like << endl;
+        
+        // reset gene tree marginal likelihoods
+//        for (int i=1; i<_forests.size(); i++) {
+//            _forests[i]._gene_tree_marginal_likelihood = 0.0;
+//        }
+        // TODO: trying this
+        calcGeneTreeMarginalLikelihood();
+        _log_weight = _gene_tree_marg_like - _prev_gene_tree_marg_like;
         
         return _log_weight;
+    }
+
+    inline double Particle::calcGeneTreeMarginalLikelihood() {
+        _prev_gene_tree_marg_like = _gene_tree_marg_like;
+        _gene_tree_marg_like = 0.0;
+        for (int i=1; i<_forests.size(); i++) {
+            _gene_tree_marg_like += _forests[i]._gene_tree_log_likelihood;
+        }
+        _generation++;
+        return _gene_tree_marg_like;
     }
 
     inline Particle::Particle(const Particle & other) {
@@ -305,6 +350,14 @@ class Particle {
         return nodes;
     }
 
+    inline double Particle::saveParticleWeights() {
+        return _log_weight;
+    }
+
+    inline double Particle::saveParticleLikelihoods() {
+        return _log_likelihood;
+    }
+
     inline void Particle::showGamma() {
         if (_forests[0]._gamma.size() > 0) {
             cout << "   " << "gamma is: " << endl;
@@ -315,10 +368,20 @@ class Particle {
         }
     }
 
+    inline void Particle::setLogLikelihood(double log_likelihood) {
+        _log_likelihood = log_likelihood;
+    }
+
+    inline void Particle::setParticleGeneration(int n) {
+        _generation = n;
+    }
+
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_likelihood = other._log_likelihood;
         _forests         = other._forests;
+        _gene_tree_marg_like = other._gene_tree_marg_like;
+        _prev_gene_tree_marg_like = other._prev_gene_tree_marg_like;
         _data           = other._data;
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;

@@ -116,6 +116,9 @@ class Forest {
         unsigned                    _index;
         map<string, list<Node*> > _species_partition;
         double                    _gene_tree_log_likelihood;
+        double                      _gene_tree_log_weight;
+        double                      _prev_gene_tree_log_likelihood;
+        vector<double>              _log_weight_vec;
         vector<pair<Node*, Node*>> _node_choices;
         vector<double>              _log_likelihood_choices;
         double                      _prev_log_likelihood;
@@ -125,6 +128,7 @@ class Forest {
         double                      _generationf = 0;
         string                      _last_direction;
         vector<double>              _rand_numbers;
+        double                      _gene_tree_marginal_likelihood;
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
         double                      calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
@@ -846,6 +850,10 @@ class Forest {
         _generationf = other._generationf;
         _gamma = other._gamma;
         _rand_numbers = other._rand_numbers;
+        _gene_tree_log_weight = other._gene_tree_log_weight;
+        _prev_gene_tree_log_likelihood = other._prev_gene_tree_log_likelihood;
+        _log_weight_vec = other._log_weight_vec;
+        _gene_tree_marginal_likelihood = other._gene_tree_marginal_likelihood;
 
         // copy tree itself
 
@@ -1054,8 +1062,6 @@ class Forest {
         _prev_log_likelihood = 0.0;
         bool done = false;
         double cum_time = 0.0;
-//        bool migration = false;
-//if (_migration_rate > 0) {migration = true;}
 
     while (!done) {
         string event = "coalescence";
@@ -1066,7 +1072,6 @@ class Forest {
         increment = rng.gamma(1.0, 1.0/(coalescence_rate));
         _rand_numbers.push_back(increment);
 
-//# if migration
         if (_migration_rate > 0.0) {
             increment = rng.gamma(1.0, 1.0/(coalescence_rate+_migration_rate));
             _rand_numbers.push_back(increment);
@@ -1091,20 +1096,19 @@ class Forest {
                 }
             }
         }
-//# endif
-//        if (_migration_rate == 0.0 || event == "coalescence") {
-            bool time_limited = species_tree_increment > 0.0;
-            bool lineages_left_to_join = s > 1;
-            bool time_limit_reached = cum_time+increment > species_tree_increment;
-            if ((time_limited && time_limit_reached) || !lineages_left_to_join)  {
-                done = true;
-                increment = species_tree_increment - cum_time;
-            }
 
-            //add increment to each lineage
-            for (auto nd:nodes) {
-                nd->_edge_length += increment; //add most recently chosen branch length to each node in lineage
-            }
+        bool time_limited = species_tree_increment > 0.0;
+        bool lineages_left_to_join = s > 1;
+        bool time_limit_reached = cum_time+increment > species_tree_increment;
+        if ((time_limited && time_limit_reached) || !lineages_left_to_join)  {
+            done = true;
+            increment = species_tree_increment - cum_time;
+        }
+
+        //add increment to each lineage
+        for (auto nd:nodes) {
+            nd->_edge_length += increment; //add most recently chosen branch length to each node in lineage
+        }
         if (_migration_rate == 0.0 || event == "coalescence") {
             if (!done) {
                 allowCoalescence(nodes, increment);
@@ -1185,6 +1189,13 @@ class Forest {
         //update species list
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+        
+        _gene_tree_log_likelihood = calcLogLikelihood();
+        _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
+        _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
+        _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
+        // marginal likelihood = normalized particle weights sum - ln(1)
+        // normalized particle sum for one particle is just log likelihood?
     }
 
     inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
@@ -1264,11 +1275,20 @@ class Forest {
                 //update species list
                 updateNodeList(nodes, subtree1, subtree2, new_nd);
                 updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+                
+                // TODO: not sure about this placement?
+                _gene_tree_log_likelihood = calcLogLikelihood();
+                _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
+                _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
+                _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
+                // marginal likelihood = particle weights sum - ln(1)
+                // normalized particle sum for one particle is just log likelihood?
             }
         }
     }
 
 inline void Forest::firstGeneTreeProposal(double time_increment) {
+    _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
     if (_species_partition.size() == 1) {
         fullyCoalesceGeneTree(_species_partition.begin()->second);
     }
@@ -1281,6 +1301,7 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
     }
 }
     inline void Forest::geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment) {
+        _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
         //update species partition
         string new_name = get<2>(species_merge_info);
         string species1 = get<0>(species_merge_info);
