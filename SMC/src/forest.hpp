@@ -121,7 +121,7 @@ class Forest {
         vector<double>              _log_weight_vec;
         vector<pair<Node*, Node*>> _node_choices;
         vector<double>              _log_likelihood_choices;
-        double                      _prev_log_likelihood;
+//        double                      _prev_log_likelihood;
         int                         _index_of_choice;
         pair<Node*, Node*>          _species_joined;
         tuple<Node*, Node*, Node*>  _hybrid_species_joined;
@@ -616,12 +616,13 @@ class Forest {
         _node_choices.clear();
 
         // reset _log_likelihood_choices to 0 if we are in a new lineage
-        if (_log_likelihood_choices.size() == 0) {
-            _prev_log_likelihood = 0.0;
-        }
-        else {
-            _prev_log_likelihood = _log_likelihood_choices[_index_of_choice];
-        }
+//        if (_log_likelihood_choices.size() == 0) {
+//            _prev_log_likelihood = 0.0;
+//        }
+//        else {
+//            _prev_log_likelihood = _log_likelihood_choices[_index_of_choice];
+//        }
+//        _prev_log_likelihood = _gene_tree_log_likelihood;
         _log_likelihood_choices.clear();
 
         //choose pair of nodes to try
@@ -630,6 +631,8 @@ class Forest {
                 // createNewSubtree returns subtree1, subtree2, new_nd
                 tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment);
                 _log_likelihood_choices.push_back(calcLogLikelihood());
+                
+//                showForest();
 
                 // revert _lineages
                 revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
@@ -645,7 +648,14 @@ class Forest {
         }
 
         // reweight each choice of pairs
-        vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_log_likelihood);
+        vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood);
+        
+        // sum unnormalized weights before choosing the pair
+        // TODO: check this
+        _gene_tree_log_weight = 0.0;
+        for (auto &l:log_weight_choices) {
+            _gene_tree_log_weight += l;
+        }
 
         // normalize weights
         double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
@@ -664,6 +674,9 @@ class Forest {
         for (int i = 0; i < _node_choices.size(); i++) {
             _nodes.pop_back();
         }
+        
+        _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
+        
         return make_pair(subtree1, subtree2);
     }
 
@@ -841,7 +854,7 @@ class Forest {
         _index_of_choice    = other._index_of_choice;
         _node_choices = other._node_choices;
         _log_likelihood_choices = other._log_likelihood_choices;
-        _prev_log_likelihood = other._prev_log_likelihood;
+//        _prev_log_likelihood = other._prev_log_likelihood;
         _species_joined = other._species_joined;
         _hybrid_species_joined = other._hybrid_species_joined;
         _migration_rate = other._migration_rate;
@@ -1059,7 +1072,7 @@ class Forest {
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double species_tree_increment) {
         // reset _log_likelihood_choices and _prev_log_likelihood each time a new lineage is entered
         _log_likelihood_choices.clear();
-        _prev_log_likelihood = 0.0;
+//        _prev_log_likelihood = 0.0;
         bool done = false;
         double cum_time = 0.0;
 
@@ -1190,17 +1203,23 @@ class Forest {
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         
-        _gene_tree_log_likelihood = calcLogLikelihood();
-        _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
-        _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
-        _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
-        // marginal likelihood = normalized particle weights sum - ln(1)
-        // normalized particle sum for one particle is just log likelihood?
+        if (_proposal == "prior-prior" || nodes.size() == 1) {
+            _gene_tree_log_likelihood = calcLogLikelihood();
+            _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
+            _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
+            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
+            // marginal likelihood = normalized particle weights sum - ln(1)
+            // normalized particle sum for one particle is just log likelihood?
+        }
+        else if (_proposal == "prior-post") {
+            _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
+            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
+        }
     }
 
     inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
         assert (nodes.size()>0);
-        _prev_log_likelihood = 0.0;
+//        _prev_log_likelihood = 0.0;
         bool done = false;
 
         while (!done) {

@@ -194,35 +194,6 @@ class Particle {
                 }
             }
         }
-        
-        // save random seeds
-        // key is forest number, values are random seeds
-//        for (int i=0; i<_forests.size(); i++) {
-//            _random_seeds[i] = _forests[i]._rand_numbers;
-//        }
-//        vector<double> mean_forest_weights;
-//
-//        for (int i=1; i<_forests.size(); i++) {
-//            double average_weight = 0.0;
-//            for (int a=0; a<_forests[i]._log_weight_vec.size(); a++) {
-//                average_weight += _forests[i]._log_weight_vec[a];
-//            }
-//            mean_forest_weights.push_back(average_weight);
-//        }
-        
-//        assert(mean_forest_weights.size() == _forests.size()-1);
-//        double prev_log_likelihood = _log_likelihood;
-//        _log_likelihood = calcLogLikelihood();
-//        _log_weight = _log_likelihood - prev_log_likelihood;
-        
-//        double gene_tree_marg_like = calcGeneTreeMarginalLikelihood();
-//        cout << "gene tree marginal likelihood: " << gene_tree_marg_like << endl;
-        
-        // reset gene tree marginal likelihoods
-//        for (int i=1; i<_forests.size(); i++) {
-//            _forests[i]._gene_tree_marginal_likelihood = 0.0;
-//        }
-        // TODO: trying this
         calcGeneTreeMarginalLikelihood();
         _log_weight = _gene_tree_marg_like - _prev_gene_tree_marg_like;
         
