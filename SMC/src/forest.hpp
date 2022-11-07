@@ -121,7 +121,6 @@ class Forest {
         vector<double>              _log_weight_vec;
         vector<pair<Node*, Node*>> _node_choices;
         vector<double>              _log_likelihood_choices;
-//        double                      _prev_log_likelihood;
         int                         _index_of_choice;
         pair<Node*, Node*>          _species_joined;
         tuple<Node*, Node*, Node*>  _hybrid_species_joined;
@@ -615,14 +614,6 @@ class Forest {
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment) {
         _node_choices.clear();
 
-        // reset _log_likelihood_choices to 0 if we are in a new lineage
-//        if (_log_likelihood_choices.size() == 0) {
-//            _prev_log_likelihood = 0.0;
-//        }
-//        else {
-//            _prev_log_likelihood = _log_likelihood_choices[_index_of_choice];
-//        }
-//        _prev_log_likelihood = _gene_tree_log_likelihood;
         _log_likelihood_choices.clear();
 
         //choose pair of nodes to try
@@ -631,8 +622,6 @@ class Forest {
                 // createNewSubtree returns subtree1, subtree2, new_nd
                 tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment);
                 _log_likelihood_choices.push_back(calcLogLikelihood());
-                
-//                showForest();
 
                 // revert _lineages
                 revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
@@ -651,7 +640,6 @@ class Forest {
         vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood);
         
         // sum unnormalized weights before choosing the pair
-        // TODO: check this
         _gene_tree_log_weight = 0.0;
         for (auto &l:log_weight_choices) {
             _gene_tree_log_weight += l;
@@ -854,7 +842,6 @@ class Forest {
         _index_of_choice    = other._index_of_choice;
         _node_choices = other._node_choices;
         _log_likelihood_choices = other._log_likelihood_choices;
-//        _prev_log_likelihood = other._prev_log_likelihood;
         _species_joined = other._species_joined;
         _hybrid_species_joined = other._hybrid_species_joined;
         _migration_rate = other._migration_rate;
@@ -1070,9 +1057,8 @@ class Forest {
     }
 
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double species_tree_increment) {
-        // reset _log_likelihood_choices and _prev_log_likelihood each time a new lineage is entered
+        // reset _log_likelihood_choices each time a new lineage is entered
         _log_likelihood_choices.clear();
-//        _prev_log_likelihood = 0.0;
         bool done = false;
         double cum_time = 0.0;
 
@@ -1177,7 +1163,6 @@ class Forest {
         Node nd;
         _nodes.push_back(nd);
         Node* new_nd = &_nodes.back();
-//        Node* new_nd=&_nodes[_nleaves+_ninternals];
 
         new_nd->_parent=0;
         new_nd->_number=_nleaves+_ninternals;
@@ -1219,7 +1204,6 @@ class Forest {
 
     inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
         assert (nodes.size()>0);
-//        _prev_log_likelihood = 0.0;
         bool done = false;
 
         while (!done) {
@@ -1273,7 +1257,6 @@ class Forest {
                 _nodes.push_back(nd);
                 Node* new_nd = &_nodes.back();
                 
-//                Node* new_nd=&_nodes[_nleaves+_ninternals];
                 new_nd->_parent=0;
                 new_nd->_number=_nleaves+_ninternals;
                 new_nd->_edge_length=0.0;
@@ -1295,30 +1278,30 @@ class Forest {
                 updateNodeList(nodes, subtree1, subtree2, new_nd);
                 updateNodeVector(_lineages, subtree1, subtree2, new_nd);
                 
-                // TODO: not sure about this placement?
                 _gene_tree_log_likelihood = calcLogLikelihood();
                 _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
                 _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
                 _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
                 // marginal likelihood = particle weights sum - ln(1)
-                // normalized particle sum for one particle is just log likelihood?
+                // normalized particle sum for one particle is just log likelihood
             }
         }
     }
 
-inline void Forest::firstGeneTreeProposal(double time_increment) {
-    _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
-    if (_species_partition.size() == 1) {
-        fullyCoalesceGeneTree(_species_partition.begin()->second);
-    }
-    
-    else {
-        for (auto &s:_species_partition) {
-            assert (s.second.size()>0);
-            evolveSpeciesFor(s.second, time_increment);
+    inline void Forest::firstGeneTreeProposal(double time_increment) {
+        _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
+        if (_species_partition.size() == 1) {
+            fullyCoalesceGeneTree(_species_partition.begin()->second);
+        }
+        
+        else {
+            for (auto &s:_species_partition) {
+                assert (s.second.size()>0);
+                evolveSpeciesFor(s.second, time_increment);
+            }
         }
     }
-}
+
     inline void Forest::geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment) {
         _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
         //update species partition
@@ -1347,28 +1330,28 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
         }
     }
 
-//    inline void Forest::debugForest() {
-//        cout << "debugging forest" << endl;
-//        for (auto &node : _nodes) {
-//            cout << "   node number " << node._number << " ";
-//            if (node._left_child) {
-//                cout << node._left_child->_number << " ";
-//
-//                if (node._left_child->_right_sib) {
-//                    cout << node._left_child->_right_sib->_number << " ";
-//                }
-//            }
-//            else (cout << " - - ");
-//
-//            if (node._partial!=nullptr) {
-//                cout << " * ";
-//            }
-//            cout << endl;
-//        }
-//        cout << "   _nleaves " << _nleaves << " ";
-//        cout << "   _ninternals " << _ninternals << " ";
-//        cout << endl;
-//    }
+    inline void Forest::debugForest() {
+        cout << "debugging forest" << endl;
+        for (auto &node : _nodes) {
+            cout << "   node number " << node._number << " ";
+            if (node._left_child) {
+                cout << node._left_child->_number << " ";
+
+                if (node._left_child->_right_sib) {
+                    cout << node._left_child->_right_sib->_number << " ";
+                }
+            }
+            else (cout << " - - ");
+
+            if (node._partial!=nullptr) {
+                cout << " * ";
+            }
+            cout << endl;
+        }
+        cout << "   _nleaves " << _nleaves << " ";
+        cout << "   _ninternals " << _ninternals << " ";
+        cout << endl;
+    }
 
     inline void Forest::updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode) {
         // Delete delnode1 from node_vector
@@ -1740,7 +1723,6 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
                 nd->_partial->clear();
                 nd->_position_in_lineages = -1;
             }
-//            _new_nodes.clear();
             
             resetToMinor(minor_nodes, minor_left_children, minor_right_children, minor_left_edge_lengths, minor_right_edge_lengths);
 
@@ -1842,23 +1824,30 @@ inline void Forest::firstGeneTreeProposal(double time_increment) {
     }
 
     inline int Forest::chooseDirectionOfHybridization(vector<double> likelihood_vec) {
-        // choose a direction
-        vector<double> log_weight_choices;
-        log_weight_choices.reserve(2);
+        _node_choices.clear();
+        _log_likelihood_choices.clear();
         
-        log_weight_choices.push_back(likelihood_vec[0]+log(.15)); // multiply minor likelihood by (1-gamma)
-        log_weight_choices.push_back(likelihood_vec[1]+log(.85)); // multiply major likelihood by (gamma)
+        _log_likelihood_choices.push_back(likelihood_vec[0]+log(.15)); // multiply minor likelihood by (1-gamma)
+        _log_likelihood_choices.push_back(likelihood_vec[1]+log(.85)); // multiply major likelihood by (gamma)
+
+        // reweight each choice of pairs
+        vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood);
         
+        // sum unnormalized weights before choosing the pair
+        _gene_tree_log_weight = 0.0;
+        for (auto &l:log_weight_choices) {
+            _gene_tree_log_weight += l;
+        }
+
         // normalize weights
-//        double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-        double log_weight_choices_sum = getRunningSumHybridChoices(log_weight_choices);
+        double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
         for (int b=0; b < (int) log_weight_choices.size(); b++) {
             log_weight_choices[b] -= log_weight_choices_sum;
         }
-        
+
         // select a direction
-        int index_of_choice = selectPair(log_weight_choices);
-        return index_of_choice;
+        _index_of_choice = selectPair(log_weight_choices);
+        return _index_of_choice;
     }
 
     inline vector<double> Forest::saveBranchLengths() {
