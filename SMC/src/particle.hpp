@@ -3,6 +3,10 @@
 #include "forest.hpp"
 #include "boost/format.hpp"
 #include "boost/math/special_functions/gamma.hpp"
+#include <cmath>
+#include <random>
+#include <iostream>
+#include <iomanip>
 using namespace std;
 using namespace boost;
 
@@ -46,6 +50,8 @@ class Particle {
         map<int, vector<double>>                     getRandomSeeds() {return _random_seeds;}
         void                                    setLogWeight(double w){_log_weight = w;}
         void                                    operator=(const Particle & other);
+        void                                    updateTheta();
+        void                                    showTheta();
         const vector<Forest> &                  getForest() const {return _forests;}
         std::string                             saveForestNewick() {
             return _forests[0].makeNewick(8, true);
@@ -73,6 +79,7 @@ class Particle {
         double                                          calcGeneTreeMarginalLikelihood();
         double                                          getGeneTreeMargLike() {return _gene_tree_marg_like;}
         void                                            setMarginalLikelihood(double ml) {_gene_tree_marg_like = ml;}
+        void                                            setRunOnEmpty(bool a) {_running_on_empty = a;}
 
     private:
 
@@ -85,6 +92,7 @@ class Particle {
         double                                  _gene_tree_marg_like;
         double                                  _prev_gene_tree_marg_like;
         map<int, vector<double>>                     _random_seeds;
+        bool                                    _running_on_empty;
         vector<tuple<string, string, string>> _triple;
 };
 
@@ -157,8 +165,12 @@ class Particle {
 
     inline double Particle::proposal() {
         string event;
+//        if (_generation != 0) {
+//            updateTheta();
+//        }
         if (_generation == 0) {
             for (unsigned i=1; i<_forests.size(); i++) {
+                _forests[i]._theta = _forests[i]._starting_theta;
                 _forests[i]._gene_tree_marginal_likelihood = _forests[i]._gene_tree_log_likelihood;
             }
             _forests[0].chooseSpeciesIncrement();
@@ -194,8 +206,11 @@ class Particle {
                 }
             }
         }
-        calcGeneTreeMarginalLikelihood();
-        _log_weight = _gene_tree_marg_like - _prev_gene_tree_marg_like;
+        
+        if (_running_on_empty == false) {
+            calcGeneTreeMarginalLikelihood();
+            _log_weight = _gene_tree_marg_like - _prev_gene_tree_marg_like;
+        }
         
         return _log_weight;
     }
@@ -310,8 +325,6 @@ class Particle {
         string nodes = "";
         int i = 0;
         for (auto &nd:_forests[0]._nodes) {
-//        for (Node* nd = _forests[0]._lineages[0]; nd; nd=nd->_left_child->_right_sib) {
-//            for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
             if (nd._major_parent) {
                 string gammastr = to_string(_forests[0]._gamma[i]);
                 nodes +=  "hybridized node is: " + nd._name + " with minor parent " + nd._minor_parent->_name + " and major parent " + nd._major_parent->_name + "\n" + "gamma is: " + gammastr + "\n";
@@ -327,6 +340,24 @@ class Particle {
 
     inline double Particle::saveParticleLikelihoods() {
         return _log_likelihood;
+    }
+
+    inline void Particle::updateTheta() {
+        lognormal_distribution<double> distribution(-5.0,1.2);
+        unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+        default_random_engine generator(seed);
+        for (int i = 1; i<_forests.size(); i++) {
+            _forests[i]._theta = distribution(generator);
+            cout << "new theta for gene " << i << " is: " << _forests[i]._theta << endl;
+        }
+    }
+
+    inline void Particle::showTheta() {
+        cout << "Particle" << endl;
+        for (int i=1; i<_forests.size(); i++) {
+            cout << "new theta for gene " << i << " is: " << _forests[i]._theta << endl;
+        }
+        cout << endl;
     }
 
     inline void Particle::showGamma() {

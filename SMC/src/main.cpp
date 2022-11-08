@@ -21,7 +21,7 @@ unsigned     Proj::_minor_version       = 0;
 
 unsigned Forest::_nspecies = 4;
 unsigned Forest::_ntaxa = 12;
-double Forest::_theta = 0.05;
+double Forest::_starting_theta = 0.05;
 double Forest::_speciation_rate = 1;
 unsigned Particle::_nsubsets = 1;
 const double Node::_smallest_edge_length=1.0e-12;
@@ -32,6 +32,7 @@ vector<double> Forest::_base_frequencies;
 string Forest::_string_base_frequencies;
 double Forest::_migration_rate;
 double Forest::_hybridization_rate;
+//bool Proj::_run_on_empty;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT

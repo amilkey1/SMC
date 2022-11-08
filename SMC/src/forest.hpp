@@ -138,7 +138,8 @@ class Forest {
     public:
 
         typedef std::shared_ptr<Forest> SharedPtr;
-        static double               _theta;
+        double               _theta;
+        static double                      _starting_theta;
         static double               _speciation_rate;
         static string               _proposal;
         static string               _model;
@@ -228,7 +229,6 @@ class Forest {
                 }
             }
         }
-
     }
 
     inline unsigned Forest::numLeaves() const {
@@ -854,6 +854,7 @@ class Forest {
         _prev_gene_tree_log_likelihood = other._prev_gene_tree_log_likelihood;
         _log_weight_vec = other._log_weight_vec;
         _gene_tree_marginal_likelihood = other._gene_tree_marginal_likelihood;
+        _theta = other._theta;
 
         // copy tree itself
 
