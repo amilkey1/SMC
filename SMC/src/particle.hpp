@@ -212,6 +212,10 @@ class Particle {
             _log_weight = _gene_tree_marg_like - _prev_gene_tree_marg_like;
         }
         
+        else {
+            _generation++;
+        }
+        
         return _log_weight;
     }
 
