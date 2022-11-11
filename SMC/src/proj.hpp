@@ -70,6 +70,11 @@ namespace proj {
             double                      _avg_marg_like;
             bool                        _run_on_empty;
             double                      _theta_prior;
+            double                      _prev_theta_prior;
+            double                      _speciation_rate_prior;
+            double                      _prev_speciation_rate_prior;
+            double                      _hybridization_rate_prior;
+            double                      _prev_hybridization_rate_prior;
 
             static std::string          _program_name;
             static unsigned             _major_version;
@@ -410,8 +415,21 @@ namespace proj {
     inline string Proj::acceptParameters() {
         double u = rng.uniform();
         // TODO: check this is working when params not updated
-        _theta_prior = logThetaPrior(Forest::_starting_theta);
-        double log_acceptance_ratio = (_avg_marg_like+logHybridizationRatePrior(Forest::_hybridization_rate)+logSpeciationRatePrior(Forest::_speciation_rate)+_theta_prior)-(_prev_log_marginal_likelihood+logHybridizationRatePrior(_prev_hybridization_rate)+logThetaPrior(_prev_theta)+logSpeciationRatePrior(_prev_speciation_rate));
+        _prev_theta_prior = _theta_prior;
+        _prev_speciation_rate_prior = _speciation_rate_prior;
+        _prev_hybridization_rate_prior = _hybridization_rate_prior;
+        
+        if (_estimate_theta) {
+            _theta_prior = logThetaPrior(Forest::_starting_theta);
+        }
+        if (_estimate_hybridization_rate) {
+            _hybridization_rate_prior = logHybridizationRatePrior(Forest::_hybridization_rate);
+        }
+        if (_estimate_speciation_rate) {
+            _speciation_rate_prior = logSpeciationRatePrior(Forest::_speciation_rate);
+        }
+        double log_acceptance_ratio = (_avg_marg_like+_hybridization_rate_prior+_speciation_rate_prior+_theta_prior)-(_prev_log_marginal_likelihood+_prev_hybridization_rate_prior+_theta_prior+_speciation_rate_prior);
+//        double log_acceptance_ratio = (_avg_marg_like+logHybridizationRatePrior(Forest::_hybridization_rate)+logSpeciationRatePrior(Forest::_speciation_rate)+_theta_prior)-(_prev_log_marginal_likelihood+logHybridizationRatePrior(_prev_hybridization_rate)+logThetaPrior(_prev_theta)+logSpeciationRatePrior(_prev_speciation_rate));
         if (log(u) > log_acceptance_ratio){
             // reject proposed theta
             bool accepted = false;
@@ -696,6 +714,10 @@ namespace proj {
             _prev_theta = Forest::_starting_theta;
             _prev_speciation_rate = Forest::_speciation_rate;
             _prev_hybridization_rate = Forest::_hybridization_rate;
+            _theta_prior = logThetaPrior(_prev_theta);
+            _speciation_rate_prior = logSpeciationRatePrior(_prev_speciation_rate);
+            _hybridization_rate_prior = logHybridizationRatePrior(_prev_hybridization_rate);
+            
             if (_estimate_theta) {_theta_lambda = 0.1;}
             if (_estimate_speciation_rate) {_speciation_rate_lambda = 5.0;}
             if (_estimate_hybridization_rate) {_hybrid_rate_lambda = 0.003;}
