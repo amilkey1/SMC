@@ -707,11 +707,6 @@ class Forest {
     inline double Forest::getRunningSumHybridChoices(vector<double> &log_weight_choices) {
         double running_sum = 0.0;
         double log_weight_choices_sum = 0.0;
-//        vector<double> adjustedLogLikelihood;
-        
-//        // multiply major likelihood * gamma, multiply minor likelihood * (1 - gamma)
-//        adjustedLogLikelihood.push_back(log_weight_choices[0]+0.15);
-//        adjustedLogLikelihood.push_back(log_weight_choices[1]+0.85);
         
         double log_max_weight = *max_element(log_weight_choices.begin(), log_weight_choices.end());
         for (auto & i:log_weight_choices) {
@@ -1894,7 +1889,6 @@ class Forest {
         Node nd;
         _nodes.push_back(nd);
         Node* new_nd = &_nodes.back();
-//        Node* new_nd = &_nodes[_nleaves+_ninternals];
         new_nd->_parent=0;
         new_nd->_number=_nleaves+_ninternals;
         new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
@@ -1910,7 +1904,6 @@ class Forest {
         Node nd2;
         _nodes.push_back(nd2);
         Node* new_nd2 = &_nodes.back();
-//        Node* new_nd2 = &_nodes[_nleaves+_ninternals];
         new_nd2->_parent=0;
         new_nd2->_number=_nleaves+_ninternals;
         new_nd2->_name=boost::str(boost::format("node-%d")%new_nd2->_number);

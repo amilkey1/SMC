@@ -50,8 +50,6 @@ class Particle {
         map<int, vector<double>>                     getRandomSeeds() {return _random_seeds;}
         void                                    setLogWeight(double w){_log_weight = w;}
         void                                    operator=(const Particle & other);
-        void                                    updateTheta();
-        void                                    showTheta();
         const vector<Forest> &                  getForest() const {return _forests;}
         std::string                             saveForestNewick() {
             return _forests[0].makeNewick(8, true);
@@ -165,9 +163,6 @@ class Particle {
 
     inline double Particle::proposal() {
         string event;
-//        if (_generation != 0) {
-//            updateTheta();
-//        }
         if (_generation == 0) {
             for (unsigned i=1; i<_forests.size(); i++) {
                 _forests[i]._theta = _forests[i]._starting_theta;
@@ -246,14 +241,12 @@ class Particle {
     }
 
     inline void Particle::saveForest(std::string treefilename)  {
-//        for (auto &_forest:_forests) {
-            ofstream treef(treefilename);
-            treef << "#nexus\n\n";
-            treef << "begin trees;\n";
-            treef << "  tree test = [&R] " << _forests[0].makeNewick(8, true)  << ";\n";
-            treef << "end;\n";
-            treef.close();
-//        }
+        ofstream treef(treefilename);
+        treef << "#nexus\n\n";
+        treef << "begin trees;\n";
+        treef << "  tree test = [&R] " << _forests[0].makeNewick(8, true)  << ";\n";
+        treef << "end;\n";
+        treef.close();
     }
 
     inline void Particle::saveMSCTrees(string treefilename) {
@@ -344,24 +337,6 @@ class Particle {
 
     inline double Particle::saveParticleLikelihoods() {
         return _log_likelihood;
-    }
-
-    inline void Particle::updateTheta() {
-        lognormal_distribution<double> distribution(-5.0,1.2);
-        unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-        default_random_engine generator(seed);
-        for (int i = 1; i<_forests.size(); i++) {
-            _forests[i]._theta = distribution(generator);
-            cout << "new theta for gene " << i << " is: " << _forests[i]._theta << endl;
-        }
-    }
-
-    inline void Particle::showTheta() {
-        cout << "Particle" << endl;
-        for (int i=1; i<_forests.size(); i++) {
-            cout << "new theta for gene " << i << " is: " << _forests[i]._theta << endl;
-        }
-        cout << endl;
     }
 
     inline void Particle::showGamma() {
