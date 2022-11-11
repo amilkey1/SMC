@@ -66,7 +66,6 @@ namespace proj {
             std::string                 _data_file_name;
             Partition::SharedPtr        _partition;
             Data::SharedPtr             _data;
-//            double                      _log_marginal_likelihood = 0.0;
             double                      _prev_log_marginal_likelihood = 0.0;
             bool                        _use_gpu;
             bool                        _ambig_missing;
@@ -74,7 +73,7 @@ namespace proj {
             unsigned                    _random_seed;
             double                      _avg_marg_like;
             bool                        _run_on_empty;
-
+            double                      _theta_prior;
 
             static std::string          _program_name;
             static unsigned             _major_version;
@@ -98,7 +97,6 @@ namespace proj {
             int                         _nattempts = 0;
             bool                        _tuning = true;
             double                      _target_acceptance = 0.3;
-//            double                      _lambda;
             double                      _theta_lambda;
             double                      _speciation_rate_lambda;
             double                      _hybrid_rate_lambda;
@@ -135,16 +133,16 @@ namespace proj {
         _data = nullptr;
     }
 
-inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
-        ofstream treef("forest.trees");
-        treef << "#nexus\n\n";
-        treef << "begin trees;\n";
-        for (auto &p:v) {
-            treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
+    inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
+            ofstream treef("forest.trees");
+            treef << "#nexus\n\n";
+            treef << "begin trees;\n";
+            for (auto &p:v) {
+                treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
+            }
+            treef << "end;\n";
+            treef.close();
         }
-        treef << "end;\n";
-        treef.close();
-    }
 
     inline void Proj::saveAllHybridNodes(vector<Particle::SharedPtr> &v) const {
         ofstream nodef("nodes.txt");
@@ -582,7 +580,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         double u = rng.uniform();
         // TODO: check this is working when params not updated
 //        double log_acceptance_ratio = (_log_marginal_likelihood+logHybridizationRatePrior(Forest::_hybridization_rate)+logSpeciationRatePrior(Forest::_speciation_rate)+logThetaPrior(Forest::_theta))-(_prev_log_marginal_likelihood+logHybridizationRatePrior(_prev_hybridization_rate)+logThetaPrior(_prev_theta)+logSpeciationRatePrior(_prev_speciation_rate));
-        double log_acceptance_ratio = (_avg_marg_like+logHybridizationRatePrior(Forest::_hybridization_rate)+logSpeciationRatePrior(Forest::_speciation_rate)+logThetaPrior(Forest::_starting_theta))-(_prev_log_marginal_likelihood+logHybridizationRatePrior(_prev_hybridization_rate)+logThetaPrior(_prev_theta)+logSpeciationRatePrior(_prev_speciation_rate));
+        _theta_prior = logThetaPrior(Forest::_starting_theta);
+        double log_acceptance_ratio = (_avg_marg_like+logHybridizationRatePrior(Forest::_hybridization_rate)+logSpeciationRatePrior(Forest::_speciation_rate)+_theta_prior)-(_prev_log_marginal_likelihood+logHybridizationRatePrior(_prev_hybridization_rate)+logThetaPrior(_prev_theta)+logSpeciationRatePrior(_prev_speciation_rate));
+//        double log_acceptance_ratio = (_avg_marg_like+logHybridizationRatePrior(Forest::_hybridization_rate)+logSpeciationRatePrior(Forest::_speciation_rate)+logThetaPrior(Forest::_starting_theta))-(_prev_log_marginal_likelihood+logHybridizationRatePrior(_prev_hybridization_rate)+logThetaPrior(_prev_theta)+logSpeciationRatePrior(_prev_speciation_rate));
         if (log(u) > log_acceptance_ratio){
             // reject proposed theta
             bool accepted = false;
@@ -891,6 +891,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             if (_estimate_speciation_rate) {_speciation_rate_lambda = 5.0;}
             if (_estimate_hybridization_rate) {_hybrid_rate_lambda = 0.003;}
             
+            // open log file
+            ofstream logf("log.txt");
+            logf << "iter" << "\t" << "lp" << "\t" << "theta" << endl;
+            
         // loop for number of samples (either theta or speciation rate)
             for (_sample=0; _sample<_nsamples; _sample++) {
                 cout << "sample: " << _sample << endl;
@@ -985,6 +989,15 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood << endl;
                 
                 estimateParameters(my_vec);
+                
+                double lp = _avg_marg_like+_theta_prior;
+                
+                logf << _sample << "\t" << lp << " " << "\t" << Forest::_starting_theta << endl;
+                
+                if (_sample == _nsamples) {
+                    logf.close();
+                }
+                
                 } // _nsamples loop - number of samples
 //            saveParticleWeights(_accepted_particle_vec);
 //            saveParticleLikelihoods(_accepted_particle_vec);
