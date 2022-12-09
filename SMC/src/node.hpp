@@ -32,6 +32,7 @@ namespace proj {
                     void                setEdgeLength(double v);
         
                     unsigned            countChildren() const;
+//                    unsigned            countDescendants() const;
 
                     void                clearPointers()             {_left_child = _right_sib = _parent = 0;}
             void                resetNode();
@@ -67,7 +68,8 @@ namespace proj {
             PartialStore::partial_t _partial;
             int                 _position_in_lineages;
             bool                _visited = false;
-        std::string              _hybrid_newick_name;
+            std::string         _hybrid_newick_name;
+            unsigned            _n_descendants;
     };
     
     
@@ -86,6 +88,7 @@ namespace proj {
         _number = -1;
         _name = "";
         _edge_length = _smallest_edge_length;
+        _n_descendants = 0;
         _partial.reset();
     }   
 

@@ -10,6 +10,7 @@
 #include <thread>
 #include <mutex>
 #include <algorithm>
+#include "tree_summary.hpp"
 
 #include "lot.hpp"
 extern proj::Lot rng;
@@ -48,6 +49,8 @@ class Forest {
         void operator=(const Forest & other);
         void                        debugForest();
         void                        debugLogLikelihood(Node* nd, double log_like);
+        double                      calcTopologyPrior();
+//        void                        showSummary() const;
 
     private:
 
@@ -97,6 +100,11 @@ class Forest {
         vector<double>              saveBranchLengths();
         int                         chooseDirectionOfHybridization(vector<double> likelihood_vec);
         void                        hybridGeneTreeProposal(double species_tree_increment);
+        void                        saveDivergenceTimes(double edge_len);
+        void                        readTreeFile(unsigned skip);
+        void                        storeSplits(set<Split> & splitset);
+        void                        readNewicks();
+        unsigned                    countDescendants(Node* nd, unsigned count);
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -128,6 +136,13 @@ class Forest {
         string                      _last_direction;
         vector<double>              _rand_numbers;
         double                      _gene_tree_marginal_likelihood;
+        vector<double>              _branch_lengths;
+        vector<double>              _branch_length_priors;
+        double                      _topology_prior;
+//        Split::treemap_t            _treeIDs;
+//        std::vector<std::string>    _newicks;
+//        vector<double>              _gene_tree_increments;
+    
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
         double                      calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
@@ -615,6 +630,7 @@ class Forest {
         _node_choices.clear();
 
         _log_likelihood_choices.clear();
+        vector<double> topology_prior_choices;
 
         //choose pair of nodes to try
         for (int i = 0; i < (int) node_list.size()-1; i++) {
@@ -650,7 +666,7 @@ class Forest {
         for (int b=0; b < (int) log_weight_choices.size(); b++) {
             log_weight_choices[b] -= log_weight_choices_sum;
         }
-
+        
         // randomly select a pair
         _index_of_choice = selectPair(log_weight_choices);
 
@@ -850,6 +866,12 @@ class Forest {
         _log_weight_vec = other._log_weight_vec;
         _gene_tree_marginal_likelihood = other._gene_tree_marginal_likelihood;
         _theta = other._theta;
+        _branch_lengths = other._branch_lengths;
+        _branch_length_priors = other._branch_length_priors;
+//        _gene_tree_increments = other._gene_tree_increments;
+        _topology_prior = other._topology_prior;
+//        _treeIDs = other. _treeIDs;
+//        _newicks = other._newicks;
 
         // copy tree itself
 
@@ -922,6 +944,7 @@ class Forest {
                 nd->_partial = othernd._partial;
                 nd->_visited = othernd._visited;
                 nd->_hybrid_newick_name = othernd._hybrid_newick_name;
+                nd->_n_descendants = othernd._n_descendants;
             }
         }
 
@@ -977,7 +1000,12 @@ class Forest {
         }
         // choose edge length but don't add it yet
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
-        _rand_numbers.push_back(_last_edge_length);
+        
+        if (_lineages.size()>2) {
+            _branch_length_priors.push_back(log(rate)-_last_edge_length*rate);
+        }
+        
+//        _rand_numbers.push_back(_last_edge_length);
         
         return event;
     }
@@ -987,11 +1015,14 @@ class Forest {
         double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
         
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
-        _rand_numbers.push_back(_last_edge_length);
+        _branch_length_priors.push_back(log(rate)-_last_edge_length*rate);
+//        _rand_numbers.push_back(_last_edge_length);
 
         for (auto nd:_lineages) {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
         }
+        
+        saveDivergenceTimes(_last_edge_length);
     }
 
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
@@ -1023,6 +1054,10 @@ class Forest {
         _species_joined = make_pair(subtree1, subtree2);
 
         return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
+    }
+
+    inline void Forest::saveDivergenceTimes(double edge_len) {
+        _branch_lengths.push_back(edge_len);
     }
 
     inline void Forest::showSpeciesJoined() {
@@ -1065,11 +1100,16 @@ class Forest {
         double s = nodes.size();
         double coalescence_rate = s*(s-1)/_theta;
         increment = rng.gamma(1.0, 1.0/(coalescence_rate));
-        _rand_numbers.push_back(increment);
+        
+//        if (s>1) {
+//            _branch_length_priors.push_back(log(coalescence_rate)-increment*coalescence_rate);
+//        }
+
+//        _rand_numbers.push_back(increment);
 
         if (_migration_rate > 0.0) {
             increment = rng.gamma(1.0, 1.0/(coalescence_rate+_migration_rate));
-            _rand_numbers.push_back(increment);
+//            _rand_numbers.push_back(increment);
             double migration_prob = _migration_rate/(_migration_rate+coalescence_rate);
             double coalescence_prob = coalescence_rate/(_migration_rate+coalescence_rate);
 
@@ -1101,12 +1141,15 @@ class Forest {
         }
 
         //add increment to each lineage
+//        _gene_tree_increments.push_back(increment);
         for (auto nd:nodes) {
             nd->_edge_length += increment; //add most recently chosen branch length to each node in lineage
         }
         if (_migration_rate == 0.0 || event == "coalescence") {
             if (!done) {
                 allowCoalescence(nodes, increment);
+                saveDivergenceTimes(increment);
+                _branch_length_priors.push_back(log(coalescence_rate)-increment*coalescence_rate);
             }
             cum_time += increment;
         }
@@ -1206,7 +1249,8 @@ class Forest {
             double s = nodes.size();
             double coalescence_rate = s*(s-1)/_theta;
             double increment = rng.gamma(1.0, 1.0/coalescence_rate);
-            _rand_numbers.push_back(increment);
+            
+//            _rand_numbers.push_back(increment);
 
             bool lineages_left_to_join = s > 1;
             if (!lineages_left_to_join)  {
@@ -1215,13 +1259,20 @@ class Forest {
 
             //add increment to each lineage
             if (!done) {
+
                 for (auto nd:nodes) {
                     nd->_edge_length += increment;
                 }
                 Node* subtree1 = nullptr;
                 Node *subtree2 = nullptr;
+                
+                saveDivergenceTimes(increment);
+                _branch_length_priors.push_back(log(coalescence_rate)-increment*coalescence_rate);
 
                 if (nodes.size()>2) {
+//                    saveDivergenceTimes(increment);
+//                    _branch_length_priors.push_back(log(coalescence_rate)-increment*coalescence_rate);
+//                    _branch_length_priors.push_back(log(coalescence_rate)-increment*coalescence_rate);
 
 // prior-prior proposal
                     if (_proposal == "prior-prior") {
@@ -1281,6 +1332,9 @@ class Forest {
                 // marginal likelihood = particle weights sum - ln(1)
                 // normalized particle sum for one particle is just log likelihood
             }
+//            if (increment-increment == 0) { // test that increment != inf
+//                saveDivergenceTimes(increment);
+//            }
         }
     }
 
@@ -1935,6 +1989,192 @@ class Forest {
         // add the previously chosen edge length
         for (auto nd:_lineages) {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
+        }
+        
+        saveDivergenceTimes(_last_edge_length);
+    }
+
+    inline double Forest::calcTopologyPrior() {
+        // only call function at final generation
+        assert(_lineages.size() == 1);
+        vector<int> interior_node_count;
+        Node* nd = _lineages[0];
+        while (nd) {
+            // if internal node has children, need to also count the node itself
+//        for (auto &lineage:_lineages) {
+//            Node* nd = lineage;
+            // if internal node has children, need to also count the node itself
+            if (nd->_left_child) {
+                interior_node_count.push_back(countDescendants(nd, 1));
+            }
+            else {
+                interior_node_count.push_back(countDescendants(nd, 0));
+            }
+            nd = findNextPreorder(nd);
+        }
+        int tip_node_number = 0;
+        if (_index == 0) {
+            // species tree
+            tip_node_number = _nspecies;
+        }
+        else {
+            // gene tree
+            tip_node_number = _ntaxa;
+        }
+        
+        int log_sum = 0;
+        for (auto &c:interior_node_count) {
+            log_sum += c;
+        }
+        
+        _topology_prior = ((tip_node_number - 1) * log(2.0) - lgamma(tip_node_number+1) - log_sum);
+        return _topology_prior;
+    }
+
+    inline unsigned Forest::countDescendants(Node* nd, unsigned count) {
+        for (Node * child = nd->_left_child; child; child=child->_right_sib) {
+            if (child->_left_child) {
+                count++;
+                count += countDescendants(child, 0);
+            }
+            else {
+                count += 0;
+            }
+        }
+        return count;
+    }
+
+//    inline void Forest::showSummary() const {
+//        // Produce some output to show that it works
+//
+////        std::cout << boost::str(boost::format("\nRead %d trees from file") % _newicks.size()) << std::endl;
+//
+//        // Show all unique topologies with a list of the trees that have that topology
+//        // Also create a map that can be used to sort topologies by their sample frequency
+//        typedef std::pair<unsigned, unsigned> sorted_pair_t;
+//        std::vector< sorted_pair_t > sorted;
+//        int t = 0;
+//        for (auto & key_value_pair : _treeIDs) {
+//            unsigned topology = ++t;
+//            unsigned ntrees = (unsigned)key_value_pair.second.size();
+//            sorted.push_back(std::pair<unsigned, unsigned>(ntrees,topology));
+//            std::cout << "Topology " << topology << " seen in these " << ntrees << " trees:" << std::endl << "  ";
+//            std::copy(key_value_pair.second.begin(), key_value_pair.second.end(), std::ostream_iterator<unsigned>(std::cout, " "));
+//            std::cout << std::endl;
+//        }
+//
+//        // Show sorted histogram data
+//        std::sort(sorted.begin(), sorted.end());
+//        //unsigned npairs = (unsigned)sorted.size();
+//        std::cout << "\nTopologies sorted by sample frequency:" << std::endl;
+//        std::cout << boost::str(boost::format("%20s %20s") % "topology" % "frequency") << std::endl;
+//        for (auto & ntrees_topol_pair : boost::adaptors::reverse(sorted)) {
+//            unsigned n = ntrees_topol_pair.first;
+//            unsigned t = ntrees_topol_pair.second;
+//            std::cout << boost::str(boost::format("%20d %20d") % t % n) << std::endl;
+//        }
+//    }
+
+//    inline void Forest::readTreeFile(unsigned skip) {
+////        TreeManip tm;
+//        Split::treeid_t splitset;
+//
+//        // See http://phylo.bio.ku.edu/ncldocs/v2.1/funcdocs/index.html for NCL documentation
+//
+//        MultiFormatReader nexusReader(-1, NxsReader::WARNINGS_TO_STDERR);
+////        try {
+////            nexusReader.ReadFilepath(filename.c_str(), MultiFormatReader::NEXUS_FORMAT);
+////        }
+////        catch(...) {
+////            nexusReader.DeleteBlocksFromFactories();
+////            throw;
+////        }
+//
+//        int numTaxaBlocks = nexusReader.GetNumTaxaBlocks();
+//        for (int i = 0; i < numTaxaBlocks; ++i) {
+//            clear();
+//            NxsTaxaBlock * taxaBlock = nexusReader.GetTaxaBlock(i);
+//            std::string taxaBlockTitle = taxaBlock->GetTitle();
+//
+//            const unsigned nTreesBlocks = nexusReader.GetNumTreesBlocks(taxaBlock);
+//            for (unsigned j = 0; j < nTreesBlocks; ++j) {
+//                const NxsTreesBlock * treesBlock = nexusReader.GetTreesBlock(taxaBlock, j);
+//                unsigned ntrees = treesBlock->GetNumTrees();
+//                if (skip < ntrees) {
+//                    //std::cout << "Trees block contains " << ntrees << " tree descriptions.\n";
+//                    for (unsigned t = skip; t < ntrees; ++t) {
+//                        const NxsFullTreeDescription & d = treesBlock->GetFullTreeDescription(t);
+//
+//                        // store the newick tree description
+//                        std::string newick = d.GetNewick();
+////                        _newicks.push_back(newick);
+////                        unsigned tree_index = (unsigned)_newicks.size() - 1;
+//
+//                        // build the tree
+////                        tm.buildFromNewick(newick, false, false);
+//
+//                        // store set of splits
+//                        splitset.clear();
+//                        storeSplits(splitset);
+//
+//                        // iterator iter will point to the value corresponding to key splitset
+//                        // or to end (if splitset is not already a key in the map)
+//                        Split::treemap_t::iterator iter = _treeIDs.lower_bound(splitset);
+//
+//                        if (iter == _treeIDs.end() || iter->first != splitset) {
+//                            // splitset key not found in map, need to create an entry
+//                            std::vector<unsigned> v(1, tree_index);  // vector of length 1 with only element set to tree_index
+//                            _treeIDs.insert(iter, Split::treemap_t::value_type(splitset, v));
+//                        }
+//                        else {
+//                            // splitset key was found in map, need to add this tree's index to vector
+//                            iter->second.push_back(tree_index);
+//                        }
+//                    } // trees loop
+//                } // if skip < ntrees
+//            } // TREES block loop
+//        } // TAXA block loop
+//
+//        // No longer any need to store raw data from nexus file
+//        nexusReader.DeleteBlocksFromFactories();
+//    }
+
+
+    inline void Forest::storeSplits(std::set<Split> & splitset) {
+        // Start by clearing and resizing all splits
+        if (_generationf == 0) { // species tree
+            for (auto & nd:_lineages) {
+                nd->_split.resize(_nspecies);
+            }
+        }
+        else { // gene trees
+            for (auto & nd:_lineages) {
+                nd->_split.resize(_ntaxa);
+            }
+        }
+
+        // Now do a postorder traversal and add the bit corresponding
+        // to the current node in its parent node's split
+        // TODO: postorder?
+        for (auto lineage : _lineages) {
+            Node * nd = lineage;
+            while (nd) {
+            nd = findNextPreorder(nd);
+    //        for (auto nd : boost::adaptors::reverse(_lineages._preorder)) {
+                if (nd->_left_child) {
+                    // add this internal node's split to splitset
+                    splitset.insert(nd->_split);
+                }
+                else {
+                    // set bit corresponding to this leaf node's number
+                    nd->_split.setBitAt(nd->_number);
+                }
+
+                if (nd->_parent) {
+                    // parent's bits are the union of the bits set in all its children
+                    nd->_parent->_split.addSplit(nd->_split);
+                }
+            }
         }
     }
 }

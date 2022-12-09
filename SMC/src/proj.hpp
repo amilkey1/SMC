@@ -11,6 +11,7 @@
 #include <vector>
 #include <thread>
 #include <boost/algorithm/string/split.hpp>
+#include "tree_summary.hpp"
 
 using namespace std;
 using namespace boost;
@@ -56,6 +57,8 @@ namespace proj {
             void                printSpeciationRates();
             void                printThetas();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
+            void                readTreeFile();
+            void                storeSplits(set<Split> & splitset);
 
         private:
 
@@ -111,6 +114,8 @@ namespace proj {
             void                        handleBaseFrequencies();
             void                        debugSpeciesTree(vector<Particle::SharedPtr> &particles);
             void                        estimateParameters(vector<Particle::SharedPtr> &particles);
+            vector<string>              _newicks;
+            Split::treemap_t            _treeIDs;
     };
 
     inline Proj::Proj() {
@@ -297,14 +302,14 @@ namespace proj {
     }
 
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles, int g) {
-        ofstream tempf(str(format("unnormalized_weights-%d.txt")%(g+1)), ios::out);
+//        ofstream tempf(str(format("unnormalized_weights-%d.txt")%(g+1)), ios::out);
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
         for (auto & p : particles) {
             log_weight_vec[i++] = p->getGeneTreeMargLike();
-            tempf << p->getGeneTreeMargLike() << "\n";
+//            tempf << p->getGeneTreeMargLike() << "\n";
         }
-        tempf.close();
+//        tempf.close();
         
 
         double log_particle_sum = getRunningSum(log_weight_vec);
@@ -490,7 +495,7 @@ namespace proj {
     }
 
     inline double Proj::logSpeciationRatePrior(double speciation_rate) {
-        double exponential_rate = -log(0.05)/400.0;
+        double exponential_rate = -log(0.05)/100.0;
         return (log(exponential_rate) - speciation_rate*exponential_rate);
     }
 
@@ -679,6 +684,61 @@ namespace proj {
         }
     }
 
+//    inline void Proj::readTreeFile() {
+//        Split::treeid_t splitset;
+//
+////        MultiFormatReader nexusReader(-1, NxsReader::WARNINGS_TO_STDERR);
+//
+//            // build the tree
+//        for (auto &newick:_newicks) {
+//            unsigned tree_index = (unsigned)_newicks.size() - 1;
+//            buildFromNewick(newick, false, false);
+//
+//            // store set of splits
+//            splitset.clear();
+//            storeSplits(splitset);
+//
+//            // iterator iter will point to the value corresponding to key splitset
+//            // or to end (if splitset is not already a key in the map)
+//            Split::treemap_t::iterator iter = _treeIDs.lower_bound(splitset);
+//
+//            if (iter == _treeIDs.end() || iter->first != splitset) {
+//                // splitset key not found in map, need to create an entry
+//                std::vector<unsigned> v(1, tree_index);  // vector of length 1 with only element set to tree_index
+//                _treeIDs.insert(iter, Split::treemap_t::value_type(splitset, v));
+//            }
+//            else {
+//                // splitset key was found in map, need to add this tree's index to vector
+//                iter->second.push_back(tree_index);
+//            }
+//        } // trees loop
+//    }
+
+//    inline void Proj::storeSplits(set<Split> & splitset) {
+//        // Start by clearing and resizing all splits
+//        for (auto & nd : _tree->_nodes) {
+//            nd._split.resize(_tree->_nleaves);
+//        }
+//
+//        // Now do a postorder traversal and add the bit corresponding
+//        // to the current node in its parent node's split
+//        for (auto nd : boost::adaptors::reverse(_tree->_preorder)) {
+//            if (nd->_left_child) {
+//                // add this internal node's split to splitset
+//                splitset.insert(nd->_split);
+//            }
+//            else {
+//                // set bit corresponding to this leaf node's number
+//                nd->_split.setBitAt(nd->_number);
+//            }
+//
+//            if (nd->_parent) {
+//                // parent's bits are the union of the bits set in all its children
+//                nd->_parent->_split.addSplit(nd->_split);
+//            }
+//        }
+//    }
+
     inline void Proj::run() {
         cout << "Starting..." << endl;
         cout << "Current working directory: " << boost::filesystem::current_path() << endl;
@@ -724,7 +784,8 @@ namespace proj {
             
             // open log file
             ofstream logf("log.txt");
-            logf << "iter" << "\t" << "lp" << "\t" << "theta" << endl;
+//            logf << "iter" << "\t" << "lp" << "\t" << "theta" << "\t" << "gene_tree_log_like" << "\t" << "increment" << "\t" << "increment_prior" << "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior" << "\t" << "topology_prior" << "\t" << "topology_prior" << "\t" << endl;
+            logf << "iter" << "\t" << "lp" << "\t" << "theta" << "\t" << "gene_tree_log_like" << "\t" << "increment" << "\t" << "increment_prior" << "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior" << "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "topology_prior" << "\t" << "topology_prior" << "\t" << endl;
             
         // loop for number of samples (either theta or speciation rate)
             for (_sample=0; _sample<_nsamples; _sample++) {
@@ -787,6 +848,7 @@ namespace proj {
                         }
                         
                         double ess = 1.0/ess_inverse;
+                        cout << "ESS = " << ess << endl;
                     
                         if (ess < 100) {
                             // save particle random seeds
@@ -805,6 +867,14 @@ namespace proj {
                     _accepted_particle_vec = my_vec;
                 } // g loop
                 
+                for (auto &p:my_vec) {
+                    p->getTopologyPriors();
+                }
+                
+//                for (auto & p:my_vec) {
+//                    p->summarizeForests();
+//                }
+                
                 cout << "\t" << "proposed marg like: " << _avg_marg_like;
                 cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood << endl;
                 
@@ -812,7 +882,50 @@ namespace proj {
                 
                 double lp = _avg_marg_like+_theta_prior;
                 
-                logf << _sample << "\t" << lp << " " << "\t" << Forest::_starting_theta << endl;
+                double a = 0;
+                for (auto &p:my_vec) {
+                    
+                    vector<double> branch_length_vec;
+                    for (auto &b:p->getBranchLengths()) {
+                        branch_length_vec.push_back(b);
+                    }
+                    
+                    vector<double> prior_vec;
+                    for (auto &b:p->getBranchLengthPriors()) {
+                        prior_vec.push_back(b);
+                    }
+                    
+                    vector<double> gene_tree_log_like;
+                    for (auto &g:p->getGeneTreeLogLikelihoods()) {
+                        gene_tree_log_like.push_back(g);
+                    }
+                    
+                    vector<double> log_topology_priors;
+                    for (auto &t:p->getTopologyPriors()) {
+                        log_topology_priors.push_back(t);
+                    }
+                    
+                    if (branch_length_vec.size() != prior_vec.size()) {
+                        cout << "branch length size: " << branch_length_vec.size() << endl;
+                        cout << "prior branch length size: " << prior_vec.size() << endl;
+                    }
+//                    showFinal(_accepted_particle_vec);
+                    assert(branch_length_vec.size() == prior_vec.size());
+                
+                    logf << a << "\t" << lp << "\t" << Forest::_starting_theta;
+                    logf << "\t" << gene_tree_log_like[0];
+                    
+                    for (int i=0; i<prior_vec.size(); i++) {
+                        logf << "\t" << branch_length_vec[i] << "\t" << prior_vec[i];
+                    }
+                    
+                    for (int i=0; i<log_topology_priors.size(); i++) {
+                        logf << "\t" << log_topology_priors[i];
+                    }
+                    
+                    logf << endl;
+                    a++;
+                }
                 
                 if (_sample == _nsamples) {
                     logf.close();
@@ -834,7 +947,17 @@ namespace proj {
                 cout << "\n" << "Speciation rate: " << _speciation_rate_vector[_nsamples-1].first << endl;
             }
             saveAllHybridNodes(_accepted_particle_vec);
-            showFinal(_accepted_particle_vec);
+//            showFinal(_accepted_particle_vec);
+//            for (auto &p:_accepted_particle_vec) {
+////                p->summarizeForests();
+//                p->storeNewicks();
+//            }
+//            for (auto &p:_accepted_particle_vec) {
+//                for (auto &n:p->getNewicks()) {
+//                    _newicks.push_back(n);
+//                }
+////                p->summarizeForests();
+//            }
         }
 
         catch (XProj & x) {

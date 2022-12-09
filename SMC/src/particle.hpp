@@ -7,6 +7,7 @@
 #include <random>
 #include <iostream>
 #include <iomanip>
+
 using namespace std;
 using namespace boost;
 
@@ -78,6 +79,13 @@ class Particle {
         double                                          getGeneTreeMargLike() {return _gene_tree_marg_like;}
         void                                            setMarginalLikelihood(double ml) {_gene_tree_marg_like = ml;}
         void                                            setRunOnEmpty(bool a) {_running_on_empty = a;}
+        void                                            summarizeForests();
+        vector<double>                                  getBranchLengths();
+        vector<double>                                  getBranchLengthPriors();
+        vector<double>                                  getGeneTreeLogLikelihoods();
+        vector<double>                                  getTopologyPriors();
+        void                                            storeNewicks();
+        vector<string>                                  getNewicks() {return _newicks;}
 
     private:
 
@@ -92,6 +100,8 @@ class Particle {
         map<int, vector<double>>                     _random_seeds;
         bool                                    _running_on_empty;
         vector<tuple<string, string, string>> _triple;
+        vector<string>                          _newicks;
+        Split::treemap_t                        _treeIDs;
 };
 
     inline Particle::Particle() {
@@ -357,6 +367,75 @@ class Particle {
         _generation = n;
     }
 
+    inline void Particle::summarizeForests() {
+                // Show all unique topologies with a list of the trees that have that topology
+                // Also create a map that can be used to sort topologies by their sample frequency
+                typedef std::pair<unsigned, unsigned> sorted_pair_t;
+                std::vector< sorted_pair_t > sorted;
+                int t = 0;
+                for (auto & key_value_pair : _treeIDs) {
+                    unsigned topology = ++t;
+                    unsigned ntrees = (unsigned)key_value_pair.second.size();
+                    sorted.push_back(std::pair<unsigned, unsigned>(ntrees,topology));
+                    std::cout << "Topology " << topology << " seen in these " << ntrees << " trees:" << std::endl << "  ";
+                    std::copy(key_value_pair.second.begin(), key_value_pair.second.end(), std::ostream_iterator<unsigned>(std::cout, " "));
+                    std::cout << std::endl;
+                }
+        
+                // Show sorted histogram data
+                std::sort(sorted.begin(), sorted.end());
+                //unsigned npairs = (unsigned)sorted.size();
+                std::cout << "\nTopologies sorted by sample frequency:" << std::endl;
+                std::cout << boost::str(boost::format("%20s %20s") % "topology" % "frequency") << std::endl;
+                for (auto & ntrees_topol_pair : boost::adaptors::reverse(sorted)) {
+                    unsigned n = ntrees_topol_pair.first;
+                    unsigned t = ntrees_topol_pair.second;
+                    std::cout << boost::str(boost::format("%20d %20d") % t % n) << std::endl;
+                }
+    }
+
+    inline vector<double> Particle::getBranchLengths() {
+        vector<double> divergence_times;
+        for (auto &f:_forests) {
+            for (auto &b:f._branch_lengths) {
+                divergence_times.push_back(b);
+            }
+        }
+        return divergence_times;
+    }
+
+    inline vector<double> Particle::getBranchLengthPriors() {
+        vector<double> priors;
+        for (auto &f:_forests) {
+            for (auto &b:f._branch_length_priors) {
+                priors.push_back(b);
+            }
+        }
+        return priors;
+    }
+
+    inline vector<double> Particle::getGeneTreeLogLikelihoods() {
+        vector<double> gene_tree_log_likelihoods;
+        for (int i=1; i<_forests.size(); i++) {
+            gene_tree_log_likelihoods.push_back(_forests[i]._gene_tree_log_likelihood);
+        }
+        return gene_tree_log_likelihoods;
+    }
+    
+    inline vector<double> Particle::getTopologyPriors() {
+        vector<double> topology_priors;
+        for (auto &f:_forests) {
+            topology_priors.push_back(f.calcTopologyPrior());
+        }
+        return topology_priors;
+    }
+
+    inline void Particle::storeNewicks() {
+        for (auto &f:_forests) {
+            _newicks.push_back(f.makeNewick(9, true));
+        }
+    }
+
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_likelihood = other._log_likelihood;
@@ -367,5 +446,6 @@ class Particle {
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;
         _triple         = other._triple;
+        _newicks = other._newicks;
     };
 }
