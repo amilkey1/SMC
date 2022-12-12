@@ -1994,42 +1994,166 @@ class Forest {
         saveDivergenceTimes(_last_edge_length);
     }
 
-    inline double Forest::calcTopologyPrior() {
-        // only call function at final generation
-        assert(_lineages.size() == 1);
-        vector<int> interior_node_count;
-        Node* nd = _lineages[0];
-        while (nd) {
-            // if internal node has children, need to also count the node itself
-//        for (auto &lineage:_lineages) {
-//            Node* nd = lineage;
-            // if internal node has children, need to also count the node itself
-            if (nd->_left_child) {
-                interior_node_count.push_back(countDescendants(nd, 1));
-            }
-            else {
-                interior_node_count.push_back(countDescendants(nd, 0));
-            }
-            nd = findNextPreorder(nd);
-        }
-        int tip_node_number = 0;
-        if (_index == 0) {
-            // species tree
-            tip_node_number = _nspecies;
-        }
-        else {
-            // gene tree
-            tip_node_number = _ntaxa;
-        }
-        
-        int log_sum = 0;
-        for (auto &c:interior_node_count) {
-            log_sum += c;
-        }
-        
-        _topology_prior = ((tip_node_number - 1) * log(2.0) - lgamma(tip_node_number+1) - log_sum);
-        return _topology_prior;
-    }
+//    inline double Forest::calcTopologyPrior() {
+//        // only call function at final generation
+//        assert(_lineages.size() == 1);
+//        vector<int> interior_node_count;
+//        Node* nd = _lineages[0];
+//        while (nd) {
+//            // if internal node has children, need to also count the node itself
+////        for (auto &lineage:_lineages) {
+////            Node* nd = lineage;
+//            // if internal node has children, need to also count the node itself
+//            if (nd->_left_child) {
+//                interior_node_count.push_back(countDescendants(nd, 1));
+//            }
+//            else {
+//                interior_node_count.push_back(countDescendants(nd, 0));
+//            }
+//            nd = findNextPreorder(nd);
+//        }
+//        int tip_node_number = 0;
+//        if (_index == 0) {
+//            // species tree
+//            tip_node_number = _nspecies;
+//        }
+//        else {
+//            // gene tree
+//            tip_node_number = _ntaxa;
+//        }
+//
+//        int log_sum = 0;
+//        for (auto &c:interior_node_count) {
+//            log_sum += c;
+//        }
+//
+//        _topology_prior = ((tip_node_number - 1) * log(2.0) - lgamma(tip_node_number+1) - log_sum);
+//        return _topology_prior;
+//    }
+
+inline double Forest::calcTopologyPrior() {
+       // Compute the probability of the tree topology only
+       // The probability of a "Markovian" tree topology (both Yule and Coalescent)
+       // is given in Tanja Stadler's Ph.D. thesis:
+       //
+       // https://arxiv.org/pdf/math/0610919.pdf
+       //
+       // See example 2.2.6, p. 15, second equation (for P_Y(T)) for an example
+       // calculation using the ranked, rooted tree in Fig. 1.6. The formula for
+       // the tree topology (marginalized over all possible rankings) is not
+       // difficult to calculate:
+       //
+       // log[P(T)] = (n-1) log(2) - log(n!) - sum_i log(n_i)
+       //
+       // where n_i = number of interior nodes descending from interior node i
+       // Note that each node counts as a descendant of itself
+       
+       // Here is the tree in Fig. 1.6:
+       //
+       //  a   b   c   d   e   f   g   h   i   j   k    node 10 has  1 descendants
+       //  |   |   |   |   |   |   |   |   |   |   |    node  9 has  1 descendants
+       //  |   +-5-+   +-8-+   +-9-+   +10-+   +-7-+    node  8 has  1 descendants
+       //  |     |       |       |       |       |      node  7 has  1 descendants
+       //  +--4--+       |       +---6---+       |      node  6 has  3 descendants
+       //     |          |           |           |      node  5 has  1 descendants
+       //     +----3-----+           +-----2-----+      node  4 has  2 descendants
+       //          |                       |            node  3 has  4 descdendants
+       //          +-----------1-----------+            node  2 has  5 descendants
+       //                      |                        node  1 has 10 descendants
+       //
+       // X = {a,b,c,d,e,f,g,h,i,j,k}
+       // n = |X| = 11
+       //
+       // log[P(T)] = (n-1) log(2) - log(n!) - sum_i log(n_i)
+       //           = 10*log(2) - lgamma(12) - log(10) - log(5) - log(4) - log(2) - log(1)
+       //              - log(3) - log(1) - log(1) - log(1) - log(1)
+       //           = -17.66091
+       // exp(-17.66091) = 0.213778e-07 accords with answer 0.21e-7 given in the dissertation.
+       //
+       
+       // Visiting nodes in preorder sequence...
+       // node  stack
+       //   1     1
+       //   3     1,3
+       //   4     1,3,4
+       //   a     ---
+       //   5     1,3,4,5
+       //   b     ---
+       //   c     --- 5 popped (no rsib), 4 popped (first to have rsib)
+       //   8     1,3,8
+       //   d     ---
+       //   e     --- 8 popped (no rsib), 3 popped (first to have rsib)
+       //   2     1,2
+       //   6     1,2,6
+       //   9     1,2,6,9
+       //   f     ---
+       //   g     --- 9 popped (first to have rsib)
+       //  10     1,2,6,10
+       //   h     ---
+       //   i     --- 10 popped (no rsib), 6 popped (first to have rsib)
+       //   7     1,2,7
+       //   j     ---
+       //   k     --- 7 popped (no rsib), 2 popped (no rsib), 1 popped (no rsib)
+       //
+       //  note that:
+       //    node 1 appears 10 times,
+       //    node 2 appears 5 times,
+       //    node 3 appears 4 times,
+       //    node 4 appears 2 times,
+       //    nodes 5, 7, 8, 9, and 10 each appear 1 time, and
+       //    node 6 appears 3 times
+       
+       // Should only be called for complete trees (this could be relaxed however)
+       assert(_lineages.size() == 1);
+       
+       //cerr << "\n" << makeNewick(5,false) << "\n" << endl;
+       
+       vector< Node *> node_stack;
+       map< Node *, unsigned> counts;
+       unsigned nleaves = 0;
+       unsigned ninternals = 0;
+        Node * nd = *(_lineages.begin());
+       while (nd) {
+           if (nd->_left_child) {
+               // internal node
+               ninternals++;
+               node_stack.push_back(nd);
+               for (auto nd : node_stack) {
+                   counts[nd]++;
+               }
+           }
+           else {
+               // leaf node
+               nleaves++;
+               if (!nd->_right_sib) {
+                    Node * popped = (node_stack.empty() ? 0 : *(node_stack.rbegin()));
+                   while (popped && !popped->_right_sib) {
+                       node_stack.pop_back();
+                       if (node_stack.empty()) {
+                           popped = 0;
+                       }
+                       else {
+                           popped = *node_stack.rbegin();
+                       }
+                   }
+                   if (popped && popped->_right_sib) {
+                       node_stack.pop_back();
+                   }
+               }
+           }   // leaf node
+           nd = findNextPreorder(nd);
+       }   // while (nd)...
+       
+       double log_topology_prob = float(nleaves)*log(2.) - lgamma(nleaves+1);
+       assert(ninternals == counts.size());
+       for (auto c : counts) {
+           log_topology_prob -= log(c.second);
+       }
+       
+       //cerr << "log_topology_prob = " << log_topology_prob << "\n" << endl;
+       
+       return log_topology_prob;
+   }
 
     inline unsigned Forest::countDescendants(Node* nd, unsigned count) {
         for (Node * child = nd->_left_child; child; child=child->_right_sib) {

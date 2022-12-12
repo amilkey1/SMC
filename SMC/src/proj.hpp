@@ -783,9 +783,7 @@ namespace proj {
             if (_estimate_hybridization_rate) {_hybrid_rate_lambda = 0.003;}
             
             // open log file
-            ofstream logf("log.txt");
-//            logf << "iter" << "\t" << "lp" << "\t" << "theta" << "\t" << "gene_tree_log_like" << "\t" << "increment" << "\t" << "increment_prior" << "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior" << "\t" << "topology_prior" << "\t" << "topology_prior" << "\t" << endl;
-            logf << "iter" << "\t" << "lp" << "\t" << "theta" << "\t" << "gene_tree_log_like" << "\t" << "increment" << "\t" << "increment_prior" << "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "increment" << "\t" << "increment_prior" << "\t" << "increment" << "\t" << "increment_prior"<< "\t" << "topology_prior" << "\t" << "topology_prior" << "\t" << endl;
+            ofstream logf("log.log");
             
         // loop for number of samples (either theta or speciation rate)
             for (_sample=0; _sample<_nsamples; _sample++) {
@@ -905,13 +903,19 @@ namespace proj {
                         log_topology_priors.push_back(t);
                     }
                     
-                    if (branch_length_vec.size() != prior_vec.size()) {
-                        cout << "branch length size: " << branch_length_vec.size() << endl;
-                        cout << "prior branch length size: " << prior_vec.size() << endl;
-                    }
+//                    if (branch_length_vec.size() != prior_vec.size()) {
+//                        cout << "branch length size: " << branch_length_vec.size() << endl;
+//                        cout << "prior branch length size: " << prior_vec.size() << endl;
+//                    }
 //                    showFinal(_accepted_particle_vec);
                     assert(branch_length_vec.size() == prior_vec.size());
                 
+                    logf << "iter" << "\t" << "lp" << "\t" << "theta" << "\t" << "gene_tree_log_like";
+                    for (int i = 0; i < branch_length_vec.size(); i++) {
+                        logf << "\t" << "increment" << "\t" << "increment_prior";
+                    }
+                    logf << "\t" << "topology_prior" << "\t" << "topology_prior" << endl;
+                    
                     logf << a << "\t" << lp << "\t" << Forest::_starting_theta;
                     logf << "\t" << gene_tree_log_like[0];
                     
