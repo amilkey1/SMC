@@ -287,11 +287,11 @@ namespace proj {
 
         double log_max_weight = *max_element(log_weight_vec.begin(), log_weight_vec.end());
         
-        ofstream testf("test.txt");
-        for (auto &l:log_weight_vec) {
-            testf << l << "\n";
-        }
-        testf.close();
+//        ofstream testf("test.txt");
+//        for (auto &l:log_weight_vec) {
+//            testf << l << "\n";
+//        }
+//        testf.close();
         
         for (auto & i:log_weight_vec) {
             running_sum += exp(i - log_max_weight);
@@ -821,11 +821,14 @@ namespace proj {
                 
                 _avg_marg_like = 0.0;
                 
+                for (auto &p:my_vec) {
+                    p->setRunOnEmpty(_run_on_empty);
+                }
+                
                 //run through each generation of particles
-                for (unsigned g=0; g<nspecies; g++){
-                        for (auto &p:my_vec) {
-                            p->setRunOnEmpty(_run_on_empty);
-                        }
+                int ntaxa = (int) _taxon_map.size();
+                for (unsigned g=0; g<ntaxa-1; g++){
+//                    if (my_vec[0]->_suppress_resampling <= 1) {
 //                    cout << "gen " << g << endl;
                     //taxon joining and reweighting step
                     proposeParticles(my_vec);
@@ -833,7 +836,7 @@ namespace proj {
                     if (!_run_on_empty) {
                         vector<double> total_marg_like;
                         for (auto & p:my_vec) {
-                            total_marg_like.push_back(p->calcGeneTreeMarginalLikelihood());
+                            total_marg_like.push_back(p->calcGeneTreeMarginalLikelihood()); // TODO: don't need to recalculate this, can just get it
                         }
                         
                         _avg_marg_like = getRunningSum(total_marg_like) - log(_nparticles);
@@ -848,7 +851,7 @@ namespace proj {
                         double ess = 1.0/ess_inverse;
                         cout << "ESS = " << ess << endl;
                     
-                        if (ess < 100) {
+//                        if (ess < 100) {
                             // save particle random seeds
                             
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
@@ -859,13 +862,18 @@ namespace proj {
 
                             //change use_first from true to false or false to true
                             use_first = !use_first;
-                        }
+//                        }
                     }
                     resetWeights(my_vec);
                     _accepted_particle_vec = my_vec;
+//                    if (my_vec[0]->_suppress_resampling == 1) {
+//                        my_vec[0]->_suppress_resampling++;
+////                    }
+//                    }
                 } // g loop
                 
                 for (auto &p:my_vec) {
+                    p->showParticle();
                     p->getTopologyPriors();
                 }
                 
@@ -876,9 +884,11 @@ namespace proj {
                 cout << "\t" << "proposed marg like: " << _avg_marg_like;
                 cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood << endl;
                 
-                estimateParameters(my_vec);
+                if (_estimate_theta || _estimate_speciation_rate || _estimate_hybridization_rate) {
+                    estimateParameters(my_vec);
+                }
                 
-                double lp = _avg_marg_like+_theta_prior;
+//                double lp = _avg_marg_like+_theta_prior;
                 
                 double a = 0;
                 unsigned col_count = 0;
@@ -908,14 +918,14 @@ namespace proj {
                     assert(branch_length_vec.size() == prior_vec.size());
                     
                     if (col_count == 0) {
-                        logf << "iter" << "\t" << "lp" << "\t" << "theta" << "\t" << "gene_tree_log_like";
+                        logf << "iter" << "\t" << "theta" << "\t" << "gene_tree_log_like";
                         for (int i = 0; i < branch_length_vec.size(); i++) {
                             logf << "\t" << "increment" << "\t" << "increment_prior";
                         }
                         logf << "\t" << "topology_prior" << "\t" << "topology_prior" << endl;
                     }
                     
-                    logf << a << "\t" << lp << "\t" << Forest::_starting_theta;
+                    logf << a << "\t" << Forest::_starting_theta;
                     logf << "\t" << gene_tree_log_like[0];
                     
                     for (int i=0; i<prior_vec.size(); i++) {
@@ -934,7 +944,6 @@ namespace proj {
                 if (_sample == _nsamples) {
                     logf.close();
                 }
-                
                 } // _nsamples loop - number of samples
 //            saveParticleWeights(_accepted_particle_vec);
 //            saveParticleLikelihoods(_accepted_particle_vec);
@@ -950,7 +959,7 @@ namespace proj {
                 printSpeciationRates();
                 cout << "\n" << "Speciation rate: " << _speciation_rate_vector[_nsamples-1].first << endl;
             }
-            saveAllHybridNodes(_accepted_particle_vec);
+//            saveAllHybridNodes(_accepted_particle_vec);
 //            showFinal(_accepted_particle_vec);
 //            for (auto &p:_accepted_particle_vec) {
 ////                p->summarizeForests();
@@ -962,6 +971,7 @@ namespace proj {
 //                }
 ////                p->summarizeForests();
 //            }
+            cout << "marg like: " << _avg_marg_like << endl;
         }
 
         catch (XProj & x) {

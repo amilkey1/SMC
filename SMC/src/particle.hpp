@@ -86,6 +86,7 @@ class Particle {
         vector<double>                                  getTopologyPriors();
         void                                            storeNewicks();
         vector<string>                                  getNewicks() {return _newicks;}
+//        int                                             _suppress_resampling = 0;
 
     private:
 
@@ -102,6 +103,7 @@ class Particle {
         vector<tuple<string, string, string>> _triple;
         vector<string>                          _newicks;
         Split::treemap_t                        _treeIDs;
+        tuple<string, string, string>           _t;
 };
 
     inline Particle::Particle() {
@@ -185,12 +187,15 @@ class Particle {
         }
         else if (_forests[0]._lineages.size()==1) {
             for (unsigned i=1; i<_forests.size(); i++) {
-                list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
-                _forests[i].fullyCoalesceGeneTree(lineages_list);
+                if (_forests[i]._lineages.size() > 1) {
+                    list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
+                    _forests[i].fullyCoalesceGeneTree(lineages_list);
+                }
             }
         }
         else {
-            event = _forests[0].chooseEvent();
+//            event = _forests[0].chooseEvent();
+            event = "speciation";
             if (event == "hybridization") {
                 vector<string> hybridized_nodes = _forests[0].hybridizeSpecies();
                 if (_forests[0]._lineages.size()>1) {
@@ -202,17 +207,64 @@ class Particle {
                 calculateGamma();
             }
             else if (event == "speciation") {
-                tuple<string, string, string> t = _forests[0].speciesTreeProposal();
-                if (_forests[0]._lineages.size()>1) {
-                    _forests[0].addSpeciesIncrement();
+                // only join a new species if gene trees have been extended down to base of species tree (if gene tree height = species tree height)
+                double gene_tree_height = _forests[1].getTreeHeight();
+                double species_tree_height = _forests[0].getTreeHeight();
+                // ready to join species
+                if (gene_tree_height >= species_tree_height) { // TODO: not sure if this is correct
+//                    tuple<string, string, string> t = _forests[0].speciesTreeProposal();
+                    _t = _forests[0].speciesTreeProposal();
+                    if (_forests[0]._lineages.size()>1) {
+                        _forests[0].addSpeciesIncrement();
+                    }
                 }
+                // don't join any species, must finish the gene trees first
                 for (unsigned i=1; i<_forests.size(); i++){
-                    _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
+                    // if species have been joined in the previous generation
+                    if (_forests[0]._lineages.size() != Forest::_nspecies) {
+                       if (_forests[0]._lineages.size()==1) {
+                            for (unsigned i=1; i<_forests.size(); i++) {
+                                if (_forests[i]._lineages.size() > 1) {
+                                    list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
+                                    _forests[i].fullyCoalesceGeneTree(lineages_list);
+                                }
+                            }
+                        }
+                       else {
+                           if (_forests[i]._lineages.size() > 1) {
+                                _forests[i].geneTreeProposal(_t, _forests[0]._last_edge_length);
+                           }
+                       }
+                    }
+                    // if no species have been joined in the previous generation
+                    if (_forests[0]._lineages.size() == Forest::_nspecies) {
+                        for (unsigned i=1; i<_forests.size(); i++){
+                            if (_forests[i]._lineages.size() > 1) {
+                                _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
+                            }
+                        }
+                    }
                 }
+            }
+        }
+        // if any forests have had no coalescence, continue again through the species tree join and gene tree proposals
+        // TODO: I'm not sure how this works if one gene tree had coalescence and one didn't
+        // TODO: this does not account for hybridization
+        for (int i=1; i<_forests.size(); i++) {
+            if (_forests[i]._num_coalescent_events_in_generation == 0) {
+                _generation++;
+                proposal();
+                break;
             }
         }
         
         if (_running_on_empty == false) {
+            for (int i = 1; i<_forests.size(); i++) {
+                if (_forests[i]._num_coalescent_events_in_generation > 1) {
+                    double smallest_branch = _forests[i].findShallowestCoalescence();
+                    _forests[i].revertToShallowest(smallest_branch);
+                }
+            }
             calcGeneTreeMarginalLikelihood();
             _log_weight = _gene_tree_marg_like - _prev_gene_tree_marg_like;
         }
@@ -221,6 +273,11 @@ class Particle {
             _generation++;
         }
         
+        for (int i = 1; i<_forests.size(); i++) {
+            _forests[i]._num_coalescent_events_in_generation = 0;
+            _forests[i]._searchable_branch_lengths.clear();
+            _forests[i]._new_nodes.clear();
+        }
         return _log_weight;
     }
 
@@ -368,37 +425,37 @@ class Particle {
     }
 
     inline void Particle::summarizeForests() {
-                // Show all unique topologies with a list of the trees that have that topology
-                // Also create a map that can be used to sort topologies by their sample frequency
-                typedef std::pair<unsigned, unsigned> sorted_pair_t;
-                std::vector< sorted_pair_t > sorted;
-                int t = 0;
-                for (auto & key_value_pair : _treeIDs) {
-                    unsigned topology = ++t;
-                    unsigned ntrees = (unsigned)key_value_pair.second.size();
-                    sorted.push_back(std::pair<unsigned, unsigned>(ntrees,topology));
-                    std::cout << "Topology " << topology << " seen in these " << ntrees << " trees:" << std::endl << "  ";
-                    std::copy(key_value_pair.second.begin(), key_value_pair.second.end(), std::ostream_iterator<unsigned>(std::cout, " "));
-                    std::cout << std::endl;
-                }
-        
-                // Show sorted histogram data
-                std::sort(sorted.begin(), sorted.end());
-                //unsigned npairs = (unsigned)sorted.size();
-                std::cout << "\nTopologies sorted by sample frequency:" << std::endl;
-                std::cout << boost::str(boost::format("%20s %20s") % "topology" % "frequency") << std::endl;
-                for (auto & ntrees_topol_pair : boost::adaptors::reverse(sorted)) {
-                    unsigned n = ntrees_topol_pair.first;
-                    unsigned t = ntrees_topol_pair.second;
-                    std::cout << boost::str(boost::format("%20d %20d") % t % n) << std::endl;
-                }
+        // Show all unique topologies with a list of the trees that have that topology
+        // Also create a map that can be used to sort topologies by their sample frequency
+        typedef std::pair<unsigned, unsigned> sorted_pair_t;
+        std::vector< sorted_pair_t > sorted;
+        int t = 0;
+        for (auto & key_value_pair : _treeIDs) {
+            unsigned topology = ++t;
+            unsigned ntrees = (unsigned)key_value_pair.second.size();
+            sorted.push_back(std::pair<unsigned, unsigned>(ntrees,topology));
+            std::cout << "Topology " << topology << " seen in these " << ntrees << " trees:" << std::endl << "  ";
+            std::copy(key_value_pair.second.begin(), key_value_pair.second.end(), std::ostream_iterator<unsigned>(std::cout, " "));
+            std::cout << std::endl;
+        }
+
+        // Show sorted histogram data
+        std::sort(sorted.begin(), sorted.end());
+        //unsigned npairs = (unsigned)sorted.size();
+        std::cout << "\nTopologies sorted by sample frequency:" << std::endl;
+        std::cout << boost::str(boost::format("%20s %20s") % "topology" % "frequency") << std::endl;
+        for (auto & ntrees_topol_pair : boost::adaptors::reverse(sorted)) {
+            unsigned n = ntrees_topol_pair.first;
+            unsigned t = ntrees_topol_pair.second;
+            std::cout << boost::str(boost::format("%20d %20d") % t % n) << std::endl;
+        }
     }
 
     inline vector<double> Particle::getBranchLengths() {
         vector<double> divergence_times;
         for (auto &f:_forests) {
-            for (auto &b:f._branch_lengths) {
-                divergence_times.push_back(b);
+            for (auto &b:f._increments) {
+                divergence_times.push_back(b.first);
             }
         }
         return divergence_times;
@@ -407,8 +464,8 @@ class Particle {
     inline vector<double> Particle::getBranchLengthPriors() {
         vector<double> priors;
         for (auto &f:_forests) {
-            for (auto &b:f._branch_length_priors) {
-                priors.push_back(b);
+            for (auto &b:f._increments) {
+                priors.push_back(b.second);
             }
         }
         return priors;
@@ -424,6 +481,7 @@ class Particle {
     
     inline vector<double> Particle::getTopologyPriors() {
         vector<double> topology_priors;
+//        showParticle();
         for (auto &f:_forests) {
             topology_priors.push_back(f.calcTopologyPrior());
         }
@@ -447,5 +505,7 @@ class Particle {
         _generation     = other._generation;
         _triple         = other._triple;
         _newicks = other._newicks;
+        _t = other._t;
+//        _suppress_resampling = other._suppress_resampling;
     };
 }
