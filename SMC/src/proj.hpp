@@ -836,7 +836,8 @@ namespace proj {
                     if (!_run_on_empty) {
                         vector<double> total_marg_like;
                         for (auto & p:my_vec) {
-                            total_marg_like.push_back(p->calcGeneTreeMarginalLikelihood()); // TODO: don't need to recalculate this, can just get it
+                            total_marg_like.push_back(p->getGeneTreeMargLike());
+
                         }
                         
                         _avg_marg_like = getRunningSum(total_marg_like) - log(_nparticles);

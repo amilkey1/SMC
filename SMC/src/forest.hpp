@@ -152,7 +152,8 @@ class Forest {
         unsigned                    _num_coalescent_events_in_generation;
 //        vector<double>              _searchable_branch_lengths;
     vector<pair<double, double>> _searchable_branch_lengths; // pair is lineage height, increment
-    
+        double                      _gene_tree_cum_time; // gene tree cumulative height in this lineage only
+
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
         double                      calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
@@ -283,7 +284,7 @@ class Forest {
 
     inline double Forest::getLineageHeight(Node* nd) {
         double sum_height = 0.0;
-        
+
         sum_height += nd->getEdgeLength();
         if (nd->_left_child) {
             for (Node* child = nd->_left_child; child; child=child->_left_child) {
@@ -689,7 +690,7 @@ class Forest {
 
         // reweight each choice of pairs
         vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood);
-        
+
         // sum unnormalized weights before choosing the pair
         _gene_tree_log_weight = 0.0;
         for (auto &l:log_weight_choices) {
@@ -701,21 +702,21 @@ class Forest {
         for (int b=0; b < (int) log_weight_choices.size(); b++) {
             log_weight_choices[b] -= log_weight_choices_sum;
         }
-        
+
         // randomly select a pair
         _index_of_choice = selectPair(log_weight_choices);
 
         // find nodes to join in node_list
         Node *subtree1 = _node_choices[_index_of_choice].first;
         Node *subtree2 = _node_choices[_index_of_choice].second;
-        
+
         // erase extra nodes created from node list
         for (int i = 0; i < _node_choices.size(); i++) {
             _nodes.pop_back();
         }
-        
+
         _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
-        
+
         return make_pair(subtree1, subtree2);
     }
 
@@ -758,12 +759,12 @@ class Forest {
     inline double Forest::getRunningSumHybridChoices(vector<double> &log_weight_choices) {
         double running_sum = 0.0;
         double log_weight_choices_sum = 0.0;
-        
+
         double log_max_weight = *max_element(log_weight_choices.begin(), log_weight_choices.end());
         for (auto & i:log_weight_choices) {
             running_sum += exp(i - log_max_weight);
         }
-        
+
         log_weight_choices_sum = log(running_sum) + log_max_weight;
         return log_weight_choices_sum;
     }
@@ -852,7 +853,7 @@ class Forest {
         double edge_length = rng.gamma(1.0, 1.0/_ntaxa);
         _rand_numbers.push_back(edge_length);
         _lineages.reserve(_nodes.size());
-        
+
         for (unsigned i = 0; i < _ntaxa; i++) {
             Node* nd = &*next(_nodes.begin(), i);
             nd->_right_sib=0;
@@ -909,6 +910,7 @@ class Forest {
 //        _newicks = other._newicks;
         _num_coalescent_events_in_generation = other._num_coalescent_events_in_generation;
         _searchable_branch_lengths = other._searchable_branch_lengths;
+        _gene_tree_cum_time = other._gene_tree_cum_time;
 
         // copy tree itself
 
@@ -1021,9 +1023,9 @@ class Forest {
         string event;
         // hybridization prior
         double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
-        
+
         double hybridization_prob = _hybridization_rate/(_hybridization_rate+_speciation_rate);
-        
+
         double u = rng.uniform();
         _rand_numbers.push_back(u);
         if (u<hybridization_prob && _lineages.size()>2) {
@@ -1037,21 +1039,21 @@ class Forest {
         }
         // choose edge length but don't add it yet
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
-        
+
         if (_lineages.size()>2) {
             _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
 //            _branch_length_priors.push_back(log(rate)-_last_edge_length*rate);
         }
-        
+
 //        _rand_numbers.push_back(_last_edge_length);
-        
+
         return event;
     }
 
     inline void Forest::chooseSpeciesIncrement() {
         // hybridization prior
         double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
-        
+
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 //        _branch_length_priors.push_back(log(rate)-_last_edge_length*rate);
 //        _rand_numbers.push_back(_last_edge_length);
@@ -1065,12 +1067,12 @@ class Forest {
 
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
         // this function creates a new node and joins two species
-        
+
         pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
         Node *subtree1=_lineages[t.first];
         Node *subtree2=_lineages[t.second];
         assert(!subtree1->_parent && !subtree2->_parent);
-        
+
         Node nd;
         _nodes.push_back(nd);
         Node* new_nd = &_nodes.back();
@@ -1086,7 +1088,7 @@ class Forest {
 
         subtree1->_parent=new_nd;
         subtree2->_parent=new_nd;
-        
+
         updateNodeVector (_lineages, subtree1, subtree2, new_nd);
 
         _species_joined = make_pair(subtree1, subtree2);
@@ -1103,11 +1105,11 @@ class Forest {
         if (_species_joined.first != NULL) {
             cout << "joining species " << _species_joined.first->_name << " and " << _species_joined.second->_name << endl;
         }
-        
+
         else if (get<0>(_hybrid_species_joined) != NULL) {
             cout << "hybridizing species " << get<0>(_hybrid_species_joined)->_name << " (hybrid) and " << get<1>(_hybrid_species_joined)->_name << " (parent) and " << get<2>(_hybrid_species_joined)->_name <<  " (parent2) " << endl;
         }
-        
+
         else {
             cout << "no species joined" << endl;
         }
@@ -1129,7 +1131,7 @@ class Forest {
         // reset _log_likelihood_choices each time a new lineage is entered
         _log_likelihood_choices.clear();
         bool done = false;
-        double cum_time = 0.0;
+        double cum_time = _gene_tree_cum_time;
         bool coalescence = false;
 
     while (!done) {
@@ -1139,7 +1141,7 @@ class Forest {
         double s = nodes.size();
         double coalescence_rate = s*(s-1)/_theta;
         increment = rng.gamma(1.0, 1.0/(coalescence_rate));
-        
+
 //        if (s>1) {
 //            _branch_length_priors.push_back(log(coalescence_rate)-increment*coalescence_rate);
 //        }
@@ -1239,9 +1241,9 @@ class Forest {
             subtree1 = nodes.front();
             subtree2 = nodes.back();
         }
-        
+
         assert (subtree1 != subtree2);
-        
+
         //new node is always needed
         Node nd;
         _nodes.push_back(nd);
@@ -1263,16 +1265,16 @@ class Forest {
         assert (new_nd->_partial == nullptr);
         new_nd->_partial=ps.getPartial(_npatterns*4);
         assert(new_nd->_left_child->_right_sib);
-        
+
         _new_nodes.push_back(new_nd);
         calcPartialArray(new_nd);
-        
+
         _num_coalescent_events_in_generation++;
 
         //update species list
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-        
+
         if (_proposal == "prior-prior" || nodes.size() == 1) {
             _gene_tree_log_likelihood = calcLogLikelihood();
             _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
@@ -1300,7 +1302,7 @@ class Forest {
             double s = nodes.size();
             double coalescence_rate = s*(s-1)/_theta;
             double increment = rng.gamma(1.0, 1.0/coalescence_rate);
-            
+
 //            _rand_numbers.push_back(increment);
 
             bool lineages_left_to_join = s > 1;
@@ -1316,7 +1318,7 @@ class Forest {
                 }
                 Node* subtree1 = nullptr;
                 Node *subtree2 = nullptr;
-                
+
                 _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
 //                _searchable_branch_lengths.push_back(increment);
 //                _searchable_branch_lengths.push_back(getLineageHeight(_new_nodes.back()));
@@ -1342,7 +1344,7 @@ class Forest {
 // prior-post proposal
                     if (_proposal == "prior-post") {
                         pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
-                        
+
                         subtree1 = t.first;
                         subtree2 = t.second;
                     }
@@ -1358,7 +1360,7 @@ class Forest {
                 Node nd;
                 _nodes.push_back(nd);
                 Node* new_nd = &_nodes.back();
-                
+
                 new_nd->_parent=0;
                 new_nd->_number=_nleaves+_ninternals;
                 new_nd->_edge_length=0.0;
@@ -1370,7 +1372,7 @@ class Forest {
 
                 subtree1->_parent=new_nd;
                 subtree2->_parent=new_nd;
-                
+
                 _new_nodes.push_back(new_nd);
 
                 assert (new_nd->_partial == nullptr);
@@ -1384,7 +1386,7 @@ class Forest {
                 //update species list
                 updateNodeList(nodes, subtree1, subtree2, new_nd);
                 updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-                
+
                 _gene_tree_log_likelihood = calcLogLikelihood();
                 _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
                 _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
@@ -1400,7 +1402,7 @@ class Forest {
         if (_species_partition.size() == 1) {
             fullyCoalesceGeneTree(_species_partition.begin()->second);
         }
-        
+
         else {
             for (auto &s:_species_partition) {
                 assert (s.second.size()>0);
@@ -1426,14 +1428,11 @@ class Forest {
             _species_partition.erase(species1);
             _species_partition.erase(species2);
         }
-        
+
         if (_species_partition.size() == 1) {
-            for (auto &s:_species_partition) {
-                cout << "x";
-            }
             fullyCoalesceGeneTree(_species_partition.begin()->second);
         }
-        
+
         else {
             for (auto &s:_species_partition) {
                 assert (s.second.size()>0);
@@ -1495,7 +1494,7 @@ class Forest {
         auto it2 = find(node_vector.begin(), node_vector.end(), delnode2);
         assert(it2 != node_vector.end());
         node_vector.erase(it2);
-        
+
         // Delete delnode3 from node_vector
         auto it3 = find(node_vector.begin(), node_vector.end(), delnode3);
         assert(it3 != node_vector.end());
@@ -1522,13 +1521,21 @@ class Forest {
 
         auto position2 = addnode2->_position_in_lineages;
         auto iter2 = addnode2;
-        
-        if (position1 > node_vector.size()) {
+
+        if (position1 > node_vector.size()+1) {
             position1 = position1-1;
+            if (position2 > 0) {
+                position2 = position2-1;
+            }
         }
-        if (position2 > node_vector.size()) {
+        if (position2 > node_vector.size()+1) {
             position2 = position2-1;
+            if (position1 > 0) {
+                position1 = position1-1;
+            }
         }
+
+        assert (position1 != position2);
 
         // lower position must be inserted first
         if (position1 < position2) {
@@ -1540,8 +1547,8 @@ class Forest {
             node_vector.insert(node_vector.begin()+position1, iter1);
         }
 
-        assert(_lineages[addnode1->_position_in_lineages] == addnode1);
-        assert(_lineages[addnode2->_position_in_lineages] == addnode2);
+//        assert(_lineages[addnode1->_position_in_lineages] == addnode1);
+//        assert(_lineages[addnode2->_position_in_lineages] == addnode2);
 
         // reset _position_in_lineages
         for (int i=0; i < (int) _lineages.size(); i++) {
@@ -1655,10 +1662,10 @@ class Forest {
         }
 
         deleteTaxon(key_to_del, taxon_choice);
-        
+
         // calculate difference between lineage length of migrating taxon and target edge length (lineage taxon is migrating into)
         double difference = calculateNewEdgeLength(key_to_add, taxon_to_migrate);
-        
+
         // set edge length of migrating taxon or target edge length (lineage taxon is migrating into)
         setNewEdgeLength(difference, taxon_to_migrate, key_to_add);
     }
@@ -1666,11 +1673,11 @@ class Forest {
     inline string Forest::chooseLineage (Node* taxon_to_migrate, string key_to_del) {
         // make vector of species names
         vector<string> species_names;
-        
+
         for (auto & s:_species_partition) {
             species_names.push_back(s.first);
         }
-        
+
         // choose lineage to migrate into
         string key_to_add;
         mtx.lock();
@@ -1720,18 +1727,18 @@ class Forest {
                 break;
             }
         }
-        
+
         // get target lineage edge length
         for (Node* child = taxon_in_target_lineage; child; child=child->_left_child) {
             target_edge_length += child->_edge_length;
         }
-        
+
         // get edge length of migrating lineage
         double migrating_edge_length = 0.0;
         for (Node* child = taxon_to_migrate; child; child = child->_left_child) {
             migrating_edge_length += child->_edge_length;
         }
-            
+
         // compare target edge length to migrating edge length
         double difference = target_edge_length - migrating_edge_length;
         return difference;
@@ -1742,7 +1749,7 @@ class Forest {
         if (difference > 0.0) {
             taxon_to_migrate->_edge_length += difference;
         }
-        
+
         // if migrating lineage is longer than target lineage, extend target edge length
         // TODO: does this work if migrating taxon has edge length 0 but its children do not?
         // TODO: can this be simplified?
@@ -1773,7 +1780,7 @@ class Forest {
 
         // find hybridizing lineage
         // move the gene in the hybrid node left or right
-        
+
         // prior-prior
 # if false
         if (u < gamma) {
@@ -1797,46 +1804,46 @@ class Forest {
 # endif
         // prior-post
         // move gene both ways, save likelihood of each, reweight, then draw random number to decide which way to move
-        
+
         vector<list<Node*>> original_nodes;
         vector<string> original_names;
         for (auto &s:_species_partition) {
             original_names.push_back(s.first);
             original_nodes.push_back(_species_partition[s.first]);
         }
-        
+
         // save branch lengths of original _lineages vector
         vector<double> branch_lengths = saveBranchLengths();
-        
+
         _new_nodes.clear();
         // move towards minor parent
         moveGene(new_nd, parent2, hybrid);
-        
+
         // go through coalescence
         hybridGeneTreeProposal(species_tree_increment);
-        
+
         // save likelihood
         vector<double> likelihood_vec;
         likelihood_vec.reserve(2);
         likelihood_vec.push_back(calcLogLikelihood());
-        
+
         // save minor move information
         vector<Node*> minor_nodes = _new_nodes;
         vector<double> minor_branch_lengths = saveBranchLengths();
-        
+
         // save children of minor nodes
         vector<Node*> minor_left_children;
         vector<Node*> minor_right_children;
         vector<double> minor_left_edge_lengths;
         vector<double> minor_right_edge_lengths;
-        
+
         for (auto &nd:minor_nodes) {
             minor_left_children.push_back(nd->_left_child);
             minor_right_children.push_back(nd->_left_child->_right_sib);
             minor_left_edge_lengths.push_back(nd->_left_child->_edge_length);
             minor_right_edge_lengths.push_back(nd->_left_child->_right_sib->_edge_length);
         }
-        
+
         // save minor spp partition
         vector<list<Node*>> minor_partition;
         vector<string> minor_names;
@@ -1844,36 +1851,36 @@ class Forest {
             minor_names.push_back(s.first);
             minor_partition.push_back(_species_partition[s.first]);
         }
-        
+
         resetLineages(branch_lengths);
-        
+
         // rebuild species partition
         _species_partition.clear();
         rebuildSpeciesPartition(original_names, original_nodes);
-        
+
         _new_nodes.clear();
         // move towards major parent
         moveGene(new_nd, parent, hybrid);
-        
+
         // go through coalescence
         hybridGeneTreeProposal(species_tree_increment);
-        
+
         // save likelihood
         likelihood_vec.push_back(calcLogLikelihood());
-        
+
         // choose major or minor path
         int index_of_choice = chooseDirectionOfHybridization(likelihood_vec);
         if (index_of_choice == 0) {
             // minor choice
             _last_direction = "minor";
-            
+
             // rebuild species partition to original
             _species_partition.clear();
             rebuildSpeciesPartition(original_names, original_nodes);
-            
+
             // revert _lineages to original
             resetLineages(branch_lengths);
-            
+
             // clear major nodes
             for (auto &nd:_new_nodes) {
                 nd->_left_child = 0;
@@ -1882,7 +1889,7 @@ class Forest {
                 nd->_partial->clear();
                 nd->_position_in_lineages = -1;
             }
-            
+
             resetToMinor(minor_nodes, minor_left_children, minor_right_children, minor_left_edge_lengths, minor_right_edge_lengths);
 
             // revert all _lineages edge lengths to minor nodes
@@ -1985,13 +1992,13 @@ class Forest {
     inline int Forest::chooseDirectionOfHybridization(vector<double> likelihood_vec) {
         _node_choices.clear();
         _log_likelihood_choices.clear();
-        
+
         _log_likelihood_choices.push_back(likelihood_vec[0]+log(.15)); // multiply minor likelihood by (1-gamma)
         _log_likelihood_choices.push_back(likelihood_vec[1]+log(.85)); // multiply major likelihood by (gamma)
 
         // reweight each choice of pairs
         vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood);
-        
+
         // sum unnormalized weights before choosing the pair
         _gene_tree_log_weight = 0.0;
         for (auto &l:log_weight_choices) {
@@ -2028,7 +2035,7 @@ class Forest {
         for (int a = (int) _new_nodes.size()-1; a>=0; a--) {
             revertNodeVector(_lineages, _new_nodes[a]->_left_child, _new_nodes[a]->_left_child->_right_sib, _new_nodes[a]);
         }
-        
+
         // reset _lineages edge lengths
         assert (_lineages.size() == branch_lengths.size());
         for (int i=0; i < (int) _lineages.size(); i++) {
@@ -2043,7 +2050,7 @@ class Forest {
         Node* parent = _lineages[get<0>(t)];
         Node* parent2 = _lineages[get<1>(t)];
         Node* hybrid_node = _lineages[get<2>(t)];
-        
+
         _hybrid_species_joined = make_tuple(hybrid_node, parent, parent2);
 
         assert (!parent->_parent && !hybrid_node->_parent && !parent2->_parent);
@@ -2062,7 +2069,7 @@ class Forest {
         parent->_right_sib=hybrid_node;
         parent->_parent=new_nd;
         hybrid_node->_parent=new_nd;
-        
+
 //        create another new node
         Node nd2;
         _nodes.push_back(nd2);
@@ -2076,42 +2083,42 @@ class Forest {
         hybrid_node->_right_sib = parent2;
         hybrid_node->_parent2=new_nd2;
         new_nd2->_left_child->_right_sib = hybrid_node;
-        
+
         updateNodeVector(_lineages, parent, hybrid_node, new_nd);
-        
+
         vector<string> hybridized_nodes;
-        
+
         hybridized_nodes.push_back(parent->_name);
         hybridized_nodes.push_back(parent2->_name);
         hybridized_nodes.push_back(hybrid_node->_name);
         hybridized_nodes.push_back(new_nd->_name);
         hybridized_nodes.push_back(new_nd2->_name);
-        
+
         hybrid_node->_major_parent = parent;
         hybrid_node->_minor_parent = parent2;
-        
+
         // update _lineages vector with major new_nd
         return hybridized_nodes;
     }
 
     inline void Forest::addSpeciesIncrement() {
         double rate = (_speciation_rate)*_lineages.size();
-        
+
         double u = rng.uniform();
         _rand_numbers.push_back(u);
         // choose edge length but don't add it yet
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
-        
+
         if (_lineages.size()>2) {
             _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
 //            _branch_length_priors.push_back(log(rate)-_last_edge_length*rate);
         }
-        
+
         // add the previously chosen edge length
         for (auto nd:_lineages) {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
         }
-        
+
 //        saveDivergenceTimes(_last_edge_length);
     }
 
@@ -2317,7 +2324,7 @@ class Forest {
         pair<double, double> smallest_branch = *min_element(_searchable_branch_lengths.begin(), _searchable_branch_lengths.end());
 //        showForest();
         return smallest_branch.first;
-        
+
 //        vector<double> searchable_branch_lengths;
 //        for (auto &nd:_lineages) {
 //            searchable_branch_lengths.push_back(nd->_left_child->_edge_length);
@@ -2329,7 +2336,7 @@ class Forest {
 
     inline void Forest::revertToShallowest(double smallest_branch){
         // revert joins that are not smallest join
-        
+
         // save nodes that must be reverted
         vector<Node*> nodes_to_revert;
 //        for (auto &lineage:_lineages) {
@@ -2347,7 +2354,7 @@ class Forest {
                 }
             }
         }
-        
+
 //        showForest();
         assert (nodes_to_revert.size() == _new_nodes.size()-1);
         // TODO: if i am only allowing one coalescence per lineage, there should only be unused nodes at the top level, shouldn't have to worry about children
@@ -2363,52 +2370,21 @@ class Forest {
                 }
             }
         }
-            
-            
-//        for (auto &s:_species_partition) {
-//            for (auto &nd : boost::adaptors::reverse(nodes_to_revert)) {
-////                for (auto &node:s.second) {
-////                    if (node == nd) {
-//                        revertNodeList(s.second, nd->_left_child, nd->_left_child->_right_sib, nd);
-////                    }
-////                }
-//            }
-//        }
-        
-//        // reset species partition, tearing down the nodes to be reverted
-//
-//        for (auto &s:_species_partition) {
-//            for (auto &nd:s.second) {
-//                if (nd->_name == "unused") {
-//                    revertNodeList(s.second, nd->_left_child, nd->_left_child->_right_sib, nd);
-//                }
-//                for (Node* child = nd->_left_child; child; child=child->_right_sib) {
-//                    if (child->_name == "unused") {
-//                        revertNodeList(s.second, child->_left_child, child->_left_child->_right_sib, child);
-//                    }
-//                }
-//            }
-//        }
 
         // revert nodes in reverse
         for (auto &nd : boost::adaptors::reverse(nodes_to_revert)) {
             assert (nd->_name == "unused");
-//            nd->_name = "unused";
             revertNodeVector(_lineages, nd->_left_child, nd->_left_child->_right_sib, nd);
-            
-//            // set branch lengths to shallowest coalescence
-//            nd->_left_child->_right_sib->_edge_length = smallest_branch; // TODO: edge length is edge_len - (increment - smallest_branch)
-//            nd->_left_child->_edge_length = smallest_branch;
-                    
+
             //reset siblings and parents of original nodes back to 0
             nd->_left_child->_right_sib->resetNode(); //subtree2
             nd->_left_child->resetNode(); //subtree1
-            
 
-            // clear new node from _nodes
+
+            // clear new node from _new_nodes
             _new_nodes.erase(remove(_new_nodes.begin(), _new_nodes.end(), nd));
         }
-        
+
 //        showForest();
         for (auto iter = _nodes.begin(); iter != _nodes.end(); iter++) {
             if (iter->_name == "unused") {
@@ -2417,7 +2393,7 @@ class Forest {
                 _ninternals--;
             }
         }
-        
+
         // reset branches to smallest coalescence
 //        showForest();
         for (auto &lineage:_lineages) {
@@ -2430,9 +2406,8 @@ class Forest {
                 }
             }
         }
-        
+
         // delete extra increments from _branch_lengths and _branch_length_priors
-        // TODO: this doesn't work anymore because we are now using heights, not increments
         vector<double> increments_to_remove;
         for (auto &s:_searchable_branch_lengths) {
             // s.first is lineage height
@@ -2441,7 +2416,7 @@ class Forest {
                 increments_to_remove.push_back(s.second);
             }
         }
-        
+
         for (auto &i:_increments) {
             for (int a = 0; a<increments_to_remove.size(); a++) {
                 if (i.first == increments_to_remove[a]) {
@@ -2449,12 +2424,7 @@ class Forest {
                 }
             }
         }
-//        for (auto &i:increments_to_remove) {
-//            if (i != smallest_branch) {
-//                _increments.erase(remove(_increments.begin(), _increments.end(), i), _increments.end());
-//            }
-//        }
-        
+
         // reset _searchable_branch_lengths
         _searchable_branch_lengths.clear();
 
@@ -2464,15 +2434,18 @@ class Forest {
             nd._number = n;
             n++;
         }
-        
+
         // clear new nodes to reset for next generation
         _new_nodes.clear();
-        
+
         for (auto &s:_species_partition) {
             for (auto &n:s.second) {
                 assert(_lineages[n->_position_in_lineages] == n);
             }
         }
+
+        // calculate gene tree height
+        _gene_tree_cum_time = getLineageHeight(_lineages[0]);
     }
 
     inline unsigned Forest::countDescendants(Node* nd, unsigned count) {
@@ -2622,3 +2595,5 @@ class Forest {
         }
     }
 }
+
+
