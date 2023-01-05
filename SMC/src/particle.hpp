@@ -99,7 +99,7 @@ class Particle {
         double                                  _gene_tree_marg_like;
         double                                  _prev_gene_tree_marg_like;
         map<int, vector<double>>                     _random_seeds;
-        bool                                    _running_on_empty;
+        bool                                    _running_on_empty = false;
         vector<tuple<string, string, string>> _triple;
         vector<string>                          _newicks;
         Split::treemap_t                        _treeIDs;
@@ -166,7 +166,7 @@ class Particle {
             log_likelihood += gene_tree_log_likelihood;
         }
         _generation++;
-        
+
         // set _generation for each forest
         for (int i=0; i < (int) _forests.size(); i++ ){
             _forests[i].setGeneration(_generation);
@@ -180,6 +180,7 @@ class Particle {
             for (unsigned i=1; i<_forests.size(); i++) {
                 _forests[i]._theta = _forests[i]._starting_theta;
                 _forests[i]._gene_tree_marginal_likelihood = _forests[i]._gene_tree_log_likelihood;
+                _forests[i]._gene_tree_cum_time = 0.0;
             }
             _forests[0].chooseSpeciesIncrement();
             for (unsigned i=1; i<_forests.size(); i++){
@@ -212,23 +213,28 @@ class Particle {
                 double gene_tree_height = _forests[1].getTreeHeight();
                 double species_tree_height = _forests[0].getTreeHeight();
                 // ready to join species
-                if (gene_tree_height >= species_tree_height) { // TODO: not sure if this is correct
+                if (gene_tree_height >= species_tree_height) {
 //                    tuple<string, string, string> t = _forests[0].speciesTreeProposal();
                     _t = _forests[0].speciesTreeProposal();
                     if (_forests[0]._lineages.size()>1) {
                         _forests[0].addSpeciesIncrement();
+                    }
+                    for (int i = 1; i <_forests.size(); i++) {
+                        _forests[i]._gene_tree_cum_time = 0.0;
                     }
                 }
                 // don't join any species, must finish the gene trees first
                 for (unsigned i=1; i<_forests.size(); i++){
                     // if species have been joined in the previous generation
                     if (_forests[0]._lineages.size() != Forest::_nspecies) {
+                        _forests[i]._gene_tree_cum_time = 0.0;
                        if (_forests[0]._lineages.size()==1) {
                             for (unsigned i=1; i<_forests.size(); i++) {
-                                if (_forests[i]._lineages.size() > 1) {
+                                assert (_forests[i]._lineages.size() > 1);
+//                                if (_forests[i]._lineages.size() > 1) {
                                     list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
                                     _forests[i].fullyCoalesceGeneTree(lineages_list);
-                                }
+//                                }
                             }
                         }
                        else {
@@ -238,43 +244,48 @@ class Particle {
                        }
                     }
                     // if no species have been joined in the previous generation
-                    if (_forests[0]._lineages.size() == Forest::_nspecies) {
+//                    if (_forests[0]._lineages.size() == Forest::_nspecies) {
+                    else {
                         for (unsigned i=1; i<_forests.size(); i++){
-                            if (_forests[i]._lineages.size() > 1) {
-                                _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
-                            }
+//                            showParticle();
+//                            if (_forests[i]._lineages.size() > 1) {
+                            assert (_forests[i]._lineages.size() > 1);
+                            _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
+//                            showParticle();
+//                            }
                         }
                     }
                 }
             }
         }
         // if any forests have had no coalescence, continue again through the species tree join and gene tree proposals
-        // TODO: I'm not sure how this works if one gene tree had coalescence and one didn't
+        // TODO: I'm not sure how this works if one gene tree had coalescence and one didn't - this could be an issue with multiple genes
         // TODO: this does not account for hybridization
         for (int i=1; i<_forests.size(); i++) {
             if (_forests[i]._num_coalescent_events_in_generation == 0) {
-                _generation++;
                 proposal();
                 break;
             }
         }
-        
-        if (_running_on_empty == false) {
+
             for (int i = 1; i<_forests.size(); i++) {
                 if (_forests[i]._num_coalescent_events_in_generation > 1) {
                     double smallest_branch = _forests[i].findShallowestCoalescence();
                     _forests[i].revertToShallowest(smallest_branch);
+//                    showParticle();
                 }
             }
+        if (_running_on_empty == false) {
             calcGeneTreeMarginalLikelihood();
             _log_weight = _gene_tree_marg_like - _prev_gene_tree_marg_like;
         }
-        
+
         else {
             _generation++;
         }
-        
+
         for (int i = 1; i<_forests.size(); i++) {
+//            showParticle();
             _forests[i]._num_coalescent_events_in_generation = 0;
             _forests[i]._searchable_branch_lengths.clear();
             _forests[i]._new_nodes.clear();
@@ -375,7 +386,7 @@ class Particle {
     inline void Particle::showSpeciesJoined(){
         _forests[0].showSpeciesJoined();
     }
-    
+
     inline void Particle::showHybridNodes() {
         cout << "particle" << endl;
         showGamma();
@@ -479,7 +490,7 @@ class Particle {
         }
         return gene_tree_log_likelihoods;
     }
-    
+
     inline vector<double> Particle::getTopologyPriors() {
         vector<double> topology_priors;
 //        showParticle();
@@ -507,6 +518,5 @@ class Particle {
         _triple         = other._triple;
         _newicks = other._newicks;
         _t = other._t;
-//        _suppress_resampling = other._suppress_resampling;
     };
 }
