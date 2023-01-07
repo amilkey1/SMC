@@ -112,6 +112,7 @@ class Forest {
         void                        revertToShallowest(double smallest_branch);
         double                      getTreeHeight();
         double                      getLineageHeight(Node* nd);
+        void                        calcForestMarginalLikelihood();
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -1275,13 +1276,31 @@ class Forest {
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
 
-        if (_proposal == "prior-prior" || nodes.size() == 1) {
+        // TODO: this should only be calculated at the end of a particle generation
+//        if (_proposal == "prior-prior" || nodes.size() == 1) {
+//            _gene_tree_log_likelihood = calcLogLikelihood();
+//            _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
+//            _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
+//            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
+//            // marginal likelihood = normalized particle weights sum - ln(1)
+//            // normalized particle sum for one particle is just log likelihood?
+//            // TODO: double check this
+//        }
+//        else if (_proposal == "prior-post") {
+//            _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
+//            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
+//        }
+    }
+
+    inline void Forest::calcForestMarginalLikelihood() {
+        if (_proposal == "prior-prior") { // TODO: or nodes.size() == 1 in case of prior-post
             _gene_tree_log_likelihood = calcLogLikelihood();
             _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
             _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
             _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
             // marginal likelihood = normalized particle weights sum - ln(1)
             // normalized particle sum for one particle is just log likelihood?
+            // TODO: double check this
         }
         else if (_proposal == "prior-post") {
             _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
@@ -1577,14 +1596,10 @@ class Forest {
         if (position1 < position2) {
             node_list.insert(iter1, addnode1);
             node_list.insert(iter2, addnode2);
-//            node_list.insert(node_list.begin()+position1, iter1);
-//            node_list.insert(node_list.begin()+position2, iter2);
         }
         else {
             node_list.insert(iter2, addnode1);
             node_list.insert(iter1, addnode2);
-//            node_list.insert(node_list.begin()+position2, iter2);
-//            node_list.insert(node_list.begin()+position1, iter1);
         }
 
 //        assert(_lineages[addnode1->_position_in_lineages] == addnode1);
@@ -2345,7 +2360,7 @@ class Forest {
             if (lineage->_left_child) {
 //                if (lineage->_left_child->_edge_length != smallest_branch) {
                     // TODO: does this still work with smallest branch being height not increment?
-                if (getLineageHeight(lineage->_left_child) != smallest_branch) { // TODO: check this
+                if (getLineageHeight(lineage->_left_child) != smallest_branch) {
                     nodes_to_revert.push_back(lineage);
                     lineage->_name = "unused";
                 }
@@ -2357,7 +2372,6 @@ class Forest {
 
 //        showForest();
         assert (nodes_to_revert.size() == _new_nodes.size()-1);
-        // TODO: if i am only allowing one coalescence per lineage, there should only be unused nodes at the top level, shouldn't have to worry about children
         // TODO: this will only work if there is only one unused node per lineage (which is true for now)
         for (auto &s:_species_partition) {
             list<Node*> my_list;
