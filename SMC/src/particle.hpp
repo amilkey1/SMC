@@ -294,6 +294,9 @@ class Particle {
     }
 
     inline double Particle::calcGeneTreeMarginalLikelihood() {
+        for (auto &f:_forests) {
+            f.calcForestMarginalLikelihood();
+        }
         _prev_gene_tree_marg_like = _gene_tree_marg_like;
         _gene_tree_marg_like = 0.0;
         for (int i=1; i<_forests.size(); i++) {
