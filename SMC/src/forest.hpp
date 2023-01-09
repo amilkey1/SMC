@@ -1275,21 +1275,6 @@ class Forest {
         //update species list
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-
-        // TODO: this should only be calculated at the end of a particle generation
-//        if (_proposal == "prior-prior" || nodes.size() == 1) {
-//            _gene_tree_log_likelihood = calcLogLikelihood();
-//            _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
-//            _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
-//            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
-//            // marginal likelihood = normalized particle weights sum - ln(1)
-//            // normalized particle sum for one particle is just log likelihood?
-//            // TODO: double check this
-//        }
-//        else if (_proposal == "prior-post") {
-//            _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
-//            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
-//        }
     }
 
     inline void Forest::calcForestMarginalLikelihood() {

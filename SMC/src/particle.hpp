@@ -104,12 +104,14 @@ class Particle {
         vector<string>                          _newicks;
         Split::treemap_t                        _treeIDs;
         tuple<string, string, string>           _t;
+        unsigned                                _gene_tree_proposal_attempts = 0;
 };
 
     inline Particle::Particle() {
         //log weight and log likelihood are 0 for first generation
         _log_weight = 0.0;
         _log_likelihood = 0.0;
+        _gene_tree_proposal_attempts = 0;
     };
 
     inline Particle::~Particle() {
@@ -176,7 +178,7 @@ class Particle {
 
     inline double Particle::proposal() {
         string event;
-        if (_generation == 0) {
+        if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
             for (unsigned i=1; i<_forests.size(); i++) {
                 _forests[i]._theta = _forests[i]._starting_theta;
                 _forests[i]._gene_tree_marginal_likelihood = _forests[i]._gene_tree_log_likelihood;
@@ -184,6 +186,7 @@ class Particle {
             }
             _forests[0].chooseSpeciesIncrement();
             for (unsigned i=1; i<_forests.size(); i++){
+                _gene_tree_proposal_attempts++;
                 _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
             }
         }
@@ -191,6 +194,7 @@ class Particle {
             for (unsigned i=1; i<_forests.size(); i++) {
                 if (_forests[i]._lineages.size() > 1) {
                     list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
+                    _gene_tree_proposal_attempts++;
                     _forests[i].fullyCoalesceGeneTree(lineages_list);
                 }
             }
@@ -232,13 +236,15 @@ class Particle {
                             for (unsigned i=1; i<_forests.size(); i++) {
                                 assert (_forests[i]._lineages.size() > 1);
 //                                if (_forests[i]._lineages.size() > 1) {
-                                    list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
-                                    _forests[i].fullyCoalesceGeneTree(lineages_list);
+                                list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
+                                _gene_tree_proposal_attempts++;
+                                _forests[i].fullyCoalesceGeneTree(lineages_list);
 //                                }
                             }
                         }
                        else {
                            if (_forests[i]._lineages.size() > 1) {
+                               _gene_tree_proposal_attempts++;
                                 _forests[i].geneTreeProposal(_t, _forests[0]._last_edge_length);
                            }
                        }
@@ -247,11 +253,9 @@ class Particle {
 //                    if (_forests[0]._lineages.size() == Forest::_nspecies) {
                     else {
                         for (unsigned i=1; i<_forests.size(); i++){
-//                            showParticle();
-//                            if (_forests[i]._lineages.size() > 1) {
                             assert (_forests[i]._lineages.size() > 1);
+                            _gene_tree_proposal_attempts++;
                             _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
-//                            showParticle();
 //                            }
                         }
                     }
@@ -263,6 +267,7 @@ class Particle {
         // TODO: this does not account for hybridization
         for (int i=1; i<_forests.size(); i++) {
             if (_forests[i]._num_coalescent_events_in_generation == 0) {
+                _gene_tree_proposal_attempts++;
                 proposal();
                 break;
             }
@@ -521,5 +526,6 @@ class Particle {
         _triple         = other._triple;
         _newicks = other._newicks;
         _t = other._t;
+        _gene_tree_proposal_attempts = other._gene_tree_proposal_attempts;
     };
 }
