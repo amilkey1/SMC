@@ -269,7 +269,7 @@ class Particle {
             if (_forests[i]._num_coalescent_events_in_generation == 0) {
                 _gene_tree_proposal_attempts++;
                 proposal();
-                break;
+//                break;
             }
         }
 
