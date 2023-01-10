@@ -1283,9 +1283,10 @@ class Forest {
             _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
             _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
             _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
+//            _gene_tree_marginal_likelihood = _gene_tree_log_weight;
             // marginal likelihood = normalized particle weights sum - ln(1)
             // normalized particle sum for one particle is just log likelihood?
-            // TODO: double check this
+            // TODO: go back to standard likelihoods
         }
         else if (_proposal == "prior-post") {
             _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
