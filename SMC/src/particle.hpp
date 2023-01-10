@@ -86,7 +86,6 @@ class Particle {
         vector<double>                                  getTopologyPriors();
         void                                            storeNewicks();
         vector<string>                                  getNewicks() {return _newicks;}
-//        int                                             _suppress_resampling = 0;
 
     private:
 
@@ -268,7 +267,6 @@ class Particle {
             if (_forests[i]._num_coalescent_events_in_generation == 0) {
                 _gene_tree_proposal_attempts++;
                 proposal();
-//                break;
             }
         }
 
@@ -276,7 +274,6 @@ class Particle {
                 if (_forests[i]._num_coalescent_events_in_generation > 1) {
                     double smallest_branch = _forests[i].findShallowestCoalescence();
                     _forests[i].revertToShallowest(smallest_branch);
-//                    showParticle();
                 }
             }
         if (_running_on_empty == false) {
@@ -289,7 +286,6 @@ class Particle {
         }
 
         for (int i = 1; i<_forests.size(); i++) {
-//            showParticle();
             _forests[i]._num_coalescent_events_in_generation = 0;
             _forests[i]._searchable_branch_lengths.clear();
             _forests[i]._new_nodes.clear();
