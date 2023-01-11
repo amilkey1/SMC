@@ -306,7 +306,7 @@ namespace proj {
         }
         
         _log_marginal_likelihood += log_particle_sum - log(_nparticles);
-        cout << _log_marginal_likelihood << endl;
+        cout << setprecision(12) << _log_marginal_likelihood << endl;
         sort(particles.begin(), particles.end(), greater<Particle::SharedPtr>());
     }
 
@@ -580,7 +580,7 @@ namespace proj {
         }
         sum_h/=my_vec.size();
         cout << "mean height equals " << sum_h << endl;
-        cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
+        cout << "log marginal likelihood = " << setprecision(12) << _log_marginal_likelihood << endl;
         cout << "starting theta = " << Forest::_starting_theta << endl;
         cout << "speciation rate = " << Forest::_speciation_rate << endl;
         cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
@@ -813,7 +813,7 @@ namespace proj {
                     
                     vector<double> prior_vec;
                     for (auto &b:p->getBranchLengthPriors()) {
-                        prior_vec.push_back(log(b));
+                        prior_vec.push_back(b);
                     }
                     
                     vector<double> gene_tree_log_like;
@@ -837,14 +837,14 @@ namespace proj {
                     }
                     
                     logf << a << "\t" << Forest::_starting_theta;
-                    logf << "\t" << gene_tree_log_like[0]+exp(gene_tree_log_like[0]);
+                    logf << "\t" << setprecision(11) << gene_tree_log_like[0]+exp(gene_tree_log_like[0]);
                     
                     for (int i=0; i<prior_vec.size(); i++) {
-                        logf << "\t" << branch_length_vec[i] << "\t" << prior_vec[i];
+                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
                     }
                     
                     for (int i=0; i<log_topology_priors.size(); i++) {
-                        logf << "\t" << log_topology_priors[i];
+                        logf << "\t" << setprecision(11) << log_topology_priors[i];
                     }
                     
                     logf << endl;
@@ -872,7 +872,7 @@ namespace proj {
             }
 //            saveAllHybridNodes(_accepted_particle_vec);
 //            showFinal(_accepted_particle_vec);
-            cout << "marg like: " << _log_marginal_likelihood << endl;
+            cout << "marg like: " << setprecision(12) << _log_marginal_likelihood << endl;
         }
 
         catch (XProj & x) {
