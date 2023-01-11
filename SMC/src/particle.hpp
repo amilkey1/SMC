@@ -295,7 +295,7 @@ class Particle {
         else {
             _generation++;
         }
-
+        
         for (int i = 1; i<_forests.size(); i++) {
             _forests[i]._num_coalescent_events_in_generation = 0;
             _forests[i]._searchable_branch_lengths.clear();
@@ -495,12 +495,8 @@ class Particle {
     inline vector<double> Particle::getTopologyPriors() {
         // calculate species tree topology probability
         vector<double> topology_priors;
-        topology_priors.push_back(_forests[0].calcTopologyPrior());
-        
-        // gene tree topology probability is 1 since there is only 1 tree
-        // ln(1) = 0
-        for (int i=1; i<_forests.size(); i++) {
-            topology_priors.push_back(0);
+        for (auto &f:_forests) {
+            topology_priors.push_back(f._log_joining_prob);
         }
         return topology_priors;
     }

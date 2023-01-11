@@ -49,7 +49,7 @@ class Forest {
         void operator=(const Forest & other);
         void                        debugForest();
         void                        debugLogLikelihood(Node* nd, double log_like);
-        double                      calcTopologyPrior();
+        double                      calcTopologyPrior(int nlineages);
         double                      nChoose2(int i);
         double                      calcFactorial (int n);
 //        void                        showSummary() const;
@@ -152,6 +152,7 @@ class Forest {
     vector<pair<double, double>> _searchable_branch_lengths; // pair is lineage height, increment
         double                      _gene_tree_cum_time; // gene tree cumulative height in this lineage only
         double                      _prev_log_likelihood;
+        double                      _log_joining_prob;
 
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -195,6 +196,7 @@ class Forest {
         _lineages.reserve(_nodes.size());
         _rand_numbers.clear();
         _num_coalescent_events_in_generation = 0;
+        _log_joining_prob = 0.0;
 
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -910,15 +912,12 @@ class Forest {
         _prev_log_likelihood = other._prev_log_likelihood;
         _log_weight_vec = other._log_weight_vec;
         _theta = other._theta;
-//        _branch_lengths = other._branch_lengths;
         _increments = other._increments;
-//        _branch_length_priors = other._branch_length_priors;
         _topology_prior = other._topology_prior;
-//        _treeIDs = other. _treeIDs;
-//        _newicks = other._newicks;
         _num_coalescent_events_in_generation = other._num_coalescent_events_in_generation;
         _searchable_branch_lengths = other._searchable_branch_lengths;
         _gene_tree_cum_time = other._gene_tree_cum_time;
+        _log_joining_prob = other._log_joining_prob;
 
         // copy tree itself
 
@@ -1090,6 +1089,8 @@ class Forest {
 
         subtree1->_parent=new_nd;
         subtree2->_parent=new_nd;
+        
+        calcTopologyPrior(_lineages.size());
 
         updateNodeVector (_lineages, subtree1, subtree2, new_nd);
 
@@ -1257,6 +1258,7 @@ class Forest {
         calcPartialArray(new_nd);
 
         _num_coalescent_events_in_generation++;
+        calcTopologyPrior(nodes.size());
 
         //update species list
         updateNodeList(nodes, subtree1, subtree2, new_nd);
@@ -1349,6 +1351,8 @@ class Forest {
                 _num_coalescent_events_in_generation++;
                 coalescence = true;
                 _searchable_branch_lengths.push_back(make_pair(getLineageHeight(_new_nodes.back()), increment));
+                
+                calcTopologyPrior(nodes.size());
 
                 //update species list
                 updateNodeList(nodes, subtree1, subtree2, new_nd);
@@ -2063,77 +2067,19 @@ class Forest {
 
         if (_lineages.size()>1) {
             _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
-//            _branch_length_priors.push_back(log(rate)-_last_edge_length*rate);
         }
 
         // add the previously chosen edge length
         for (auto nd:_lineages) {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
         }
-
-//        saveDivergenceTimes(_last_edge_length);
     }
 
-//    inline double Forest::calcTopologyPrior() {
-//        // only call function at final generation
-//        assert(_lineages.size() == 1);
-//        vector<int> interior_node_count;
-//        Node* nd = _lineages[0];
-//        while (nd) {
-//            // if internal node has children, need to also count the node itself
-////        for (auto &lineage:_lineages) {
-////            Node* nd = lineage;
-//            // if internal node has children, need to also count the node itself
-//            if (nd->_left_child) {
-//                interior_node_count.push_back(countDescendants(nd, 1));
-//            }
-//            else {
-//                interior_node_count.push_back(countDescendants(nd, 0));
-//            }
-//            nd = findNextPreorder(nd);
+    inline double Forest::calcTopologyPrior(int nlineages) {
+//        for (int n=_nspecies; n>1; n--) {
+            _log_joining_prob += -log(0.5*nlineages*(nlineages-1));
 //        }
-////        int tip_node_number = 0;
-////        if (_index == 0) {
-////            // species tree
-////            tip_node_number = _nspecies;
-////        }
-////        else {
-////            // gene tree
-////            tip_node_number = _ntaxa;
-////        }
-//
-//        int sum = 0;
-//        for (auto &c:interior_node_count) {
-//            sum += c;
-//        }
-//
-//        _topology_prior = (_nleaves - 1)*log(2.) - lgamma(_nleaves+1) - log(sum);
-//        return _topology_prior;
-//    }
-
-    inline double Forest::nChoose2(int i) {
-        // this function calculates n choose 2 for a given integer (i choose 2)
-        return calcFactorial(i) / (calcFactorial (2) * calcFactorial(i - 2));
-    }
-
-    inline double Forest::calcFactorial(int n) {
-        // this function calculates a factorial for a given integer (n!)
-        if (n == 0) {
-            return 1;
-        }
-        int fact = 1;
-        for (int i = 2; i<=n; i++) {
-            fact = fact * i;
-        }
-        return fact;
-    }
-
-    inline double Forest::calcTopologyPrior() {
-        double log_joining_prob = 0.0;
-        for (int n=_nspecies; n>1; n--) {
-            log_joining_prob += -log(0.5*n*(n-1));
-        }
-        return log_joining_prob;
+        return _log_joining_prob;
     }
 
     inline double Forest::findShallowestCoalescence() {
