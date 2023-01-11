@@ -50,9 +50,6 @@ class Forest {
         void                        debugForest();
         void                        debugLogLikelihood(Node* nd, double log_like);
         double                      calcTopologyPrior(int nlineages);
-        double                      nChoose2(int i);
-        double                      calcFactorial (int n);
-//        void                        showSummary() const;
 
     private:
 
@@ -103,10 +100,6 @@ class Forest {
         vector<double>              saveBranchLengths();
         int                         chooseDirectionOfHybridization(vector<double> likelihood_vec);
         void                        hybridGeneTreeProposal(double species_tree_increment);
-//        void                        saveDivergenceTimes(double edge_len);
-        void                        readTreeFile(unsigned skip);
-        void                        storeSplits(set<Split> & splitset);
-        void                        readNewicks();
         unsigned                    countDescendants(Node* nd, unsigned count);
         double                      findShallowestCoalescence();
         void                        revertToShallowest(double smallest_branch);
@@ -142,13 +135,8 @@ class Forest {
         string                      _last_direction;
         vector<double>              _rand_numbers;
         vector<pair<double, double>>         _increments;
-//        vector<double>              _branch_lengths;
-//        vector<double>              _branch_length_priors;
         double                      _topology_prior;
-//        Split::treemap_t            _treeIDs;
-//        std::vector<std::string>    _newicks;
         unsigned                    _num_coalescent_events_in_generation;
-//        vector<double>              _searchable_branch_lengths;
     vector<pair<double, double>> _searchable_branch_lengths; // pair is lineage height, increment
         double                      _gene_tree_cum_time; // gene tree cumulative height in this lineage only
         double                      _prev_log_likelihood;
@@ -1090,7 +1078,7 @@ class Forest {
         subtree1->_parent=new_nd;
         subtree2->_parent=new_nd;
         
-        calcTopologyPrior(_lineages.size());
+        calcTopologyPrior((int) _lineages.size());
 
         updateNodeVector (_lineages, subtree1, subtree2, new_nd);
 
@@ -1258,7 +1246,7 @@ class Forest {
         calcPartialArray(new_nd);
 
         _num_coalescent_events_in_generation++;
-        calcTopologyPrior(nodes.size());
+        calcTopologyPrior((int) nodes.size());
 
         //update species list
         updateNodeList(nodes, subtree1, subtree2, new_nd);
@@ -1269,7 +1257,6 @@ class Forest {
         bool coalescence = false;
         _prev_log_likelihood = 0.0;
         assert (nodes.size()>0);
-//        assert (nodes.size()>1);
         bool done = false;
         if (nodes.size() == 1) {
             done = true;
@@ -1279,8 +1266,6 @@ class Forest {
             double s = nodes.size();
             double coalescence_rate = s*(s-1)/_theta;
             double increment = rng.gamma(1.0, 1.0/coalescence_rate);
-
-//            _rand_numbers.push_back(increment);
 
             bool lineages_left_to_join = s > 1;
             if (!lineages_left_to_join || coalescence == true)  {
@@ -1352,7 +1337,7 @@ class Forest {
                 coalescence = true;
                 _searchable_branch_lengths.push_back(make_pair(getLineageHeight(_new_nodes.back()), increment));
                 
-                calcTopologyPrior(nodes.size());
+                calcTopologyPrior((int) nodes.size());
 
                 //update species list
                 updateNodeList(nodes, subtree1, subtree2, new_nd);
@@ -1507,9 +1492,6 @@ class Forest {
             node_vector.insert(node_vector.begin()+position1, iter1);
         }
 
-//        assert(_lineages[addnode1->_position_in_lineages] == addnode1);
-//        assert(_lineages[addnode2->_position_in_lineages] == addnode2);
-
         // reset _position_in_lineages
         for (int i=0; i < (int) _lineages.size(); i++) {
             _lineages[i] -> _position_in_lineages=i;
@@ -1542,9 +1524,6 @@ class Forest {
             node_list.insert(iter2, addnode1);
             node_list.insert(iter1, addnode2);
         }
-
-//        assert(_lineages[addnode1->_position_in_lineages] == addnode1);
-//        assert(_lineages[addnode2->_position_in_lineages] == addnode2);
 
         // reset _position_in_lineages
         for (int i=0; i < (int) _lineages.size(); i++) {
@@ -2076,9 +2055,7 @@ class Forest {
     }
 
     inline double Forest::calcTopologyPrior(int nlineages) {
-//        for (int n=_nspecies; n>1; n--) {
-            _log_joining_prob += -log(0.5*nlineages*(nlineages-1));
-//        }
+        _log_joining_prob += -log(0.5*nlineages*(nlineages-1));
         return _log_joining_prob;
     }
 
@@ -2205,140 +2182,6 @@ class Forest {
             }
         }
         return count;
-    }
-
-//    inline void Forest::showSummary() const {
-//        // Produce some output to show that it works
-//
-////        std::cout << boost::str(boost::format("\nRead %d trees from file") % _newicks.size()) << std::endl;
-//
-//        // Show all unique topologies with a list of the trees that have that topology
-//        // Also create a map that can be used to sort topologies by their sample frequency
-//        typedef std::pair<unsigned, unsigned> sorted_pair_t;
-//        std::vector< sorted_pair_t > sorted;
-//        int t = 0;
-//        for (auto & key_value_pair : _treeIDs) {
-//            unsigned topology = ++t;
-//            unsigned ntrees = (unsigned)key_value_pair.second.size();
-//            sorted.push_back(std::pair<unsigned, unsigned>(ntrees,topology));
-//            std::cout << "Topology " << topology << " seen in these " << ntrees << " trees:" << std::endl << "  ";
-//            std::copy(key_value_pair.second.begin(), key_value_pair.second.end(), std::ostream_iterator<unsigned>(std::cout, " "));
-//            std::cout << std::endl;
-//        }
-//
-//        // Show sorted histogram data
-//        std::sort(sorted.begin(), sorted.end());
-//        //unsigned npairs = (unsigned)sorted.size();
-//        std::cout << "\nTopologies sorted by sample frequency:" << std::endl;
-//        std::cout << boost::str(boost::format("%20s %20s") % "topology" % "frequency") << std::endl;
-//        for (auto & ntrees_topol_pair : boost::adaptors::reverse(sorted)) {
-//            unsigned n = ntrees_topol_pair.first;
-//            unsigned t = ntrees_topol_pair.second;
-//            std::cout << boost::str(boost::format("%20d %20d") % t % n) << std::endl;
-//        }
-//    }
-
-//    inline void Forest::readTreeFile(unsigned skip) {
-////        TreeManip tm;
-//        Split::treeid_t splitset;
-//
-//        // See http://phylo.bio.ku.edu/ncldocs/v2.1/funcdocs/index.html for NCL documentation
-//
-//        MultiFormatReader nexusReader(-1, NxsReader::WARNINGS_TO_STDERR);
-////        try {
-////            nexusReader.ReadFilepath(filename.c_str(), MultiFormatReader::NEXUS_FORMAT);
-////        }
-////        catch(...) {
-////            nexusReader.DeleteBlocksFromFactories();
-////            throw;
-////        }
-//
-//        int numTaxaBlocks = nexusReader.GetNumTaxaBlocks();
-//        for (int i = 0; i < numTaxaBlocks; ++i) {
-//            clear();
-//            NxsTaxaBlock * taxaBlock = nexusReader.GetTaxaBlock(i);
-//            std::string taxaBlockTitle = taxaBlock->GetTitle();
-//
-//            const unsigned nTreesBlocks = nexusReader.GetNumTreesBlocks(taxaBlock);
-//            for (unsigned j = 0; j < nTreesBlocks; ++j) {
-//                const NxsTreesBlock * treesBlock = nexusReader.GetTreesBlock(taxaBlock, j);
-//                unsigned ntrees = treesBlock->GetNumTrees();
-//                if (skip < ntrees) {
-//                    //std::cout << "Trees block contains " << ntrees << " tree descriptions.\n";
-//                    for (unsigned t = skip; t < ntrees; ++t) {
-//                        const NxsFullTreeDescription & d = treesBlock->GetFullTreeDescription(t);
-//
-//                        // store the newick tree description
-//                        std::string newick = d.GetNewick();
-////                        _newicks.push_back(newick);
-////                        unsigned tree_index = (unsigned)_newicks.size() - 1;
-//
-//                        // build the tree
-////                        tm.buildFromNewick(newick, false, false);
-//
-//                        // store set of splits
-//                        splitset.clear();
-//                        storeSplits(splitset);
-//
-//                        // iterator iter will point to the value corresponding to key splitset
-//                        // or to end (if splitset is not already a key in the map)
-//                        Split::treemap_t::iterator iter = _treeIDs.lower_bound(splitset);
-//
-//                        if (iter == _treeIDs.end() || iter->first != splitset) {
-//                            // splitset key not found in map, need to create an entry
-//                            std::vector<unsigned> v(1, tree_index);  // vector of length 1 with only element set to tree_index
-//                            _treeIDs.insert(iter, Split::treemap_t::value_type(splitset, v));
-//                        }
-//                        else {
-//                            // splitset key was found in map, need to add this tree's index to vector
-//                            iter->second.push_back(tree_index);
-//                        }
-//                    } // trees loop
-//                } // if skip < ntrees
-//            } // TREES block loop
-//        } // TAXA block loop
-//
-//        // No longer any need to store raw data from nexus file
-//        nexusReader.DeleteBlocksFromFactories();
-//    }
-
-
-    inline void Forest::storeSplits(std::set<Split> & splitset) {
-        // Start by clearing and resizing all splits
-        if (_generationf == 0) { // species tree
-            for (auto & nd:_lineages) {
-                nd->_split.resize(_nspecies);
-            }
-        }
-        else { // gene trees
-            for (auto & nd:_lineages) {
-                nd->_split.resize(_ntaxa);
-            }
-        }
-
-        // Now do a postorder traversal and add the bit corresponding
-        // to the current node in its parent node's split
-        // TODO: postorder?
-        for (auto lineage : _lineages) {
-            Node * nd = lineage;
-            while (nd) {
-            nd = findNextPreorder(nd);
-    //        for (auto nd : boost::adaptors::reverse(_lineages._preorder)) {
-                if (nd->_left_child) {
-                    // add this internal node's split to splitset
-                    splitset.insert(nd->_split);
-                }
-                else {
-                    // set bit corresponding to this leaf node's number
-                    nd->_split.setBitAt(nd->_number);
-                }
-
-                if (nd->_parent) {
-                    // parent's bits are the union of the bits set in all its children
-                    nd->_parent->_split.addSplit(nd->_split);
-                }
-            }
-        }
     }
 }
 
