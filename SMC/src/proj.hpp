@@ -57,8 +57,6 @@ namespace proj {
             void                printSpeciationRates();
             void                printThetas();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
-            void                readTreeFile();
-            void                storeSplits(set<Split> & splitset);
 
         private:
 
@@ -115,8 +113,6 @@ namespace proj {
             void                        handleBaseFrequencies();
             void                        debugSpeciesTree(vector<Particle::SharedPtr> &particles);
             void                        estimateParameters(vector<Particle::SharedPtr> &particles);
-            vector<string>              _newicks;
-            Split::treemap_t            _treeIDs;
     };
 
     inline Proj::Proj() {
@@ -288,12 +284,6 @@ namespace proj {
 
         double log_max_weight = *max_element(log_weight_vec.begin(), log_weight_vec.end());
         
-//        ofstream testf("test.txt");
-//        for (auto &l:log_weight_vec) {
-//            testf << l << "\n";
-//        }
-//        testf.close();
-        
         for (auto & i:log_weight_vec) {
             running_sum += exp(i - log_max_weight);
         }
@@ -303,7 +293,6 @@ namespace proj {
     }
 
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles, int g) {
-//        ofstream tempf(str(format("unnormalized_weights-%d.txt")%(g+1)), ios::out);
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
         for (auto & p : particles) {
@@ -682,61 +671,6 @@ namespace proj {
         }
     }
 
-//    inline void Proj::readTreeFile() {
-//        Split::treeid_t splitset;
-//
-////        MultiFormatReader nexusReader(-1, NxsReader::WARNINGS_TO_STDERR);
-//
-//            // build the tree
-//        for (auto &newick:_newicks) {
-//            unsigned tree_index = (unsigned)_newicks.size() - 1;
-//            buildFromNewick(newick, false, false);
-//
-//            // store set of splits
-//            splitset.clear();
-//            storeSplits(splitset);
-//
-//            // iterator iter will point to the value corresponding to key splitset
-//            // or to end (if splitset is not already a key in the map)
-//            Split::treemap_t::iterator iter = _treeIDs.lower_bound(splitset);
-//
-//            if (iter == _treeIDs.end() || iter->first != splitset) {
-//                // splitset key not found in map, need to create an entry
-//                std::vector<unsigned> v(1, tree_index);  // vector of length 1 with only element set to tree_index
-//                _treeIDs.insert(iter, Split::treemap_t::value_type(splitset, v));
-//            }
-//            else {
-//                // splitset key was found in map, need to add this tree's index to vector
-//                iter->second.push_back(tree_index);
-//            }
-//        } // trees loop
-//    }
-
-//    inline void Proj::storeSplits(set<Split> & splitset) {
-//        // Start by clearing and resizing all splits
-//        for (auto & nd : _tree->_nodes) {
-//            nd._split.resize(_tree->_nleaves);
-//        }
-//
-//        // Now do a postorder traversal and add the bit corresponding
-//        // to the current node in its parent node's split
-//        for (auto nd : boost::adaptors::reverse(_tree->_preorder)) {
-//            if (nd->_left_child) {
-//                // add this internal node's split to splitset
-//                splitset.insert(nd->_split);
-//            }
-//            else {
-//                // set bit corresponding to this leaf node's number
-//                nd->_split.setBitAt(nd->_number);
-//            }
-//
-//            if (nd->_parent) {
-//                // parent's bits are the union of the bits set in all its children
-//                nd->_parent->_split.addSplit(nd->_split);
-//            }
-//        }
-//    }
-
     inline void Proj::run() {
         cout << "Starting..." << endl;
         cout << "Current working directory: " << boost::filesystem::current_path() << endl;
@@ -861,18 +795,12 @@ namespace proj {
                     p->getTopologyPriors();
                 }
                 
-//                for (auto & p:my_vec) {
-//                    p->summarizeForests();
-//                }
-                
                 cout << "\t" << "proposed marg like: " << _log_marginal_likelihood;
                 cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood << endl;
                 
                 if (_estimate_theta || _estimate_speciation_rate || _estimate_hybridization_rate) {
                     estimateParameters(my_vec);
                 }
-                
-//                double lp = _avg_marg_like+_theta_prior;
                 
                 double a = 0;
                 unsigned col_count = 0;
@@ -898,7 +826,6 @@ namespace proj {
                         log_topology_priors.push_back(t);
                     }
                     
-//                    showFinal(_accepted_particle_vec);
                     assert(branch_length_vec.size() == prior_vec.size());
                     
                     if (col_count == 0) {
@@ -945,16 +872,6 @@ namespace proj {
             }
 //            saveAllHybridNodes(_accepted_particle_vec);
 //            showFinal(_accepted_particle_vec);
-//            for (auto &p:_accepted_particle_vec) {
-////                p->summarizeForests();
-//                p->storeNewicks();
-//            }
-//            for (auto &p:_accepted_particle_vec) {
-//                for (auto &n:p->getNewicks()) {
-//                    _newicks.push_back(n);
-//                }
-////                p->summarizeForests();
-//            }
             cout << "marg like: " << _log_marginal_likelihood << endl;
         }
 
