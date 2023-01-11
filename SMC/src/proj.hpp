@@ -910,7 +910,7 @@ namespace proj {
                     }
                     
                     logf << a << "\t" << Forest::_starting_theta;
-                    logf << "\t" << gene_tree_log_like[0];
+                    logf << "\t" << gene_tree_log_like[0]+exp(gene_tree_log_like[0]);
                     
                     for (int i=0; i<prior_vec.size(); i++) {
                         logf << "\t" << branch_length_vec[i] << "\t" << prior_vec[i];
