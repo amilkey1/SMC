@@ -75,9 +75,6 @@ class Particle {
         void                                            showGamma();
         string                                          saveGamma();
         void                                            calculateGamma();
-        double                                          calcGeneTreeMarginalLikelihood();
-        double                                          getGeneTreeMargLike() {return _gene_tree_marg_like;}
-        void                                            setMarginalLikelihood(double ml) {_gene_tree_marg_like = ml;}
         void                                            setRunOnEmpty(bool a) {_running_on_empty = a;}
         void                                            summarizeForests();
         vector<double>                                  getBranchLengths();
@@ -176,30 +173,41 @@ class Particle {
 
     inline double Particle::proposal() {
         string event;
-        if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
-            for (unsigned i=1; i<_forests.size(); i++) {
-                _forests[i]._theta = _forests[i]._starting_theta;
-                _forests[i]._gene_tree_marginal_likelihood = _forests[i]._gene_tree_log_likelihood;
-                _forests[i]._gene_tree_cum_time = 0.0;
-            }
-            _forests[0].chooseSpeciesIncrement();
-            for (unsigned i=1; i<_forests.size(); i++){
-                _gene_tree_proposal_attempts++;
-                _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
-            }
-        }
-        else if (_forests[0]._lineages.size()==1) {
-            for (unsigned i=1; i<_forests.size(); i++) {
-                if (_forests[i]._lineages.size() > 1) {
-                    list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
-                    _gene_tree_proposal_attempts++;
-                    _forests[i].fullyCoalesceGeneTree(lineages_list);
+        bool coalescence = false;
+
+        // attempt coalescent events until there has been at least 1
+        while (!coalescence) {
+            
+            // set starting variables
+            if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
+                for (unsigned i=1; i<_forests.size(); i++) {
+                    _forests[i]._theta = _forests[i]._starting_theta;
+                    _forests[i]._gene_tree_cum_time = 0.0;
+                }
+                
+                // choose a species tree height but don't join species yet (TODO: try both ways?)
+                _forests[0].chooseSpeciesIncrement();
+                
+                // attempt first gene tree proposal
+                for (unsigned i=1; i<_forests.size(); i++){
+                        _gene_tree_proposal_attempts++;
+                    _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
                 }
             }
-        }
+            
+            // if the species tree is done, go into fullyCoalesceGeneTree
+            else if (_forests[0]._lineages.size()==1) {
+                for (unsigned i=1; i<_forests.size(); i++) {
+                    if (_forests[i]._lineages.size() > 1) {
+                        list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
+                        _gene_tree_proposal_attempts++;
+                        _forests[i].fullyCoalesceGeneTree(lineages_list);
+                    }
+                }
+            }
         else {
 //            event = _forests[0].chooseEvent();
-            event = "speciation";
+            event = "speciation"; // for now, assume event is speciation
             if (event == "hybridization") {
                 vector<string> hybridized_nodes = _forests[0].hybridizeSpecies();
                 if (_forests[0]._lineages.size()>1) {
@@ -218,14 +226,19 @@ class Particle {
                 if (gene_tree_height >= species_tree_height) {
 //                    tuple<string, string, string> t = _forests[0].speciesTreeProposal();
                     _t = _forests[0].speciesTreeProposal();
+                    
+                    // if the species tree is not finished, add another species increment
                     if (_forests[0]._lineages.size()>1) {
                         _forests[0].addSpeciesIncrement();
                     }
+                    
+                    // reset gene tree cumulative time to 0 for a new species lineage
                     for (int i = 1; i <_forests.size(); i++) {
                         _forests[i]._gene_tree_cum_time = 0.0;
                     }
                 }
-                // don't join any species, must finish the gene trees first
+                
+                // don't join any more species, now must finish the gene trees first
                 for (unsigned i=1; i<_forests.size(); i++){
                     // if species have been joined in the previous generation
                     if (_forests[0]._lineages.size() != Forest::_nspecies) {
@@ -233,11 +246,9 @@ class Particle {
                        if (_forests[0]._lineages.size()==1) {
                             for (unsigned i=1; i<_forests.size(); i++) {
                                 assert (_forests[i]._lineages.size() > 1);
-//                                if (_forests[i]._lineages.size() > 1) {
                                 list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
                                 _gene_tree_proposal_attempts++;
                                 _forests[i].fullyCoalesceGeneTree(lineages_list);
-//                                }
                             }
                         }
                        else {
@@ -260,25 +271,24 @@ class Particle {
                 }
             }
         }
-        // if any forests have had no coalescence, continue again through the species tree join and gene tree proposals
-        // TODO: I'm not sure how this works if one gene tree had coalescence and one didn't - this could be an issue with multiple genes
-        // TODO: this does not account for hybridization
-        for (int i=1; i<_forests.size(); i++) {
-            if (_forests[i]._num_coalescent_events_in_generation == 0) {
-                _gene_tree_proposal_attempts++;
-                proposal();
-            }
-        }
-
-            for (int i = 1; i<_forests.size(); i++) {
-                if (_forests[i]._num_coalescent_events_in_generation > 1) {
-                    double smallest_branch = _forests[i].findShallowestCoalescence();
-                    _forests[i].revertToShallowest(smallest_branch);
+            for (int i=1; i<_forests.size(); i++) {
+                if (_forests[i]._num_coalescent_events_in_generation > 0) {
+                    coalescence = true;
+                    break;
                 }
             }
+        }
+        
+        for (int i = 1; i<_forests.size(); i++) {
+            if (_forests[i]._num_coalescent_events_in_generation > 1) {
+                double smallest_branch = _forests[i].findShallowestCoalescence();
+                _forests[i].revertToShallowest(smallest_branch);
+            }
+        }
         if (_running_on_empty == false) {
-            calcGeneTreeMarginalLikelihood();
-            _log_weight = _gene_tree_marg_like - _prev_gene_tree_marg_like;
+            double prev_log_likelihood = _log_likelihood;
+            _log_likelihood = calcLogLikelihood();
+            _log_weight = _log_likelihood - prev_log_likelihood;
         }
 
         else {
@@ -291,19 +301,6 @@ class Particle {
             _forests[i]._new_nodes.clear();
         }
         return _log_weight;
-    }
-
-    inline double Particle::calcGeneTreeMarginalLikelihood() {
-        for (auto &f:_forests) {
-            f.calcForestMarginalLikelihood();
-        }
-        _prev_gene_tree_marg_like = _gene_tree_marg_like;
-        _gene_tree_marg_like = 0.0;
-        for (int i=1; i<_forests.size(); i++) {
-            _gene_tree_marg_like += _forests[i]._gene_tree_log_likelihood;
-        }
-        _generation++;
-        return _gene_tree_marg_like;
     }
 
     inline Particle::Particle(const Particle & other) {
@@ -496,7 +493,6 @@ class Particle {
 
     inline vector<double> Particle::getTopologyPriors() {
         vector<double> topology_priors;
-//        showParticle();
         for (auto &f:_forests) {
             topology_priors.push_back(f.calcTopologyPrior());
         }

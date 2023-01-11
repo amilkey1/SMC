@@ -70,7 +70,8 @@ namespace proj {
             bool                        _ambig_missing;
             unsigned                    _nparticles;
             unsigned                    _random_seed;
-            double                      _avg_marg_like;
+//            double                      _avg_marg_like;
+            double                      _log_marginal_likelihood;
             bool                        _run_on_empty;
             double                      _theta_prior;
             double                      _prev_theta_prior;
@@ -306,19 +307,17 @@ namespace proj {
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
         for (auto & p : particles) {
-            log_weight_vec[i++] = p->getGeneTreeMargLike();
-//            tempf << p->getGeneTreeMargLike() << "\n";
+            log_weight_vec[i++] = p->getLogWeight();
         }
-//        tempf.close();
-        
 
         double log_particle_sum = getRunningSum(log_weight_vec);
 
-        // TODO: not sure about this
         for (auto & p : particles) {
-            p->setLogWeight(p->getGeneTreeMargLike() - log_particle_sum);
+            p->setLogWeight(p->getLogWeight() - log_particle_sum);
         }
         
+        _log_marginal_likelihood += log_particle_sum - log(_nparticles);
+        cout << _log_marginal_likelihood << endl;
         sort(particles.begin(), particles.end(), greater<Particle::SharedPtr>());
     }
 
@@ -368,9 +367,9 @@ namespace proj {
         if (_sample == 0) {
             _prev_particles = particles;
             _prev_log_marginal_likelihood = 0.0;
-            _speciation_rate_vector.push_back(make_pair(Forest::_speciation_rate, _avg_marg_like));
-            _hybridization_rate_vector.push_back(make_pair(Forest::_hybridization_rate, _avg_marg_like));
-            _theta_vector.push_back(make_pair(Forest::_starting_theta, _avg_marg_like));
+            _speciation_rate_vector.push_back(make_pair(Forest::_speciation_rate, _log_marginal_likelihood));
+            _hybridization_rate_vector.push_back(make_pair(Forest::_hybridization_rate, _log_marginal_likelihood));
+            _theta_vector.push_back(make_pair(Forest::_starting_theta, _log_marginal_likelihood));
         }
         // propose new value of all parameters being estimated
         if (_prev_log_marginal_likelihood != 0.0) {
@@ -390,20 +389,20 @@ namespace proj {
             if (outcome == "reject") {
                 cout << "\n" << "REJECT" << endl;
                 particles = _prev_particles;
-                _avg_marg_like = _prev_log_marginal_likelihood;
+                _log_marginal_likelihood = _prev_log_marginal_likelihood;
                 Forest::_speciation_rate = _prev_speciation_rate;
                 Forest::_hybridization_rate = _prev_hybridization_rate;
                 Forest::_starting_theta = _prev_theta;
-                _speciation_rate_vector.push_back(make_pair(Forest::_speciation_rate, _avg_marg_like));
-                _theta_vector.push_back(make_pair(Forest::_starting_theta, _avg_marg_like));
-                _hybridization_rate_vector.push_back(make_pair(Forest::_hybridization_rate, _avg_marg_like));
+                _speciation_rate_vector.push_back(make_pair(Forest::_speciation_rate, _log_marginal_likelihood));
+                _theta_vector.push_back(make_pair(Forest::_starting_theta, _log_marginal_likelihood));
+                _hybridization_rate_vector.push_back(make_pair(Forest::_hybridization_rate, _log_marginal_likelihood));
             }
             else {
                 cout << "\n" << "ACCEPT" << endl;
                 _prev_particles = particles;
-                _speciation_rate_vector.push_back(make_pair(Forest::_speciation_rate, _avg_marg_like));
-                _theta_vector.push_back(make_pair(Forest::_starting_theta, _avg_marg_like));
-                _hybridization_rate_vector.push_back(make_pair(Forest::_hybridization_rate, _avg_marg_like));
+                _speciation_rate_vector.push_back(make_pair(Forest::_speciation_rate, _log_marginal_likelihood));
+                _theta_vector.push_back(make_pair(Forest::_starting_theta, _log_marginal_likelihood));
+                _hybridization_rate_vector.push_back(make_pair(Forest::_hybridization_rate, _log_marginal_likelihood));
                 if (_estimate_theta) {_theta_accepted_number++;}
                 if (_estimate_speciation_rate) {_speciation_rate_accepted_number++;}
                 if (_estimate_hybridization_rate) {_hybridization_rate_accepted_number++;}
@@ -433,8 +432,7 @@ namespace proj {
         if (_estimate_speciation_rate) {
             _speciation_rate_prior = logSpeciationRatePrior(Forest::_speciation_rate);
         }
-        double log_acceptance_ratio = (_avg_marg_like+_hybridization_rate_prior+_speciation_rate_prior+_theta_prior)-(_prev_log_marginal_likelihood+_prev_hybridization_rate_prior+_theta_prior+_speciation_rate_prior);
-//        double log_acceptance_ratio = (_avg_marg_like+logHybridizationRatePrior(Forest::_hybridization_rate)+logSpeciationRatePrior(Forest::_speciation_rate)+_theta_prior)-(_prev_log_marginal_likelihood+logHybridizationRatePrior(_prev_hybridization_rate)+logThetaPrior(_prev_theta)+logSpeciationRatePrior(_prev_speciation_rate));
+        double log_acceptance_ratio = (_log_marginal_likelihood+_hybridization_rate_prior+_speciation_rate_prior+_theta_prior)-(_prev_log_marginal_likelihood+_prev_hybridization_rate_prior+_theta_prior+_speciation_rate_prior);
         if (log(u) > log_acceptance_ratio){
             // reject proposed theta
             bool accepted = false;
@@ -593,7 +591,7 @@ namespace proj {
         }
         sum_h/=my_vec.size();
         cout << "mean height equals " << sum_h << endl;
-        cout << "log marginal likelihood = " << _avg_marg_like << endl;
+        cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
         cout << "starting theta = " << Forest::_starting_theta << endl;
         cout << "speciation rate = " << Forest::_speciation_rate << endl;
         cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
@@ -792,8 +790,8 @@ namespace proj {
                 vector<Particle::SharedPtr> my_vec_2(nparticles);
                 vector<Particle::SharedPtr> &my_vec = my_vec_1;
                 
-                _prev_log_marginal_likelihood = _avg_marg_like;
-                _avg_marg_like = 0.0;
+                _prev_log_marginal_likelihood = _log_marginal_likelihood;
+                _log_marginal_likelihood = 0.0;
                 
                 for (unsigned i=0; i<nparticles; i++) {
                     my_vec_1[i] = Particle::SharedPtr(new Particle);
@@ -814,12 +812,9 @@ namespace proj {
                         }
                         p->setLogLikelihood(logLikelihood);
                         p->setLogWeight(logLikelihood); // at this stage, log weight = log likelihood
-                        p->setMarginalLikelihood(logLikelihood);
                     }
                 
                 normalizeWeights(my_vec, -1);
-                
-                _avg_marg_like = 0.0;
                 
                 for (auto &p:my_vec) {
                     p->setRunOnEmpty(_run_on_empty);
@@ -828,19 +823,11 @@ namespace proj {
                 //run through each generation of particles
                 int ntaxa = (int) _taxon_map.size();
                 for (unsigned g=0; g<ntaxa-1; g++){
-//                    if (my_vec[0]->_suppress_resampling <= 1) {
 //                    cout << "gen " << g << endl;
                     //taxon joining and reweighting step
                     proposeParticles(my_vec);
                     
                     if (!_run_on_empty) {
-                        vector<double> total_marg_like;
-                        for (auto & p:my_vec) {
-                            total_marg_like.push_back(p->getGeneTreeMargLike());
-
-                        }
-                        
-                        _avg_marg_like = getRunningSum(total_marg_like) - log(_nparticles);
                         
                         double ess_inverse = 0.0;
                         normalizeWeights(my_vec, g);
@@ -852,7 +839,7 @@ namespace proj {
                         double ess = 1.0/ess_inverse;
                         cout << "ESS = " << ess << endl;
                     
-//                        if (ess < 100) {
+//                        if (ess < 10000) {
                             // save particle random seeds
                             
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
@@ -867,14 +854,10 @@ namespace proj {
                     }
                     resetWeights(my_vec);
                     _accepted_particle_vec = my_vec;
-//                    if (my_vec[0]->_suppress_resampling == 1) {
-//                        my_vec[0]->_suppress_resampling++;
-////                    }
-//                    }
                 } // g loop
                 
                 for (auto &p:my_vec) {
-                    p->showParticle();
+//                    p->showParticle();
                     p->getTopologyPriors();
                 }
                 
@@ -882,7 +865,7 @@ namespace proj {
 //                    p->summarizeForests();
 //                }
                 
-                cout << "\t" << "proposed marg like: " << _avg_marg_like;
+                cout << "\t" << "proposed marg like: " << _log_marginal_likelihood;
                 cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood << endl;
                 
                 if (_estimate_theta || _estimate_speciation_rate || _estimate_hybridization_rate) {
@@ -897,12 +880,12 @@ namespace proj {
                     
                     vector<double> branch_length_vec;
                     for (auto &b:p->getBranchLengths()) {
-                        branch_length_vec.push_back(b);
+                        branch_length_vec.push_back(log(b));
                     }
                     
                     vector<double> prior_vec;
                     for (auto &b:p->getBranchLengthPriors()) {
-                        prior_vec.push_back(b);
+                        prior_vec.push_back(log(b));
                     }
                     
                     vector<double> gene_tree_log_like;
@@ -972,7 +955,7 @@ namespace proj {
 //                }
 ////                p->summarizeForests();
 //            }
-            cout << "marg like: " << _avg_marg_like << endl;
+            cout << "marg like: " << _log_marginal_likelihood << endl;
         }
 
         catch (XProj & x) {
