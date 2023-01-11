@@ -112,7 +112,6 @@ class Forest {
         void                        revertToShallowest(double smallest_branch);
         double                      getTreeHeight();
         double                      getLineageHeight(Node* nd);
-        void                        calcForestMarginalLikelihood();
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -133,7 +132,6 @@ class Forest {
         map<string, list<Node*> > _species_partition;
         double                    _gene_tree_log_likelihood;
         double                      _gene_tree_log_weight;
-        double                      _prev_gene_tree_log_likelihood;
         vector<double>              _log_weight_vec;
         vector<pair<Node*, Node*>> _node_choices;
         vector<double>              _log_likelihood_choices;
@@ -143,7 +141,6 @@ class Forest {
         double                      _generationf = 0;
         string                      _last_direction;
         vector<double>              _rand_numbers;
-        double                      _gene_tree_marginal_likelihood;
         vector<pair<double, double>>         _increments;
 //        vector<double>              _branch_lengths;
 //        vector<double>              _branch_length_priors;
@@ -154,6 +151,7 @@ class Forest {
 //        vector<double>              _searchable_branch_lengths;
     vector<pair<double, double>> _searchable_branch_lengths; // pair is lineage height, increment
         double                      _gene_tree_cum_time; // gene tree cumulative height in this lineage only
+        double                      _prev_log_likelihood;
 
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -665,6 +663,16 @@ class Forest {
 
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment) {
         _node_choices.clear();
+        
+        // TODO: not sure about this next chunk of code, check if using prior-post
+        // reset _log_likelihood_choices to 0 if we are in a new lineage
+        if (_log_likelihood_choices.size() == 0) {
+            _prev_log_likelihood = 0.0;
+        }
+        else {
+            _prev_log_likelihood = _log_likelihood_choices[_index_of_choice];
+        }
+        _log_likelihood_choices.clear();
 
         _log_likelihood_choices.clear();
         vector<double> topology_prior_choices;
@@ -690,7 +698,7 @@ class Forest {
         }
 
         // reweight each choice of pairs
-        vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood);
+        vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_log_likelihood);
 
         // sum unnormalized weights before choosing the pair
         _gene_tree_log_weight = 0.0;
@@ -899,9 +907,8 @@ class Forest {
         _gamma = other._gamma;
         _rand_numbers = other._rand_numbers;
         _gene_tree_log_weight = other._gene_tree_log_weight;
-        _prev_gene_tree_log_likelihood = other._prev_gene_tree_log_likelihood;
+        _prev_log_likelihood = other._prev_log_likelihood;
         _log_weight_vec = other._log_weight_vec;
-        _gene_tree_marginal_likelihood = other._gene_tree_marginal_likelihood;
         _theta = other._theta;
 //        _branch_lengths = other._branch_lengths;
         _increments = other._increments;
@@ -1131,6 +1138,7 @@ class Forest {
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double species_tree_increment) {
         // reset _log_likelihood_choices each time a new lineage is entered
         _log_likelihood_choices.clear();
+        _prev_log_likelihood = 0.0;
         bool done = false;
         double cum_time = _gene_tree_cum_time;
         bool coalescence = false;
@@ -1143,13 +1151,8 @@ class Forest {
         double coalescence_rate = s*(s-1)/_theta;
         increment = rng.gamma(1.0, 1.0/(coalescence_rate));
 
-//        if (s>1) {
-//            _branch_length_priors.push_back(log(coalescence_rate)-increment*coalescence_rate);
-//        }
-
         if (_migration_rate > 0.0) {
             increment = rng.gamma(1.0, 1.0/(coalescence_rate+_migration_rate));
-//            _rand_numbers.push_back(increment);
             double migration_prob = _migration_rate/(_migration_rate+coalescence_rate);
             double coalescence_prob = coalescence_rate/(_migration_rate+coalescence_rate);
 
@@ -1188,15 +1191,8 @@ class Forest {
             if (!done) {
                 allowCoalescence(nodes, increment);
                 _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
-//                if (_new_nodes.back()->_left_child->_left_child || _new_nodes.back()->_left->child->_right_sib->_left_child) {
-//                    _searchable_branch_lengths.push_back(getLineageHeight();
-//                }
-//                _searchable_branch_lengths.push_back(increment);
                 _searchable_branch_lengths.push_back(make_pair (getLineageHeight(_new_nodes.back()), increment));
-//                showForest();
-                coalescence = true; // TODO: testing - only allow one coalescent event per lineage
-//                saveDivergenceTimes(increment);
-//                _branch_length_priors.push_back(log(coalescence_rate)-increment*coalescence_rate);
+                coalescence = true;
             }
             cum_time += increment;
         }
@@ -1277,25 +1273,9 @@ class Forest {
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
     }
 
-    inline void Forest::calcForestMarginalLikelihood() {
-        if (_proposal == "prior-prior") { // TODO: or nodes.size() == 1 in case of prior-post
-            _gene_tree_log_likelihood = calcLogLikelihood();
-            _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
-            _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
-            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
-//            _gene_tree_marginal_likelihood = _gene_tree_log_weight;
-            // marginal likelihood = normalized particle weights sum - ln(1)
-            // normalized particle sum for one particle is just log likelihood?
-            // TODO: go back to standard likelihoods
-        }
-        else if (_proposal == "prior-post") {
-            _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
-            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
-        }
-    }
-
     inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
         bool coalescence = false;
+        _prev_log_likelihood = 0.0;
         assert (nodes.size()>0);
 //        assert (nodes.size()>1);
         bool done = false;
@@ -1325,16 +1305,8 @@ class Forest {
                 Node *subtree2 = nullptr;
 
                 _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
-//                _searchable_branch_lengths.push_back(increment);
-//                _searchable_branch_lengths.push_back(getLineageHeight(_new_nodes.back()));
-
-//                saveDivergenceTimes(increment);
-//                _branch_length_priors.push_back(log(coalescence_rate)-increment*coalescence_rate);
 
                 if (nodes.size()>2) {
-//                    saveDivergenceTimes(increment);
-//                    _branch_length_priors.push_back(log(coalescence_rate)-increment*coalescence_rate);
-//                    _branch_length_priors.push_back(log(coalescence_rate)-increment*coalescence_rate);
 
 // prior-prior proposal
                     if (_proposal == "prior-prior") {
@@ -1391,19 +1363,11 @@ class Forest {
                 //update species list
                 updateNodeList(nodes, subtree1, subtree2, new_nd);
                 updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-
-                _gene_tree_log_likelihood = calcLogLikelihood();
-                _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
-                _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
-                _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
-                // marginal likelihood = particle weights sum - ln(1)
-                // normalized particle sum for one particle is just log likelihood
             }
         }
     }
 
     inline void Forest::firstGeneTreeProposal(double time_increment) {
-        _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
         if (_species_partition.size() == 1) {
             fullyCoalesceGeneTree(_species_partition.begin()->second);
         }
@@ -1411,15 +1375,12 @@ class Forest {
         else {
             for (auto &s:_species_partition) {
                 assert (s.second.size()>0);
-//                showForest();
                 evolveSpeciesFor(s.second, time_increment);
-//                showForest();
             }
         }
     }
 
     inline void Forest::geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment) {
-        _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood; // TODO: i think this is redundant?
         //update species partition
         string new_name = get<2>(species_merge_info);
         string species1 = get<0>(species_merge_info);
@@ -1998,7 +1959,7 @@ class Forest {
         _log_likelihood_choices.push_back(likelihood_vec[1]+log(.85)); // multiply major likelihood by (gamma)
 
         // reweight each choice of pairs
-        vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood);
+        vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_log_likelihood);
 
         // sum unnormalized weights before choosing the pair
         _gene_tree_log_weight = 0.0;
@@ -2110,7 +2071,7 @@ class Forest {
         // choose edge length but don't add it yet
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
-        if (_lineages.size()>2) {
+        if (_lineages.size()>1) {
             _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
 //            _branch_length_priors.push_back(log(rate)-_last_edge_length*rate);
         }
