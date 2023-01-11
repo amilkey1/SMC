@@ -76,13 +76,10 @@ class Particle {
         string                                          saveGamma();
         void                                            calculateGamma();
         void                                            setRunOnEmpty(bool a) {_running_on_empty = a;}
-        void                                            summarizeForests();
         vector<double>                                  getBranchLengths();
         vector<double>                                  getBranchLengthPriors();
         vector<double>                                  getGeneTreeLogLikelihoods();
         vector<double>                                  getTopologyPriors();
-        void                                            storeNewicks();
-        vector<string>                                  getNewicks() {return _newicks;}
 
     private:
 
@@ -96,9 +93,6 @@ class Particle {
         double                                  _prev_gene_tree_marg_like;
         map<int, vector<double>>                     _random_seeds;
         bool                                    _running_on_empty = false;
-        vector<tuple<string, string, string>> _triple;
-        vector<string>                          _newicks;
-        Split::treemap_t                        _treeIDs;
         tuple<string, string, string>           _t;
         unsigned                                _gene_tree_proposal_attempts = 0;
 };
@@ -225,7 +219,6 @@ class Particle {
                 double species_tree_height = _forests[0].getTreeHeight();
                 // ready to join species
                 if (gene_tree_height >= species_tree_height) {
-//                    tuple<string, string, string> t = _forests[0].speciesTreeProposal();
                     _t = _forests[0].speciesTreeProposal();
                     
                     // if the species tree is not finished, add another species increment
@@ -260,13 +253,11 @@ class Particle {
                        }
                     }
                     // if no species have been joined in the previous generation
-//                    if (_forests[0]._lineages.size() == Forest::_nspecies) {
                     else {
                         for (unsigned i=1; i<_forests.size(); i++){
                             assert (_forests[i]._lineages.size() > 1);
                             _gene_tree_proposal_attempts++;
                             _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
-//                            }
                         }
                     }
                 }
@@ -437,33 +428,6 @@ class Particle {
         _generation = n;
     }
 
-    inline void Particle::summarizeForests() {
-        // Show all unique topologies with a list of the trees that have that topology
-        // Also create a map that can be used to sort topologies by their sample frequency
-        typedef std::pair<unsigned, unsigned> sorted_pair_t;
-        std::vector< sorted_pair_t > sorted;
-        int t = 0;
-        for (auto & key_value_pair : _treeIDs) {
-            unsigned topology = ++t;
-            unsigned ntrees = (unsigned)key_value_pair.second.size();
-            sorted.push_back(std::pair<unsigned, unsigned>(ntrees,topology));
-            std::cout << "Topology " << topology << " seen in these " << ntrees << " trees:" << std::endl << "  ";
-            std::copy(key_value_pair.second.begin(), key_value_pair.second.end(), std::ostream_iterator<unsigned>(std::cout, " "));
-            std::cout << std::endl;
-        }
-
-        // Show sorted histogram data
-        std::sort(sorted.begin(), sorted.end());
-        //unsigned npairs = (unsigned)sorted.size();
-        std::cout << "\nTopologies sorted by sample frequency:" << std::endl;
-        std::cout << boost::str(boost::format("%20s %20s") % "topology" % "frequency") << std::endl;
-        for (auto & ntrees_topol_pair : boost::adaptors::reverse(sorted)) {
-            unsigned n = ntrees_topol_pair.first;
-            unsigned t = ntrees_topol_pair.second;
-            std::cout << boost::str(boost::format("%20d %20d") % t % n) << std::endl;
-        }
-    }
-
     inline vector<double> Particle::getBranchLengths() {
         vector<double> divergence_times;
         for (auto &f:_forests) {
@@ -501,12 +465,6 @@ class Particle {
         return topology_priors;
     }
 
-    inline void Particle::storeNewicks() {
-        for (auto &f:_forests) {
-            _newicks.push_back(f.makeNewick(9, true));
-        }
-    }
-
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_likelihood = other._log_likelihood;
@@ -516,8 +474,6 @@ class Particle {
         _data           = other._data;
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;
-        _triple         = other._triple;
-        _newicks = other._newicks;
         _t = other._t;
         _gene_tree_proposal_attempts = other._gene_tree_proposal_attempts;
     };
