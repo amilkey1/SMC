@@ -1339,7 +1339,7 @@ class Forest {
                     done = true;
                 }
                 cum_time += increment;
-                if (!coalescence) {
+                if (!coalescence && _proposal == "prior-post-ish") {
                     allowDummyCoalescence(nodes, increment);
                     _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
 
@@ -2405,6 +2405,7 @@ class Forest {
     }
 
     inline void Forest::revertToShallowest(double smallest_branch){
+        assert (_proposal != "prior-post-ish");
         // revert joins that are not smallest join
 
         // save nodes that must be reverted
