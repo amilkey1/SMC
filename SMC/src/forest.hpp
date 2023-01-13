@@ -91,6 +91,7 @@ class Forest {
         void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
         void                        deleteTaxon(string key_to_del, unsigned taxon_choice);
         void                        allowCoalescence(list<Node*> &nodes, double increment);
+        void                        allowDummyCoalescence(list<Node*> &nodes, double increment);
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
         vector<string>              hybridizeSpecies();
         void                        moveGene(string new_nd, string parent, string hybrid);
@@ -105,6 +106,11 @@ class Forest {
         void                        revertToShallowest(double smallest_branch);
         double                      getTreeHeight();
         double                      getLineageHeight(Node* nd);
+        void                        revertNewNode(list <Node*> &nodes, Node*new_nd, Node* subtree1, Node* subtree2, double increment);
+        void                        revertBranches(list <Node*> &nodes, Node* subtree1, Node* subtree2, double increment);
+        void                        chooseCoalescentEvent();
+        void                        mergeChosenPair(double species_tree_increment);
+        void                        extendGeneTreeLineages(double species_tree_increment);
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -140,7 +146,9 @@ class Forest {
     vector<pair<double, double>> _searchable_branch_lengths; // pair is lineage height, increment
         double                      _gene_tree_cum_time; // gene tree cumulative height in this lineage only
         double                      _prev_log_likelihood;
+        vector<double>               _prev_log_likelihood_choices;
         double                      _log_joining_prob;
+        vector<double>              _increment_choices;
 
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -719,6 +727,141 @@ class Forest {
         return make_pair(subtree1, subtree2);
     }
 
+    inline void Forest::chooseCoalescentEvent() {
+        _gene_tree_log_weight = 0.0;
+        if (_log_likelihood_choices.size() > 0) {
+            // reweight each choice of pairs
+            vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_log_likelihood);
+            
+            // sum unnormalized weights before choosing the pair
+            // must include the likelihoods of all pairs in the final particle weight
+//            _gene_tree_log_weight = getRunningSumChoices(log_weight_choices);
+            
+            
+//            for (auto &l:log_weight_choices) {
+//                _gene_tree_log_weight += l;
+//            }
+
+            // normalize weights
+            double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
+            _gene_tree_log_weight = log_weight_choices_sum;
+            for (int b=0; b < (int) log_weight_choices.size(); b++) {
+                log_weight_choices[b] -= log_weight_choices_sum;
+            }
+
+//            _gene_tree_log_likelihood = _gene_tree_log_weight;
+            // randomly select a pair
+            _index_of_choice = selectPair(log_weight_choices);
+            
+            _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
+//            _prev_log_likelihood_choices = _log_likelihood_choices;
+        }
+    }
+
+    inline void Forest::mergeChosenPair(double species_tree_increment) { // TODO: make sure be able to account for deep  coalescnece
+        if (_log_likelihood_choices.size() > 0) {
+            _log_likelihood_choices.clear();
+            // find nodes to join in node_list
+            Node *subtree1 = _node_choices[_index_of_choice].first;
+            Node *subtree2 = _node_choices[_index_of_choice].second;
+            
+            if (_increment_choices[_index_of_choice] < species_tree_increment) { // TODO: not sure this works for 3+ individuals
+                // no deep coalescence, must rejoin chosen pair
+                
+                _node_choices.clear();
+
+                _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
+                _log_likelihood_choices.clear();
+                _new_nodes.clear();
+                
+                // new node is always needed
+                Node nd;
+                _nodes.push_back(nd);
+                Node* new_nd = &_nodes.back();
+                new_nd->_parent=0;
+                new_nd->_number=_nleaves+_ninternals;
+                new_nd->_edge_length=0.0;
+                new_nd->_right_sib=0;
+                _ninternals++;
+
+                new_nd->_left_child=subtree1;
+                subtree1->_right_sib=subtree2;
+
+                subtree1->_parent=new_nd;
+                subtree2->_parent=new_nd;
+                
+                subtree1->_edge_length += _increment_choices[_index_of_choice];
+                subtree2->_edge_length += _increment_choices[_index_of_choice];
+                
+                _num_coalescent_events_in_generation = 1;
+
+                //always calculating partials now
+                assert (new_nd->_partial == nullptr);
+                new_nd->_partial=ps.getPartial(_npatterns*4);
+                assert(new_nd->_left_child->_right_sib);
+                calcPartialArray(new_nd);
+
+                //update species list
+                updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+                
+                    // update species partition
+                for (auto &s:_species_partition) {
+                    for (auto &nd:s.second) {
+                        // TODO: there must be a better way to do this
+                        if (nd == subtree1 || nd == subtree2) {
+    //                    if (nd->_name == subtree1->_name || nd->_name == subtree2->_name) {
+                            updateNodeList(s.second, subtree1, subtree2, new_nd);
+                            break;
+                        }
+                    }
+                }
+                
+//                for (auto &s:_species_partition) {
+//                    cout << "x";
+//                }
+                
+                // clear new node from _nodes
+//                for (auto iter = _nodes.begin(); iter != _nodes.end(); iter++) {
+//                    if (iter->_name == "unused") {
+//                        iter = _nodes.erase(iter);
+//                        --iter;
+//                        _ninternals--;
+//                    }
+//                }
+//
+//                // reset node numbers
+//                int n = 0;
+//                for (auto &nd:_nodes) {
+//                    nd._number = n;
+//                    n++;
+//                }
+            }
+            
+            else {
+                showForest();
+                // deep coalescence, don't need to join anything
+                // reset branch lengths for the chosen deep coalescence event
+                subtree1->_edge_length = _increment_choices[_index_of_choice];
+                subtree2->_edge_length = _increment_choices[_index_of_choice];
+                _num_coalescent_events_in_generation = 0;
+            }
+            
+            // delete extra increments from _increments list
+            for (auto &i:_increments) {
+                if (i.first != _increment_choices[_index_of_choice]) {
+                    _increments.erase(remove(_increments.begin(), _increments.end()-1, i)); // TODO: this only works for the first generation
+                }
+            }
+        }
+        
+        // reset gene_tree_cum_time
+        _gene_tree_cum_time;
+        // TODO: how to do this because all lineages are not the same height? do we need a cum_time for each lineage?
+        
+        _increment_choices.clear();
+        _node_choices.clear();
+    }
+
     inline int Forest::selectPair(vector<double> weight_vec) {
         // choose a random number [0,1]
         double u = rng.uniform();
@@ -738,6 +881,7 @@ class Forest {
 
     inline vector<double> Forest::reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood) {
         vector<double> weight_vec;
+//        assert (likelihood_vec.size() == prev_log_likelihood_choices.size());
         for (int a = 0; a < (int) likelihood_vec.size(); a++) {
             weight_vec.push_back(likelihood_vec[a]-prev_log_likelihood);
         }
@@ -825,6 +969,7 @@ class Forest {
         return make_tuple(subtree1, subtree2, new_nd);
     }
 
+
     inline void Forest::debugLogLikelihood(Node* nd, double log_like) {
         cout << "debugging likelihood" << endl;
         cout << "gene: " << _index << endl;
@@ -906,6 +1051,8 @@ class Forest {
         _searchable_branch_lengths = other._searchable_branch_lengths;
         _gene_tree_cum_time = other._gene_tree_cum_time;
         _log_joining_prob = other._log_joining_prob;
+        _increment_choices = other._increment_choices;
+        _prev_log_likelihood_choices = other._prev_log_likelihood_choices;
 
         // copy tree itself
 
@@ -1115,85 +1262,121 @@ class Forest {
     }
 
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double species_tree_increment) {
+//        _prev_log_likelihood_choices.push_back(calcLogLikelihood());
         // reset _log_likelihood_choices each time a new lineage is entered
-        _log_likelihood_choices.clear();
-        _prev_log_likelihood = 0.0;
+//        _log_likelihood_choices.clear(); // TODO: how to deal with prior-post and prior-post-ish in the same fxn?
+//        _prev_log_likelihood = 0.0;
         bool done = false;
         double cum_time = _gene_tree_cum_time;
+//        double cum_time = _gene_tree_cum_time = getLineageHeight(nodes.front()); // TODO: make sure all nodes in the list have the same height here
         bool coalescence = false;
+        
+        
+        // for prior post ish proposal, do not add increment if not attempting a coalescent event
+        if (_proposal == "prior-post-ish") {
+            if (nodes.size() == 1) {
+                done = true;
+            }
+        }
 
-    while (!done) {
-        string event = "coalescence";
-        double increment;
+        while (!done) {
+            string event = "coalescence";
+            double increment;
 
-        double s = nodes.size();
-        double coalescence_rate = s*(s-1)/_theta;
-        increment = rng.gamma(1.0, 1.0/(coalescence_rate));
+            double s = nodes.size();
+            double coalescence_rate = s*(s-1)/_theta;
+            increment = rng.gamma(1.0, 1.0/(coalescence_rate));
 
-        if (_migration_rate > 0.0) {
-            increment = rng.gamma(1.0, 1.0/(coalescence_rate+_migration_rate));
-            double migration_prob = _migration_rate/(_migration_rate+coalescence_rate);
-            double coalescence_prob = coalescence_rate/(_migration_rate+coalescence_rate);
+            if (_migration_rate > 0.0) {
+                increment = rng.gamma(1.0, 1.0/(coalescence_rate+_migration_rate));
+                double migration_prob = _migration_rate/(_migration_rate+coalescence_rate);
+                double coalescence_prob = coalescence_rate/(_migration_rate+coalescence_rate);
 
-//             draw random number to determine coalescent or migration event
-            vector<double> prob_vec;
-            prob_vec.push_back(coalescence_prob);
-            prob_vec.push_back(migration_prob);
+    //             draw random number to determine coalescent or migration event
+                vector<double> prob_vec;
+                prob_vec.push_back(coalescence_prob);
+                prob_vec.push_back(migration_prob);
 
-            double u = rng.uniform();
-            _rand_numbers.push_back(u);
+                double u = rng.uniform();
+                _rand_numbers.push_back(u);
 
-            double cum_prob = 0.0;
-            for (int i = 0; i<2; i++) {
-                cum_prob += prob_vec[i];
-                if (u <= cum_prob) {
-                    if (i == 0) {event = "coalescence";}
-                    if (i == 1) {event = "migration";}
-                    break;
+                double cum_prob = 0.0;
+                for (int i = 0; i<2; i++) {
+                    cum_prob += prob_vec[i];
+                    if (u <= cum_prob) {
+                        if (i == 0) {event = "coalescence";}
+                        if (i == 1) {event = "migration";}
+                        break;
+                    }
                 }
             }
-        }
 
-        bool time_limited = species_tree_increment > 0.0;
-        bool lineages_left_to_join = s > 1;
-        bool time_limit_reached = cum_time+increment > species_tree_increment;
-        if ((time_limited && time_limit_reached) || !lineages_left_to_join || coalescence == true)  {
-            done = true;
-            increment = species_tree_increment - cum_time;
-        }
+            bool time_limited = species_tree_increment > 0.0;
+            bool lineages_left_to_join = s > 1;
+            bool time_limit_reached = cum_time+increment > species_tree_increment;
+            if ((time_limited && time_limit_reached) || !lineages_left_to_join)  {
+                done = true;
+                increment = species_tree_increment - cum_time;
+            }
+            if (increment == 0) {
+                cout << "x";
+            }
 
-        //add increment to each lineage
-        for (auto nd:nodes) {
-            nd->_edge_length += increment; //add most recently chosen branch length to each node in lineage
-        }
-        if (_migration_rate == 0.0 || event == "coalescence") {
-            if (!done) {
-                allowCoalescence(nodes, increment);
-                _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
-                _searchable_branch_lengths.push_back(make_pair (getLineageHeight(_new_nodes.back()), increment));
-                coalescence = true;
+            //if increment is 0, the lineage is done and we don't consider it at all
+            if (increment > 0) {
+                if (_proposal == "prior-post-ish") {
+                    _increment_choices.push_back(increment);
+                }
+                for (auto nd:nodes) {
+                    nd->_edge_length += increment; //add most recently chosen branch length to each node in lineage
+                }
+//            }
+            if (_migration_rate == 0.0 || event == "coalescence") {
+                if (!done) {
+                    allowCoalescence(nodes, increment);
+                    coalescence = true;
+                    _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
+                    if (_proposal != "prior-post-ish") {
+                        _searchable_branch_lengths.push_back(make_pair (getLineageHeight(_new_nodes.back()), increment));
+                    }
+                    done = true;
+                }
+                cum_time += increment;
+                if (!coalescence) {
+                    allowDummyCoalescence(nodes, increment);
+//                    // create a dummy node for keeping track of coalescent choices
+//                    // choose 2 of the nodes from node_list to undergo deep coalescence // TODO: not sure if this works in all cases
+//                    Node nd;
+//                    _nodes.push_back(nd);
+//                    Node* new_nd = &_nodes.back();
+//
+//                    new_nd->_parent=0;
+//                    new_nd->_number=_nleaves+_ninternals;
+//                    new_nd->_edge_length=0.0;
+//                    _ninternals++;
+//                    new_nd->_name = "unused";
+                    
+                    
+//                    revertBranches(nodes, increment, new_nd);
+                }
             }
-            cum_time += increment;
-        }
-        else if (event == "migration" && nodes.size() > 1) {
-            // TODO: can this happen with only one individual in a lineage?
-            // if there's only one individual in a lineage, don't allow migration b/c then there will be no individuals in the lineage, which we know is not true
-            assert(nodes.size()>1);
-            if (!done) {
-                allowMigration(nodes);
+            else if (event == "migration" && nodes.size() > 1) {
+                // TODO: can this happen with only one individual in a lineage?
+                // if there's only one individual in a lineage, don't allow migration b/c then there will be no individuals in the lineage, which we know is not true
+                assert(nodes.size()>1);
+                if (!done) {
+                    allowMigration(nodes);
+                }
             }
-        }
+            }
         }
     }
 
-    inline void Forest::allowCoalescence(list<Node*> &nodes, double increment) {
+    inline void Forest::allowDummyCoalescence(list<Node*> &nodes, double increment) {
         Node *subtree1 = nullptr;
         Node *subtree2 = nullptr;
         unsigned s = (unsigned) nodes.size();
-
         if (nodes.size()>2) {
-            // prior-prior proposal
-            if (_proposal == "prior-prior") {
                 pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
                 auto it1 = std::next(nodes.begin(), t.first);
                 subtree1 = *it1;
@@ -1201,14 +1384,60 @@ class Forest {
                 auto it2 = std::next(nodes.begin(), t.second);
                 subtree2 = *it2;
                 assert (t.first < nodes.size() && t.second < nodes.size());
-            }
+        }
+        else {
+            // if there are only two lineages left, there is only one choice
+            subtree1 = nodes.front();
+            subtree2 = nodes.back();
+        }
 
+        assert (subtree1 != subtree2);
+
+        //new node is always needed
+//        Node nd; // TODO: not sure this is necessary
+//        _nodes.push_back(nd);
+//        Node* new_nd = &_nodes.back();
+//        new_nd->_name = "unused";
+//
+//        new_nd->_parent=0;
+//        new_nd->_number=_nleaves+_ninternals;
+//        new_nd->_edge_length=0.0;
+//        _ninternals++;
+//        new_nd->_right_sib=0;
+
+//        _new_nodes.push_back(new_nd);
+//        calcPartialArray(new_nd);
+        
+        if (_proposal == "prior-post-ish") {
+            _log_likelihood_choices.push_back(calcLogLikelihood());
+//            new_nd->_name = "unused";
+            _node_choices.push_back(make_pair(subtree1, subtree2));
+            revertBranches(nodes, subtree1, subtree2, increment);
+        }
+    }
+
+    inline void Forest::allowCoalescence(list<Node*> &nodes, double increment) {
+        Node *subtree1 = nullptr;
+        Node *subtree2 = nullptr;
+        unsigned s = (unsigned) nodes.size();
+        if (nodes.size()>2) {
             // prior-post proposal
             if (_proposal == "prior-post") {
                 pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
 
                 subtree1 = t.first;
                 subtree2 = t.second;
+            }
+            
+            // prior-prior proposal
+            else {
+                pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+                auto it1 = std::next(nodes.begin(), t.first);
+                subtree1 = *it1;
+
+                auto it2 = std::next(nodes.begin(), t.second);
+                subtree2 = *it2;
+                assert (t.first < nodes.size() && t.second < nodes.size());
             }
         }
         else {
@@ -1244,22 +1473,37 @@ class Forest {
 
         _new_nodes.push_back(new_nd);
         calcPartialArray(new_nd);
-
         _num_coalescent_events_in_generation++;
-        calcTopologyPrior((int) nodes.size());
+
+        if (_proposal != "prior-post-ish" ) {
+            calcTopologyPrior((int) nodes.size()); // TODO: this won't work with prior-post-ish
+        }
 
         //update species list
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+        
+        if (_proposal == "prior-post-ish") {
+            _log_likelihood_choices.push_back(calcLogLikelihood());
+            new_nd->_name = "unused";
+            _node_choices.push_back(make_pair(subtree1, subtree2));
+            revertNewNode(nodes, new_nd, subtree1, subtree2, increment);
+        }
     }
 
-    inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
-        bool coalescence = false;
-        _prev_log_likelihood = 0.0;
+    inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) { // TODO: add prior post ish here too - I think this is okay because deep coalescence is never an issue here
+//        bool coalescence = false;
         assert (nodes.size()>0);
         bool done = false;
         if (nodes.size() == 1) {
             done = true;
+        }
+        
+        // for prior post-ish propposal, do not add increment if not attempting a coalescent event
+        if (_proposal == "prior-post-ish") {
+            if (nodes.size() == 1) {
+                done = true;
+            }
         }
 
         while (!done) {
@@ -1268,13 +1512,16 @@ class Forest {
             double increment = rng.gamma(1.0, 1.0/coalescence_rate);
 
             bool lineages_left_to_join = s > 1;
-            if (!lineages_left_to_join || coalescence == true)  {
+            if (!lineages_left_to_join)  {
                 done = true;
             }
 
             //add increment to each lineage
             if (!done) {
-
+                if (_proposal == "prior-post-ish") {
+                    _increment_choices.push_back(increment);
+                }
+                
                 for (auto nd:nodes) {
                     nd->_edge_length += increment;
                 }
@@ -1285,22 +1532,21 @@ class Forest {
 
                 if (nodes.size()>2) {
 
-// prior-prior proposal
-                    if (_proposal == "prior-prior") {
-                        pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
-                        auto it1 = std::next(nodes.begin(), t.first);
-                        subtree1 = *it1;
-
-                        auto it2 = std::next(nodes.begin(), t.second);
-                        subtree2 = *it2;
-                    }
-
 // prior-post proposal
                     if (_proposal == "prior-post") {
                         pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
 
                         subtree1 = t.first;
                         subtree2 = t.second;
+                    }
+                    // prior prior or prior post ish
+                    else {
+                        pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+                        auto it1 = std::next(nodes.begin(), t.first);
+                        subtree1 = *it1;
+
+                        auto it2 = std::next(nodes.begin(), t.second);
+                        subtree2 = *it2;
                     }
                 }
 
@@ -1310,7 +1556,9 @@ class Forest {
                     subtree1 = nodes.front();
                     subtree2 = nodes.back();
                 }
-
+                
+                assert (subtree1 != subtree2); // TODO: make sure this is right for deep coalescence case too
+                
                 Node nd;
                 _nodes.push_back(nd);
                 Node* new_nd = &_nodes.back();
@@ -1334,26 +1582,43 @@ class Forest {
                 assert(new_nd->_left_child->_right_sib);
                 calcPartialArray(new_nd);
                 _num_coalescent_events_in_generation++;
-                coalescence = true;
+//                coalescence = true;
                 _searchable_branch_lengths.push_back(make_pair(getLineageHeight(_new_nodes.back()), increment));
                 
-                calcTopologyPrior((int) nodes.size());
+                if (_proposal != "prior-post-ish" ) {
+                    calcTopologyPrior((int) nodes.size()); // TODO: this won't work with prior-post-ish, must do it later
+                }
 
                 //update species list
                 updateNodeList(nodes, subtree1, subtree2, new_nd);
                 updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+                
+                if (_proposal == "prior-post-ish") {
+                    _prev_log_likelihood_choices.push_back(_gene_tree_log_likelihood);
+                    _log_likelihood_choices.push_back(calcLogLikelihood());
+                    new_nd->_name = "unused";
+                    _node_choices.push_back(make_pair(subtree1, subtree2));
+                    revertNewNode(nodes, new_nd, subtree1, subtree2, increment);
+                    done = true;
+                }
             }
         }
     }
 
     inline void Forest::firstGeneTreeProposal(double time_increment) {
+        _prev_log_likelihood = _gene_tree_log_likelihood;
+        _prev_log_likelihood_choices.clear();
+        
         if (_species_partition.size() == 1) {
-            fullyCoalesceGeneTree(_species_partition.begin()->second);
+//            _prev_log_likelihood_choices.push_back(calcLogLikelihood());
+            fullyCoalesceGeneTree(_species_partition.begin()->second); // TODO: make sure this function is correct now
         }
 
         else {
             for (auto &s:_species_partition) {
+//                _prev_log_likelihood_choices.push_back(calcLogLikelihood());
                 assert (s.second.size()>0);
+                _gene_tree_cum_time = getLineageHeight(s.second.front());
                 evolveSpeciesFor(s.second, time_increment);
             }
         }
@@ -1364,6 +1629,12 @@ class Forest {
         string new_name = get<2>(species_merge_info);
         string species1 = get<0>(species_merge_info);
         string species2 = get<1>(species_merge_info);
+        
+        _prev_log_likelihood = _gene_tree_log_likelihood;
+        _prev_log_likelihood_choices.clear();
+        
+        bool reset_gene_tree_cum_time = true;
+        _gene_tree_cum_time = 0.0;
 
         if (new_name != "null" ){
             // skip this for generation 0, no species have been joined yet
@@ -1372,15 +1643,21 @@ class Forest {
             copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
             _species_partition.erase(species1);
             _species_partition.erase(species2);
+            reset_gene_tree_cum_time = false;
         }
 
         if (_species_partition.size() == 1) {
+//            _prev_log_likelihood_choices.push_back(calcLogLikelihood());
             fullyCoalesceGeneTree(_species_partition.begin()->second);
         }
 
         else {
             for (auto &s:_species_partition) {
+//                _prev_log_likelihood_choices.push_back(calcLogLikelihood());
                 assert (s.second.size()>0);
+                if (reset_gene_tree_cum_time) {
+                    _gene_tree_cum_time = getLineageHeight(s.second.front()); // TODO: needs to be within this increment only
+                }
                 evolveSpeciesFor(s.second, time_increment);
             }
         }
@@ -1544,6 +1821,95 @@ class Forest {
 
         // Add addnode to node_list
         node_list.push_back(addnode);
+    }
+
+    inline void Forest::revertBranches(list <Node*> &nodes, Node* subtree1, Node* subtree2, double increment) {
+        // save increment that was added to to subtrees
+        vector<double> increments;
+        increments.push_back(subtree1->_edge_length);
+        increments.push_back(subtree2->_edge_length);
+
+        // clear new node from _nodes
+        for (auto iter = _nodes.begin(); iter != _nodes.end(); iter++) {
+            if (iter->_name == "unused") {
+                iter = _nodes.erase(iter);
+                --iter;
+                _ninternals--;
+            }
+        }
+
+        // reset node numbers
+        int n = 0;
+        for (auto &nd:_nodes) {
+            nd._number = n;
+            n++;
+        }
+        
+        // revert edge lengths back
+        for (auto &nd:nodes) {
+            nd->_edge_length -= increment;
+        }
+//        subtree1->_edge_length = subtree1->_edge_length - increments[0];
+//        subtree2->_edge_length = subtree2->_edge_length - increments[1];
+    }
+
+    inline void Forest::revertNewNode(list <Node*> &nodes, Node* new_nd, Node* subtree1, Node* subtree2, double increment) {
+        // save increment that was added to to subtrees // TODO: this won't always work
+//        vector<double> increments;
+//        increments.push_back(subtree1->_edge_length);
+//        increments.push_back(subtree2->_edge_length);
+
+            // revert the species partition
+        for (auto &s:_species_partition) {
+            for (auto &nd:s.second) {
+                if (nd->_name == "unused") {
+                    revertNodeList(s.second, nd->_left_child, nd->_left_child->_right_sib, nd);
+                    break;
+                }
+            }
+        }
+
+        // revert _lineages vector
+        revertNodeVector(_lineages, subtree1, subtree2, new_nd);
+
+        // reset siblings and parents of new node back to 0
+        new_nd->_left_child->_right_sib->resetNode(); // subtree 2
+        new_nd->_left_child->resetNode(); // subtree 1
+
+        // clear new node from _new_nodes
+//        _new_nodes.erase(remove(_new_nodes.begin(), _new_nodes.end(), new_nd));
+
+        // clear new node from _nodes
+        for (auto iter = _nodes.begin(); iter != _nodes.end(); iter++) {
+            if (iter->_name == "unused") {
+                iter = _nodes.erase(iter);
+                --iter;
+                _ninternals--;
+            }
+        }
+
+        // reset node numbers
+        int n = 0;
+        for (auto &nd:_nodes) {
+            nd._number = n;
+            n++;
+        }
+
+        // check the reversion worked
+        for (auto &s:_species_partition) {
+            for (auto &n:s.second) {
+                assert(_lineages[n->_position_in_lineages] == n);
+            }
+        }
+        
+        // revert edge lengths back
+        for (auto &nd:nodes) {
+            nd->_edge_length -= increment;
+        }
+//        subtree1->_edge_length -= increment;
+//        subtree2->_edge_length -= increment;
+//        subtree1->_edge_length = subtree1->_edge_length - increments[0];
+//        subtree2->_edge_length = subtree2->_edge_length - increments[1];
     }
 
     inline void Forest::allowMigration(list<Node*> &nodes) {
@@ -2109,7 +2475,6 @@ class Forest {
             _new_nodes.erase(remove(_new_nodes.begin(), _new_nodes.end(), nd));
         }
 
-//        showForest();
         for (auto iter = _nodes.begin(); iter != _nodes.end(); iter++) {
             if (iter->_name == "unused") {
                 iter = _nodes.erase(iter);
@@ -2182,6 +2547,34 @@ class Forest {
             }
         }
         return count;
+    }
+
+    inline void Forest::extendGeneTreeLineages(double species_tree_height) {
+        showForest();
+        if (_lineages.size() > 1) {
+            for (auto &l:_lineages) {
+//                if (l->_left_child) { // TODO: if there was deep coalescence this might not be true
+//                    if (getLineageHeight(l->_left_child) < species_tree_height) {
+//                        l->_edge_length += species_tree_height - getLineageHeight(l->_left_child);
+//                    }
+//                }
+                if (l->_left_child) {
+                    if (getLineageHeight(l) < species_tree_height) {
+                        l->_edge_length += species_tree_height - getLineageHeight(l);
+                    }
+                }
+                else {
+                    if (l->_edge_length < species_tree_height) {
+                        l->_edge_length += species_tree_height - getLineageHeight(l);
+                    }
+                }
+            }
+        }
+        else {
+            _lineages[0]->_left_child->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child);
+            _lineages[0]->_left_child->_right_sib->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child->_right_sib);
+        }
+        showForest();
     }
 }
 
