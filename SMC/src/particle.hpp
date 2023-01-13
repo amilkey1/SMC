@@ -201,7 +201,7 @@ class Particle {
         // attempt coalescent events until there has been at least 1 coalescence
         while (!coalescence) {
             for (int i = 1; i < _forests.size(); i++) {
-            if (Forest::_proposal == "prior-post-ish") {
+//            if (Forest::_proposal == "prior-post-ish") {
                 if (_coalescent_attempts_within_species_generation == _num_coalescent_attempts_needed || _forests[i]._lineages.size() == 1) {
                     _forests[i].extendGeneTreeLineages(_forests[0].getTreeHeight());
                     if (_forests[0]._lineages.size() > 1) {
@@ -211,7 +211,7 @@ class Particle {
                         _ready_to_join_species = false;
                     }
                 }
-            }
+//            }
                 // check if all the gene coalescence attempts have been made for the species
                 // if yes, then extend the remaining gene tree lineages to the species boundary
                 
@@ -223,6 +223,7 @@ class Particle {
                     hybridizationProposal();
                 }
                 else if (event == "speciation") {
+                    showParticle();
                     // only join a new species if gene trees have been extended down to base of species tree (if gene tree height = species tree height)
                     if (Forest::_proposal != "prior-post-ish") {
                         _ready_to_join_species = checkIfReadyToJoinSpecies();
@@ -266,10 +267,8 @@ class Particle {
                                 assert (_forests[i]._lineages.size() > 1);
                                 _gene_tree_proposal_attempts++;
                                 _coalescent_attempts_within_species_generation++;
-                                if (_coalescent_attempts_within_species_generation == 5) {
-                                    cout << "stop";
-                                }
                                 _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
+                                showParticle();
                                 if (Forest::_proposal == "prior-post-ish") {
                                     priorPostIshChoice(i);
                                 }
@@ -277,13 +276,11 @@ class Particle {
                         }
                     }
                 }
-//            }
             for (int i=1; i<_forests.size(); i++) { // TODO: fixed this
                 // if one forest has a deep coalescent event, need to continue in this generation
                 coalescence = true;
                 if (_forests[i]._num_coalescent_events_in_generation == 0) {
                     coalescence = false;
-                    cout << "deep coalescence occurred" << endl;
                     break;
                 }
             }
@@ -293,14 +290,9 @@ class Particle {
             if (_forests[i]._num_coalescent_events_in_generation > 1 && Forest::_proposal != "prior-post-ish") {
                 double smallest_branch = _forests[i].findShallowestCoalescence();
                 _forests[i].revertToShallowest(smallest_branch);
+                showParticle();
                 }
         }
-//        if (Forest::_proposal == "prior-post-ish" && _generation == Forest::_ntaxa - 2) {
-//            for (int i = 1; i < _forests.size(); i++ ) {
-//            // finish off gene tree for last generation
-//                _forests[i].extendGeneTreeLineages(_forests[0].getTreeHeight());
-//            }
-//        }
         if (_running_on_empty == false) {
             if (Forest::_proposal != "prior-post-ish") {
                 double prev_log_likelihood = _log_likelihood;
