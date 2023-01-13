@@ -202,9 +202,7 @@ class Particle {
         while (!coalescence) {
             for (int i = 1; i < _forests.size(); i++) {
             if (Forest::_proposal == "prior-post-ish") {
-//                cout <<  _forests[1]._species_partition.size() << "   " << _forests[1]._lineages.size() << endl;
                 if (_coalescent_attempts_within_species_generation == _num_coalescent_attempts_needed || _forests[i]._lineages.size() == 1) {
-                    showParticle();
                     _forests[i].extendGeneTreeLineages(_forests[0].getTreeHeight());
                     if (_forests[0]._lineages.size() > 1) {
                         _ready_to_join_species = true;
@@ -212,7 +210,6 @@ class Particle {
                     else {
                         _ready_to_join_species = false;
                     }
-                    showParticle();
                 }
             }
                 // check if all the gene coalescence attempts have been made for the species
@@ -259,9 +256,7 @@ class Particle {
                                    _coalescent_attempts_within_species_generation++;
                                     _forests[i].geneTreeProposal(_t, _forests[0]._last_edge_length);
                                    if (Forest::_proposal == "prior-post-ish") {
-                                       showParticle();
                                        priorPostIshChoice(i);
-                                       showParticle();
                                    }
                                }
                         }
@@ -277,7 +272,6 @@ class Particle {
                                 _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
                                 if (Forest::_proposal == "prior-post-ish") {
                                     priorPostIshChoice(i);
-                                    showParticle();
                                 }
                             }
                         }
@@ -326,7 +320,6 @@ class Particle {
             _generation++;
         }
         resetVariables();
-        showParticle();
         return _log_weight;
     }
 
@@ -383,7 +376,6 @@ class Particle {
         // attempt first gene tree proposal for all lineages, then select the one to keep
         _forests[i].chooseCoalescentEvent();
         _forests[i].mergeChosenPair(_forests[0]._last_edge_length);
-//        showParticle();
     }
 
     inline void Particle::resetVariables() {
