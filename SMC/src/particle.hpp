@@ -80,6 +80,7 @@ class Particle {
         vector<double>                                  getBranchLengthPriors();
         vector<double>                                  getGeneTreeLogLikelihoods();
         vector<double>                                  getTopologyPriors();
+        void                                            hybridizationProposal();
 
     private:
 
@@ -94,7 +95,15 @@ class Particle {
         map<int, vector<double>>                     _random_seeds;
         bool                                    _running_on_empty = false;
         tuple<string, string, string>           _t;
-        unsigned                                _gene_tree_proposal_attempts = 0;
+        unsigned                                _gene_tree_proposal_attempts;
+        unsigned                                _coalescent_attempts_within_species_generation;
+        unsigned                                _num_coalescent_attempts_needed;
+        bool                                    _ready_to_join_species;
+    
+        bool                                    firstProposal();
+        void                                    priorPostIshChoice(int i);
+        void                                    resetVariables();
+        bool                                    checkIfReadyToJoinSpecies();
 };
 
     inline Particle::Particle() {
@@ -102,6 +111,7 @@ class Particle {
         _log_weight = 0.0;
         _log_likelihood = 0.0;
         _gene_tree_proposal_attempts = 0;
+        _coalescent_attempts_within_species_generation = 0;
     };
 
     inline Particle::~Particle() {
@@ -149,149 +159,238 @@ class Particle {
     inline double Particle::calcLogLikelihood() {
         //calculate likelihood for each gene tree
         double log_likelihood = 0.0;
+        double gene_tree_log_likelihood = 0.0;
         for (unsigned i=1; i<_forests.size(); i++) {
-            double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
+//            if (Forest::_proposal == "prior-post-ish") {
+//                if (_generation == -1) {
+//                    gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
+//                }
+//                else {
+//                    gene_tree_log_likelihood = _forests[i]._gene_tree_log_weight;
+//                }
+//            }
+//            else {
+                gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
+//            }
             assert(!isnan (log_likelihood));
             assert(!isnan (gene_tree_log_likelihood));
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
         }
-        _generation++;
 
         // set _generation for each forest
         for (int i=0; i < (int) _forests.size(); i++ ){
             _forests[i].setGeneration(_generation);
         }
+        _generation++;
         return log_likelihood;
     }
 
     inline double Particle::proposal() {
+        // TODO: check _generation = 0 for generation 0 on run on empty
         string event;
         bool coalescence = false;
+        
+        // set starting variables
+//        if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
+        if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
+            coalescence = firstProposal();
+        }
 
-        // attempt coalescent events until there has been at least 1
+        // attempt coalescent events until there has been at least 1 coalescence
         while (!coalescence) {
-            
-            // set starting variables
-            if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
-                for (unsigned i=1; i<_forests.size(); i++) {
-                    _forests[i]._theta = _forests[i]._starting_theta;
-                    _forests[i]._gene_tree_cum_time = 0.0;
+            for (int i = 1; i < _forests.size(); i++) {
+            if (Forest::_proposal == "prior-post-ish") {
+//                cout <<  _forests[1]._species_partition.size() << "   " << _forests[1]._lineages.size() << endl;
+                if (_coalescent_attempts_within_species_generation == _num_coalescent_attempts_needed || _forests[i]._lineages.size() == 1) {
+                    showParticle();
+                    _forests[i].extendGeneTreeLineages(_forests[0].getTreeHeight());
+                    if (_forests[0]._lineages.size() > 1) {
+                        _ready_to_join_species = true;
+                    }
+                    else {
+                        _ready_to_join_species = false;
+                    }
+                    showParticle();
                 }
+            }
+                // check if all the gene coalescence attempts have been made for the species
+                // if yes, then extend the remaining gene tree lineages to the species boundary
                 
-                // choose a species tree height but don't join species yet (TODO: try both ways?)
-                _forests[0].chooseSpeciesIncrement();
-                
-                // attempt first gene tree proposal
-                for (unsigned i=1; i<_forests.size(); i++){
-                        _gene_tree_proposal_attempts++;
-                    _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
-                }
             }
             
-            // if the species tree is done, go into fullyCoalesceGeneTree
-            else if (_forests[0]._lineages.size()==1) {
-                for (unsigned i=1; i<_forests.size(); i++) {
-                    if (_forests[i]._lineages.size() > 1) {
-                        list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
-                        _gene_tree_proposal_attempts++;
-                        _forests[i].fullyCoalesceGeneTree(lineages_list);
+    //            event = _forests[0].chooseEvent();
+                event = "speciation"; // for now, assume event is speciation
+                if (event == "hybridization") {
+                    hybridizationProposal();
+                }
+                else if (event == "speciation") {
+                    // only join a new species if gene trees have been extended down to base of species tree (if gene tree height = species tree height)
+                    if (Forest::_proposal != "prior-post-ish") {
+                        _ready_to_join_species = checkIfReadyToJoinSpecies();
                     }
-                }
-            }
-        else {
-//            event = _forests[0].chooseEvent();
-            event = "speciation"; // for now, assume event is speciation
-            if (event == "hybridization") {
-                vector<string> hybridized_nodes = _forests[0].hybridizeSpecies();
-                if (_forests[0]._lineages.size()>1) {
-                    _forests[0].addSpeciesIncrement();
-                }
-                for (unsigned i=1; i<_forests.size(); i++) {
-                    _forests[i].hybridizeGene(hybridized_nodes, _forests[0]._last_edge_length);
-                }
-                calculateGamma();
-            }
-            else if (event == "speciation") {
-                // only join a new species if gene trees have been extended down to base of species tree (if gene tree height = species tree height)
-                double gene_tree_height = _forests[1].getTreeHeight();
-                double species_tree_height = _forests[0].getTreeHeight();
-                // ready to join species
-                if (gene_tree_height >= species_tree_height) {
-                    _t = _forests[0].speciesTreeProposal();
-                    
-                    // if the species tree is not finished, add another species increment
-                    if (_forests[0]._lineages.size()>1) {
-                        _forests[0].addSpeciesIncrement();
+                    // ready to join species
+                    if (_ready_to_join_species && _forests[0]._lineages.size() > 1) {
+//                        assert (_forests[0]._lineages.size() > 1); // TODO: figure out why it's going in here
+                        _t = _forests[0].speciesTreeProposal();
+                        _coalescent_attempts_within_species_generation = 0; // reset coalescent attempts for this new species generation
+                        _num_coalescent_attempts_needed = (unsigned) _forests[1]._lineages.size() - (unsigned) _forests[0]._lineages.size(); // TODO: check if this is always true
+//                        species_joined = true;
+                        
+                        // if the species tree is not finished, add another species increment
+                        if (_forests[0]._lineages.size()>1) {
+                            _forests[0].addSpeciesIncrement();
+                        }
+                        
+                        // reset gene tree cumulative time to 0 for a new species lineage
+                        for (int i = 1; i <_forests.size(); i++) {
+                            _forests[i]._gene_tree_cum_time = 0.0;
+                        }
                     }
                     
-                    // reset gene tree cumulative time to 0 for a new species lineage
-                    for (int i = 1; i <_forests.size(); i++) {
-                        _forests[i]._gene_tree_cum_time = 0.0;
-                    }
-                }
-                
-                // don't join any more species, now must finish the gene trees first
-                for (unsigned i=1; i<_forests.size(); i++){
-                    // if species have been joined in the previous generation
-                    if (_forests[0]._lineages.size() != Forest::_nspecies) {
-                        _forests[i]._gene_tree_cum_time = 0.0;
-                       if (_forests[0]._lineages.size()==1) {
-                            for (unsigned i=1; i<_forests.size(); i++) {
+                    // don't join any more species, now must finish the gene trees first
+                    for (unsigned i=1; i<_forests.size(); i++){
+                        // if species have been joined previously
+                        if (_forests[0]._lineages.size() != Forest::_nspecies) {
+                            _forests[i]._gene_tree_cum_time = 0.0;
+                               if (_forests[i]._lineages.size() > 1) {
+                                   _gene_tree_proposal_attempts++;
+                                   _coalescent_attempts_within_species_generation++;
+                                    _forests[i].geneTreeProposal(_t, _forests[0]._last_edge_length);
+                                   if (Forest::_proposal == "prior-post-ish") {
+                                       showParticle();
+                                       priorPostIshChoice(i);
+                                       showParticle();
+                                   }
+                               }
+                        }
+                        // if no species have been joined at all
+                        else {
+                            for (unsigned i=1; i<_forests.size(); i++){ // TODO: fixed this
                                 assert (_forests[i]._lineages.size() > 1);
-                                list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
                                 _gene_tree_proposal_attempts++;
-                                _forests[i].fullyCoalesceGeneTree(lineages_list);
+                                _coalescent_attempts_within_species_generation++;
+                                if (_coalescent_attempts_within_species_generation == 5) {
+                                    cout << "stop";
+                                }
+                                _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
+                                if (Forest::_proposal == "prior-post-ish") {
+                                    priorPostIshChoice(i);
+                                    showParticle();
+                                }
                             }
                         }
-                       else {
-                           if (_forests[i]._lineages.size() > 1) {
-                               _gene_tree_proposal_attempts++;
-                                _forests[i].geneTreeProposal(_t, _forests[0]._last_edge_length);
-                           }
-                       }
-                    }
-                    // if no species have been joined in the previous generation
-                    else {
-                        for (unsigned i=1; i<_forests.size(); i++){
-                            assert (_forests[i]._lineages.size() > 1);
-                            _gene_tree_proposal_attempts++;
-                            _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
-                        }
                     }
                 }
-            }
-        }
-            for (int i=1; i<_forests.size(); i++) {
-                if (_forests[i]._num_coalescent_events_in_generation > 0) {
-                    coalescence = true;
+//            }
+            for (int i=1; i<_forests.size(); i++) { // TODO: fixed this
+                // if one forest has a deep coalescent event, need to continue in this generation
+                coalescence = true;
+                if (_forests[i]._num_coalescent_events_in_generation == 0) {
+                    coalescence = false;
+                    cout << "deep coalescence occurred" << endl;
                     break;
                 }
             }
         }
         
         for (int i = 1; i<_forests.size(); i++) {
-            if (_forests[i]._num_coalescent_events_in_generation > 1) {
+            if (_forests[i]._num_coalescent_events_in_generation > 1 && Forest::_proposal != "prior-post-ish") {
                 double smallest_branch = _forests[i].findShallowestCoalescence();
                 _forests[i].revertToShallowest(smallest_branch);
+                }
+        }
+//        if (Forest::_proposal == "prior-post-ish" && _generation == Forest::_ntaxa - 2) {
+//            for (int i = 1; i < _forests.size(); i++ ) {
+//            // finish off gene tree for last generation
+//                _forests[i].extendGeneTreeLineages(_forests[0].getTreeHeight());
+//            }
+//        }
+        if (_running_on_empty == false) {
+            if (Forest::_proposal != "prior-post-ish") {
+                double prev_log_likelihood = _log_likelihood;
+                _log_likelihood = calcLogLikelihood();
+                _log_weight = _log_likelihood - prev_log_likelihood;
+            }
+            else {
+                // use the gene tree weights to calculate the particle weight
+                _log_weight = 0.0;
+                for (int i = 1; i<_forests.size(); i++) {
+                    _log_weight += _forests[i]._gene_tree_log_weight;
+                }
+                _generation++;
             }
         }
-        if (_running_on_empty == false) {
-            double prev_log_likelihood = _log_likelihood;
-            _log_likelihood = calcLogLikelihood();
-            _log_weight = _log_likelihood - prev_log_likelihood;
-        }
-
         else {
             _generation++;
         }
+        resetVariables();
+        showParticle();
+        return _log_weight;
+    }
+
+    inline bool Particle::firstProposal() {
+        bool coalescence = true;
+        // set starting variables
+        assert (_generation == 0);
+        assert (_gene_tree_proposal_attempts == 0);
         
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i]._theta = _forests[i]._starting_theta;
+            _forests[i]._gene_tree_cum_time = 0.0;
+        }
+        
+        _ready_to_join_species = false;
+//        _num_coalescent_attempts_needed = (unsigned) _forests[1]._lineages.size() - (unsigned) _forests[1]._species_partition.size();
+        _num_coalescent_attempts_needed = Forest::_ntaxa - Forest::_nspecies;
+            
+        // choose a species tree height but don't join species yet (TODO: try both ways?)
+        _forests[0].chooseSpeciesIncrement();
+        
+        for (unsigned i=1; i<_forests.size(); i++){
+            assert (_forests[i]._lineages.size() > 1);
+            _gene_tree_proposal_attempts++;
+            _coalescent_attempts_within_species_generation++;
+            _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
+            if (Forest::_proposal == "prior-post-ish") {
+                priorPostIshChoice(i);
+            }
+        }
+        
+        // check if there has been a deep coalescent event
+        for (unsigned i=1; i<_forests.size(); i++) {
+            if (_forests[i]._num_coalescent_events_in_generation == 0) {
+                coalescence = false;
+                break;
+            }
+        }
+        return coalescence;
+    }
+
+    inline bool Particle::checkIfReadyToJoinSpecies() {
+        _ready_to_join_species = false;
+        
+        double gene_tree_height = _forests[1].getTreeHeight();
+        double species_tree_height = _forests[0].getTreeHeight();
+        if (gene_tree_height >= species_tree_height && _forests[0]._lineages.size() > 1) {
+            _ready_to_join_species = true;
+        }
+        return _ready_to_join_species;
+    }
+
+    inline void Particle::priorPostIshChoice(int i) {
+        // attempt first gene tree proposal for all lineages, then select the one to keep
+        _forests[i].chooseCoalescentEvent();
+        _forests[i].mergeChosenPair(_forests[0]._last_edge_length);
+//        showParticle();
+    }
+
+    inline void Particle::resetVariables() {
         for (int i = 1; i<_forests.size(); i++) {
             _forests[i]._num_coalescent_events_in_generation = 0;
             _forests[i]._searchable_branch_lengths.clear();
             _forests[i]._new_nodes.clear();
         }
-        return _log_weight;
     }
 
     inline Particle::Particle(const Particle & other) {
@@ -354,6 +453,17 @@ class Particle {
             sum_height += child->getEdgeLength();
         }
         return sum_height;
+    }
+
+    inline void Particle::hybridizationProposal() {
+        vector<string> hybridized_nodes = _forests[0].hybridizeSpecies();
+        if (_forests[0]._lineages.size()>1) {
+            _forests[0].addSpeciesIncrement();
+        }
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i].hybridizeGene(hybridized_nodes, _forests[0]._last_edge_length);
+        }
+        calculateGamma();
     }
 
     inline void Particle::setNumSubsets(unsigned n) {
@@ -475,5 +585,8 @@ class Particle {
         _generation     = other._generation;
         _t = other._t;
         _gene_tree_proposal_attempts = other._gene_tree_proposal_attempts;
+        _coalescent_attempts_within_species_generation = other._coalescent_attempts_within_species_generation;
+        _num_coalescent_attempts_needed = other._num_coalescent_attempts_needed;
+        _ready_to_join_species = other._ready_to_join_species;
     };
 }
