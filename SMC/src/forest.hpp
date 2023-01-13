@@ -1478,6 +1478,7 @@ class Forest {
 
     inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) { // TODO: add prior post ish here too - I think this is okay because deep coalescence is never an issue here
 //        bool coalescence = false;
+//        showForest();
         assert (nodes.size()>0);
         bool done = false;
         if (nodes.size() == 1) {
@@ -1514,7 +1515,7 @@ class Forest {
                 Node *subtree2 = nullptr;
 
                 _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
-
+// TODO: only allow one coalescent event in this function
                 if (nodes.size()>2) {
 
 // prior-post proposal
@@ -1584,8 +1585,9 @@ class Forest {
                     new_nd->_name = "unused";
                     _node_choices.push_back(make_pair(subtree1, subtree2));
                     revertNewNode(nodes, new_nd, subtree1, subtree2, increment);
-                    done = true;
+//                    done = true;
                 }
+                done = true;
             }
         }
     }
@@ -2421,6 +2423,7 @@ class Forest {
                 }
             }
         }
+//        showForest();
 
         assert (nodes_to_revert.size() == _new_nodes.size()-1);
         // TODO: this will only work if there is only one unused node per lineage (which is true for now)

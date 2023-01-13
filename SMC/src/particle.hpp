@@ -161,17 +161,7 @@ class Particle {
         double log_likelihood = 0.0;
         double gene_tree_log_likelihood = 0.0;
         for (unsigned i=1; i<_forests.size(); i++) {
-//            if (Forest::_proposal == "prior-post-ish") {
-//                if (_generation == -1) {
-//                    gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
-//                }
-//                else {
-//                    gene_tree_log_likelihood = _forests[i]._gene_tree_log_weight;
-//                }
-//            }
-//            else {
-                gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
-//            }
+            gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
             assert(!isnan (log_likelihood));
             assert(!isnan (gene_tree_log_likelihood));
             //total log likelihood is sum of gene tree log likelihoods
@@ -192,10 +182,10 @@ class Particle {
         bool coalescence = false;
         
         // set starting variables
-//        if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
         if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
             coalescence = firstProposal();
         }
+//        showParticle();
 
         // attempt coalescent events until there has been at least 1 coalescence
         while (!coalescence) {
@@ -203,12 +193,15 @@ class Particle {
 //            if (Forest::_proposal == "prior-post-ish") {
                 if (_coalescent_attempts_within_species_generation == _num_coalescent_attempts_needed || _forests[i]._lineages.size() == 1) {
                     _forests[i].extendGeneTreeLineages(_forests[0].getTreeHeight());
-                    if (_forests[0]._lineages.size() > 1) {
-                        _ready_to_join_species = true;
-                    }
-                    else {
-                        _ready_to_join_species = false;
-                    }
+//                    if (Forest::_proposal == "prior-post-ish") {
+                        if (_forests[0]._lineages.size() > 1) {
+                            _ready_to_join_species = true;
+                        }
+                        else {
+                            _ready_to_join_species = false;
+                        }
+//                    }
+//                    showParticle();
                 }
 //            }
                 // check if all the gene coalescence attempts have been made for the species
@@ -222,18 +215,20 @@ class Particle {
                     hybridizationProposal();
                 }
                 else if (event == "speciation") {
-                    showParticle();
+//                    showParticle();
                     // only join a new species if gene trees have been extended down to base of species tree (if gene tree height = species tree height)
-                    if (Forest::_proposal != "prior-post-ish") {
-                        _ready_to_join_species = checkIfReadyToJoinSpecies();
-                    }
+//                    if (Forest::_proposal != "prior-post-ish") {
+//                        _ready_to_join_species = checkIfReadyToJoinSpecies();
+//                    }
                     // ready to join species
                     if (_ready_to_join_species && _forests[0]._lineages.size() > 1) {
+                        // reset _ready_to_join_species
+                        _ready_to_join_species = false;
 //                        assert (_forests[0]._lineages.size() > 1); // TODO: figure out why it's going in here
                         _t = _forests[0].speciesTreeProposal();
                         _coalescent_attempts_within_species_generation = 0; // reset coalescent attempts for this new species generation
                         _num_coalescent_attempts_needed = (unsigned) _forests[1]._lineages.size() - (unsigned) _forests[0]._lineages.size(); // TODO: check if this is always true
-//                        species_joined = true;
+//                        showParticle();
                         
                         // if the species tree is not finished, add another species increment
                         if (_forests[0]._lineages.size()>1) {
@@ -258,6 +253,7 @@ class Particle {
                                    if (Forest::_proposal == "prior-post-ish") {
                                        priorPostIshChoice(i);
                                    }
+//                                   showParticle();
                                }
                         }
                         // if no species have been joined at all
@@ -267,7 +263,7 @@ class Particle {
                                 _gene_tree_proposal_attempts++;
                                 _coalescent_attempts_within_species_generation++;
                                 _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
-                                showParticle();
+//                                showParticle();
                                 if (Forest::_proposal == "prior-post-ish") {
                                     priorPostIshChoice(i);
                                 }
@@ -289,9 +285,10 @@ class Particle {
             if (_forests[i]._num_coalescent_events_in_generation > 1 && Forest::_proposal != "prior-post-ish") {
                 double smallest_branch = _forests[i].findShallowestCoalescence();
                 _forests[i].revertToShallowest(smallest_branch);
-                showParticle();
+//                showParticle();
                 }
         }
+        
         if (_running_on_empty == false) {
             if (Forest::_proposal != "prior-post-ish") {
                 double prev_log_likelihood = _log_likelihood;
@@ -311,6 +308,7 @@ class Particle {
             _generation++;
         }
         resetVariables();
+//        showParticle();
         return _log_weight;
     }
 
@@ -360,6 +358,7 @@ class Particle {
         if (gene_tree_height >= species_tree_height && _forests[0]._lineages.size() > 1) {
             _ready_to_join_species = true;
         }
+            
         return _ready_to_join_species;
     }
 
