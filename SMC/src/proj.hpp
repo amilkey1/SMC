@@ -248,7 +248,7 @@ namespace proj {
             Forest::_base_frequencies.push_back(f);
             sum +=f;
         }
-        cout << sum-1 << endl;
+//        cout << sum-1 << endl;
         assert (fabs(sum-1) < 0.000001);
         if (fabs(sum-1)>0.000001) {
             throw XProj(format("base frequencies (%s) don't add to 1")%Forest::_string_base_frequencies);
