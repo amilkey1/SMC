@@ -1295,24 +1295,12 @@ class Forest {
 
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double species_tree_increment, double species_tree_height) {
         bool done = false;
-//        double cum_time = 0.0;
-//        double cum_time = getLineageHeight(nodes.front()) - (species_tree_height - species_tree_increment); // TODO: make sure all nodes in the list have the same height here
-//        assert(fabs(cum_time) < 0.000001 || cum_time >= 0.0);
-        double test = getLineageHeight(nodes.front());
-        double test2 = getLineageHeight(nodes.back());
         // if an individual in the lineage has not "caught up to" the previously joined clade (withinin the same species increment), must extend it before joining
         if (_proposal == "prior-post-ish" && nodes.size() > 1) {
             catchUpGeneLineage(nodes);
-            showForest();
         }
-        double test3 = getLineageHeight(nodes.front());
-        double test4 = getLineageHeight(nodes.back());
-//        assert (test3 == test4);
         double cum_time = getLineageHeight(nodes.front()) - (species_tree_height - species_tree_increment); // TODO: make sure all nodes in the list have the same height here
-        assert(fabs(cum_time) < 0.000001 || cum_time >= 0.0);
         bool coalescence = false;
-//        double cum_time = _gene_tree_cum_time[0];
-//        double cum_time = 0.0;
         
         // for prior post ish proposal, do not add increment if not attempting a coalescent event
         if (_proposal == "prior-post-ish") {
