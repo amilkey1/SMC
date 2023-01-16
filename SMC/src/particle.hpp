@@ -179,23 +179,19 @@ class Particle {
     inline double Particle::proposal() {
         // TODO: check _generation = 0 for generation 0 on run on empty
         string event;
-        showParticle();
         bool coalescence = false;
         
         // set starting variables
         if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
             coalescence = firstProposal();
         }
-//        showParticle();
 
         // attempt coalescent events until there has been at least 1 coalescence
         while (!coalescence) {
-            showParticle();
             for (int i = 1; i < _forests.size(); i++) {
                 if (_forests[0]._lineages.size() > 1) {
                 checkIfReadyToJoinSpecies();
                     if (_coalescent_attempts_within_species_generation == _num_coalescent_attempts_needed || _ready_to_join_species) {
-    //                if (_coalescent_attempts_within_species_generation == _num_coalescent_attempts_needed && _forests[i]._lineages.size() == 1) {
                         if (_forests[i]._lineages.size() > 1) {
                         _forests[i].extendGeneTreeLineages(_forests[0].getTreeHeight());
                             if (_forests[0]._lineages.size() > 1) {
@@ -212,15 +208,6 @@ class Particle {
                     _forests[i].finishGeneTree();
                 }
                 }
-//                if (!_ready_to_join_species && Forest::_proposal == "prior-prior") {
-//                if (!_ready_to_join_species) {
-//                    checkIfReadyToJoinSpecies();
-//                    if (_ready_to_join_species) {
-//                        _forests[i].extendGeneTreeLineages(_forests[0].getTreeHeight());
-//                    }
-//                }
-//            }
-            showParticle();
             
     //            event = _forests[0].chooseEvent();
                 event = "speciation"; // for now, assume event is speciation
@@ -239,7 +226,6 @@ class Particle {
                         _t = _forests[0].speciesTreeProposal();
                         _coalescent_attempts_within_species_generation = 0; // reset coalescent attempts for this new species generation
                         _num_coalescent_attempts_needed = (unsigned) _forests[1]._lineages.size() - (unsigned) _forests[0]._lineages.size(); // TODO: check if this is always true
-//                        showParticle();
                         
                         // if the species tree is not finished, add another species increment
                         if (_forests[0]._lineages.size()>1) {
@@ -254,12 +240,10 @@ class Particle {
                                if (_forests[i]._lineages.size() > 1) {
                                    _gene_tree_proposal_attempts++;
                                    _coalescent_attempts_within_species_generation++;
-//                                   showParticle();
                                     _forests[i].geneTreeProposal(_t, _forests[0]._last_edge_length, _forests[0].getTreeHeight());
                                    if (Forest::_proposal == "prior-post-ish") {
                                        priorPostIshChoice(i);
                                    }
-//                                   showParticle();
                                }
                         }
                         // if no species have been joined at all
@@ -289,11 +273,9 @@ class Particle {
         
         if (Forest::_proposal != "prior-post-ish") {
         for (int i = 1; i<_forests.size(); i++) {
-//            showParticle();
             if (_forests[i]._num_coalescent_events_in_generation > 1) {
                 double smallest_branch = _forests[i].findShallowestCoalescence();
                 _forests[i].revertToShallowest(smallest_branch);
-//                showParticle();
                 }
             }
         }
@@ -317,8 +299,6 @@ class Particle {
             _generation++;
         }
         resetVariables();
-        showParticle();
-//        assert(_forests[0].getTreeHeight() >= _forests[1].getTreeHeight());
         return _log_weight;
     }
 
