@@ -218,11 +218,9 @@ class Particle {
                     // ready to join species
 //                    if (_ready_to_join_species && _forests[0]._lineages.size() > 1) {
                     if (_ready_to_join_species) {
-                        showParticle();
                         // reset _ready_to_join_species
                         _ready_to_join_species = false;
                         assert (_forests[0]._lineages.size() > 1); // TODO: figure out why it's going in here
-//                        showParticle();
                         _t = _forests[0].speciesTreeProposal();
                         _coalescent_attempts_within_species_generation = 0; // reset coalescent attempts for this new species generation
                         _num_coalescent_attempts_needed = (unsigned) _forests[1]._lineages.size() - (unsigned) _forests[0]._lineages.size(); // TODO: check if this is always true
@@ -253,7 +251,6 @@ class Particle {
                                 _gene_tree_proposal_attempts++;
                                 _coalescent_attempts_within_species_generation++;
                                 _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length, _forests[0].getTreeHeight());
-//                                showParticle();
                                 if (Forest::_proposal == "prior-post-ish") {
                                     priorPostIshChoice(i);
                                 }
@@ -329,7 +326,6 @@ class Particle {
             if (Forest::_proposal == "prior-post-ish") {
                 priorPostIshChoice(i);
             }
-            showParticle();
         }
         
         // check if there has been a deep coalescent event
