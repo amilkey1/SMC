@@ -795,7 +795,14 @@ class Forest {
             Node *subtree1 = _node_choices[_index_of_choice].first;
             Node *subtree2 = _node_choices[_index_of_choice].second;
             
-            if (_increment_choices[_index_of_choice] < species_tree_increment) { // TODO: not sure this works for 3+ individuals
+            double increment = _increment_choices[_index_of_choice];
+            for (auto &nd:_lineages) {
+                nd->_edge_length += increment;
+            }
+            
+            if (increment < species_tree_increment) {
+            
+//            if (_increment_choices[_index_of_choice] < species_tree_increment) { // TODO: not sure this works for 3+ individuals
                 // no deep coalescence, must rejoin chosen pair
                 
                 _node_choices.clear();
@@ -820,8 +827,8 @@ class Forest {
                 subtree1->_parent=new_nd;
                 subtree2->_parent=new_nd;
                 
-                subtree1->_edge_length += _increment_choices[_index_of_choice];
-                subtree2->_edge_length += _increment_choices[_index_of_choice];
+//                subtree1->_edge_length += _increment_choices[_index_of_choice];
+//                subtree2->_edge_length += _increment_choices[_index_of_choice];
                 
                 _num_coalescent_events_in_generation = 1;
 
@@ -876,6 +883,8 @@ class Forest {
         
         _increment_choices.clear();
         _node_choices.clear();
+        
+//        showForest();
     }
 
     inline int Forest::selectPair(vector<double> weight_vec) {
@@ -1325,10 +1334,12 @@ class Forest {
         bool done = false;
         // if an individual in the lineage has not "caught up to" the previously joined clade (withinin the same species increment), must extend it before joining
         if (_proposal == "prior-post-ish" && nodes.size() > 1) {
-            catchUpGeneLineage(nodes);
+//            showForest();
+//            catchUpGeneLineage(nodes);
         }
-        double cum_time = getLineageHeight(nodes.front()) - (species_tree_height - species_tree_increment);
+        double cum_time = getLineageHeight(nodes.front()) - (species_tree_height - species_tree_increment); // TODO: why is this still necessary?
         bool coalescence = false;
+//        double cum_time = 0.0;
         
         // for prior post ish proposal, do not add increment if not attempting a coalescent event
         if (_proposal == "prior-post-ish") {
