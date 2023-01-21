@@ -789,6 +789,7 @@ class Forest {
     }
 
     inline void Forest::mergeChosenPair(double species_tree_increment) { // TODO: make sure be able to account for deep  coalescnece
+        assert (_proposal == "prior-post-ish");
         if (_log_likelihood_choices.size() > 0) {
             _log_likelihood_choices.clear();
             // find nodes to join in node_list
@@ -884,7 +885,7 @@ class Forest {
         _increment_choices.clear();
         _node_choices.clear();
         
-//        showForest();
+        //        showForest();
     }
 
     inline int Forest::selectPair(vector<double> weight_vec) {
@@ -1206,7 +1207,9 @@ class Forest {
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
         if (_lineages.size()>2) {
-            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+            double increment_prior = log(rate)-_last_edge_length*rate*(_lineages.size()-1);
+            _increments.push_back(make_pair(_last_edge_length, increment_prior));
+//            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
         }
 
         return event;
@@ -1221,7 +1224,9 @@ class Forest {
         for (auto nd:_lineages) {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
         }
-        _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+        double increment_prior = log(rate)-_last_edge_length*rate*(_lineages.size()-1);
+        _increments.push_back(make_pair(_last_edge_length, increment_prior));
+//        _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
     }
 
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
@@ -2446,7 +2451,10 @@ class Forest {
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
         if (_lineages.size()>1) {
-            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+            double increment_prior = log(rate)-_last_edge_length*rate*(_lineages.size()-1);
+            _increments.push_back(make_pair(_last_edge_length, increment_prior));
+
+//            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
         }
 
         // add the previously chosen edge length
