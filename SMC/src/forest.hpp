@@ -1405,7 +1405,10 @@ class Forest {
                 if (!done) {
                     double lineage_log_likelihood = allowCoalescence(nodes, increment);
                     coalescence = true;
-                    _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
+                    // TODO: this isn't fully correct
+                    double increment_prior = log(coalescence_rate) - (increment*coalescence_rate)*_lineages.size();
+                    _increments.push_back(make_pair(increment, increment_prior));
+//                    _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
                     if (_proposal != "prior-post-ish") {
                         _searchable_branch_lengths.push_back(make_pair (getLineageHeight(_new_nodes.back()), increment));
                     }
@@ -1415,8 +1418,10 @@ class Forest {
                 cum_time += increment;
                 if (!coalescence && _proposal == "prior-post-ish") {
                     double lineage_log_likelihood = allowDummyCoalescence(nodes, increment);
-                    _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
-                    _log_weight_vec.push_back(lineage_log_likelihood - prev_lineage_log_likelihood); // TODO: I think this can be simplified because it should always be 0
+//                    _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
+                    double increment_prior = log(coalescence_rate) - (increment*coalescence_rate)*_lineages.size();
+                    _increments.push_back(make_pair(increment, increment_prior));
+                    _log_weight_vec.push_back(0.0); // log weight will always be 0.0 because nothing was joined
                 }
             }
             else if (event == "migration" && nodes.size() > 1) {
@@ -1594,7 +1599,10 @@ class Forest {
                 Node* subtree1 = nullptr;
                 Node *subtree2 = nullptr;
 
-                _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
+                double increment_prior = log(coalescence_rate) - (increment*coalescence_rate)*_lineages.size();
+                _increments.push_back(make_pair(increment, increment_prior));
+                
+//                _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
                 if (nodes.size()>2) {
 
 // prior-post proposal
