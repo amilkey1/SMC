@@ -92,7 +92,7 @@ class Forest {
         void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
         void                        deleteTaxon(string key_to_del, unsigned taxon_choice);
         double                      allowCoalescence(list<Node*> &nodes, double increment);
-        double                        allowDummyCoalescence(list<Node*> &nodes, double increment);
+        void                        allowDummyCoalescence(list<Node*> &nodes, double increment);
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
         vector<string>              hybridizeSpecies();
         void                        moveGene(string new_nd, string parent, string hybrid);
@@ -1207,9 +1207,9 @@ class Forest {
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
         if (_lineages.size()>2) {
-            double increment_prior = log(rate)-_last_edge_length*rate*(_lineages.size()-1);
-            _increments.push_back(make_pair(_last_edge_length, increment_prior));
-//            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+//            double increment_prior = log(rate)-_last_edge_length*rate*(_lineages.size()-1);
+//            _increments.push_back(make_pair(_last_edge_length, increment_prior));
+            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
         }
 
         return event;
@@ -1224,9 +1224,9 @@ class Forest {
         for (auto nd:_lineages) {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
         }
-        double increment_prior = log(rate)-_last_edge_length*rate*(_lineages.size()-1);
-        _increments.push_back(make_pair(_last_edge_length, increment_prior));
-//        _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+//        double increment_prior = log(rate)-_last_edge_length*rate*(_lineages.size()-1);
+//        _increments.push_back(make_pair(_last_edge_length, increment_prior));
+        _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
     }
 
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
@@ -1417,7 +1417,7 @@ class Forest {
                 }
                 cum_time += increment;
                 if (!coalescence && _proposal == "prior-post-ish") {
-                    double lineage_log_likelihood = allowDummyCoalescence(nodes, increment);
+                    allowDummyCoalescence(nodes, increment);
 //                    _increments.push_back(make_pair(increment, log(coalescence_rate)-increment*coalescence_rate));
                     double increment_prior = log(coalescence_rate) - (increment*coalescence_rate)*_lineages.size();
                     _increments.push_back(make_pair(increment, increment_prior));
@@ -1436,7 +1436,7 @@ class Forest {
         }
     }
 
-    inline double Forest::allowDummyCoalescence(list<Node*> &nodes, double increment) {
+    inline void Forest::allowDummyCoalescence(list<Node*> &nodes, double increment) {
         assert (_proposal == "prior-post-ish");
         Node *subtree1 = nullptr;
         Node *subtree2 = nullptr;
@@ -1457,28 +1457,11 @@ class Forest {
         }
 
         assert (subtree1 != subtree2);
-
-        //new node is always needed
-//        Node nd; // TODO: not sure this is necessary
-//        _nodes.push_back(nd);
-//        Node* new_nd = &_nodes.back();
-//        new_nd->_name = "unused";
-//
-//        new_nd->_parent=0;
-//        new_nd->_number=_nleaves+_ninternals;
-//        new_nd->_edge_length=0.0;
-//        _ninternals++;
-//        new_nd->_right_sib=0;
-
-//        _new_nodes.push_back(new_nd);
-//        calcPartialArray(new_nd);
-//        if (_proposal == "prior-post-ish") {
+        
         _log_likelihood_choices.push_back(calcLogLikelihood());
-//            new_nd->_name = "unused";
         _node_choices.push_back(make_pair(subtree1, subtree2));
         revertBranches(nodes, subtree1, subtree2, increment);
-        return calcLineageLogLikelihood(nodes);
-//        }
+        calcLineageLogLikelihood(nodes);
     }
 
     inline double Forest::allowCoalescence(list<Node*> &nodes, double increment) { // returns likelihood of lineage if using prior-post-ish proposal, else returns 0.0
@@ -2459,10 +2442,10 @@ class Forest {
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
         if (_lineages.size()>1) {
-            double increment_prior = log(rate)-_last_edge_length*rate*(_lineages.size()-1);
-            _increments.push_back(make_pair(_last_edge_length, increment_prior));
+//            double increment_prior = log(rate)-_last_edge_length*rate*(_lineages.size()-1);
+//            _increments.push_back(make_pair(_last_edge_length, increment_prior));
 
-//            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
         }
 
         // add the previously chosen edge length
