@@ -814,6 +814,7 @@ namespace proj {
                     vector<double> prior_vec;
                     for (auto &b:p->getBranchLengthPriors()) {
                         prior_vec.push_back(b);
+                        assert (b != 0.0);
                     }
                     
                     vector<double> gene_tree_log_like;
