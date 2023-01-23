@@ -220,6 +220,7 @@ class Particle {
 //                    if (_ready_to_join_species && _forests[0]._lineages.size() > 1) {
                     if (_ready_to_join_species) {
                         // reset _ready_to_join_species
+//                        showParticle();
                         _ready_to_join_species = false;
                         assert (_forests[0]._lineages.size() > 1); // TODO: figure out why it's going in here
                         _t = _forests[0].speciesTreeProposal();
