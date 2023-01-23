@@ -792,16 +792,22 @@ class Forest {
         assert (_proposal == "prior-post-ish");
         double coalescence_rate = 0.0;
         double log_increment_prior = 0.0;
+        
+        double increment = _increment_choices[_index_of_choice];
+        for (auto &nd:_lineages) {
+            nd->_edge_length += increment;
+        }
+        
         if (_log_likelihood_choices.size() > 0) {
             _log_likelihood_choices.clear();
             // find nodes to join in node_list
             Node *subtree1 = _node_choices[_index_of_choice].first;
             Node *subtree2 = _node_choices[_index_of_choice].second;
             
-            double increment = _increment_choices[_index_of_choice];
-            for (auto &nd:_lineages) {
-                nd->_edge_length += increment;
-            }
+//            double increment = _increment_choices[_index_of_choice];
+//            for (auto &nd:_lineages) {
+//                nd->_edge_length += increment;
+//            }
             
             if (increment < species_tree_increment) {
                 // no deep coalescence, must rejoin chosen pair
@@ -859,8 +865,9 @@ class Forest {
             else {
                 // deep coalescence, don't need to join anything
                 // reset branch lengths for the chosen deep coalescence event
-                subtree1->_edge_length = _increment_choices[_index_of_choice];
-                subtree2->_edge_length = _increment_choices[_index_of_choice];
+                showForest();
+//                subtree1->_edge_length = _increment_choices[_index_of_choice];
+//                subtree2->_edge_length = _increment_choices[_index_of_choice];
                 _num_coalescent_events_in_generation = 0;
                 // TODO: make sure increment & increment prior are properly added for case of deep coalescence
             }
@@ -1344,9 +1351,12 @@ class Forest {
 //            showForest();
 //            catchUpGeneLineage(nodes);
         }
-        double cum_time = getLineageHeight(nodes.front()) - (species_tree_height - species_tree_increment); // TODO: why is this still necessary?
+//        double cum_time = getLineageHeight(nodes.front()) - (species_tree_height - species_tree_increment); // TODO: why is this still necessary?
         bool coalescence = false;
-//        double cum_time = 0.0;
+        double cum_time = 0.0; // TODO: this should NOT be done anymore because gene trees may not be at the bounds of the species tree yet
+//        if (cum_time > 0.0) {
+//            cout << "x";
+//        }
         
         // for prior post ish proposal, do not add increment if not attempting a coalescent event
         if (_proposal == "prior-post-ish") {
