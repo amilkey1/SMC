@@ -885,6 +885,7 @@ class Forest {
                 assert(_increments.size() >= _increment_choices.size());
                 _increments.resize(_increments.size() - _increment_choices.size());
                 
+//            showForest();
                 _increments.push_back(chosen_increment);
             }
 //        }
@@ -1575,6 +1576,7 @@ class Forest {
             }
 
             //add increment to each lineage
+//            showForest();
             if (!done) {
                 if (_proposal == "prior-post-ish") {
                     _increment_choices.push_back(increment);
@@ -1586,6 +1588,7 @@ class Forest {
                 Node* subtree1 = nullptr;
                 Node *subtree2 = nullptr;
                 
+//                showForest();
                 double increment_prior = log(coalescence_rate) - (increment*coalescence_rate);
                 _increments.push_back(make_pair(increment, increment_prior));
                 

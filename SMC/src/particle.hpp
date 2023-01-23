@@ -192,8 +192,8 @@ class Particle {
                 if (_forests[0]._lineages.size() > 1) {
                 checkIfReadyToJoinSpecies();
                     if (_coalescent_attempts_within_species_generation == _num_coalescent_attempts_needed || _ready_to_join_species) {
-                        if (_forests[i]._lineages.size() > 1) {
-                        _forests[i].extendGeneTreeLineages(_forests[0].getTreeHeight());
+//                        if (_forests[i]._lineages.size() > 1) {
+//                        _forests[i].extendGeneTreeLineages(_forests[0].getTreeHeight());
                             if (_forests[0]._lineages.size() > 1) {
                                 _ready_to_join_species = true;
                                 break;
@@ -201,7 +201,7 @@ class Particle {
                             else {
                                 _ready_to_join_species = false;
                             }
-                        }
+//                        }
                     }
                 }
                 else if (_forests[0]._lineages.size() == 1) { // if species tree is done
