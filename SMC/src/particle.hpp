@@ -106,7 +106,6 @@ class Particle {
         unsigned                                _coalescent_attempts_within_species_generation;
         unsigned                                _num_coalescent_attempts_needed;
         bool                                    _ready_to_join_species;
-        double                                  _prev_species_increment;
     
         bool                                    firstProposal();
         void                                    priorPostIshChoice(int i);
@@ -120,7 +119,6 @@ class Particle {
         _log_likelihood = 0.0;
         _gene_tree_proposal_attempts = 0;
         _coalescent_attempts_within_species_generation = 0;
-        _prev_species_increment = 0.0;
     };
 
     inline Particle::~Particle() {
@@ -187,7 +185,6 @@ class Particle {
     }
 
     inline double Particle::proposal() {
-        // TODO: check _generation = 0 for generation 0 on run on empty
         string event;
         bool coalescence = false;
         
@@ -211,7 +208,6 @@ class Particle {
                 else if (event == "speciation") {
                     // ready to join species
                     if (_ready_to_join_species) {
-                        _prev_species_increment = _forests[0]._last_edge_length; // save previous species increment for outputfile
                         joinSpeciesProposal();
                     }
                     
@@ -300,9 +296,9 @@ class Particle {
         _ready_to_join_species = false;
         _num_coalescent_attempts_needed = Forest::_ntaxa - Forest::_nspecies;
             
-        // choose a species tree height but don't join species yet (TODO: try both ways?)
+        // choose a species tree height but don't join species yet
         _forests[0].chooseSpeciesIncrement();
-       _prev_species_increment = 0.0;
+//       _prev_species_increment = 0.0;
         for (unsigned i=1; i<_forests.size(); i++){
             assert (_forests[i]._lineages.size() > 1);
             _gene_tree_proposal_attempts++;
@@ -374,7 +370,7 @@ class Particle {
     inline void Particle::priorPostIshChoice(int i) {
         // attempt first gene tree proposal for all lineages, then select the one to keep
         _forests[i].chooseCoalescentEvent();
-        _forests[i].mergeChosenPair(_forests[0]._last_edge_length, _prev_species_increment);
+        _forests[i].mergeChosenPair(_forests[0]._last_edge_length);
     }
 
     inline void Particle::speciesJoinedProposal() {
@@ -604,6 +600,7 @@ class Particle {
         _coalescent_attempts_within_species_generation = other._coalescent_attempts_within_species_generation;
         _num_coalescent_attempts_needed = other._num_coalescent_attempts_needed;
         _ready_to_join_species = other._ready_to_join_species;
-        _prev_species_increment = other._prev_species_increment;
+        _running_on_empty = other._running_on_empty;
+        _random_seeds = other._random_seeds;
     };
 }
