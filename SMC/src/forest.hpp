@@ -288,7 +288,7 @@ class Forest {
 
     inline double Forest::getLineageHeight(Node* nd) {
         double sum_height = 0.0;
-
+        
         sum_height += nd->getEdgeLength();
         if (nd->_left_child) {
             for (Node* child = nd->_left_child; child; child=child->_left_child) {
@@ -759,8 +759,7 @@ class Forest {
     inline void Forest::chooseCoalescentEvent() {
         _gene_tree_log_weight = 0.0;
         if (_log_likelihood_choices.size() > 0) {
-            // reweight each choice of pairs
-//            vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_log_likelihood);
+            // choices are already weighted
 
             // sum unnormalized weights before choosing the pair
             // must include the likelihoods of all pairs in the final particle weight
@@ -769,31 +768,17 @@ class Forest {
             for (int b=0; b < (int) _log_weight_vec.size(); b++) {
                 _log_weight_vec[b] -= log_weight_choices_sum;
             }
-
-
-//            for (auto &l:log_weight_choices) {
-//                _gene_tree_log_weight += l;
-//            }
-
-            // normalize weights
-//            assert (_log_weight_vec.size() > 0);
-//            double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-//            _gene_tree_log_weight = log_weight_choices_sum;
-//            for (int b=0; b < (int) log_weight_choices.size(); b++) {
-//                log_weight_choices[b] -= log_weight_choices_sum;
-//            }
-
-//            _gene_tree_log_likelihood = _gene_tree_log_weight;
+            
             // randomly select a pair
             _index_of_choice = selectPair(_log_weight_vec);
-
-//            _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
+            
             _gene_tree_log_likelihood = calcLogLikelihood();
             _log_weight_vec.clear();
         }
     }
 
     inline void Forest::mergeChosenPair(double species_tree_increment) {
+        if (_increment_choices.size() > 0) {
         assert (_proposal == "prior-post-ish");
         double log_increment_prior = 0.0;
 
@@ -859,6 +844,7 @@ class Forest {
 
         _increment_choices.clear();
         _node_choices.clear();
+        }
     }
 
     inline void Forest::calcDeepCoalescentPrior() {
@@ -1408,7 +1394,7 @@ class Forest {
             }
 
             //if increment is 0, the lineage is done and we don't consider it at all
-            if (increment > 0) {
+            if (increment > 0.0) {
                 if (_proposal == "prior-post-ish") {
                     _increment_choices.push_back(increment);
                 }
@@ -2604,8 +2590,10 @@ class Forest {
         }
         else {
             _extended_increment = species_tree_height - getLineageHeight(_lineages[0]->_left_child);
-            _lineages[0]->_left_child->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child);
-            _lineages[0]->_left_child->_right_sib->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child->_right_sib);
+            _lineages[0]->_left_child->_edge_length = _extended_increment;
+            _lineages[0]->_left_child->_right_sib->_edge_length = _extended_increment;
+//            _lineages[0]->_left_child->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child);
+//            _lineages[0]->_left_child->_right_sib->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child->_right_sib);
         }
     }
 }
