@@ -110,12 +110,12 @@ class Forest {
         void                        revertNewNode(list <Node*> &nodes, Node*new_nd, Node* subtree1, Node* subtree2, double increment);
         void                        revertBranches(list <Node*> &nodes, Node* subtree1, Node* subtree2, double increment);
         void                        chooseCoalescentEvent();
-        void                        mergeChosenPair(double species_tree_increment, double prev_species_increment);
+        void                        mergeChosenPair(double species_tree_increment);
         void                        extendGeneTreeLineages(double species_tree_increment);
         void                        catchUpGeneLineage(list<Node*> &nodes);
         void                        finishGeneTree();
         double                      updateSpeciesPartition(Node* subtree1, Node* subtree2, Node* new_nd, double increment);
-        void                        updateIncrements(double log_increment_prior, double species_tree_increment);
+        void                        updateIncrements(double log_increment_prior);
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -793,7 +793,7 @@ class Forest {
         }
     }
 
-    inline void Forest::mergeChosenPair(double species_tree_increment, double prev_species_increment) { // TODO: make sure be able to account for deep  coalescnece
+    inline void Forest::mergeChosenPair(double species_tree_increment) {
         assert (_proposal == "prior-post-ish");
         double log_increment_prior = 0.0;
 
@@ -804,7 +804,7 @@ class Forest {
         
         _log_likelihood_choices.clear();
         
-        // if we are joining gene lineages
+        // if a coalescent event has been chosen
         if (increment < species_tree_increment) {
             // find nodes to join in node list
             Node *subtree1 = _node_choices[_index_of_choice].first;
@@ -848,7 +848,7 @@ class Forest {
             
             // save only the correct increment in the _increments vector
             
-            updateIncrements(log_increment_prior, prev_species_increment);
+            updateIncrements(log_increment_prior);
         }
             else {
                 // deep coalescence, don't need to join anything
@@ -871,7 +871,7 @@ class Forest {
         _deep_coalescent_increments.second = log_increment_prior;
     }
 
-    inline void Forest::updateIncrements(double log_increment_prior, double species_tree_increment) {
+    inline void Forest::updateIncrements(double log_increment_prior) {
         pair <double, double> chosen_increment;
         if (_deep_coalescent_increments.second > 0.0) {
             chosen_increment =
@@ -1447,6 +1447,8 @@ class Forest {
     }
 
     inline void Forest::allowDummyCoalescence(list<Node*> &nodes, double increment) {
+        // this function doesn't actually join anything
+        // this function picks out two random lineages to join and pushes those to node_choices, but they never get used
         assert (_proposal == "prior-post-ish");
         Node *subtree1 = nullptr;
         Node *subtree2 = nullptr;
