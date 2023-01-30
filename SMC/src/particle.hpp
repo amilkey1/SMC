@@ -297,6 +297,11 @@ class Particle {
             
         // choose a species tree height but don't join species yet
         _forests[0].chooseSpeciesIncrement();
+        
+        for (int i = 1; i<_forests.size(); i++) {
+            _forests[i]._extended_increment = 0.0;
+        }
+        
 //       _prev_species_increment = 0.0;
         for (unsigned i=1; i<_forests.size(); i++){
             assert (_forests[i]._lineages.size() > 1);
