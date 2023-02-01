@@ -375,7 +375,13 @@ class Particle {
     inline void Particle::priorPostIshChoice(int i) {
         // attempt first gene tree proposal for all lineages, then select the one to keep
         _forests[i].chooseCoalescentEvent();
-        _forests[i].mergeChosenPair(_forests[0]._last_edge_length);
+        // if species tree is finished, deep coalescence is not a concern anymore
+        if (_forests[0]._lineages.size() > 1) {
+            _forests[i].mergeChosenPair(_forests[0]._last_edge_length);
+        }
+        else {
+            _forests[i].mergeChosenPair(1000000.0);
+        }
     }
 
     inline void Particle::speciesJoinedProposal() {

@@ -137,7 +137,8 @@ class Forest {
         double                    _gene_tree_log_likelihood;
         double                      _gene_tree_log_weight;
         vector<double>              _log_weight_vec;
-        vector<pair<Node*, Node*>> _node_choices;
+//        vector<pair<Node*, Node*>> _node_choices;
+        vector<tuple<Node*, Node*, bool>> _node_choices;
         vector<double>              _log_likelihood_choices;
         int                         _index_of_choice;
         pair<Node*, Node*>          _species_joined;
@@ -160,7 +161,7 @@ class Forest {
         void                        setNewEdgeLength(double difference, Node* taxon_to_migrate, string key_to_add);
         void                        hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment);
         void                        resetToMinor(vector<Node*> minor_nodes, vector<Node*> minor_left_children, vector<Node*> minor_right_children, vector<double> minor_left_edge_lengths, vector<double> minor_right_edge_lengths);
-        pair<double, double>              _deep_coalescent_increments;
+        vector<pair<double, double>>              _deep_coalescent_increments;
         void                        calcDeepCoalescentPrior();
 
     public:
@@ -743,8 +744,10 @@ class Forest {
         _index_of_choice = selectPair(log_weight_choices);
 
         // find nodes to join in node_list
-        Node *subtree1 = _node_choices[_index_of_choice].first;
-        Node *subtree2 = _node_choices[_index_of_choice].second;
+        Node *subtree1 = get<0>(_node_choices[_index_of_choice]);
+        Node *subtree2 = get<1>(_node_choices[_index_of_choice]);
+//        Node *subtree1 = _node_choices[_index_of_choice].first;
+//        Node *subtree2 = _node_choices[_index_of_choice].second;
 
         // erase extra nodes created from node list
         for (int i = 0; i < _node_choices.size(); i++) {
@@ -779,21 +782,26 @@ class Forest {
 
     inline void Forest::mergeChosenPair(double species_tree_increment) {
         if (_increment_choices.size() > 0) {
-        assert (_proposal == "prior-post-ish");
-        double log_increment_prior = 0.0;
+            assert (_proposal == "prior-post-ish");
+            double log_increment_prior = 0.0;
 
-        double increment = _increment_choices[_index_of_choice];
-        for (auto &nd:_lineages) {
-            nd->_edge_length += increment;
+            double increment = _increment_choices[_index_of_choice];
+            for (auto &nd:_lineages) {
+                nd->_edge_length += increment;
         }
         
         _log_likelihood_choices.clear();
         
         // if a coalescent event has been chosen
-        if (increment < species_tree_increment) {
+//        if (increment < species_tree_increment) { // TODO: this doesn't always work b/c lineage time could be accumulating
+            if (get<2> (_node_choices[_index_of_choice])) { // if there has been deep coalescence
             // find nodes to join in node list
-            Node *subtree1 = _node_choices[_index_of_choice].first;
-            Node *subtree2 = _node_choices[_index_of_choice].second;
+            
+            Node *subtree1 = get<0>(_node_choices[_index_of_choice]);
+            Node *subtree2 = get<1>(_node_choices[_index_of_choice]);
+            
+//            Node *subtree1 = _node_choices[_index_of_choice].first;
+//            Node *subtree2 = _node_choices[_index_of_choice].second;
             
             _node_choices.clear();
 
@@ -852,24 +860,45 @@ class Forest {
         double log_increment_prior = 0.0;
         for (auto &s:_species_partition) {
             coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
-            log_increment_prior -= _deep_coalescent_increments.first*coalescence_rate;
+            log_increment_prior -= (_deep_coalescent_increments.back().first)*coalescence_rate;
         }
-        _deep_coalescent_increments.second = log_increment_prior;
+        _deep_coalescent_increments.back().second = log_increment_prior;
+        
+        // reset deep coalescent increments to only the chosen one
+        vector<pair<double, double>> chosen_increments;
+        
+        for (int i=0; i < _deep_coalescent_increments.size(); i++) {
+            if (_deep_coalescent_increments[i].second != 0.0) {
+                chosen_increments.push_back(_deep_coalescent_increments[i]);
+            }
+        }
+        _deep_coalescent_increments.clear();
+        
+        for (int i=0; i < chosen_increments.size(); i++) {
+            _deep_coalescent_increments.push_back(chosen_increments[i]);
+        }
     }
 
     inline void Forest::updateIncrements(double log_increment_prior) {
         pair <double, double> chosen_increment;
-        if (_deep_coalescent_increments.second > 0.0) {
-            chosen_increment =
-            make_pair(_increment_choices[_index_of_choice]+_deep_coalescent_increments.first+_extended_increment, log_increment_prior+_deep_coalescent_increments.second);
+        double deep_coalescent_increment = 0.0;
+        double deep_coalescent_prior = 0.0;
+        for (int i=0; i<_deep_coalescent_increments.size(); i++) {
+            if (_deep_coalescent_increments[i].second != 0.0) {
+                deep_coalescent_increment += _deep_coalescent_increments[i].first;
+                deep_coalescent_prior += _deep_coalescent_increments[i].second;
+            }
+        }
+        
+        if (deep_coalescent_increment > 0.0) {
+            chosen_increment = make_pair(_increment_choices[_index_of_choice]+deep_coalescent_increment+_extended_increment, log_increment_prior+deep_coalescent_prior);
         }
         else {
-//            chosen_increment = make_pair(_increment_choices[_index_of_choice]+species_tree_increment, log_increment_prior);
             chosen_increment = make_pair(_increment_choices[_index_of_choice]+_extended_increment, log_increment_prior);
         }
         
         // clear deep coalescent increment
-        _deep_coalescent_increments = make_pair(0.0, 0.0);
+        _deep_coalescent_increments.clear();
         // add increment and prior to increments list
         _increments.push_back(chosen_increment);
     }
@@ -962,7 +991,7 @@ class Forest {
         }
 
         pair<Node*, Node*> s = make_pair(subtree1, subtree2);
-        _node_choices.push_back(s);
+        _node_choices.push_back(make_tuple(subtree1, subtree2, true));
 
         return s;
     }
@@ -1394,7 +1423,7 @@ class Forest {
             }
 
             //if increment is 0, the lineage is done and we don't consider it at all
-            if (increment > 0.0) {
+            if (increment > 0.0000001) {
                 if (_proposal == "prior-post-ish") {
                     _increment_choices.push_back(increment);
                 }
@@ -1416,7 +1445,7 @@ class Forest {
                 // deep coalescence
                 if (!coalescence && _proposal == "prior-post-ish") {
                     allowDummyCoalescence(nodes, increment); // TODO: this function can be simplified
-                    _deep_coalescent_increments = (make_pair(increment, 0.0));
+                    _deep_coalescent_increments.push_back(make_pair(increment, 0.0));
                     _log_weight_vec.push_back(0.0); // log weight will always be 0.0 because nothing was joined
                 }
             }
@@ -1457,7 +1486,8 @@ class Forest {
         assert (subtree1 != subtree2);
 
         _log_likelihood_choices.push_back(calcLogLikelihood());
-        _node_choices.push_back(make_pair(subtree1, subtree2));
+        _node_choices.push_back(make_tuple(subtree1, subtree2, false));
+//        _node_choices.push_back(make_pair(subtree1, subtree2));
         revertBranches(nodes, subtree1, subtree2, increment);
         calcLineageLogLikelihood(nodes);
     }
@@ -1533,7 +1563,8 @@ class Forest {
             _log_likelihood_choices.push_back(calcLogLikelihood());
             double current_lineage_likelihood = calcLineageLogLikelihood(nodes);
             new_nd->_name = "unused";
-            _node_choices.push_back(make_pair(subtree1, subtree2));
+//            _node_choices.push_back(make_pair(subtree1, subtree2));
+            _node_choices.push_back(make_tuple(subtree1, subtree2, true));
             revertNewNode(nodes, new_nd, subtree1, subtree2, increment);
             return current_lineage_likelihood;
         }
@@ -1631,9 +1662,9 @@ class Forest {
                 assert(new_nd->_left_child->_right_sib);
                 calcPartialArray(new_nd);
                 _num_coalescent_events_in_generation++;
-                _searchable_branch_lengths.push_back(make_pair(getLineageHeight(_new_nodes.back()), increment));
 
                 if (_proposal != "prior-post-ish" ) {
+                    _searchable_branch_lengths.push_back(make_pair(getLineageHeight(_new_nodes.back()), increment));
                     calcTopologyPrior((int) nodes.size()); // TODO: this won't work with prior-post-ish, must do it later
                 }
 
@@ -1646,7 +1677,8 @@ class Forest {
                     double lineage_log_likelihood = calcLineageLogLikelihood(nodes);
                     _log_weight_vec.push_back(lineage_log_likelihood - prev_lineage_log_likelihood);
                     new_nd->_name = "unused";
-                    _node_choices.push_back(make_pair(subtree1, subtree2));
+//                    _node_choices.push_back(make_pair(subtree1, subtree2));
+                    _node_choices.push_back(make_tuple(subtree1, subtree2, true));
                     revertNewNode(nodes, new_nd, subtree1, subtree2, increment);
                 }
                 done = true;
