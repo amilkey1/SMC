@@ -47,6 +47,7 @@ class Particle {
         void                                    setLogLikelihood(double log_likelihood);
         void                                    setParticleGeneration(int n);
         double                                  calcHeight();
+        string                                  getSpeciesNewick() {return _forests[0].makeNewick(9, true);}
         double                                  getLogWeight() const {return _log_weight;}
         map<int, vector<double>>                     getRandomSeeds() {return _random_seeds;}
         void                                    setLogWeight(double w){_log_weight = w;}

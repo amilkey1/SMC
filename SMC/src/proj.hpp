@@ -57,7 +57,6 @@ namespace proj {
             void                printSpeciationRates();
             void                printThetas();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
-            void filterParticles(const vector< pair<double,unsigned> > & cum_probs, vector<Particle::SharedPtr> & particles, vector<Particle::SharedPtr> & to_particles)  ;
         vector< pair<double,unsigned> >                throwDarts(vector< pair<double,unsigned> > & cum_probs, vector<Particle::SharedPtr> &particles);
         
         private:
@@ -115,11 +114,6 @@ namespace proj {
             void                        handleBaseFrequencies();
             void                        debugSpeciesTree(vector<Particle::SharedPtr> &particles);
             void                        estimateParameters(vector<Particle::SharedPtr> &particles);
-//            bool                        _using_particles1;
-//            bool                        _using_particles2;
-//            vector<Particle::SharedPtr>           _alt_particles;
-//            vector<Particle::SharedPtr>           _particles1;
-//            vector<Particle::SharedPtr>           _particles2;
             double                      _small_enough;
     };
 
@@ -139,8 +133,6 @@ namespace proj {
         _ambig_missing  = true;
         _nparticles = 50000;
         _data = nullptr;
-//        _using_particles1 = false;
-//        _using_particles2 = false;
         _small_enough = 0.0000001;
     }
 
@@ -165,14 +157,14 @@ namespace proj {
     }
 
     inline void Proj::saveParticleWeights(vector<Particle::SharedPtr> &v) const {
+        // this function saves particle weights + species tree newick in order of weight
         //sort particles by weight
         sort(v.begin(), v.end(), greater<Particle::SharedPtr>());
         
         ofstream weightf("weights.txt");
         for (auto &p:v) {
             weightf << "particle\n";
-            weightf << p->saveParticleWeights() << "\n";
-            // TODO: add get particle newick
+            weightf << p->saveParticleWeights() << "\t" << p->getSpeciesNewick() << "\n";
         }
         weightf.close();
     }
@@ -529,41 +521,6 @@ namespace proj {
         return chosen_index;
     }
 
-inline void Proj::filterParticles(const vector< pair<double,unsigned> > & cum_probs, vector<Particle::SharedPtr> & particles, vector<Particle::SharedPtr> & to_particles) {
-        // Draw new set of particles by sampling with replacement according to cum_probs
-        to_particles.resize(_nparticles);
-        for(unsigned i = 0; i < _nparticles; i++) {
-
-            // Select a particle to copy to the ith slot in _alt_particles
-            int sel_index = -1;
-            double u = rng.uniform();
-            for(unsigned j = 0; j < _nparticles; j++) {
-                if (u < cum_probs[j].first) {
-                    sel_index = cum_probs[j].second;
-                    break;
-                }
-            }
-            assert(sel_index > -1);
-            (to_particles)[i] = (particles)[sel_index];
-        }
-    
-        assert (_nparticles = (int) to_particles.size());
-    
-//        particles = to_particles;
-
-//        if (_using_particles1) {
-//            _using_particles1 = false;
-//            particles     = _particles2;
-//            _alt_particles = _particles1;
-//        }
-//        else {
-//            _using_particles1 = true;
-//            particles     = _particles1;
-//            _alt_particles = _particles2;
-//        }
-//        return particles;
-    }
-
     inline vector< pair<double,unsigned> > Proj::throwDarts(vector< pair<double,unsigned> > & cum_probs, vector<Particle::SharedPtr> &particles) {
         // Create vector of pairs p, with p.first = log weight and p.second = particle index
         cum_probs.resize(_nparticles);
@@ -620,7 +577,7 @@ inline void Proj::filterParticles(const vector< pair<double,unsigned> > & cum_pr
         to_particles.resize(_nparticles);
         for(unsigned i = 0; i < _nparticles; i++) {
         
-            // Select a particle to copy to the ith slot in _alt_particles
+            // Select a particle to copy to the ith slot in to_particles
             int sel_index = -1;
             double u = rng.uniform();
             for(unsigned j = 0; j < _nparticles; j++) {
@@ -635,12 +592,6 @@ inline void Proj::filterParticles(const vector< pair<double,unsigned> > & cum_pr
         assert(nparticles == to_particles.size());
         }
     }
-
-//    inline void Proj::resampleParticles(vector<Particle::SharedPtr> & my_vec, vector<Particle::SharedPtr> & to_particles) {
-//        vector< pair<double,unsigned> > cum_probs;
-//        cum_probs = throwDarts(cum_probs, my_vec);
-//        filterParticles(cum_probs, my_vec, to_particles);
-//    }
 
     inline void Proj::resetWeights(vector<Particle::SharedPtr> & particles) {
         double logw = -log(particles.size());
@@ -888,6 +839,7 @@ inline void Proj::filterParticles(const vector< pair<double,unsigned> > & cum_pr
 
                         //change use_first from true to false or false to true
                         use_first = !use_first;
+                        saveParticleWeights(my_vec);
 //                        }
                     }
                     resetWeights(my_vec);
