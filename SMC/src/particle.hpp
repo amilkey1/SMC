@@ -194,9 +194,9 @@ class Particle {
             coalescence = firstProposal();
         }
         
-        for (int i = 1; i<_forests.size(); i++) {
-            _forests[i]._extended_increment = 0.0;
-        }
+//        for (int i = 1; i<_forests.size(); i++) {
+//            _forests[i]._extended_increment = 0.0;
+//        }
 
         // attempt coalescent events until there has been at least 1 coalescence
         while (!coalescence) {
