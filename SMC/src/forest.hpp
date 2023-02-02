@@ -901,6 +901,7 @@ class Forest {
         _deep_coalescent_increments.clear();
         // add increment and prior to increments list
         _increments.push_back(chosen_increment);
+        _extended_increment = 0.0;
     }
 
     inline double Forest::updateSpeciesPartition(Node* subtree1, Node* subtree2, Node* new_nd, double increment) {
@@ -1331,13 +1332,13 @@ class Forest {
         for (auto &l:_lineages) {
             if (l->_left_child) {
                 if (getLineageHeight(l) < max_height) {
-                    _extended_increment = max_height - getLineageHeight(l);
+                    _extended_increment += max_height - getLineageHeight(l);
                     l->_edge_length += max_height - getLineageHeight(l);
                 }
             }
             else {
                 if (l->_edge_length < max_height) {
-                    _extended_increment = max_height - getLineageHeight(l);
+                    _extended_increment += max_height - getLineageHeight(l);
                     l->_edge_length += max_height - getLineageHeight(l);
                 }
             }
@@ -1637,7 +1638,7 @@ class Forest {
                     subtree2 = nodes.back();
                 }
 
-                assert (subtree1 != subtree2); // TODO: make sure this is right for deep coalescence case too
+                assert (subtree1 != subtree2);
 
                 Node nd;
                 _nodes.push_back(nd);
@@ -2608,24 +2609,24 @@ class Forest {
             for (auto &l:_lineages) {
                 if (l->_left_child) {
                     if (getLineageHeight(l) < species_tree_height) {
-                        _extended_increment = species_tree_height - getLineageHeight(l);
+                        _extended_increment += species_tree_height - getLineageHeight(l);
                         l->_edge_length += species_tree_height - getLineageHeight(l);
                     }
                 }
                 else {
                     if (l->_edge_length < species_tree_height) {
-                        _extended_increment = species_tree_height - getLineageHeight(l);
+                        _extended_increment += species_tree_height - getLineageHeight(l);
                         l->_edge_length += species_tree_height - getLineageHeight(l);
                     }
                 }
             }
         }
         else {
-            _extended_increment = species_tree_height - getLineageHeight(_lineages[0]->_left_child);
-            _lineages[0]->_left_child->_edge_length = _extended_increment;
-            _lineages[0]->_left_child->_right_sib->_edge_length = _extended_increment;
-//            _lineages[0]->_left_child->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child);
-//            _lineages[0]->_left_child->_right_sib->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child->_right_sib);
+            _extended_increment += species_tree_height - getLineageHeight(_lineages[0]->_left_child);
+//            _lineages[0]->_left_child->_edge_length = _extended_increment;
+//            _lineages[0]->_left_child->_right_sib->_edge_length = _extended_increment;
+            _lineages[0]->_left_child->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child);
+            _lineages[0]->_left_child->_right_sib->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child->_right_sib);
         }
     }
 }
