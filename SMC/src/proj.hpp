@@ -774,8 +774,6 @@ namespace proj {
                 vector<Particle::SharedPtr> my_vec_1(nparticles);
                 vector<Particle::SharedPtr> my_vec_2(nparticles);
                 vector<Particle::SharedPtr> &my_vec = my_vec_1;
-//                _particles1 = my_vec;
-//                _particles2 = my_vec;
                 
                 _prev_log_marginal_likelihood = _log_marginal_likelihood;
                 _log_marginal_likelihood = 0.0;
@@ -783,8 +781,6 @@ namespace proj {
                 for (unsigned i=0; i<nparticles; i++) {
                     my_vec_1[i] = Particle::SharedPtr(new Particle);
                     my_vec_2[i] = Particle::SharedPtr(new Particle);
-//                    _particles1[i] = Particle::SharedPtr(new Particle);
-//                    _particles2[i] = Particle::SharedPtr(new Particle);
                 }
 
                 bool use_first = true;
@@ -795,12 +791,15 @@ namespace proj {
                         double logLikelihood = 0.0;
                         if (!_run_on_empty) {
                             logLikelihood = p->calcLogLikelihood();
+                            p->setLogLikelihood(logLikelihood);
+    //                        p->setLogLikelihood(0.0);
+                            p->setLogWeight(logLikelihood);
+    //                        p->setLogWeight(0.0);// at this stage, log weight = log likelihood
                         }
                         else {
                             p->setParticleGeneration(0);
+                            p->setLogLikelihood(0.0);
                         }
-                        p->setLogLikelihood(logLikelihood);
-                        p->setLogWeight(logLikelihood); // at this stage, log weight = log likelihood
                     }
                 
                 normalizeWeights(my_vec, -1);
@@ -817,8 +816,6 @@ namespace proj {
                     proposeParticles(my_vec);
                     
                     if (!_run_on_empty) {
-                        
-//                        double ess_inverse = 0.0;
                         normalizeWeights(my_vec, g);
                         
                         double ess_inverse = 0.0;
@@ -840,6 +837,14 @@ namespace proj {
                         //change use_first from true to false or false to true
                         use_first = !use_first;
                         saveParticleWeights(my_vec);
+                        
+                        if (g == ntaxa - 2) {
+                            ess_inverse = 0.0;
+                            for (auto & p:my_vec) {
+                                ess_inverse += exp(2.0*p->getLogWeight());
+                            }
+                            cout << "final ESS: " << ess_inverse << endl;
+                        }
 //                        }
                     }
                     resetWeights(my_vec);
@@ -896,7 +901,8 @@ namespace proj {
                     logf << "\t" << setprecision(11) << gene_tree_log_like[0]+exp(gene_tree_log_like[0]);
                     
                     for (int i=0; i<prior_vec.size(); i++) {
-                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i]+branch_length_vec[i];
+//                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i]+branch_length_vec[i];
+                        logf << "\t" << setprecision(11) << exp(branch_length_vec[i]) << "\t" << prior_vec[i]+branch_length_vec[i];
                     }
                     
                     for (int i=0; i<log_topology_priors.size(); i++) {
@@ -927,7 +933,7 @@ namespace proj {
                 cout << "\n" << "Speciation rate: " << _speciation_rate_vector[_nsamples-1].first << endl;
             }
 //            saveAllHybridNodes(_accepted_particle_vec);
-//            showFinal(_accepted_particle_vec);
+            showFinal(_accepted_particle_vec);
             cout << "marg like: " << setprecision(12) << _log_marginal_likelihood << endl;
         }
 
