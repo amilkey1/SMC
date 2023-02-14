@@ -116,6 +116,7 @@ class Forest {
         void                        finishGeneTree();
         double                      updateSpeciesPartition(Node* subtree1, Node* subtree2, Node* new_nd, double increment);
         void                        updateIncrements(double log_increment_prior);
+        bool                        checkIfReadyToJoinSpecies(double species_tree_height);
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -154,6 +155,9 @@ class Forest {
         double                      _log_joining_prob;
         vector<double>              _increment_choices;
         double                      _extended_increment;
+        int                         _species_join_number;
+        int                         _num_coalescent_attempts_within_species_generation;
+        int                         _num_lineages_at_beginning_of_species_generation;
 
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -201,6 +205,9 @@ class Forest {
         _num_coalescent_events_in_generation = 0;
         _log_joining_prob = 0.0;
         _extended_increment = 0.0;
+        _species_join_number = 0;
+        _num_coalescent_attempts_within_species_generation = 0.0;
+        _num_lineages_at_beginning_of_species_generation = _ntaxa;
         
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -760,6 +767,7 @@ class Forest {
     }
 
     inline void Forest::chooseCoalescentEvent() {
+        _num_coalescent_attempts_within_species_generation++;
         _gene_tree_log_weight = 0.0;
         if (_log_likelihood_choices.size() > 0) {
             // choices are already weighted
@@ -793,8 +801,7 @@ class Forest {
         _log_likelihood_choices.clear();
         
         // if a coalescent event has been chosen
-//        if (increment < species_tree_increment) { // TODO: this doesn't always work b/c lineage time could be accumulating
-            if (get<2> (_node_choices[_index_of_choice])) { // if there has been deep coalescence
+        if (get<2> (_node_choices[_index_of_choice])) { // if there has been deep coalescence
             // find nodes to join in node list
             
             Node *subtree1 = get<0>(_node_choices[_index_of_choice]);
@@ -825,7 +832,7 @@ class Forest {
             subtree1->_parent=new_nd;
             subtree2->_parent=new_nd;
 
-            _num_coalescent_events_in_generation = 1;
+            _num_coalescent_events_in_generation++;
 
             //always calculating partials now
             assert (new_nd->_partial == nullptr);
@@ -845,8 +852,9 @@ class Forest {
         }
             else {
                 // deep coalescence, don't need to join anything
+//                cout << "deep coalescence chosen" << endl;
                 // branch lengths already set
-                _num_coalescent_events_in_generation = 0;
+//                _num_coalescent_events_in_generation = 0;
                 calcDeepCoalescentPrior();
             }
 
@@ -1114,6 +1122,8 @@ class Forest {
         _increment_choices = other._increment_choices;
         _deep_coalescent_increments = other._deep_coalescent_increments;
         _extended_increment = other._extended_increment;
+        _species_join_number = other._species_join_number;
+        _num_coalescent_attempts_within_species_generation = other._num_coalescent_attempts_within_species_generation;
 
         // copy tree itself
 
@@ -1371,6 +1381,15 @@ class Forest {
         if (_proposal == "prior-post-ish") {
             prev_lineage_log_likelihood = calcLineageLogLikelihood(nodes);
         }
+        
+//        if (_proposal == "prior-post-ish" && _lineages.size() != _ntaxa) {
+//            prev_lineage_log_likelihood = calcLineageLogLikelihood(nodes);
+//        }
+//
+//        if (_lineages.size() == _ntaxa) {
+//            prev_lineage_log_likelihood = 0.0;
+//        }
+        
         bool done = false;
         double cum_time = getLineageHeight(nodes.front()) - (species_tree_height - species_tree_increment);
         bool coalescence = false;
@@ -1446,8 +1465,15 @@ class Forest {
                 // deep coalescence
                 if (!coalescence && _proposal == "prior-post-ish") {
                     allowDummyCoalescence(nodes, increment); // TODO: this function can be simplified
-                    _deep_coalescent_increments.push_back(make_pair(increment, 0.0));
-                    _log_weight_vec.push_back(0.0); // log weight will always be 0.0 because nothing was joined
+//                    if (prev_lineage_log_likelihood == 0.0) {
+//                        double lineage_log_likelihood = calcLineageLogLikelihood(nodes);
+//                        _log_weight_vec.push_back(lineage_log_likelihood);
+//                    }
+//                    else {
+                        _log_weight_vec.push_back(0.0); // log weight will always be 0.0 because nothing was joined
+//                    }
+                        _deep_coalescent_increments.push_back(make_pair(increment, 0.0));
+//                    _log_weight_vec.push_back(0.0); // log weight will always be 0.0 because nothing was joined
                 }
             }
             else if (event == "migration" && nodes.size() > 1) {
@@ -1550,7 +1576,7 @@ class Forest {
 
         _new_nodes.push_back(new_nd);
         calcPartialArray(new_nd);
-        _num_coalescent_events_in_generation++;
+//        _num_coalescent_events_in_generation++;
 
         if (_proposal != "prior-post-ish" ) {
             calcTopologyPrior((int) nodes.size()); // TODO: this won't work with prior-post-ish
@@ -1581,7 +1607,7 @@ class Forest {
             done = true;
         }
 
-        // for prior post-ish propposal, do not add increment if not attempting a coalescent event
+        // for prior post-ish proposal, do not add increment if not attempting a coalescent event
         double prev_lineage_log_likelihood = 0.0;
         if (_proposal == "prior-post-ish") {
             prev_lineage_log_likelihood = calcLineageLogLikelihood(nodes);
@@ -1589,6 +1615,9 @@ class Forest {
                 done = true;
             }
         }
+//        if (_lineages.size() == _ntaxa) {
+//            prev_lineage_log_likelihood = 0.0;
+//        }
 
         while (!done) {
             double s = nodes.size();
@@ -1662,7 +1691,7 @@ class Forest {
                 new_nd->_partial=ps.getPartial(_npatterns*4);
                 assert(new_nd->_left_child->_right_sib);
                 calcPartialArray(new_nd);
-                _num_coalescent_events_in_generation++;
+//                _num_coalescent_events_in_generation++;
 
                 if (_proposal != "prior-post-ish" ) {
                     _searchable_branch_lengths.push_back(make_pair(getLineageHeight(_new_nodes.back()), increment));
@@ -1704,6 +1733,8 @@ class Forest {
 
     inline void Forest::geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment, double species_tree_height) {
         //update species partition
+        int size_before = (int) _species_partition.size();
+        
         string new_name = get<2>(species_merge_info);
         string species1 = get<0>(species_merge_info);
         string species2 = get<1>(species_merge_info);
@@ -1719,6 +1750,14 @@ class Forest {
             _species_partition.erase(species2);
         }
 
+        int size_after = (int) _species_partition.size();
+        
+        if (size_before != size_after) {
+            _num_coalescent_attempts_within_species_generation = 0;
+            _species_join_number++;
+            _num_lineages_at_beginning_of_species_generation = (int) _lineages.size();
+        }
+        
         if (_species_partition.size() == 1) {
             fullyCoalesceGeneTree(_species_partition.begin()->second);
         }
@@ -2602,6 +2641,26 @@ class Forest {
             }
         }
         return count;
+    }
+
+    inline bool Forest::checkIfReadyToJoinSpecies(double species_tree_height) {
+        int num_coalescent_attempts_needed = _num_lineages_at_beginning_of_species_generation - (int) _species_partition.size(); // TODO: make sure this works
+        if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation || getTreeHeight() >= species_tree_height) {
+            return true;
+        }
+        else {
+            return false;
+        }
+        
+//
+//        for (int i=1; i<_forests.size(); i++) {
+//            double gene_tree_height = _forests[i].getTreeHeight();
+//            if (gene_tree_height >= species_tree_height && _forests[0]._lineages.size() > 1) {
+//                _ready_to_join_species = true;
+//                break;
+//            }
+//        }
+        
     }
 
     inline void Forest::extendGeneTreeLineages(double species_tree_height) {
