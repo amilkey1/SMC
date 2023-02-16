@@ -901,8 +901,7 @@ namespace proj {
                     logf << "\t" << setprecision(11) << gene_tree_log_like[0]+exp(gene_tree_log_like[0]);
                     
                     for (int i=0; i<prior_vec.size(); i++) {
-//                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i]+branch_length_vec[i];
-                        logf << "\t" << setprecision(11) << exp(branch_length_vec[i]) << "\t" << prior_vec[i]+branch_length_vec[i];
+                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i]+branch_length_vec[i];
                     }
                     
                     for (int i=0; i<log_topology_priors.size(); i++) {
