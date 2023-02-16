@@ -816,7 +816,20 @@ namespace proj {
                     proposeParticles(my_vec);
                     
                     if (!_run_on_empty) {
+                        cout << "weights before normalization: " << endl;
+                        for (auto &p:my_vec) {
+                            cout << "   " << p->getLogWeight() << endl;
+                        }
                         normalizeWeights(my_vec, g);
+                        for (auto &p:my_vec) {
+                            p->showParticle();
+                        }
+                        
+                        cout << " " << endl;
+                        cout << "weights after normalization: " << endl;
+                        for (auto &p:my_vec) {
+                            cout << "   " << p->getLogWeight() << endl;
+                        }
                         
                         double ess_inverse = 0.0;
                         
@@ -837,14 +850,6 @@ namespace proj {
                         //change use_first from true to false or false to true
                         use_first = !use_first;
                         saveParticleWeights(my_vec);
-                        
-                        if (g == ntaxa - 2) {
-                            ess_inverse = 0.0;
-                            for (auto & p:my_vec) {
-                                ess_inverse += exp(2.0*p->getLogWeight());
-                            }
-                            cout << "final ESS: " << ess_inverse << endl;
-                        }
 //                        }
                     }
                     resetWeights(my_vec);

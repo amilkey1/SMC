@@ -77,7 +77,6 @@ class Forest {
         double                      getRunningSumChoices(vector<double> &log_weight_choices);
         double                      getRunningSumHybridChoices(vector<double> &log_weight_choices);
         vector<double>              reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
-        pair<Node*, Node*>          chooseAllPairs(list<Node *> &node_list, double increment);
         pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
         int                         selectPair(vector<double> weight_vec);
         void                        chooseSpeciesIncrement();
@@ -112,7 +111,6 @@ class Forest {
         void                        chooseCoalescentEvent();
         void                        mergeChosenPair(double species_tree_increment);
         void                        extendGeneTreeLineages(double species_tree_increment);
-        void                        catchUpGeneLineage(list<Node*> &nodes);
         void                        finishGeneTree();
         double                      updateSpeciesPartition(Node* subtree1, Node* subtree2, Node* new_nd, double increment);
         void                        updateIncrements(double log_increment_prior);
@@ -138,8 +136,7 @@ class Forest {
         double                    _gene_tree_log_likelihood;
         double                      _gene_tree_log_weight;
         vector<double>              _log_weight_vec;
-//        vector<pair<Node*, Node*>> _node_choices;
-        vector<tuple<Node*, Node*, bool>> _node_choices;
+        vector<tuple<Node*, Node*, bool>> _node_choices; // bool is false if no coalescence (deep coalescence)
         vector<double>              _log_likelihood_choices;
         int                         _index_of_choice;
         pair<Node*, Node*>          _species_joined;
@@ -695,75 +692,6 @@ class Forest {
 //            debugLogLikelihood(nd, log_like);
         }
         return _gene_tree_log_likelihood;
-    }
-
-    inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment) {
-        _node_choices.clear();
-
-        // reset _log_likelihood_choices to 0 if we are in a new lineage
-        if (_log_likelihood_choices.size() == 0) {
-            _prev_log_likelihood = 0.0;
-        }
-        else {
-            _prev_log_likelihood = _log_likelihood_choices[_index_of_choice];
-        }
-        _log_likelihood_choices.clear();
-
-        _log_likelihood_choices.clear();
-        vector<double> topology_prior_choices;
-
-        //choose pair of nodes to try
-        for (int i = 0; i < (int) node_list.size()-1; i++) {
-            for (int j = i+1; j < (int) node_list.size(); j++) {
-                // createNewSubtree returns subtree1, subtree2, new_nd
-                tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment);
-                _log_likelihood_choices.push_back(calcLogLikelihood());
-
-                // revert _lineages
-                revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
-
-                //reset siblings and parents of original nodes back to 0
-                get<0>(t)->resetNode(); //subtree1
-                get<1>(t)->resetNode(); //subtree2
-
-                // clear new node from _nodes
-                //clear new node that was just created
-                get<2>(t)->clear(); //new_nd
-            }
-        }
-
-        // reweight each choice of pairs
-        vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_log_likelihood);
-
-        // sum unnormalized weights before choosing the pair
-        _gene_tree_log_weight = 0.0;
-        for (auto &l:log_weight_choices) {
-            _gene_tree_log_weight += l;
-        }
-
-        // normalize weights
-        double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-        for (int b=0; b < (int) log_weight_choices.size(); b++) {
-            log_weight_choices[b] -= log_weight_choices_sum;
-        }
-
-        // randomly select a pair
-        _index_of_choice = selectPair(log_weight_choices);
-
-        // find nodes to join in node_list
-        Node *subtree1 = get<0>(_node_choices[_index_of_choice]);
-        Node *subtree2 = get<1>(_node_choices[_index_of_choice]);
-//        Node *subtree1 = _node_choices[_index_of_choice].first;
-//        Node *subtree2 = _node_choices[_index_of_choice].second;
-
-        // erase extra nodes created from node list
-        for (int i = 0; i < _node_choices.size(); i++) {
-            _nodes.pop_back();
-        }
-
-        _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
-
-        return make_pair(subtree1, subtree2);
     }
 
     inline void Forest::chooseCoalescentEvent() {
@@ -1355,27 +1283,6 @@ class Forest {
         }
     }
 
-    inline void Forest::catchUpGeneLineage(list<Node*> &nodes) {
-        vector<double> lineage_heights;
-        for (auto &nd:nodes) {
-            lineage_heights.push_back(getLineageHeight(nd));
-        }
-        double max_height = *max_element(lineage_heights.begin(), lineage_heights.end());
-
-        for (auto &l:_lineages) {
-            if (l->_left_child) {
-                if (getLineageHeight(l) < max_height) {
-                    l->_edge_length += max_height - getLineageHeight(l);
-                }
-            }
-            else {
-                if (l->_edge_length < max_height) {
-                    l->_edge_length += max_height - getLineageHeight(l);
-                }
-            }
-        }
-    }
-
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double species_tree_increment, double species_tree_height) {
         double prev_lineage_log_likelihood = 0.0;
         if (_proposal == "prior-post-ish") {
@@ -1524,28 +1431,16 @@ class Forest {
         Node *subtree2 = nullptr;
         unsigned s = (unsigned) nodes.size();
         if (nodes.size()>2) {
-            // prior-post proposal
-            if (_proposal == "prior-post") {
-                pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
+            pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+            auto it1 = std::next(nodes.begin(), t.first);
+            subtree1 = *it1;
 
-                subtree1 = t.first;
-                subtree2 = t.second;
-            }
-
-            // prior-prior proposal
-            else {
-                pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
-                auto it1 = std::next(nodes.begin(), t.first);
-                subtree1 = *it1;
-
-                auto it2 = std::next(nodes.begin(), t.second);
-                subtree2 = *it2;
-                assert (t.first < nodes.size() && t.second < nodes.size());
-            }
+            auto it2 = std::next(nodes.begin(), t.second);
+            subtree2 = *it2;
+            assert (t.first < nodes.size() && t.second < nodes.size());
         }
         else {
             // if there are only two lineages left, there is only one choice
-            // prior-prior and prior-post proposals will return the same thing
             subtree1 = nodes.front();
             subtree2 = nodes.back();
         }
@@ -1643,21 +1538,12 @@ class Forest {
 
                 if (nodes.size()>2) {
                 // prior-post proposal
-                    if (_proposal == "prior-post") {
-                        pair<Node*, Node*> t = chooseAllPairs(nodes, increment);
-
-                        subtree1 = t.first;
-                        subtree2 = t.second;
-                    }
-                    // prior prior or prior post ish
-                    else {
                         pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
                         auto it1 = std::next(nodes.begin(), t.first);
                         subtree1 = *it1;
 
                         auto it2 = std::next(nodes.begin(), t.second);
                         subtree2 = *it2;
-                    }
                 }
 
                 else {
@@ -2394,7 +2280,7 @@ class Forest {
         _log_likelihood_choices.push_back(likelihood_vec[1]+log(.85)); // multiply major likelihood by (gamma)
 
         // reweight each choice of pairs
-        vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_log_likelihood);
+        vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_log_likelihood); // TODO: this is incorrect
 
         // sum unnormalized weights before choosing the pair
         _gene_tree_log_weight = 0.0;
@@ -2644,23 +2530,15 @@ class Forest {
     }
 
     inline bool Forest::checkIfReadyToJoinSpecies(double species_tree_height) {
-        int num_coalescent_attempts_needed = _num_lineages_at_beginning_of_species_generation - (int) _species_partition.size(); // TODO: make sure this works
+        int num_coalescent_attempts_needed = _num_lineages_at_beginning_of_species_generation - (int) _species_partition.size(); // TODO: check num_lineages_at_beginning
+        cout << "num coal attempts needed: " << num_coalescent_attempts_needed << endl;
+
         if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation || getTreeHeight() >= species_tree_height) {
             return true;
         }
         else {
             return false;
         }
-        
-//
-//        for (int i=1; i<_forests.size(); i++) {
-//            double gene_tree_height = _forests[i].getTreeHeight();
-//            if (gene_tree_height >= species_tree_height && _forests[0]._lineages.size() > 1) {
-//                _ready_to_join_species = true;
-//                break;
-//            }
-//        }
-        
     }
 
     inline void Forest::extendGeneTreeLineages(double species_tree_height) {
