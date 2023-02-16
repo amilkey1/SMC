@@ -190,7 +190,6 @@ class Particle {
         if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
             coalescence = firstProposal();
         }
-//        showParticle();
         // attempt coalescent events until there has been at least 1 coalescence
         while (!coalescence) {
             chooseNextMove();
@@ -257,14 +256,13 @@ class Particle {
             if (extend) {
                 if (_forests[i]._lineages.size() > 1) {
                     if (_forests[i]._lineages.size() > 1) {
-//                        _forests[i].extendGeneTreeLineages(_forests[0].getTreeHeight());
                         _forests[i].extendGeneTreeLineages(species_tree_height);
                         _ready_to_join_species = true;
                     }
                 }
-                else if (_forests[0]._lineages.size() == 1) { // if species tree is done but gene tree needs to be extended to the species tree barrier // TODO: does this work with multiple genes?
-                    _forests[i].finishGeneTree();
-                }
+//                else if (_forests[0]._lineages.size() == 1) { // if species tree is done but gene tree needs to be extended to the species tree barrier // TODO: does this work with multiple genes?
+//                    _forests[i].finishGeneTree();
+//                }
             }
             }
         }
@@ -346,6 +344,7 @@ class Particle {
         // use the gene tree weights to calculate the particle weight
         _log_weight = 0.0;
         for (int i = 1; i<_forests.size(); i++) {
+//            cout << _forests[i]._gene_tree_log_weight << endl;
             _log_weight += _forests[i]._gene_tree_log_weight;
         }
         _generation++;
@@ -371,7 +370,6 @@ class Particle {
                 _ready_to_join_species = true;
                 break;
             }
-//            break;
         }
             
         return _ready_to_join_species;
