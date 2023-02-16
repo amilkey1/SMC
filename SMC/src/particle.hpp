@@ -257,7 +257,8 @@ class Particle {
             if (extend) {
                 if (_forests[i]._lineages.size() > 1) {
                     if (_forests[i]._lineages.size() > 1) {
-                        _forests[i].extendGeneTreeLineages(_forests[0].getTreeHeight());
+//                        _forests[i].extendGeneTreeLineages(_forests[0].getTreeHeight());
+                        _forests[i].extendGeneTreeLineages(species_tree_height);
                         _ready_to_join_species = true;
                     }
                 }
