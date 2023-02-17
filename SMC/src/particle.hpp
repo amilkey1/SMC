@@ -218,12 +218,12 @@ class Particle {
             coalescence = checkForDeepCoalescence();
         }
         
-        if (Forest::_proposal != "prior-post-ish") {
+        if (Forest::_proposal == "prior-prior") {
             priorPriorProposal();
         }
         
         if (_running_on_empty == false) {
-            if (Forest::_proposal != "prior-post-ish") {
+            if (Forest::_proposal == "prior-prior") {
                 double prev_log_likelihood = _log_likelihood;
                 _log_likelihood = calcLogLikelihood();
                 _log_weight = _log_likelihood - prev_log_likelihood;
@@ -243,10 +243,8 @@ class Particle {
 
     inline void Particle::chooseNextMove() {
         bool extend = false;
-        checkIfReadyToJoinSpecies();
-        if (_forests[0]._lineages.size() > 1) {
         for (int i = 1; i < _forests.size(); i++) {
-            int a = _forests[i]._species_join_number; //
+            int a = _forests[i]._species_join_number;
             double species_tree_height = 0.0;
             for (int i = 0; i<a+1; i++) {
                 species_tree_height += _t[i].second;
@@ -257,15 +255,14 @@ class Particle {
                 if (_forests[i]._lineages.size() > 1) {
                     if (_forests[i]._lineages.size() > 1) {
                         _forests[i].extendGeneTreeLineages(species_tree_height);
-                        _ready_to_join_species = true;
+                        }
                     }
+                else {
+                    _forests[i].finishGeneTree();
                 }
-//                else if (_forests[0]._lineages.size() == 1) { // if species tree is done but gene tree needs to be extended to the species tree barrier // TODO: does this work with multiple genes?
-//                    _forests[i].finishGeneTree();
-//                }
-            }
             }
         }
+        checkIfReadyToJoinSpecies();
     }
 
     inline void Particle::noSpeciesJoinedProposal() {
@@ -273,7 +270,7 @@ class Particle {
         for (unsigned i=1; i<_forests.size(); i++){
             assert (_forests[i]._lineages.size() > 1);
             _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length, _forests[0].getTreeHeight());
-            if (Forest::_proposal == "prior-post-ish") {
+            if (Forest::_proposal != "prior-prior") {
                 priorPostIshChoice(i);
             }
         }
@@ -309,13 +306,12 @@ class Particle {
             assert (_forests[i]._lineages.size() > 1);
             _gene_tree_proposal_attempts++;
             _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length, _forests[0].getTreeHeight());
-            if (Forest::_proposal == "prior-post-ish") {
+            if (Forest::_proposal != "prior-prior") {
                 priorPostIshChoice(i);
             }
         }
         
         // check if there has been a deep coalescent event
-//        showParticle();
         for (unsigned i=1; i<_forests.size(); i++) {
             if (_forests[i]._num_coalescent_events_in_generation == 0) {
                 coalescence = false;
@@ -351,7 +347,7 @@ class Particle {
     }
 
     inline void Particle::priorPriorProposal() {
-        assert (Forest::_proposal != "prior-post-ish");
+        assert (Forest::_proposal == "prior-prior");
         for (int i = 1; i<_forests.size(); i++) {
             if (_forests[i]._num_coalescent_events_in_generation > 1) {
                 double smallest_branch = _forests[i].findShallowestCoalescence();
@@ -366,7 +362,7 @@ class Particle {
         
         for (int i=1; i<_forests.size(); i++) {
             double gene_tree_height = _forests[i].getTreeHeight();
-            if (gene_tree_height >= species_tree_height && _forests[0]._lineages.size() > 1) {
+            if (gene_tree_height >= species_tree_height-0.000001 && _forests[0]._lineages.size() > 1) {
                 _ready_to_join_species = true;
                 break;
             }
@@ -388,12 +384,15 @@ class Particle {
     }
 
     inline void Particle::speciesJoinedProposal() {
-//        showParticle();
         for (int i=1; i<_forests.size(); i++) {
             if (_forests[i]._num_coalescent_events_in_generation == 0) {
                 // if the forest has already had a coalescent event, need to wait for filtering to attempt another coalescence
-            int a = _forests[i]._species_join_number+1;
-                if (a > _t.size()-1) { // TODO: not sure why this is happening
+                int a = _forests[i]._species_join_number;
+                if (_forests[i]._ready_to_join_species_forest) {
+                    a++;
+                    _forests[i]._ready_to_join_species_forest = false;
+                }   // TODO: this might be wrong - what is going on here?
+                if (a > _t.size()-1) { // TODO: not sure why this is happening still
                     a = (int) _t.size()-1;
                 }
                 double species_tree_height = 0.0;
@@ -401,12 +400,11 @@ class Particle {
                     species_tree_height += _t[i].second;
                 }
                 _forests[i].geneTreeProposal(_t[a].first, _t[a].second, species_tree_height);
-            if (Forest::_proposal == "prior-post-ish") {
+            if (Forest::_proposal != "prior-prior") {
                 priorPostIshChoice(i);
             }
         }
         }
-//        showParticle();
     }
 
     inline bool Particle::checkForDeepCoalescence() {
