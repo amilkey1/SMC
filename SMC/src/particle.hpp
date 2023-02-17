@@ -325,14 +325,17 @@ class Particle {
         // reset _ready_to_join_species
         _ready_to_join_species = false;
         assert (_forests[0]._lineages.size() > 1);
-//        _t = _forests[0].speciesTreeProposal();
         tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
         
         // if the species tree is not finished, add another species increment
         if (_forests[0]._lineages.size()>1) {
             _forests[0].addSpeciesIncrement();
         }
-        double edge_len = _forests[0]._last_edge_length;
+        
+        double edge_len = 0.0;
+        if (_forests[0]._lineages.size() > 1) {
+            edge_len = _forests[0]._last_edge_length;
+        }
         _t.push_back(make_pair(species_joined, edge_len));
     }
 
@@ -340,7 +343,6 @@ class Particle {
         // use the gene tree weights to calculate the particle weight
         _log_weight = 0.0;
         for (int i = 1; i<_forests.size(); i++) {
-//            cout << _forests[i]._gene_tree_log_weight << endl;
             _log_weight += _forests[i]._gene_tree_log_weight;
         }
         _generation++;
@@ -376,10 +378,10 @@ class Particle {
         _forests[i].chooseCoalescentEvent();
         // if species tree is finished, deep coalescence is not a concern anymore
         if (_forests[0]._lineages.size() > 1) {
-            _forests[i].mergeChosenPair(_forests[0]._last_edge_length);
+            _forests[i].mergeChosenPair();
         }
         else {
-            _forests[i].mergeChosenPair(1000000.0);
+            _forests[i].mergeChosenPair();
         }
     }
 
