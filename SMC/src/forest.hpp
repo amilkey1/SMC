@@ -109,7 +109,7 @@ class Forest {
         void                        revertNewNode(list <Node*> &nodes, Node*new_nd, Node* subtree1, Node* subtree2);
         void                        revertBranches(list <Node*> &nodes, Node* subtree1, Node* subtree2, double increment);
         void                        chooseCoalescentEvent();
-        void                        mergeChosenPair(double species_tree_increment);
+        void                        mergeChosenPair();
         void                        extendGeneTreeLineages(double species_tree_increment);
         void                        finishGeneTree();
         double                      updateSpeciesPartition(Node* subtree1, Node* subtree2, Node* new_nd, double increment);
@@ -699,7 +699,9 @@ class Forest {
         assert (_increment_choices.size() == _log_weight_vec.size());
         _num_coalescent_attempts_within_species_generation++;
         _gene_tree_log_weight = 0.0;
-        if (_log_likelihood_choices.size() > 0) {
+        assert(_log_weight_vec.size() > 0);
+//        if (_log_likelihood_choices.size() > 0) {
+//        if (_log_weight_vec.size() > 0) {
             // choices are already weighted
 
             // sum unnormalized weights before choosing the pair
@@ -715,10 +717,10 @@ class Forest {
             
             _gene_tree_log_likelihood = calcLogLikelihood();
             _log_weight_vec.clear();
-        }
+//        }
     }
 
-    inline void Forest::mergeChosenPair(double species_tree_increment) {
+    inline void Forest::mergeChosenPair() {
         if (_increment_choices.size() > 0) {
             assert (_proposal != "prior-prior");
             double log_increment_prior = 0.0;
@@ -739,7 +741,7 @@ class Forest {
             
             _node_choices.clear();
 
-            _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
+//            _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
             _log_likelihood_choices.clear();
             _new_nodes.clear();
             
@@ -1280,7 +1282,7 @@ class Forest {
                 }
             }
         }
-        _ready_to_join_species_forest = true;
+//        _ready_to_join_species_forest = true;
     }
 
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double species_tree_increment, double species_tree_height) {
@@ -1358,9 +1360,9 @@ class Forest {
                 cum_time += increment;
 
                 // deep coalescence
-                if (!coalescence && _proposal == "prior-post-ish") {
+                if (!coalescence && _proposal != "prior-prior") {
                     allowDummyCoalescence(nodes, increment); // TODO: this function can be simplified
-                    _log_weight_vec.push_back(0.0); // log weight will always be 0.0 because nothing was joined
+//                    _log_weight_vec.push_back(0.0); // log weight will always be 0.0 because nothing was joined
                     _deep_coalescent_increments.push_back(make_pair(increment, 0.0));
                 }
             }
@@ -1395,7 +1397,11 @@ class Forest {
                     Node *node2 = nullptr;
                     
                     assert (i < nodes.size() && j < nodes.size());
-                    node_choices.push_back(make_pair(node1, node2));
+//                    node_choices.push_back(make_pair(node1, node2));
+                    _node_choices.push_back(make_tuple(node1, node2, false));
+                    _increment_choices.push_back(increment);
+                    _log_weight_vec.push_back(0.0);
+//                    _log_likelihood_choices.push_back(calcLogLikelihood());
                 }
             }
         }
@@ -1403,12 +1409,15 @@ class Forest {
             Node *node1 = nullptr;
             Node *node2 = nullptr;
             
-            node_choices.push_back(make_pair(node1, node2));
+//            node_choices.push_back(make_pair(node1, node2));
             _increment_choices.push_back(increment);
+            _log_weight_vec.push_back(0.0);
+//            _log_likelihood_choices.push_back(calcLogLikelihood());
+            _node_choices.push_back(make_tuple(node1, node2, false));
         }
 
-        _log_likelihood_choices.push_back(calcLogLikelihood());
-        _node_choices.push_back(make_tuple(subtree1, subtree2, false));
+//        _log_likelihood_choices.push_back(calcLogLikelihood());
+//        _node_choices.push_back(make_tuple(subtree1, subtree2, false));
         calcLineageLogLikelihood(nodes);
     }
 
@@ -1480,7 +1489,7 @@ class Forest {
             _new_nodes.push_back(new_nd);
             calcPartialArray(new_nd);
 
-            if (_proposal != "prior-post-ish" ) {
+            if (_proposal == "prior-prior") {
                 calcTopologyPrior((int) nodes.size()); // TODO: this won't work with prior-post-ish
             }
 
@@ -1488,9 +1497,10 @@ class Forest {
             updateNodeList(nodes, subtree1, subtree2, new_nd);
             updateNodeVector(_lineages, subtree1, subtree2, new_nd);
 
-            _log_likelihood_choices.push_back(calcLogLikelihood());
+//            _log_likelihood_choices.push_back(calcLogLikelihood());
             double current_lineage_likelihood = calcLineageLogLikelihood(nodes);
             _log_weight_vec.push_back(current_lineage_likelihood - prev_lineage_log_likelihood);
+//            assert(current_lineage_likelihood - prev_lineage_log_likelihood > 0.0);
             new_nd->_name = "unused";
             _node_choices.push_back(make_tuple(subtree1, subtree2, true));
             revertNewNode(nodes, new_nd, subtree1, subtree2);
@@ -2543,7 +2553,7 @@ class Forest {
         int num_coalescent_attempts_needed = _num_lineages_at_beginning_of_species_generation - (int) _species_partition.size(); // TODO: check num_lineages_at_beginning
 //        cout << "num coal attempts needed: " << num_coalescent_attempts_needed << endl;
 
-        if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation || getTreeHeight() >= species_tree_height) { // TODO: I'm not sure this always works
+        if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation || getTreeHeight() >= species_tree_height - 0.000001) { // TODO: I'm not sure this always works
 //        if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation) {
             _ready_to_join_species_forest = true;
             return true;
