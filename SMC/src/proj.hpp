@@ -72,6 +72,7 @@ namespace proj {
 //            double                      _avg_marg_like;
             double                      _log_marginal_likelihood;
             bool                        _run_on_empty;
+            bool                        _build_species_tree_first;
             double                      _theta_prior;
             double                      _prev_theta_prior;
             double                      _speciation_rate_prior;
@@ -206,6 +207,7 @@ namespace proj {
         ("migration_rate", boost::program_options::value(&Forest::_migration_rate)->default_value(0.0), "migration rate")
         ("hybridization_rate", boost::program_options::value(&Forest::_hybridization_rate)->default_value(0.0), "hybridization rate")
         ("run_on_empty", boost::program_options::value(&_run_on_empty)->default_value(false), "run with no data")
+        ("build_species_tree_first", boost::program_options::value(&_build_species_tree_first)->default_value(false), "build the complete species tree before starting the gene trees")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -806,6 +808,7 @@ namespace proj {
                 
                 for (auto &p:my_vec) {
                     p->setRunOnEmpty(_run_on_empty);
+                    p->setBuildEntireSpeciesTree(_build_species_tree_first);
                 }
                 
                 //run through each generation of particles

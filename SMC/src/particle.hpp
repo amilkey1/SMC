@@ -47,6 +47,7 @@ class Particle {
         void                                    setLogLikelihood(double log_likelihood);
         void                                    setParticleGeneration(int n);
         double                                  calcHeight();
+        void                                    buildEntireSpeciesTree();
         string                                  getSpeciesNewick() {return _forests[0].makeNewick(9, true);}
         double                                  getLogWeight() const {return _log_weight;}
         map<int, vector<double>>                     getRandomSeeds() {return _random_seeds;}
@@ -77,6 +78,7 @@ class Particle {
         string                                          saveGamma();
         void                                            calculateGamma();
         void                                            setRunOnEmpty(bool a) {_running_on_empty = a;}
+        void                                            setBuildEntireSpeciesTree(bool a) {_species_first = a;}
         vector<double>                                  getBranchLengths();
         vector<double>                                  getBranchLengthPriors();
         vector<double>                                  getGeneTreeLogLikelihoods();
@@ -102,10 +104,12 @@ class Particle {
         double                                  _prev_gene_tree_marg_like;
         map<int, vector<double>>                     _random_seeds;
         bool                                    _running_on_empty = false;
+        bool                                    _no_species_joined = true;
 //        tuple<string, string, string>           _t;
         vector<pair<tuple<string, string, string>, double>> _t;
         unsigned                                _gene_tree_proposal_attempts;
         bool                                    _ready_to_join_species;
+        bool                                    _species_first;
     
         bool                                    firstProposal();
         void                                    priorPostIshChoice(int i);
@@ -187,6 +191,10 @@ class Particle {
         string event;
         bool coalescence = false;
         
+        if (_species_first && _generation == 0) {
+            buildEntireSpeciesTree();
+        }
+        
         // set starting variables
         if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
             coalescence = firstProposal();
@@ -203,11 +211,13 @@ class Particle {
                     // ready to join species
                     if (_ready_to_join_species) {
                         joinSpeciesProposal();
+                        _no_species_joined = false;
                     }
                     
                     // don't join any more species, now must finish the gene trees first
                     // if species have been joined previously
-                    if (_forests[0]._lineages.size() != Forest::_nspecies) {
+//                    if (_forests[0]._lineages.size() != Forest::_nspecies) {
+                    if (!_no_species_joined) {
                         speciesJoinedProposal();
                     }
                     // if no species have been joined at all
@@ -268,11 +278,23 @@ class Particle {
 
     inline void Particle::noSpeciesJoinedProposal() {
         // propose gene tree moves if there have been no species joined at all
-        for (unsigned i=1; i<_forests.size(); i++){
-            assert (_forests[i]._lineages.size() > 1);
-            _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length, _forests[0].getTreeHeight());
-            if (Forest::_proposal != "prior-prior") {
-                priorPostIshChoice(i);
+        
+        if (!_species_first) {
+            for (unsigned i=1; i<_forests.size(); i++){
+                assert (_forests[i]._lineages.size() > 1);
+                _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length, _forests[0].getTreeHeight());
+                assert (_forests[0]._last_edge_length == _forests[0].getTreeHeight());
+                if (Forest::_proposal != "prior-prior") {
+                    priorPostIshChoice(i);
+                }
+            }
+        }
+        else {
+            for (unsigned i=1; i<_forests.size(); i++){
+                _forests[i].firstGeneTreeProposal(_t[0].second, _t[0].second);
+                if (Forest::_proposal != "prior-prior") {
+                    priorPostIshChoice(i);
+                }
             }
         }
     }
@@ -282,33 +304,49 @@ class Particle {
         // set starting variables
         assert (_generation == 0);
         assert (_gene_tree_proposal_attempts == 0);
+        _no_species_joined = true;
         
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i]._theta = _forests[i]._starting_theta;
         }
         
-        _ready_to_join_species = false;
-        
-        // choose a species tree height if species tree is unfinished, but don't join species yet
-        if (_forests[0]._lineages.size() > 1) {
-            _forests[0].chooseSpeciesIncrement();
+        if (!_species_first) {
+            _ready_to_join_species = false;
+            
+            // choose a species tree height if species tree is unfinished, but don't join species yet
+            if (_forests[0]._lineages.size() > 1) {
+                _forests[0].chooseSpeciesIncrement();
+            }
         }
         
         for (int i = 1; i<_forests.size(); i++) {
             _forests[i]._extended_increment = 0.0;
         }
-        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-        double edge_len = _forests[0]._last_edge_length;
+        if (!_species_first) {
+            tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+            double edge_len = _forests[0]._last_edge_length;
+            
+            _t.push_back(make_pair(species_joined, edge_len));
         
-        _t.push_back(make_pair(species_joined, edge_len));
+    //       _prev_species_increment = 0.0;
+            for (unsigned i=1; i<_forests.size(); i++){
+                assert (_forests[i]._lineages.size() > 1);
+                _gene_tree_proposal_attempts++;
+                _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length, _forests[0].getTreeHeight());
+                if (Forest::_proposal != "prior-prior") {
+                    priorPostIshChoice(i);
+                }
+            }
+        }
         
-//       _prev_species_increment = 0.0;
-        for (unsigned i=1; i<_forests.size(); i++){
-            assert (_forests[i]._lineages.size() > 1);
-            _gene_tree_proposal_attempts++;
-            _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length, _forests[0].getTreeHeight());
-            if (Forest::_proposal != "prior-prior") {
-                priorPostIshChoice(i);
+        else {
+            for (unsigned i=1; i<_forests.size(); i++){
+                assert (_forests[i]._lineages.size() > 1);
+                _gene_tree_proposal_attempts++;
+                _forests[i].firstGeneTreeProposal(_t[0].second, _t[0].second);
+                if (Forest::_proposal != "prior-prior") {
+                    priorPostIshChoice(i);
+                }
             }
         }
         
@@ -325,19 +363,22 @@ class Particle {
     inline void Particle::joinSpeciesProposal() {
         // reset _ready_to_join_species
         _ready_to_join_species = false;
-        assert (_forests[0]._lineages.size() > 1);
-        tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
-        
-        // if the species tree is not finished, add another species increment
-        if (_forests[0]._lineages.size()>1) {
-            _forests[0].addSpeciesIncrement();
+            
+        if (!_species_first) {
+            assert (_forests[0]._lineages.size() > 1);
+            tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
+            
+            // if the species tree is not finished, add another species increment
+            if (_forests[0]._lineages.size()>1) {
+                _forests[0].addSpeciesIncrement();
+            }
+            
+            double edge_len = 0.0;
+            if (_forests[0]._lineages.size() > 1) {
+                edge_len = _forests[0]._last_edge_length;
+            }
+            _t.push_back(make_pair(species_joined, edge_len));
         }
-        
-        double edge_len = 0.0;
-        if (_forests[0]._lineages.size() > 1) {
-            edge_len = _forests[0]._last_edge_length;
-        }
-        _t.push_back(make_pair(species_joined, edge_len));
     }
 
     inline void Particle::calcParticleWeight() {
@@ -361,13 +402,38 @@ class Particle {
 
     inline bool Particle::checkIfReadyToJoinSpecies() {
         _ready_to_join_species = false;
-        double species_tree_height = _forests[0].getTreeHeight();
+        double species_tree_height = 0.0;
         
-        for (int i=1; i<_forests.size(); i++) {
-            double gene_tree_height = _forests[i].getTreeHeight();
-            if (gene_tree_height >= species_tree_height-0.000001 && _forests[0]._lineages.size() > 1) {
-                _ready_to_join_species = true;
-                break;
+        if (!_species_first) {
+            species_tree_height = _forests[0].getTreeHeight();
+        }
+        else {
+            // find gene forest that has advanced the furthest
+            vector<int> species_times;
+            for (int i=1; i<_forests.size(); i++) {
+                species_times.push_back(_forests[i]._species_join_number);
+            }
+            double max = *max_element(species_times.begin(), species_times.end());
+            // get height of species tree at time of deepest gene tree coalescence
+            species_tree_height = _t[max].second;
+        }
+        
+        if (!_species_first) {
+            for (int i=1; i<_forests.size(); i++) {
+                double gene_tree_height = _forests[i].getTreeHeight();
+                if (gene_tree_height >= species_tree_height-0.000001 && _forests[0]._lineages.size() > 1) {
+                    _ready_to_join_species = true;
+                    break;
+                }
+            }
+        }
+        else {
+            for (int i=1; i<_forests.size(); i++) {
+                double gene_tree_height = _forests[i].getTreeHeight();
+                if (gene_tree_height >= species_tree_height-0.000001) {
+                    _ready_to_join_species = true;
+                    break;
+                }
             }
         }
             
@@ -427,6 +493,32 @@ class Particle {
             _forests[i]._num_coalescent_events_in_generation = 0;
             _forests[i]._searchable_branch_lengths.clear();
             _forests[i]._new_nodes.clear();
+        }
+    }
+
+    inline void Particle::buildEntireSpeciesTree() {
+        
+        _forests[0].chooseSpeciesIncrement();
+        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+        double edge_len = _forests[0]._last_edge_length;
+        
+        _t.push_back(make_pair(species_joined, edge_len));
+        
+        for (int i=0; i < _forests[0]._nspecies-1; i++) {
+            if (_forests[0]._lineages.size() > 1) {
+                tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
+                
+                // if the species tree is not finished, add another species increment
+                if (_forests[0]._lineages.size()>1) {
+                    _forests[0].addSpeciesIncrement();
+                }
+                
+                double edge_len = 0.0;
+                if (_forests[0]._lineages.size() > 1) {
+                    edge_len = _forests[0]._last_edge_length;
+                }
+                _t.push_back(make_pair(species_joined, edge_len));
+            }
         }
     }
 
@@ -625,5 +717,7 @@ class Particle {
         _ready_to_join_species = other._ready_to_join_species;
         _running_on_empty = other._running_on_empty;
         _random_seeds = other._random_seeds;
+        _species_first = other._species_first;
+        _no_species_joined = other._no_species_joined;
     };
 }
