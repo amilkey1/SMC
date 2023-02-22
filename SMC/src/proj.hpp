@@ -37,7 +37,9 @@ namespace proj {
 
             void                normalizeWeights(vector<Particle::SharedPtr> & particles, int g);
             unsigned            chooseRandomParticle(vector<Particle::SharedPtr> & particles, vector<double> & cum_prob);
+//            void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
+
             void                resetWeights(vector<Particle::SharedPtr> & particles);
             double              getWeightAverage(vector<double> log_weight_vec);
             void                createSpeciesMap(Data::SharedPtr);
@@ -116,6 +118,7 @@ namespace proj {
             void                        estimateParameters(vector<Particle::SharedPtr> &particles);
             vector<string>              _newicks;
             Split::treemap_t            _treeIDs;
+            double                      _small_enough;
     };
 
     inline Proj::Proj() {
@@ -134,6 +137,7 @@ namespace proj {
         _ambig_missing  = true;
         _nparticles = 50000;
         _data = nullptr;
+        _small_enough = 0.000001;
     }
 
     inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
@@ -529,31 +533,50 @@ namespace proj {
 
     inline void Proj::resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles) {
         unsigned nparticles = (unsigned)from_particles.size();
-        vector<double> cum_probs(nparticles, -1.0);
-        
-        // throw darts
-        vector<unsigned> darts(nparticles, 0);
-        unsigned max_j = 0;
-        for(unsigned i = 0; i < nparticles; i++) {
-            unsigned j = chooseRandomParticle(from_particles, cum_probs);
-            if (j>max_j){
-                max_j = j;
+        vector<pair<double, double>> cum_probs;
+            // Create vector of pairs p, with p.first = log weight and p.second = particle index
+            cum_probs.resize(nparticles);
+            unsigned i = 0;
+            for(auto & p : from_particles) {
+                cum_probs[i].first = p->getLogWeight();
+                cum_probs[i].second = i;
+                ++i;
             }
-            darts[j]++;
-        }
 
-        // create new particle vector
-        unsigned m = 0;
-        for (unsigned i = 0; i < nparticles; i++) {
-            for (unsigned k = 0; k < darts[i]; k++) {
-                Particle::SharedPtr p0 = from_particles[i];
-                // dereference p0, create a new particle, create new shared pointer to that particle
-//                Particle::SharedPtr p = Particle::SharedPtr(new Particle(*p0));
-                to_particles[m++]=Particle::SharedPtr(new Particle(*p0));
+            // Sort cum_probs vector so that largest log weights come first
+            sort(cum_probs.begin(), cum_probs.end(), greater< pair<double,unsigned> >());
+
+            // Convert vector from storing log weights to storing cumulative weights
+            double cumpr = 0.0;
+            for (auto & w : cum_probs) {
+                cumpr += exp(w.first);
+                w.first = cumpr;
             }
-        }
+
+            // Last element in cum_probs should hold 1.0 if weights were indeed normalized coming in
+            assert( fabs( 1.0 - cum_probs[_nparticles-1].first ) < Proj::_small_enough);
+
+
+        // Draw new set of particles by sampling with replacement according to cum_probs
+        to_particles.resize(_nparticles);
+        for(unsigned i = 0; i < _nparticles; i++) {
+
+            // Select a particle to copy to the ith slot in to_particles
+            int sel_index = -1;
+            double u = rng.uniform();
+            for(unsigned j = 0; j < _nparticles; j++) {
+                if (u < cum_probs[j].first) {
+                    sel_index = cum_probs[j].second;
+                    break;
+                }
+            }
+            assert(sel_index > -1);
+            Particle::SharedPtr p0 = from_particles[sel_index];
+            to_particles[i]=Particle::SharedPtr(new Particle(*p0));
         assert(nparticles == to_particles.size());
+        }
     }
+    
 
     inline void Proj::resetWeights(vector<Particle::SharedPtr> & particles) {
         double logw = -log(particles.size());
@@ -904,7 +927,7 @@ namespace proj {
                         log_topology_priors.push_back(t);
                     }
                     
-//                    showFinal(_accepted_particle_vec);
+                    showFinal(_accepted_particle_vec);
                     assert(branch_length_vec.size() == prior_vec.size());
                     
                     if (col_count == 0) {
