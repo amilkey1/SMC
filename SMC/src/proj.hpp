@@ -927,7 +927,6 @@ namespace proj {
                         log_topology_priors.push_back(t);
                     }
                     
-                    showFinal(_accepted_particle_vec);
                     assert(branch_length_vec.size() == prior_vec.size());
                     
                     if (col_count == 0) {
@@ -974,7 +973,7 @@ namespace proj {
                 cout << "\n" << "Speciation rate: " << _speciation_rate_vector[_nsamples-1].first << endl;
             }
             saveAllHybridNodes(_accepted_particle_vec);
-//            showFinal(_accepted_particle_vec);
+            showFinal(_accepted_particle_vec);
 //            for (auto &p:_accepted_particle_vec) {
 ////                p->summarizeForests();
 //                p->storeNewicks();

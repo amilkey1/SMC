@@ -657,15 +657,20 @@ class Forest {
         
         // sum unnormalized weights before choosing the pair
         _gene_tree_log_weight = 0.0;
-        for (auto &l:log_weight_choices) {
-            _gene_tree_log_weight += l;
-        }
+            // choices are already weighted
 
-        // normalize weights
+        // sum unnormalized weights before choosing the pair
+        // must include the likelihoods of all pairs in the final particle weight
         double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
+        _gene_tree_log_weight = log_weight_choices_sum;
         for (int b=0; b < (int) log_weight_choices.size(); b++) {
             log_weight_choices[b] -= log_weight_choices_sum;
         }
+        
+        // randomly select a pair
+        _index_of_choice = selectPair(_log_weight_vec);
+        
+        _log_weight_vec.clear();
         
         // randomly select a pair
         _index_of_choice = selectPair(log_weight_choices);
@@ -678,8 +683,6 @@ class Forest {
         for (int i = 0; i < _node_choices.size(); i++) {
             _nodes.pop_back();
         }
-        
-        _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
         
         return make_pair(subtree1, subtree2);
     }
@@ -1236,6 +1239,7 @@ class Forest {
             // normalized particle sum for one particle is just log likelihood?
         }
         else if (_proposal == "prior-post") {
+            _gene_tree_log_likelihood = calcLogLikelihood();
             _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
             _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
         }
