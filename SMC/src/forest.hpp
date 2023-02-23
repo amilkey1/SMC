@@ -135,7 +135,7 @@ class Forest {
         double                      _generationf = 0;
         string                      _last_direction;
         vector<double>              _rand_numbers;
-        double                      _gene_tree_marginal_likelihood;
+//        double                      _gene_tree_marginal_likelihood;
         vector<double>              _branch_lengths;
         vector<double>              _branch_length_priors;
         double                      _topology_prior;
@@ -656,13 +656,13 @@ class Forest {
         vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood);
         
         // sum unnormalized weights before choosing the pair
-        _gene_tree_log_weight = 0.0;
+//        _gene_tree_log_weight = 0.0;
             // choices are already weighted
 
         // sum unnormalized weights before choosing the pair
         // must include the likelihoods of all pairs in the final particle weight
         double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-        _gene_tree_log_weight = log_weight_choices_sum;
+        _gene_tree_log_weight += log_weight_choices_sum;
         for (int b=0; b < (int) log_weight_choices.size(); b++) {
             log_weight_choices[b] -= log_weight_choices_sum;
         }
@@ -867,7 +867,7 @@ class Forest {
         _gene_tree_log_weight = other._gene_tree_log_weight;
         _prev_gene_tree_log_likelihood = other._prev_gene_tree_log_likelihood;
         _log_weight_vec = other._log_weight_vec;
-        _gene_tree_marginal_likelihood = other._gene_tree_marginal_likelihood;
+//        _gene_tree_marginal_likelihood = other._gene_tree_marginal_likelihood;
         _theta = other._theta;
         _branch_lengths = other._branch_lengths;
         _branch_length_priors = other._branch_length_priors;
@@ -1172,7 +1172,7 @@ class Forest {
         Node *subtree2 = nullptr;
         unsigned s = (unsigned) nodes.size();
 
-        if (nodes.size()>2) {
+//        if (nodes.size()>2) {
             // prior-prior proposal
             if (_proposal == "prior-prior") {
                 pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
@@ -1191,13 +1191,13 @@ class Forest {
                 subtree1 = t.first;
                 subtree2 = t.second;
             }
-        }
-        else {
-            // if there are only two lineages left, there is only one choice
-            // prior-prior and prior-post proposals will return the same thing
-            subtree1 = nodes.front();
-            subtree2 = nodes.back();
-        }
+//        }
+//        else {
+//            // if there are only two lineages left, there is only one choice
+//            // prior-prior and prior-post proposals will return the same thing
+//            subtree1 = nodes.front();
+//            subtree2 = nodes.back();
+//        }
         
         assert (subtree1 != subtree2);
         
@@ -1230,22 +1230,24 @@ class Forest {
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         
-        if (_proposal == "prior-prior" || nodes.size() == 1) {
+//        if (_proposal == "prior-prior" || nodes.size() == 1) {
+        if (_proposal == "prior-prior") {
             _gene_tree_log_likelihood = calcLogLikelihood();
-            _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
+//            _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
             _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
-            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
+//            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
             // marginal likelihood = normalized particle weights sum - ln(1)
             // normalized particle sum for one particle is just log likelihood?
         }
         else if (_proposal == "prior-post") {
             _gene_tree_log_likelihood = calcLogLikelihood();
             _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
-            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
+//            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
         }
     }
 
     inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
+        _gene_tree_log_weight = 0.0;
         assert (nodes.size()>0);
         bool done = false;
 
@@ -1330,9 +1332,9 @@ class Forest {
                 updateNodeVector(_lineages, subtree1, subtree2, new_nd);
                 
                 _gene_tree_log_likelihood = calcLogLikelihood();
-                _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
+//                _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
                 _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
-                _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
+//                _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
                 // marginal likelihood = particle weights sum - ln(1)
                 // normalized particle sum for one particle is just log likelihood
             }
@@ -1343,6 +1345,7 @@ class Forest {
     }
 
     inline void Forest::firstGeneTreeProposal(double time_increment) {
+        _gene_tree_log_weight = 0.0;
         _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
         if (_species_partition.size() == 1) {
             fullyCoalesceGeneTree(_species_partition.begin()->second);
@@ -1357,6 +1360,7 @@ class Forest {
     }
 
     inline void Forest::geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment) {
+        _gene_tree_log_weight = 0.0;
         _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
         //update species partition
         string new_name = get<2>(species_merge_info);

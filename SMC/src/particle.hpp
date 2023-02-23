@@ -86,6 +86,7 @@ class Particle {
         vector<double>                                  getTopologyPriors();
         void                                            storeNewicks();
         vector<string>                                  getNewicks() {return _newicks;}
+        void                                            calcParticleWeight();
 
     private:
 
@@ -177,7 +178,7 @@ class Particle {
         if (_generation == 0) {
             for (unsigned i=1; i<_forests.size(); i++) {
                 _forests[i]._theta = _forests[i]._starting_theta;
-                _forests[i]._gene_tree_marginal_likelihood = _forests[i]._gene_tree_log_likelihood;
+//                _forests[i]._gene_tree_marginal_likelihood = _forests[i]._gene_tree_log_likelihood;
             }
             _forests[0].chooseSpeciesIncrement();
             for (unsigned i=1; i<_forests.size(); i++){
@@ -214,8 +215,18 @@ class Particle {
         }
         
         if (_running_on_empty == false) {
-            calcGeneTreeMarginalLikelihood();
-            _log_weight = _gene_tree_marg_like - _prev_gene_tree_marg_like;
+            double prev_log_likelihood = _log_likelihood;
+//            _log_weight = calcGeneTreeMarginalLikelihood();
+            _log_likelihood = calcLogLikelihood();
+//            _log_weight = _log_likelihood - prev_log_likelihood;
+            if (Forest::_proposal == "prior-prior") {
+                _log_weight = _log_likelihood - prev_log_likelihood;
+//                _log_weight = _gene_tree_marg_like - _prev_gene_tree_marg_like;
+            }
+            else {
+//                _log_weight = _log_likelihood;
+                calcParticleWeight();
+            }
         }
         
         else {
@@ -229,10 +240,30 @@ class Particle {
         _prev_gene_tree_marg_like = _gene_tree_marg_like;
         _gene_tree_marg_like = 0.0;
         for (int i=1; i<_forests.size(); i++) {
-            _gene_tree_marg_like += _forests[i]._gene_tree_log_likelihood;
+            _gene_tree_marg_like += _forests[i]._gene_tree_log_weight;
+
+//            _gene_tree_marg_like += _forests[i]._gene_tree_log_likelihood;
+//            _gene_tree_marg_like += _forests[i]._gene_tree_marginal_likelihood;
         }
         _generation++;
         return _gene_tree_marg_like;
+    }
+
+    inline void Particle::calcParticleWeight() {
+        // use the gene tree weights to calculate the particle weight
+//        if (_generation == 1) {
+//            _log_weight = _log_likelihood;
+//        }
+//        else {
+//            _log_weight = 0.0;
+//            }
+        _log_weight = 0.0;
+            for (int i = 1; i<_forests.size(); i++) {
+                _log_weight += _forests[i]._gene_tree_log_weight;
+            }
+
+//        }
+        _generation++;
     }
 
     inline Particle::Particle(const Particle & other) {
