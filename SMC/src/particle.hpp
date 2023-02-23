@@ -75,7 +75,6 @@ class Particle {
         void                                            showGamma();
         string                                          saveGamma();
         void                                            calculateGamma();
-        double                                          calcGeneTreeMarginalLikelihood();
         double                                          getGeneTreeMargLike() {return _gene_tree_marg_like;}
         void                                            setMarginalLikelihood(double ml) {_gene_tree_marg_like = ml;}
         void                                            setRunOnEmpty(bool a) {_running_on_empty = a;}
@@ -216,9 +215,7 @@ class Particle {
         
         if (_running_on_empty == false) {
             double prev_log_likelihood = _log_likelihood;
-//            _log_weight = calcGeneTreeMarginalLikelihood();
             _log_likelihood = calcLogLikelihood();
-//            _log_weight = _log_likelihood - prev_log_likelihood;
             if (Forest::_proposal == "prior-prior") {
                 _log_weight = _log_likelihood - prev_log_likelihood;
 //                _log_weight = _gene_tree_marg_like - _prev_gene_tree_marg_like;
@@ -236,18 +233,6 @@ class Particle {
         return _log_weight;
     }
 
-    inline double Particle::calcGeneTreeMarginalLikelihood() {
-        _prev_gene_tree_marg_like = _gene_tree_marg_like;
-        _gene_tree_marg_like = 0.0;
-        for (int i=1; i<_forests.size(); i++) {
-            _gene_tree_marg_like += _forests[i]._gene_tree_log_weight;
-
-//            _gene_tree_marg_like += _forests[i]._gene_tree_log_likelihood;
-//            _gene_tree_marg_like += _forests[i]._gene_tree_marginal_likelihood;
-        }
-        _generation++;
-        return _gene_tree_marg_like;
-    }
 
     inline void Particle::calcParticleWeight() {
         // use the gene tree weights to calculate the particle weight

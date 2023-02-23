@@ -135,7 +135,6 @@ class Forest {
         double                      _generationf = 0;
         string                      _last_direction;
         vector<double>              _rand_numbers;
-//        double                      _gene_tree_marginal_likelihood;
         vector<double>              _branch_lengths;
         vector<double>              _branch_length_priors;
         double                      _topology_prior;
@@ -656,7 +655,7 @@ class Forest {
         vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood);
         
         // sum unnormalized weights before choosing the pair
-//        _gene_tree_log_weight = 0.0;
+        _gene_tree_log_weight = 0.0;
             // choices are already weighted
 
         // sum unnormalized weights before choosing the pair
@@ -867,7 +866,6 @@ class Forest {
         _gene_tree_log_weight = other._gene_tree_log_weight;
         _prev_gene_tree_log_likelihood = other._prev_gene_tree_log_likelihood;
         _log_weight_vec = other._log_weight_vec;
-//        _gene_tree_marginal_likelihood = other._gene_tree_marginal_likelihood;
         _theta = other._theta;
         _branch_lengths = other._branch_lengths;
         _branch_length_priors = other._branch_length_priors;
@@ -1233,16 +1231,12 @@ class Forest {
 //        if (_proposal == "prior-prior" || nodes.size() == 1) {
         if (_proposal == "prior-prior") {
             _gene_tree_log_likelihood = calcLogLikelihood();
-//            _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
+//            _gene_tree_log_weight += _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
             _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
-//            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
-            // marginal likelihood = normalized particle weights sum - ln(1)
-            // normalized particle sum for one particle is just log likelihood?
         }
         else if (_proposal == "prior-post") {
             _gene_tree_log_likelihood = calcLogLikelihood();
             _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
-//            _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
         }
     }
 
@@ -1334,9 +1328,6 @@ class Forest {
                 _gene_tree_log_likelihood = calcLogLikelihood();
 //                _gene_tree_log_weight = _gene_tree_log_likelihood - _prev_gene_tree_log_likelihood;
                 _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
-//                _gene_tree_marginal_likelihood += _gene_tree_log_weight - log(1);
-                // marginal likelihood = particle weights sum - ln(1)
-                // normalized particle sum for one particle is just log likelihood
             }
 //            if (increment-increment == 0) { // test that increment != inf
 //                saveDivergenceTimes(increment);
