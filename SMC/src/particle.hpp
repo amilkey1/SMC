@@ -75,8 +75,6 @@ class Particle {
         void                                            showGamma();
         string                                          saveGamma();
         void                                            calculateGamma();
-        double                                          getGeneTreeMargLike() {return _gene_tree_marg_like;}
-        void                                            setMarginalLikelihood(double ml) {_gene_tree_marg_like = ml;}
         void                                            setRunOnEmpty(bool a) {_running_on_empty = a;}
         void                                            summarizeForests();
         vector<double>                                  getBranchLengths();
@@ -177,7 +175,6 @@ class Particle {
         if (_generation == 0) {
             for (unsigned i=1; i<_forests.size(); i++) {
                 _forests[i]._theta = _forests[i]._starting_theta;
-//                _forests[i]._gene_tree_marginal_likelihood = _forests[i]._gene_tree_log_likelihood;
             }
             _forests[0].chooseSpeciesIncrement();
             for (unsigned i=1; i<_forests.size(); i++){
@@ -218,10 +215,8 @@ class Particle {
             _log_likelihood = calcLogLikelihood();
             if (Forest::_proposal == "prior-prior") {
                 _log_weight = _log_likelihood - prev_log_likelihood;
-//                _log_weight = _gene_tree_marg_like - _prev_gene_tree_marg_like;
             }
             else {
-//                _log_weight = _log_likelihood;
                 calcParticleWeight();
             }
         }
@@ -414,8 +409,8 @@ class Particle {
     inline vector<double> Particle::getBranchLengths() {
         vector<double> divergence_times;
         for (auto &f:_forests) {
-            for (auto &b:f._branch_lengths) {
-                divergence_times.push_back(b);
+            for (auto &b:f._increments) {
+                divergence_times.push_back(b.first);
             }
         }
         return divergence_times;
@@ -424,8 +419,8 @@ class Particle {
     inline vector<double> Particle::getBranchLengthPriors() {
         vector<double> priors;
         for (auto &f:_forests) {
-            for (auto &b:f._branch_length_priors) {
-                priors.push_back(b);
+            for (auto &b:f._increments) {
+                priors.push_back(b.second);
             }
         }
         return priors;
@@ -440,9 +435,10 @@ class Particle {
     }
     
     inline vector<double> Particle::getTopologyPriors() {
+        // calculate species tree topology probability
         vector<double> topology_priors;
         for (auto &f:_forests) {
-            topology_priors.push_back(f.calcTopologyPrior());
+            topology_priors.push_back(f._log_joining_prob);
         }
         return topology_priors;
     }

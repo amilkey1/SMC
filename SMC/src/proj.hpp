@@ -838,12 +838,12 @@ namespace proj {
                             logLikelihood = p->calcLogLikelihood();
                             p->setLogLikelihood(logLikelihood);
 //                            _log_marginal_likelihood = logLikelihood;
+                            p->setLogWeight(logLikelihood);
                         }
                         else {
                             p->setParticleGeneration(0);
+                            p->setLogLikelihood(0.0);
                         }
-                        p->setLogWeight(logLikelihood); // at this stage, log weight = log likelihood
-                        p->setMarginalLikelihood(logLikelihood);
                     }
                 _prev_log_marginal_likelihood = _log_marginal_likelihood;
                 
@@ -889,20 +889,13 @@ namespace proj {
                     _accepted_particle_vec = my_vec;
                 } // g loop
                 
-                for (auto &p:my_vec) {
-                    p->getTopologyPriors();
-                }
-                
-//                for (auto & p:my_vec) {
-//                    p->summarizeForests();
-//                }
                 
                 cout << "\t" << "proposed marg like: " << _log_marginal_likelihood;
                 cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood << endl;
                 
-                estimateParameters(my_vec);
-                
-                double lp = _log_marginal_likelihood+_theta_prior;
+                if (_estimate_theta || _estimate_speciation_rate || _estimate_hybridization_rate) {
+                        estimateParameters(my_vec);
+                    }
                 
                 double a = 0;
                 unsigned col_count = 0;
@@ -910,7 +903,7 @@ namespace proj {
                     
                     vector<double> branch_length_vec;
                     for (auto &b:p->getBranchLengths()) {
-                        branch_length_vec.push_back(b);
+                        branch_length_vec.push_back(log(b));
                     }
                     
                     vector<double> prior_vec;
@@ -931,22 +924,23 @@ namespace proj {
                     assert(branch_length_vec.size() == prior_vec.size());
                     
                     if (col_count == 0) {
-                        logf << "iter" << "\t" << "lp" << "\t" << "theta" << "\t" << "gene_tree_log_like";
+                        logf << "iter" << "\t" << "theta" << "\t" << "gene_tree_log_like";
                         for (int i = 0; i < branch_length_vec.size(); i++) {
                             logf << "\t" << "increment" << "\t" << "increment_prior";
                         }
                         logf << "\t" << "topology_prior" << "\t" << "topology_prior" << endl;
                     }
                     
-//                    logf << a << "\t" << lp << "\t" << Forest::_starting_theta;
-                    logf << "\t" << gene_tree_log_like[0];
+                    logf << a << "\t" << Forest::_starting_theta;
+                    logf << "\t" << setprecision(11) << gene_tree_log_like[0]+exp(gene_tree_log_like[0]);
+                                        
                     
                     for (int i=0; i<prior_vec.size(); i++) {
-                        logf << "\t" << branch_length_vec[i] << "\t" << prior_vec[i];
+                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i]+branch_length_vec[i];
                     }
-                    
+                                  
                     for (int i=0; i<log_topology_priors.size(); i++) {
-                        logf << "\t" << log_topology_priors[i];
+                        logf << "\t" << setprecision(11) << log_topology_priors[i];
                     }
                     
                     logf << endl;
