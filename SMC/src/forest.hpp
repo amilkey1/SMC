@@ -104,9 +104,8 @@ class Forest {
         void                        storeSplits(set<Split> & splitset);
         void                        readNewicks();
         unsigned                    countDescendants(Node* nd, unsigned count);
-        void                        calcDeepCoalescentPrior();
+        double                      calcDeepCoalescentPrior();
         double                      calcIncrementPrior();
-        void                         updateIncrements();
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -141,7 +140,7 @@ class Forest {
         double                      _log_joining_prob;
         vector<pair<double, double>>              _increments;
         vector<double>              _coalescent_rates;
-        vector<pair<double, double>>              _deep_coalescent_increments;
+        vector<tuple<double, double, double>>              _deep_coalescent_increments; // increment, prior, coalescent rate
         vector<double>               _extended_increments;
         vector<double>                      _shallowest_join_in_generation;
 //        Split::treemap_t            _treeIDs;
@@ -1146,8 +1145,7 @@ class Forest {
                 _extended_increments.push_back(increment);
             }
             else {
-                _deep_coalescent_increments.push_back(make_pair(increment, 0.0));
-                calcDeepCoalescentPrior();
+                _deep_coalescent_increments.push_back(make_tuple(increment, 0.0, coalescence_rate));
             }
         }
 
@@ -1207,101 +1205,22 @@ class Forest {
                 }
             }
         }
-        
-        // calculate priors, starting from shallowest
-//        for (int b=0; b<increments_to_calculate.size(); b++) {
-//            for (int a=0; a<_increments.size(); a++) {
-//                // find the correct increment in _increments
-//                double log_prior = 0.0;
-//                if (increments_to_calculate[b] == _increments[a].first) {
-//                    // calc prior prob of joined increment
-//                    log_prior = log(_coalescent_rates[a])-(_increments[a].first*_coalescent_rates[a]);
-////                    _increments[a].second = log_prior;
-//                }
-//                // account for prior probs of other lineages not joining yet
-//
-//
-//                for (int c=b+1; c<increments_to_calculate.size(); c++) {
-//                    for (int d=0; d<_increments.size(); d++) {
-//                        if (increments_to_calculate[c] == _increments[d].first) {
-//                            log_prior -= increments_to_calculate[d]*_coalescent_rates[d];
-//                    }
-//                }
-//                    _increments[a].second = log_prior;
-//                break;
-//            }
-//        }
-//
-//        for (int i=0; i<_increments.size(); i++) {
-//            if (_increments[i].second == 0.0) {
-//                _increments[i].second = log(_coalescent_rates[i])-(_increments[i].first*_coalescent_rates[i]);
-//            }
-//        }
-////
-////            }
-////        } // TODO: must also account for lineages that haven't joined yet
-//
-////        for (auto &s:_species_partition) {
-////            for (auto &nd:s.second) {
-////                coalescent_rate = s.second.size()*(s.second.size() - 1) / _theta;
-////                if (nd == subtree1 || nd == subtree2) {
-////                    log_increment_prior += log(coalescent_rate) - (increment*coalescent_rate);
-////                    break;
-////                }
-////                else {
-////                    log_increment_prior -= increment*coalescent_rate;
-////                }
-////            }
-//        }
         return log_increment_prior;
     }
 
-    inline void Forest::updateIncrements() {
-//        pair <double, double> chosen_increment;
-//        double deep_coalescent_increment = 0.0;
-//        double deep_coalescent_prior = 0.0;
-//        for (int i=0; i<_deep_coalescent_increments.size(); i++) {
-//            if (_deep_coalescent_increments[i].second != 0.0) {
-//                deep_coalescent_increment += _deep_coalescent_increments[i].first;
-//                deep_coalescent_prior += _deep_coalescent_increments[i].second;
-//            }
-//        }
+    inline double Forest::calcDeepCoalescentPrior() {
+        double deep_coal_prior = 0.0;
         
-//        if (deep_coalescent_increment > 0.0) {
-//            chosen_increment = make_pair(_increment_choices[_index_of_choice]+deep_coalescent_increment, log_increment_prior+deep_coalescent_prior);
-//        }
-//        else {
-//            chosen_increment = make_pair(_increment_choices[_index_of_choice]+ log_increment_prior);
-//        }
-
-        // clear deep coalescent increment
-        _deep_coalescent_increments.clear();
-        // add increment and prior to increments list
-//        _increments.push_back(chosen_increment);
-    }
-
-    inline void Forest::calcDeepCoalescentPrior() {
-           double coalescence_rate = 0.0;
-           double log_increment_prior = 0.0;
-           for (auto &s:_species_partition) {
-               coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
-               log_increment_prior -= (_deep_coalescent_increments.back().first)*coalescence_rate;
-           }
-           _deep_coalescent_increments.back().second = log_increment_prior;
-           
-           // reset deep coalescent increments to only the chosen one
-           vector<pair<double, double>> chosen_increments;
-           
-           for (int i=0; i < _deep_coalescent_increments.size(); i++) {
-               if (_deep_coalescent_increments[i].second != 0.0) {
-                   chosen_increments.push_back(_deep_coalescent_increments[i]);
-               }
-           }
-           _deep_coalescent_increments.clear();
-           
-           for (int i=0; i < chosen_increments.size(); i++) {
-               _deep_coalescent_increments.push_back(chosen_increments[i]);
-           }
+        for (int i=0; i<_deep_coalescent_increments.size(); i++) {
+            double log_increment_prior = 0.0;
+            double coalescence_rate = get<2> (_deep_coalescent_increments[i]);
+            double increment = get<0> (_deep_coalescent_increments[i]);
+            log_increment_prior -= increment*coalescence_rate;
+            get<1> (_deep_coalescent_increments[i]) = log_increment_prior;
+            deep_coal_prior += log_increment_prior;
+        }
+        
+        return deep_coal_prior;
        }
 
     inline void Forest::allowCoalescence(list<Node*> &nodes, double increment) {
@@ -1370,9 +1289,6 @@ class Forest {
             calcTopologyPrior((int) nodes.size());
         }
         
-        // TODO: must calculate priors after all lineages have been allowed to coalesce
-        // TODO: otherwise, prior is very dependent on the order the lineages are chosen
-//        double log_increment_prior = calcIncrementPrior(subtree1, subtree2, increment);
         double log_increment_prior = 0.0;
         _increments.push_back(make_pair(increment, log_increment_prior));
         
@@ -1389,7 +1305,6 @@ class Forest {
     }
 
     inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) {
-        // TODO: shallowest join in generation
         _gene_tree_log_weight = 0.0;
         assert (nodes.size()>0);
         bool done = false;
@@ -1399,8 +1314,6 @@ class Forest {
             double s = nodes.size();
             double coalescence_rate = s*(s-1)/_theta;
             double increment = rng.gamma(1.0, 1.0/coalescence_rate);
-            
-//            _rand_numbers.push_back(increment);
 
             bool lineages_left_to_join = s > 1;
             if (!lineages_left_to_join)  {
@@ -1500,8 +1413,16 @@ class Forest {
             _extended_increments.clear();
         }
         
+        double deep_coal_prior = 0.0;
+        double deep_coal_increment = 0.0;
+        if (_deep_coalescent_increments.size() > 0) {
+            for (auto &d:_deep_coalescent_increments) {
+                deep_coal_prior += get<1> (d);
+                deep_coal_increment = get<0> (d); // should be the same for all deep coalescent increments
+            }
+        }
+        
         if (_species_partition.size() == 1) {
-//            updateIncrements(); // now account for deep coalescence + extra extended increments
             fullyCoalesceGeneTree(_species_partition.begin()->second);
         }
         
@@ -1514,9 +1435,24 @@ class Forest {
             
             // calculate priors for chosen increments now that all lineages have been given a chance to coalesce
             calcIncrementPrior();
+        
+        if (_deep_coalescent_increments.size() > 0) {
+            // if there has been an extended increment in another lineage, deep coalescence increment is equal to that
+            double deep_coal_increment = 0.0;
+            if (_extended_increments.size() > 0) {
+                deep_coal_increment = *min_element(_extended_increments.begin(), _extended_increments.end());
+                for (auto &d:_deep_coalescent_increments) {
+                    get<0> (d) = deep_coal_increment;
+                    deep_coal_increment = get<0> (d); // should be the same for all deep coalescent increments
+                }
+            }
+            
+            calcDeepCoalescentPrior();
+        }
 
             // find the shallowest join in this generation, and add extended increment to it
             // prior on extended increment is 0 on log scale, so it doesn't need to get counted
+            // also add deep coalescent increment + prior
             
             if (_shallowest_join_in_generation.size() > 0) {
                 double shallowest = *min_element(_shallowest_join_in_generation.begin(), _shallowest_join_in_generation.end());
@@ -1524,11 +1460,18 @@ class Forest {
                 
                 for (int i=0; i<_increments.size(); i++) {
                     if (_increments[i].first == shallowest) {
-                        _increments[i].first += extended_increment;
+                        if (deep_coal_increment > 0.0) {
+                            _increments[i].first += deep_coal_increment;
+                            _increments[i].second += deep_coal_prior;
+                        }
+                        else {
+                            _increments[i].first += extended_increment;
+                        }
                         break;
                     }
                 }
             }
+        _deep_coalescent_increments.clear();
     }
 
     inline void Forest::geneTreeProposal(tuple<string, string, string> &species_merge_info, double time_increment) {
@@ -1544,6 +1487,14 @@ class Forest {
             _extended_increments.clear();
         }
         
+        double deep_coal_prior = 0.0;
+        double deep_coal_increment = 0.0;
+        if (_deep_coalescent_increments.size() > 0) {
+            for (auto &d:_deep_coalescent_increments) {
+                deep_coal_prior += get<1> (d);
+                deep_coal_increment = get<0> (d); // should be the same for all deep coalescent increments
+            }
+        }
         
         //update species partition
         string new_name = get<2>(species_merge_info);
@@ -1560,31 +1511,48 @@ class Forest {
         }
         
         if (_species_partition.size() == 1) {
-            updateIncrements(); // now account for deep coalescence + extra extended increments
-
             fullyCoalesceGeneTree(_species_partition.begin()->second);
         }
         
         else {
             for (auto &s:_species_partition) {
                 assert (s.second.size()>0);
-                updateIncrements(); // now account for deep coalescence + extra extended increments
                 evolveSpeciesFor(s.second, time_increment);
             }
-            calcIncrementPrior();
         }
             
+        calcIncrementPrior();
+        
+        if (_deep_coalescent_increments.size() > 0) {
+            double deep_coal_increment = 0.0;
+            if (_extended_increments.size() > 0) {
+                deep_coal_increment = *min_element(_extended_increments.begin(), _extended_increments.end());
+                for (auto &d:_deep_coalescent_increments) {
+                    get<0> (d) = deep_coal_increment;
+                }
+            }
+            
+            calcDeepCoalescentPrior();
+        }
+        
             if (_shallowest_join_in_generation.size() > 0) {
                 double shallowest = *min_element(_shallowest_join_in_generation.begin(), _shallowest_join_in_generation.end());
                 _shallowest_join_in_generation.clear();
                 
                 for (int i=0; i<_increments.size(); i++) {
                     if (_increments[i].first == shallowest) {
-                        _increments[i].first += extended_increment;
+                        if (deep_coal_increment > 0.0) {
+                            _increments[i].first += deep_coal_increment;
+                            _increments[i].second += deep_coal_prior;
+                        }
+                        else {
+                            _increments[i].first += extended_increment;
+                        }
                         break;
                     }
                 }
         }
+        _deep_coalescent_increments.clear();
     }
 
     inline void Forest::debugForest() {
