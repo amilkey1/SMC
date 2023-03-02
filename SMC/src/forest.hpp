@@ -699,7 +699,8 @@ class Forest {
         assert (_increment_choices.size() == _log_weight_vec.size());
         _num_coalescent_attempts_within_species_generation++;
         _gene_tree_log_weight = 0.0;
-        assert(_log_weight_vec.size() > 0);
+//        assert(_log_weight_vec.size() > 0);
+        if (_log_weight_vec.size() > 0) {
 //        if (_log_likelihood_choices.size() > 0) {
 //        if (_log_weight_vec.size() > 0) {
             // choices are already weighted
@@ -717,7 +718,7 @@ class Forest {
             
             _gene_tree_log_likelihood = calcLogLikelihood();
             _log_weight_vec.clear();
-//        }
+        }
     }
 
     inline void Forest::mergeChosenPair() {
@@ -1344,6 +1345,7 @@ class Forest {
             }
 
             //if increment is 0, the lineage is done and we don't consider it at all
+//            showForest();
             if (increment > 0.0000001) {
                 for (auto nd:nodes) {
                     nd->_edge_length += increment; //add most recently chosen branch length to each node in lineage
@@ -1360,7 +1362,7 @@ class Forest {
                 cum_time += increment;
 
                 // deep coalescence
-                if (!coalescence && _proposal != "prior-prior") {
+                if (!coalescence && _proposal != "prior-prior" && s > 1) {
                     allowDummyCoalescence(nodes, increment); // TODO: this function can be simplified
 //                    _log_weight_vec.push_back(0.0); // log weight will always be 0.0 because nothing was joined
                     _deep_coalescent_increments.push_back(make_pair(increment, 0.0));
@@ -1386,8 +1388,8 @@ class Forest {
         // this function adds 2 null nodes to _node_choices
         vector<pair<Node*, Node*>> node_choices;
         assert (_proposal != "prior-prior");
-        Node *subtree1 = nullptr;
-        Node *subtree2 = nullptr;
+//        Node *subtree1 = nullptr;
+//        Node *subtree2 = nullptr;
         
         if (_proposal == "prior-post") {
 //            make list of all possible node pairs

@@ -126,7 +126,7 @@ class Particle {
 
     inline Particle::~Particle() {
 //        cout << "destroying a particle" << endl;
-	cout << "test" << endl;
+//	cout << "test" << endl;
     }
     inline void Particle::showParticle() {
         //print out weight of each particle

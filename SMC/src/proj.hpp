@@ -808,7 +808,7 @@ namespace proj {
                 
                 for (auto &p:my_vec) {
                     p->setRunOnEmpty(_run_on_empty);
-                    p->setBuildEntireSpeciesTree(_build_species_tree_first);
+//                    p->setBuildEntireSpeciesTree(_build_species_tree_first);
                 }
                 
                 //run through each generation of particles
