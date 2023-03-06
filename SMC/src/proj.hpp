@@ -819,22 +819,14 @@ namespace proj {
                     proposeParticles(my_vec);
                     
                     if (!_run_on_empty) {
-//                        cout << "weights before normalization: " << endl;
-//                        for (auto &p:my_vec) {
-//                            cout << "   " << p->getLogWeight() << endl;
-//                        }
-                        normalizeWeights(my_vec, g);
                         
-//                        cout << " " << endl;
-//                        cout << "weights after normalization: " << endl;
-//                        for (auto &p:my_vec) {
-//                            cout << "   " << p->getLogWeight() << endl;
-//                        }
+                        normalizeWeights(my_vec, g);
                         
                         double ess_inverse = 0.0;
                         
                         for (auto & p:my_vec) {
                             ess_inverse += exp(2.0*p->getLogWeight());
+                            p->showParticle();
                         }
 
                         double ess = 1.0/ess_inverse;
