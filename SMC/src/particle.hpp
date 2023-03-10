@@ -336,6 +336,7 @@ class Particle {
                 if (Forest::_proposal != "prior-prior") {
                     priorPostIshChoice(i);
                 }
+                showParticle();
             }
         }
         
@@ -386,6 +387,7 @@ class Particle {
         _log_weight = 0.0;
         for (int i = 1; i<_forests.size(); i++) {
             _log_weight += _forests[i]._gene_tree_log_weight;
+//            _log_weight += _forests[i]._gene_tree_log_likelihood;
         }
         _generation++;
     }

@@ -2555,7 +2555,8 @@ class Forest {
         int num_coalescent_attempts_needed = _num_lineages_at_beginning_of_species_generation - (int) _species_partition.size(); // TODO: check num_lineages_at_beginning
 //        cout << "num coal attempts needed: " << num_coalescent_attempts_needed << endl;
 
-        if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation || getTreeHeight() >= species_tree_height - 0.000001) { // TODO: I'm not sure this always works
+//        if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation || getTreeHeight() >= species_tree_height - 0.000001) { // TODO: I'm not sure this always works
+        if (num_coalescent_attempts_needed <= _num_coalescent_attempts_within_species_generation || getTreeHeight() >= species_tree_height - 0.000001) { 
 //        if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation) {
             _ready_to_join_species_forest = true;
             return true;
