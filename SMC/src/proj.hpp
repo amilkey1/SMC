@@ -58,6 +58,7 @@ namespace proj {
             void                printThetas();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
         vector< pair<double,unsigned> >                throwDarts(vector< pair<double,unsigned> > & cum_probs, vector<Particle::SharedPtr> &particles);
+            void                writeGeneTreeFile();
         
         private:
 
@@ -549,6 +550,24 @@ namespace proj {
         return cum_probs;
     }
 
+    inline void Proj::writeGeneTreeFile() {
+        // open log file
+        ofstream genef("genetrees.txt");
+        genef << "let gene_forests = [\n";
+        for (int j=0; j<_accepted_particle_vec.size(); j++) {
+            vector<string> names = _accepted_particle_vec[j]->getGeneTreeNames(j);
+            vector<string> newicks = _accepted_particle_vec[j]->getGeneTreeNewicks();
+            // name and newick include quotes
+            for (int i=0; i<names.size(); i++) {
+                string name = names[i];
+                string newick = newicks[i];
+                genef << "{name:" << name << ", relrate:1.0, w:1.0, cumw:1.0, " << newick << "},\n";
+            }
+        }
+        genef << "];";
+        genef.close();
+    }
+
     inline void Proj::resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles) {
         unsigned nparticles = (unsigned)from_particles.size();
         vector<pair<double, double>> cum_probs;
@@ -914,6 +933,7 @@ namespace proj {
                     logf.close();
                 }
                 } // _nsamples loop - number of samples
+            writeGeneTreeFile();
 //            saveParticleWeights(_accepted_particle_vec);
 //            saveParticleLikelihoods(_accepted_particle_vec);
             

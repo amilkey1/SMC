@@ -91,6 +91,8 @@ class Particle {
         void                                            chooseNextMove();
         void                                            noSpeciesJoinedProposal();
         void                                            speciesJoinedProposal();
+        vector<string>                                  getGeneTreeNames(int j);
+        vector<string>                                  getGeneTreeNewicks();
 
     private:
 
@@ -336,7 +338,7 @@ class Particle {
                 if (Forest::_proposal != "prior-prior") {
                     priorPostIshChoice(i);
                 }
-                showParticle();
+//                showParticle();
             }
         }
         
@@ -688,6 +690,7 @@ class Particle {
         return priors;
     }
 
+
     inline vector<double> Particle::getGeneTreeLogLikelihoods() {
         vector<double> gene_tree_log_likelihoods;
         for (int i=1; i<_forests.size(); i++) {
@@ -703,6 +706,26 @@ class Particle {
             topology_priors.push_back(f._log_joining_prob);
         }
         return topology_priors;
+    }
+
+    inline vector<string> Particle::getGeneTreeNames(int j) {
+        vector<string> names;
+        string particle_number = to_string(j);
+        for (int i=1; i<_forests.size(); i++) {
+            string forest_number = to_string(i-1);
+            string name = "\"gene-" + forest_number + "-" + particle_number + "\"";
+            names.push_back(name);
+        }
+        return names;
+    }
+
+    inline vector<string> Particle::getGeneTreeNewicks() {
+        vector<string> newicks;
+        for (int i=1; i<_forests.size(); i++) {
+            string newick = "newick:\"" + _forests[i].makeNewick(9, true) + "\"";
+            newicks.push_back(newick);
+        }
+        return newicks;
     }
 
     inline void Particle::operator=(const Particle & other) {
