@@ -52,8 +52,8 @@ namespace proj {
             string              acceptParameters();
             void                showFinal(vector<Particle::SharedPtr>);
             double              tune(bool accepted, double lambda);
-            void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
-            void                proposeParticles(vector<Particle::SharedPtr> &particles);
+            void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, int nspecies);
+            void                proposeParticles(vector<Particle::SharedPtr> &particles, int nspecies);
             void                printSpeciationRates();
             void                printThetas();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
@@ -658,11 +658,12 @@ namespace proj {
         cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
     }
 
-    inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles) {
+    inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles, int nspecies) {
         assert(_nthreads > 0);
         if (_nthreads == 1) {
           for (auto & p : particles) {
-              p->proposal();
+//              p->proposal();
+              p->altProposal(nspecies);
           }
         }
         else {
@@ -676,7 +677,7 @@ namespace proj {
 
             while (true) {
             // create a thread to handle particles first through last - 1
-              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles)));
+              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles), nspecies));
             // update first and last
             first = last;
             last += incr;
@@ -695,9 +696,10 @@ namespace proj {
         }
     }
 
-    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles) {
+    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, int nspecies) {
         for (unsigned i=first; i<last; i++){
-            particles[i]->proposal();
+//            particles[i]->proposal();
+            particles[i]->altProposal(nspecies);
         }
     }
 
@@ -827,15 +829,23 @@ namespace proj {
                 
                 for (auto &p:my_vec) {
                     p->setRunOnEmpty(_run_on_empty);
-//                    p->setBuildEntireSpeciesTree(_build_species_tree_first);
+                    p->setBuildEntireSpeciesTree(_build_species_tree_first);
                 }
                 
                 //run through each generation of particles
                 int ntaxa = (int) _taxon_map.size();
-                for (unsigned g=0; g<ntaxa-1; g++){
+                for (unsigned g=0; g<ntaxa-1+nspecies-1; g++){
 //                    cout << "gen " << g << endl;
                     //taxon joining and reweighting step
-                    proposeParticles(my_vec);
+                    
+                    // get largest number of existing species in any particle
+                    vector<double> species_numbers;
+                    for (auto &p:my_vec){
+                        species_numbers.push_back(p->getNumSpecies());
+                    }
+                    int nspecies = *max_element(species_numbers.begin(), species_numbers.end());
+                    
+                    proposeParticles(my_vec, nspecies);
                     
                     if (!_run_on_empty) {
                         

@@ -707,6 +707,11 @@ class Forest {
 
             // sum unnormalized weights before choosing the pair
             // must include the likelihoods of all pairs in the final particle weight
+//            for (auto &t:_log_weight_vec) {
+//                if (t < 0.0) {
+//                    cout << "stop";
+//                }
+//            }
             double log_weight_choices_sum = getRunningSumChoices(_log_weight_vec);
             _gene_tree_log_weight = log_weight_choices_sum;
             for (int b=0; b < (int) _log_weight_vec.size(); b++) {
@@ -1345,7 +1350,6 @@ class Forest {
             }
 
             //if increment is 0, the lineage is done and we don't consider it at all
-//            showForest();
             if (increment > 0.0000001) {
                 for (auto nd:nodes) {
                     nd->_edge_length += increment; //add most recently chosen branch length to each node in lineage
