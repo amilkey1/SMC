@@ -834,7 +834,7 @@ namespace proj {
                 
                 //run through each generation of particles
                 int ntaxa = (int) _taxon_map.size();
-                for (unsigned g=0; g<ntaxa-1+nspecies-1; g++){
+                for (unsigned g=0; g<ntaxa-1; g++){
 //                    cout << "gen " << g << endl;
                     //taxon joining and reweighting step
                     
