@@ -52,8 +52,8 @@ namespace proj {
             string              acceptParameters();
             void                showFinal(vector<Particle::SharedPtr>);
             double              tune(bool accepted, double lambda);
-            void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, int nspecies);
-            void                proposeParticles(vector<Particle::SharedPtr> &particles, int nspecies);
+            void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
+            void                proposeParticles(vector<Particle::SharedPtr> &particles);
             void                printSpeciationRates();
             void                printThetas();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
@@ -658,12 +658,11 @@ namespace proj {
         cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
     }
 
-    inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles, int nspecies) {
+    inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles) {
         assert(_nthreads > 0);
         if (_nthreads == 1) {
           for (auto & p : particles) {
-//              p->proposal();
-              p->altProposal(nspecies);
+              p->proposal();
           }
         }
         else {
@@ -677,7 +676,7 @@ namespace proj {
 
             while (true) {
             // create a thread to handle particles first through last - 1
-              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles), nspecies));
+              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles)));
             // update first and last
             first = last;
             last += incr;
@@ -696,10 +695,9 @@ namespace proj {
         }
     }
 
-    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, int nspecies) {
+    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles) {
         for (unsigned i=first; i<last; i++){
-//            particles[i]->proposal();
-            particles[i]->altProposal(nspecies);
+            particles[i]->proposal();
         }
     }
 
@@ -845,7 +843,7 @@ namespace proj {
                     }
                     int nspecies = *max_element(species_numbers.begin(), species_numbers.end());
                     
-                    proposeParticles(my_vec, nspecies);
+                    proposeParticles(my_vec);
                     
                     if (!_run_on_empty) {
                         
