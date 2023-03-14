@@ -203,35 +203,38 @@ class Particle {
         if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
             coalescence = firstProposal();
         }
-        // attempt coalescent events until there has been at least 1 coalescence
-        while (!coalescence) {
-            chooseNextMove();
-    //            event = _forests[0].chooseEvent();
-                event = "speciation"; // for now, assume event is speciation
-                if (event == "hybridization") {
-                    hybridizationProposal();
-                }
-                else if (event == "speciation") {
-                    // ready to join species
-                    if (_ready_to_join_species) {
-                        joinSpeciesProposal();
-                        _no_species_joined = false;
-                    }
-                    
-                    // don't join any more species, now must finish the gene trees first
-                    // if species have been joined previously
-//                    if (_forests[0]._lineages.size() != Forest::_nspecies) {
-                    if (!_no_species_joined) {
-                        speciesJoinedProposal();
-                    }
-                    // if no species have been joined at all
-                    else {
-                        noSpeciesJoinedProposal();
-                    }
-                    _gene_tree_proposal_attempts++;
-                }
-            coalescence = checkForDeepCoalescence();
+        else {
+            speciesJoinedProposal();
         }
+        // attempt coalescent events until there has been at least 1 coalescence
+//        while (!coalescence) {
+//            chooseNextMove();
+    //            event = _forests[0].chooseEvent();
+//                event = "speciation"; // for now, assume event is speciation
+//                if (event == "hybridization") {
+//                    hybridizationProposal();
+//                }
+//                else if (event == "speciation") {
+//                    // ready to join species
+//                    if (_ready_to_join_species) {
+//                        joinSpeciesProposal();
+//                        _no_species_joined = false;
+//                    }
+//
+//                    // don't join any more species, now must finish the gene trees first
+//                    // if species have been joined previously
+////                    if (_forests[0]._lineages.size() != Forest::_nspecies) {
+//                    if (!_no_species_joined) {
+//                        speciesJoinedProposal();
+//                    }
+//                    // if no species have been joined at all
+//                    else {
+//                        noSpeciesJoinedProposal();
+//                    }
+//                    _gene_tree_proposal_attempts++;
+//                }
+//            coalescence = checkForDeepCoalescence();
+//        }
         
         if (Forest::_proposal == "prior-prior") {
             priorPriorProposal();
@@ -454,26 +457,26 @@ class Particle {
 
     inline void Particle::speciesJoinedProposal() {
         for (int i=1; i<_forests.size(); i++) {
-            if (_forests[i]._num_coalescent_events_in_generation == 0) {
-                // if the forest has already had a coalescent event, need to wait for filtering to attempt another coalescence
-                int a = _forests[i]._species_join_number;
-                if (_forests[i]._ready_to_join_species_forest) {
-                    a++;
-                    _forests[i]._ready_to_join_species_forest = false;
-                }   // TODO: this might be wrong - what is going on here?
-                if (a > _t.size()-1) { // TODO: not sure why this is happening still
-                    a = (int) _t.size()-1;
-                }
-                double species_tree_height = 0.0;
-                for (int i=0; i<a+1; i++) {
-                    species_tree_height += _t[i].second;
-                }
+//            if (_forests[i]._num_coalescent_events_in_generation == 0) {
+//                // if the forest has already had a coalescent event, need to wait for filtering to attempt another coalescence
+//                int a = _forests[i]._species_join_number;
+//                if (_forests[i]._ready_to_join_species_forest) {
+//                    a++;
+//                    _forests[i]._ready_to_join_species_forest = false;
+//                }   // TODO: this might be wrong - what is going on here?
+//                if (a > _t.size()-1) { // TODO: not sure why this is happening still
+//                    a = (int) _t.size()-1;
+//                }
+//                double species_tree_height = 0.0;
+//                for (int i=0; i<a+1; i++) {
+//                    species_tree_height += _t[i].second;
+//                }
                 _forests[i].geneTreeProposal(_t);
             if (Forest::_proposal != "prior-prior") {
                 priorPostIshChoice(i, _t);
             }
         }
-        }
+//        }
     }
 
     inline bool Particle::checkForDeepCoalescence() {
