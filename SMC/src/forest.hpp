@@ -114,7 +114,7 @@ class Forest {
         void                        finishGeneTree();
         double                      updateSpeciesPartition(Node* subtree1, Node* subtree2, Node* new_nd, double increment, vector<pair<tuple<string, string, string>, double>> species_merge_info);
         void                        updateIncrements(double log_increment_prior);
-        bool                        checkIfReadyToJoinSpecies(double species_tree_height);
+        bool                        checkIfReadyToJoinSpecies(double species_tree_height, tuple<string, string, string> species_merge_info);
         vector<pair<Node*, Node*>>  getAllPossiblePairs(list<Node*> &nodes);
 
         std::vector<Node *>         _lineages;
@@ -2562,7 +2562,7 @@ class Forest {
         return count;
     }
 
-    inline bool Forest::checkIfReadyToJoinSpecies(double species_tree_height) {
+    inline bool Forest::checkIfReadyToJoinSpecies(double species_tree_height, tuple<string, string, string> species_merge_info) {
         int num_coalescent_attempts_needed = _num_lineages_at_beginning_of_species_generation - (int) _species_partition.size(); // TODO: check num_lineages_at_beginning
 //        cout << "num coal attempts needed: " << num_coalescent_attempts_needed << endl;
 
@@ -2570,6 +2570,17 @@ class Forest {
         if (num_coalescent_attempts_needed <= _num_coalescent_attempts_within_species_generation || getTreeHeight() >= species_tree_height - 0.000001) { 
 //        if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation) {
             _ready_to_join_species_forest = true;
+            
+            // need to now update the species partition
+            string species1 = get<0> (species_merge_info);
+            string species2 = get<1> (species_merge_info);
+            string new_nd = get<2> (species_merge_info);
+            
+            list<Node*> &nodes = _species_partition[new_nd];
+            copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
+            copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
+            _species_partition.erase(species1);
+            _species_partition.erase(species2);
             return true;
         }
         else {

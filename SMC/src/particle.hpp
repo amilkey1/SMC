@@ -199,7 +199,7 @@ class Particle {
         }
         showParticle();
         chooseNextMove();
-        _forests[0].showForest();
+        showParticle();
         
         // set starting variables
         if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
@@ -271,7 +271,7 @@ class Particle {
                 species_tree_height += _t[i].second;
             }
                 
-            extend = _forests[i].checkIfReadyToJoinSpecies(species_tree_height);
+            extend = _forests[i].checkIfReadyToJoinSpecies(species_tree_height, _t[i].first);
             if (extend) {
                 if (_forests[i]._lineages.size() > 1) {
                     if (_forests[i]._lineages.size() > 1) {
