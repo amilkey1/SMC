@@ -2570,6 +2570,7 @@ class Forest {
         if (num_coalescent_attempts_needed <= _num_coalescent_attempts_within_species_generation || getTreeHeight() >= species_tree_height - 0.000001) { 
 //        if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation) {
             _ready_to_join_species_forest = true;
+            _species_join_number++;
             
             // need to now update the species partition
             string species1 = get<0> (species_merge_info);
