@@ -723,7 +723,7 @@ class Forest {
             // randomly select a pair
             _index_of_choice = selectPair(_log_weight_vec);
             
-            _gene_tree_log_likelihood = calcLogLikelihood();
+//            _gene_tree_log_likelihood = calcLogLikelihood();
             _log_weight_vec.clear();
         }
     }

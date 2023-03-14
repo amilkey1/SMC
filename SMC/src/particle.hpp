@@ -197,6 +197,8 @@ class Particle {
         if (_species_first && _generation == 0) {
             buildEntireSpeciesTree();
         }
+        showParticle();
+        chooseNextMove();
         _forests[0].showForest();
         
         // set starting variables
@@ -281,7 +283,7 @@ class Particle {
                 }
             }
         }
-        checkIfReadyToJoinSpecies();
+//        checkIfReadyToJoinSpecies();
     }
 
     inline void Particle::noSpeciesJoinedProposal() {
@@ -471,10 +473,12 @@ class Particle {
 //                for (int i=0; i<a+1; i++) {
 //                    species_tree_height += _t[i].second;
 //                }
+            showParticle();
                 _forests[i].geneTreeProposal(_t);
             if (Forest::_proposal != "prior-prior") {
                 priorPostIshChoice(i, _t);
             }
+            showParticle();
         }
 //        }
     }
