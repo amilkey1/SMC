@@ -194,9 +194,13 @@ class Particle {
     inline double Particle::proposal() {
         string event;
         
+        if (_generation != 0) {
+            rebuildSpeciesTree();
+        }
         if (_species_first && _generation == 0) {
             buildEntireSpeciesTree();
         }
+        
 //        else {
 //            if (_forests[0]._lineages.size() > 1) {
 //                if (_generation == 0) {
@@ -225,12 +229,15 @@ class Particle {
             pair<double, string> species_info = _forests[i].chooseDelta(_t);
             _forests[i].geneTreeProposal(species_info);
         }
-        rebuildSpeciesTree();
+//        rebuildSpeciesTree();
         if (_running_on_empty == false) {
             double prev_log_likelihood = _log_likelihood;
             _log_likelihood = calcLogLikelihood();
             if (Forest::_proposal == "prior-prior") {
                 _log_weight = _log_likelihood - prev_log_likelihood;
+            }
+            else {
+                calcParticleWeight();
             }
         }
         else {

@@ -841,7 +841,6 @@ namespace proj {
                     for (auto &p:my_vec){
                         species_numbers.push_back(p->getNumSpecies());
                     }
-                    int nspecies = *max_element(species_numbers.begin(), species_numbers.end());
                     
                     proposeParticles(my_vec);
                     
