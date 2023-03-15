@@ -94,6 +94,7 @@ class Particle {
         vector<string>                                  getGeneTreeNames(int j);
         vector<string>                                  getGeneTreeNewicks();
         double                                          getNumSpecies(){return _forests[0]._lineages.size();}
+        void                                            rebuildSpeciesTree();
 
     private:
 
@@ -196,34 +197,35 @@ class Particle {
         if (_species_first && _generation == 0) {
             buildEntireSpeciesTree();
         }
-        else {
-            if (_forests[0]._lineages.size() > 1) {
-                if (_generation == 0) {
-                    _forests[0].chooseSpeciesIncrement();
-                    
-                    tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-                    double edge_len = _forests[0]._last_edge_length;
-                    
-                    _t.push_back(make_pair(species_joined, edge_len));
-                }
-                else {
-                    checkIfReadyToJoinSpecies();
-                    if (_ready_to_join_species) {
-                        _forests[0].chooseSpeciesIncrement();
-                        tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
-                        double edge_len = _forests[0]._last_edge_length;
-                        
-                        _t.push_back(make_pair(species_joined, edge_len));
-                    }
-                }
-            }
-        }
+//        else {
+//            if (_forests[0]._lineages.size() > 1) {
+//                if (_generation == 0) {
+//                    _forests[0].chooseSpeciesIncrement();
+//
+//                    tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+//                    double edge_len = _forests[0]._last_edge_length;
+//
+//                    _t.push_back(make_pair(species_joined, edge_len));
+//                }
+//                else {
+//                    checkIfReadyToJoinSpecies();
+//                    if (_ready_to_join_species) {
+//                        _forests[0].chooseSpeciesIncrement();
+//                        tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
+//                        double edge_len = _forests[0]._last_edge_length;
+//
+//                        _t.push_back(make_pair(species_joined, edge_len));
+//                    }
+//                }
+//            }
+//        }
         
         for (int i=1; i<_forests.size(); i++) {
             _forests[i]._theta = _forests[i]._starting_theta;
             pair<double, string> species_info = _forests[i].chooseDelta(_t);
             _forests[i].geneTreeProposal(species_info);
         }
+        rebuildSpeciesTree();
         if (_running_on_empty == false) {
             double prev_log_likelihood = _log_likelihood;
             _log_likelihood = calcLogLikelihood();
@@ -485,6 +487,39 @@ class Particle {
         
         _t.push_back(make_pair(species_joined, edge_len));
         
+        for (int i=0; i < _forests[0]._nspecies-1; i++) {
+            if (_forests[0]._lineages.size() > 1) {
+                tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
+                
+                // if the species tree is not finished, add another species increment
+                if (_forests[0]._lineages.size()>1) {
+                    _forests[0].addSpeciesIncrement();
+                }
+                
+                double edge_len = 0.0;
+                if (_forests[0]._lineages.size() > 1) {
+                    edge_len = _forests[0]._last_edge_length;
+                }
+                _t.push_back(make_pair(species_joined, edge_len));
+            }
+        }
+    }
+
+    inline void Particle::rebuildSpeciesTree() {
+        // walk through gene trees and find deepest one
+        int smallest_num_species = (int) _t.size();
+        for (int i=1; i<_forests.size(); i++) {
+            if (_forests[i]._species_partition.size() < smallest_num_species) {
+                smallest_num_species = (int) _forests[i]._species_partition.size();
+            }
+        }
+        
+        _forests[0].resetSpeciesTree(_t, smallest_num_species);
+        
+        // subtract those species from _t to rebuild the species tree below deepest gene tree
+        _t.resize(_t.size() - (smallest_num_species-1));
+        
+        // now rebuild the tree below that point
         for (int i=0; i < _forests[0]._nspecies-1; i++) {
             if (_forests[0]._lineages.size() > 1) {
                 tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
