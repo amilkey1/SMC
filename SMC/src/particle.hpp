@@ -192,8 +192,31 @@ class Particle {
 
     inline double Particle::proposal() {
         string event;
+        
         if (_species_first && _generation == 0) {
             buildEntireSpeciesTree();
+        }
+        else {
+            if (_forests[0]._lineages.size() > 1) {
+                if (_generation == 0) {
+                    _forests[0].chooseSpeciesIncrement();
+                    
+                    tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+                    double edge_len = _forests[0]._last_edge_length;
+                    
+                    _t.push_back(make_pair(species_joined, edge_len));
+                }
+                else {
+                    checkIfReadyToJoinSpecies();
+                    if (_ready_to_join_species) {
+                        _forests[0].chooseSpeciesIncrement();
+                        tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
+                        double edge_len = _forests[0]._last_edge_length;
+                        
+                        _t.push_back(make_pair(species_joined, edge_len));
+                    }
+                }
+            }
         }
         
         for (int i=1; i<_forests.size(); i++) {
