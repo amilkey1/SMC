@@ -205,6 +205,7 @@ class Particle {
         }
         else {
             speciesJoinedProposal();
+            cout << "test";
         }
         // attempt coalescent events until there has been at least 1 coalescence
 //        while (!coalescence) {
