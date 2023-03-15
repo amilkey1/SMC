@@ -66,8 +66,10 @@ class Forest {
         void                        setUpSpeciesForest(vector<string> &species_names);
         tuple<string,string, string> speciesTreeProposal();
         void                        firstGeneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_merge_info);
-        void                        geneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_merge_info);
-        void                        evolveSpeciesFor(list <Node*> &nodes, vector<pair<tuple<string, string, string>, double>> species_merge_info);
+//        void                        geneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_merge_info);
+        void                        geneTreeProposal(pair<double, string> species_info);
+//        void                        evolveSpeciesFor(list <Node*> &nodes, vector<pair<tuple<string, string, string>, double>> species_merge_info);
+        void                        evolveSpeciesFor(list <Node*> &nodes, double increment);
 //        void                        fullyCoalesceGeneTree(list<Node*> &nodes);
         void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
@@ -90,7 +92,8 @@ class Forest {
         string                      chooseLineage(Node* taxon_to_migrate, string key_to_del);
         void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
         void                        deleteTaxon(string key_to_del, unsigned taxon_choice);
-        void                        allowCoalescence(pair<Node*, Node*> nd_pair, double increment, double prev_lineage_log_likelihood, list<Node*> &nodes);
+//        void                        allowCoalescence(pair<Node*, Node*> nd_pair, double increment, double prev_lineage_log_likelihood, list<Node*> &nodes);
+        void                        allowCoalescence(list<Node*> &nodes, double increment);
         void                        allowDummyCoalescence(list<Node*> &nodes, double increment);
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
         vector<string>              hybridizeSpecies();
@@ -116,6 +119,8 @@ class Forest {
         void                        updateIncrements(double log_increment_prior);
         bool                        checkIfReadyToJoinSpecies(double species_tree_height, tuple<string, string, string> species_merge_info);
         vector<pair<Node*, Node*>>  getAllPossiblePairs(list<Node*> &nodes);
+        pair<double, string>                      chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info);
+        void                        chooseSpeciesForCoalescentEvent(double delta);
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -1396,179 +1401,296 @@ class Forest {
 //        _ready_to_join_species_forest = true;
     }
 
-    inline void Forest::evolveSpeciesFor(list<Node*> &nodes, vector<pair<tuple<string, string, string>, double>> species_merge_info) {
-        _node_choices.clear();
-        double prev_lineage_log_likelihood = calcLogLikelihood();
-        // make list of all possible node pairs
-        for (int i = 0; i < (int) nodes.size()-1; i++) {
-            for (int j = i+1; j < (int) nodes.size(); j++) {
-                Node *node1 = nullptr;
-                Node *node2 = nullptr;
-                
-                auto it1 = std::next(nodes.begin(), i);
-                node1 = *it1;
-
-                auto it2 = std::next(nodes.begin(), j);
-                node2 = *it2;
-                
-                assert (i < nodes.size() && j < nodes.size());
-                _node_choices.push_back(make_pair(node1, node2));
-            }
-        }
-        // separate into pairs within a species and pairs from separate species
-        vector<pair<Node*, Node*>> same_species_pairs;
-        vector<pair<Node*, Node*>> different_species_pairs;
+    inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info) {
+        // get species info
+        double species_increment = species_info[_species_join_number].second;
+        
+        // first, check if gene lineages need to be extended
+        bool extend = true;
         for (auto &s:_species_partition) {
-                for (auto &nd_pair:_node_choices) {
-                    bool found1 = (find(s.second.begin(), s.second.end(), nd_pair.first) != s.second.end());
-                    bool found2 = (find(s.second.begin(), s.second.end(), nd_pair.second) != s.second.end());
-                    if (found1 && found2) {
-                        same_species_pairs.push_back(nd_pair);
-                    }
-                }
-        }
-        
-        for (auto &nd_pair:_node_choices) {
-            bool found = (find(same_species_pairs.begin(), same_species_pairs.end(), nd_pair) != same_species_pairs.end());
-            if (!found) {
-                different_species_pairs.push_back(nd_pair);
+            if (s.second.size() != 1) {
+                extend = false;
+                break;
             }
         }
-        assert (same_species_pairs.size() + different_species_pairs.size() == _node_choices.size());
         
-        // clear node choices and reset so it's in the same order as the other vectors
-        _node_choices.clear();
+        if (extend) {
+            // extend all gene lineages down to the existing species barrier
+            extendGeneTreeLineages(species_increment); // TODO: check this really works now
+            
+            // update species partition
+            _species_join_number++;
+            if (_species_join_number > species_info.size() - 1) {
+                _species_join_number = (int) species_info.size() - 1;
+            }
+            
+            string species1 = get<0> (species_info[_species_join_number].first);
+            string species2 = get<1> (species_info[_species_join_number].first);
+            string new_name = get<2> (species_info[_species_join_number].first);
+            
+            list<Node*> &nodes = _species_partition[new_name];
+            copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
+            copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
+            _species_partition.erase(species1);
+            _species_partition.erase(species2);
+        }
         
-        // if node choices are in the same species, choose an increment and try to join them
-        // no restrictions on increment length
-        for (auto &nd_pair:same_species_pairs) {
-            _node_choices.push_back(nd_pair);
-            double increment;
+        
+     // calculate coalescence rate for each population
+        double coalescence_rate = 0.0;
+        vector<double> population_coalescent_rates;
+        vector<string> eligible_species; // only possibility of coalescing if species has >1 lineage present
+        
+        for (auto &s:_species_partition) {
+            if (s.second.size() > 1) {
+                eligible_species.push_back(s.first);
+                double population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta;
+                population_coalescent_rates.push_back(population_coalescence_rate);
+                coalescence_rate += population_coalescence_rate;
+            }
+        }
+        
+        // use combined rate to draw an increment (delta)
+        double increment = rng.gamma(1.0, 1.0/(coalescence_rate));
+        
+        // choose which species coalescent event occurred in
+        for (auto &p:population_coalescent_rates) {
+            p = p/coalescence_rate;
+        }
+        int index = selectPair(population_coalescent_rates);
+        string species_for_join = eligible_species[index];
+        
+        if (increment > species_increment) {
+            // extend existing lineages to species barrier
+            extendGeneTreeLineages(species_increment);
+            
+            // update species partition - two species must merge now to accommodate deep coalescence
+            _species_join_number++;
+            if (_species_join_number > species_info.size()-1) {
+                _species_join_number = (int) species_info.size()-1;
+            }
+            string species1 = get<0> (species_info[_species_join_number].first);
+            string species2 = get<1> (species_info[_species_join_number].first);
+            string new_name = get<2> (species_info[_species_join_number].first);
+            
+            list<Node*> &nodes = _species_partition[new_name];
+            copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
+            copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
+            _species_partition.erase(species1);
+            _species_partition.erase(species2);
+            
+            // draw a new increment
             int nlineages = 0;
-            // calculate size of lineage nodes are in
             for (auto &s:_species_partition) {
-                bool found = (find(s.second.begin(), s.second.end(), nd_pair.first) != s.second.end());
-                if (found) {
+                if (s.first == new_name) {
                     nlineages = (int) s.second.size();
                     break;
                 }
             }
-
-//            double s = nodes.size(); // TODO: not sure this is right, should s be the lineage rate or the total rate now?
-            double coalescence_rate = nlineages*(nlineages-1)/_theta;
-            increment = rng.gamma(1.0, 1.0/(coalescence_rate));
-            _increments.push_back(make_pair(increment, 0.0)); // TODO: fix prior
             
-            // add increment to all lineages
-            for (auto &nd:nodes) {
+            double deep_coalescence_rate = nlineages*(nlineages-1)/_theta;
+            double deep_coalescent_increment = rng.gamma(1.0, 1.0/(deep_coalescence_rate));
+            
+            for (auto &nd:_lineages) {
+                nd->_edge_length += deep_coalescent_increment;
+            }
+        }
+        else {
+            for (auto &nd:_lineages) {
                 nd->_edge_length += increment;
             }
-           allowCoalescence(nd_pair, increment, prev_lineage_log_likelihood, nodes);
         }
-        
-        // now deal with pairs from different species
-        // must calculate how much distance is between the species; that is the minimum placed on the chosen increment
-        int nlineages = 0;
-        
-        for (auto &nd_pair:different_species_pairs) {
-            _node_choices.push_back(nd_pair);
-            // figure out what species each taxon belongs to
-            string species1 = "blank";
-            string species2 = "blank";
-            for (auto &s:_species_partition) {
-                for (auto &nd:s.second) {
-                    if (nd == nd_pair.first) {
-                        species1 = s.first;
-                    }
-                    else if (nd == nd_pair.second) {
-                        species2 = s.first;
-                    }
-                    if (species1 != "blank" && species2 != "blank") {
-                        break;
-                    }
-                }
-            }
-            assert (species1 != species2);
-            assert (species1 != "blank" && species2 != "blank");
-            
-            // find species in species_merge_info and calculate how much distance separates them in the species tree
-            double species_tree_minimum = 0.0;
-            
-            bool species1_done = false;
-            bool species2_done = false;
-
-            vector<string> species_merged;
-            
-        while (!species1_done || !species2_done) {
-            for (auto &st:species_merge_info) {
-                string spp1_lineage = get<0>(st.first);
-                string spp2_lineage = get<1>(st.first);
-                string new_nd = get<2>(st.first);
-                
-                species_merged.push_back(spp1_lineage);
-                species_merged.push_back(spp2_lineage);
-                
-                bool sp1_bool = false;
-                bool sp2_bool = false;
-                if (species1 == spp1_lineage || species1 == spp2_lineage) {
-                    sp1_bool = true;
-                }
-                if (species2 == spp1_lineage || species2 == spp2_lineage) {
-                    sp2_bool = true;
-                }
-                if (sp1_bool && sp2_bool) {
-                    species1_done = true;
-                    species2_done = true;
-                }
-                
-                if (species1 == spp1_lineage || species1 == spp2_lineage) {
-                    species1 = new_nd;
-                }
-                
-                if (species2 == spp1_lineage || species2 == spp2_lineage) {
-                    species2 = new_nd;
-                }
-//
-                if (species1_done && species2_done) {
-                    break;
-                }
-                species_tree_minimum += st.second;
-            }
-        }
-            for (auto &s:_species_partition) {
-            for (int i=0; i<species_merged.size(); i++) {
-                if (s.first == species_merged[i]) {
-                    nlineages += s.second.size();
-                }
-            }
-        }
-            
-            // calculate how much distance separates species1 and species2 in the species tree
-            double increment = 0.0;
-//            while (increment < species_tree_minimum) { // TODO: why does this rarely happen
-                double s = nlineages;
-    //                double s = nodes.size();
-                    double coalescence_rate = s*(s-1)/_theta;
-                    increment = rng.gamma(1.0, 1.0/(coalescence_rate))+species_tree_minimum;
-//                }
-                _increments.push_back(make_pair(increment, 0.0)); // TODO: fix prior
-                // add increment to all lineages
-                for (auto &nd:nodes) {
-                    nd->_edge_length += increment;
-                }
-               allowCoalescence(nd_pair, increment, prev_lineage_log_likelihood, nodes);
-        }
+        return make_pair(increment, species_for_join);
     }
 
-    inline void Forest::allowCoalescence(pair<Node*, Node*> nd_pair, double increment, double prev_lineage_log_likelihood, list<Node*> &nodes) {
-        _increment_choices.push_back(increment);
+    inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double increment) {
+        // try prior-prior for now
+        allowCoalescence(nodes, increment);
+    }
+
+//    inline void Forest::evolveSpeciesFor(list<Node*> &nodes, vector<pair<tuple<string, string, string>, double>> species_merge_info) {
+//        _node_choices.clear();
+//        double prev_lineage_log_likelihood = calcLogLikelihood();
+//        // make list of all possible node pairs
+//        for (int i = 0; i < (int) nodes.size()-1; i++) {
+//            for (int j = i+1; j < (int) nodes.size(); j++) {
+//                Node *node1 = nullptr;
+//                Node *node2 = nullptr;
+//
+//                auto it1 = std::next(nodes.begin(), i);
+//                node1 = *it1;
+//
+//                auto it2 = std::next(nodes.begin(), j);
+//                node2 = *it2;
+//
+//                assert (i < nodes.size() && j < nodes.size());
+//                _node_choices.push_back(make_pair(node1, node2));
+//            }
+//        }
+//        // separate into pairs within a species and pairs from separate species
+//        vector<pair<Node*, Node*>> same_species_pairs;
+//        vector<pair<Node*, Node*>> different_species_pairs;
+//        for (auto &s:_species_partition) {
+//                for (auto &nd_pair:_node_choices) {
+//                    bool found1 = (find(s.second.begin(), s.second.end(), nd_pair.first) != s.second.end());
+//                    bool found2 = (find(s.second.begin(), s.second.end(), nd_pair.second) != s.second.end());
+//                    if (found1 && found2) {
+//                        same_species_pairs.push_back(nd_pair);
+//                    }
+//                }
+//        }
+//
+//        for (auto &nd_pair:_node_choices) {
+//            bool found = (find(same_species_pairs.begin(), same_species_pairs.end(), nd_pair) != same_species_pairs.end());
+//            if (!found) {
+//                different_species_pairs.push_back(nd_pair);
+//            }
+//        }
+//        assert (same_species_pairs.size() + different_species_pairs.size() == _node_choices.size());
+//
+//        // clear node choices and reset so it's in the same order as the other vectors
+//        _node_choices.clear();
+//
+//        // if node choices are in the same species, choose an increment and try to join them
+//        // no restrictions on increment length
+//        for (auto &nd_pair:same_species_pairs) {
+//            _node_choices.push_back(nd_pair);
+//            double increment;
+//            int nlineages = 0;
+//            // calculate size of lineage nodes are in
+//            for (auto &s:_species_partition) {
+//                bool found = (find(s.second.begin(), s.second.end(), nd_pair.first) != s.second.end());
+//                if (found) {
+//                    nlineages = (int) s.second.size();
+//                    break;
+//                }
+//            }
+//
+////            double s = nodes.size(); // TODO: not sure this is right, should s be the lineage rate or the total rate now?
+//            double coalescence_rate = nlineages*(nlineages-1)/_theta;
+//            increment = rng.gamma(1.0, 1.0/(coalescence_rate));
+//            _increments.push_back(make_pair(increment, 0.0)); // TODO: fix prior
+//
+//            // add increment to all lineages
+//            for (auto &nd:nodes) {
+//                nd->_edge_length += increment;
+//            }
+//           allowCoalescence(nd_pair, increment, prev_lineage_log_likelihood, nodes);
+//        }
+//
+//        // now deal with pairs from different species
+//        // must calculate how much distance is between the species; that is the minimum placed on the chosen increment
+//        int nlineages = 0;
+//
+//        for (auto &nd_pair:different_species_pairs) {
+//            _node_choices.push_back(nd_pair);
+//            // figure out what species each taxon belongs to
+//            string species1 = "blank";
+//            string species2 = "blank";
+//            for (auto &s:_species_partition) {
+//                for (auto &nd:s.second) {
+//                    if (nd == nd_pair.first) {
+//                        species1 = s.first;
+//                    }
+//                    else if (nd == nd_pair.second) {
+//                        species2 = s.first;
+//                    }
+//                    if (species1 != "blank" && species2 != "blank") {
+//                        break;
+//                    }
+//                }
+//            }
+//            assert (species1 != species2);
+//            assert (species1 != "blank" && species2 != "blank");
+//
+//            // find species in species_merge_info and calculate how much distance separates them in the species tree
+//            double species_tree_minimum = 0.0;
+//
+//            bool species1_done = false;
+//            bool species2_done = false;
+//
+//            vector<string> species_merged;
+//
+//        while (!species1_done || !species2_done) {
+//            for (auto &st:species_merge_info) {
+//                string spp1_lineage = get<0>(st.first);
+//                string spp2_lineage = get<1>(st.first);
+//                string new_nd = get<2>(st.first);
+//
+//                species_merged.push_back(spp1_lineage);
+//                species_merged.push_back(spp2_lineage);
+//
+//                bool sp1_bool = false;
+//                bool sp2_bool = false;
+//                if (species1 == spp1_lineage || species1 == spp2_lineage) {
+//                    sp1_bool = true;
+//                }
+//                if (species2 == spp1_lineage || species2 == spp2_lineage) {
+//                    sp2_bool = true;
+//                }
+//                if (sp1_bool && sp2_bool) {
+//                    species1_done = true;
+//                    species2_done = true;
+//                }
+//
+//                if (species1 == spp1_lineage || species1 == spp2_lineage) {
+//                    species1 = new_nd;
+//                }
+//
+//                if (species2 == spp1_lineage || species2 == spp2_lineage) {
+//                    species2 = new_nd;
+//                }
+////
+//                if (species1_done && species2_done) {
+//                    break;
+//                }
+//                species_tree_minimum += st.second;
+//            }
+//        }
+//            for (auto &s:_species_partition) {
+//            for (int i=0; i<species_merged.size(); i++) {
+//                if (s.first == species_merged[i]) {
+//                    nlineages += s.second.size();
+//                }
+//            }
+//        }
+//
+//            // calculate how much distance separates species1 and species2 in the species tree
+//            double increment = 0.0;
+////            while (increment < species_tree_minimum) { // TODO: why does this rarely happen
+//                double s = nlineages;
+//    //                double s = nodes.size();
+//                    double coalescence_rate = s*(s-1)/_theta;
+//                    increment = rng.gamma(1.0, 1.0/(coalescence_rate))+species_tree_minimum;
+////                }
+//                _increments.push_back(make_pair(increment, 0.0)); // TODO: fix prior
+//                // add increment to all lineages
+//                for (auto &nd:nodes) {
+//                    nd->_edge_length += increment;
+//                }
+//               allowCoalescence(nd_pair, increment, prev_lineage_log_likelihood, nodes);
+//        }
+//    }
+
+//    inline void Forest::allowCoalescence(pair<Node*, Node*> nd_pair, double increment, double prev_lineage_log_likelihood, list<Node*> &nodes) {
+    inline void Forest::allowCoalescence(list<Node*> &nodes, double increment) {
         Node *subtree1 = nullptr;
         Node *subtree2 = nullptr;
-        subtree1 = nd_pair.first;
-        subtree2 = nd_pair.second;
+        unsigned s = (unsigned) nodes.size();
 
+        // prior-prior proposal
+        if (_proposal == "prior-prior") {
+            pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+            auto it1 = std::next(nodes.begin(), t.first);
+            subtree1 = *it1;
+
+            auto it2 = std::next(nodes.begin(), t.second);
+            subtree2 = *it2;
+            assert (t.first < nodes.size() && t.second < nodes.size());
+        }
+        
         assert (subtree1 != subtree2);
-
+        
         //new node is always needed
         Node nd;
         _nodes.push_back(nd);
@@ -1590,25 +1712,13 @@ class Forest {
         assert (new_nd->_partial == nullptr);
         new_nd->_partial=ps.getPartial(_npatterns*4);
         assert(new_nd->_left_child->_right_sib);
-
+        
         _new_nodes.push_back(new_nd);
         calcPartialArray(new_nd);
-        
+
         //update species list
-//        updateNodeList(nodes, subtree1, subtree2, new_nd);
+        updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-        
-        double current_log_likelihood = calcLogLikelihood();
-//        double current_lineage_likelihood = calcLineageLogLikelihood(nodes);
-        _log_weight_vec.push_back(current_log_likelihood - prev_lineage_log_likelihood); // TODO: double check the likelihood calculations
-////            assert(current_lineage_likelihood - prev_lineage_log_likelihood > 0.0);
-        new_nd->_name = "unused";
-        revertNewNode(nodes, new_nd, subtree1, subtree2);
-        
-        // revert edge lengths back
-        for (auto &nd:nodes) {
-            nd->_edge_length -= increment;
-        }
     }
 
 //    inline void Forest::fullyCoalesceGeneTree(list<Node*> &nodes) { // TODO: fix this function for full prior-post
@@ -1665,34 +1775,45 @@ class Forest {
 //        }
 //    }
 
-    inline void Forest::firstGeneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_merge_info) {
-//        _prev_log_likelihood = _gene_tree_log_likelihood;
-//
-//        if (_species_partition.size() == 1) {
-//            fullyCoalesceGeneTree(_species_partition.begin()->second); // TODO: make sure this function is correct now
-//        }
-
-//        else {
-//            for (auto &s:_species_partition) {
-//                assert (s.second.size()>0);
-            list<Node*> lineages_to_try_list;
-            for (auto &nd:_lineages){
-                lineages_to_try_list.push_back(nd);
+    inline void Forest::geneTreeProposal(pair<double, string> species_info) {
+        string species_name = species_info.second;
+        double increment = species_info.first;
+        for (auto &s:_species_partition) {
+            if (s.first == species_name) {
+                evolveSpeciesFor(s.second, increment);
+                break;
             }
-                evolveSpeciesFor(lineages_to_try_list, species_merge_info);
-
-//                evolveSpeciesFor(s.second, time_increment, species_tree_height);
-//            }
-//        }
-    }
-
-    inline void Forest::geneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_merge_info) {
-        list<Node*> lineages_to_try_list;
-        for (auto &nd:_lineages){
-            lineages_to_try_list.push_back(nd);
         }
-            evolveSpeciesFor(lineages_to_try_list, species_merge_info);
     }
+
+//    inline void Forest::firstGeneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_merge_info) {
+////        _prev_log_likelihood = _gene_tree_log_likelihood;
+////
+////        if (_species_partition.size() == 1) {
+////            fullyCoalesceGeneTree(_species_partition.begin()->second); // TODO: make sure this function is correct now
+////        }
+//
+////        else {
+////            for (auto &s:_species_partition) {
+////                assert (s.second.size()>0);
+//            list<Node*> lineages_to_try_list;
+//            for (auto &nd:_lineages){
+//                lineages_to_try_list.push_back(nd);
+//            }
+//                evolveSpeciesFor(lineages_to_try_list, species_merge_info);
+//
+////                evolveSpeciesFor(s.second, time_increment, species_tree_height);
+////            }
+////        }
+//    }
+
+//    inline void Forest::geneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_merge_info) {
+//        list<Node*> lineages_to_try_list;
+//        for (auto &nd:_lineages){
+//            lineages_to_try_list.push_back(nd);
+//        }
+//            evolveSpeciesFor(lineages_to_try_list, species_merge_info);
+//    }
 
     inline void Forest::debugForest() {
         cout << "debugging forest" << endl;

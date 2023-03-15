@@ -192,64 +192,20 @@ class Particle {
 
     inline double Particle::proposal() {
         string event;
-        bool coalescence = false;
-        
         if (_species_first && _generation == 0) {
             buildEntireSpeciesTree();
         }
-        chooseNextMove();
         
-        // set starting variables
-        if (_generation == 0 && _gene_tree_proposal_attempts == 0) {
-            coalescence = firstProposal();
+        for (int i=1; i<_forests.size(); i++) {
+            _forests[i]._theta = _forests[i]._starting_theta;
+            pair<double, string> species_info = _forests[i].chooseDelta(_t);
+            _forests[i].geneTreeProposal(species_info);
         }
-        else {
-            speciesJoinedProposal();
-            cout << "test";
-        }
-        // attempt coalescent events until there has been at least 1 coalescence
-//        while (!coalescence) {
-//            chooseNextMove();
-    //            event = _forests[0].chooseEvent();
-//                event = "speciation"; // for now, assume event is speciation
-//                if (event == "hybridization") {
-//                    hybridizationProposal();
-//                }
-//                else if (event == "speciation") {
-//                    // ready to join species
-//                    if (_ready_to_join_species) {
-//                        joinSpeciesProposal();
-//                        _no_species_joined = false;
-//                    }
-//
-//                    // don't join any more species, now must finish the gene trees first
-//                    // if species have been joined previously
-////                    if (_forests[0]._lineages.size() != Forest::_nspecies) {
-//                    if (!_no_species_joined) {
-//                        speciesJoinedProposal();
-//                    }
-//                    // if no species have been joined at all
-//                    else {
-//                        noSpeciesJoinedProposal();
-//                    }
-//                    _gene_tree_proposal_attempts++;
-//                }
-//            coalescence = checkForDeepCoalescence();
-//        }
-        
-        if (Forest::_proposal == "prior-prior") {
-            priorPriorProposal();
-        }
-        
         if (_running_on_empty == false) {
+            double prev_log_likelihood = _log_likelihood;
+            _log_likelihood = calcLogLikelihood();
             if (Forest::_proposal == "prior-prior") {
-                double prev_log_likelihood = _log_likelihood;
-                _log_likelihood = calcLogLikelihood();
                 _log_weight = _log_likelihood - prev_log_likelihood;
-            }
-            else {
-                _log_likelihood = calcLogLikelihood();
-                calcParticleWeight();
             }
         }
         else {
@@ -290,7 +246,7 @@ class Particle {
         if (!_species_first) {
             for (unsigned i=1; i<_forests.size(); i++){
                 assert (_forests[i]._lineages.size() > 1);
-                _forests[i].firstGeneTreeProposal(_t);
+//                _forests[i].firstGeneTreeProposal(_t);
                 assert (_forests[0]._last_edge_length == _forests[0].getTreeHeight());
                 if (Forest::_proposal != "prior-prior") {
                     priorPostIshChoice(i, _t);
@@ -299,7 +255,7 @@ class Particle {
         }
         else {
             for (unsigned i=1; i<_forests.size(); i++){
-                _forests[i].firstGeneTreeProposal(_t);
+//                _forests[i].firstGeneTreeProposal(_t);
                 if (Forest::_proposal != "prior-prior") {
                     priorPostIshChoice(i, _t);
                 }
@@ -339,7 +295,7 @@ class Particle {
             for (unsigned i=1; i<_forests.size(); i++){
                 assert (_forests[i]._lineages.size() > 1);
                 _gene_tree_proposal_attempts++;
-                _forests[i].firstGeneTreeProposal(_t);
+//                _forests[i].firstGeneTreeProposal(_t);
                 if (Forest::_proposal != "prior-prior") {
                     priorPostIshChoice(i, _t);
                 }
@@ -350,7 +306,7 @@ class Particle {
             for (unsigned i=1; i<_forests.size(); i++){
                 assert (_forests[i]._lineages.size() > 1);
                 _gene_tree_proposal_attempts++;
-                _forests[i].firstGeneTreeProposal(_t);
+//                _forests[i].firstGeneTreeProposal(_t);
                 if (Forest::_proposal != "prior-prior") {
                     priorPostIshChoice(i, _t);
                 }
@@ -471,7 +427,7 @@ class Particle {
 //                for (int i=0; i<a+1; i++) {
 //                    species_tree_height += _t[i].second;
 //                }
-                _forests[i].geneTreeProposal(_t);
+//                _forests[i].geneTreeProposal(_t);
             if (Forest::_proposal != "prior-prior") {
                 priorPostIshChoice(i, _t);
             }
