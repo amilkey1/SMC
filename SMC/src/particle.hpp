@@ -196,29 +196,18 @@ class Particle {
         
         if (_generation != 0) {
             for (int i=1; i<_forests.size(); i++) {
-//                if (_forests[i]._resample_species_tree) {
-//                    _forests[0].showForest();
                 rebuildSpeciesTree();
-//                    _forests[0].showForest();
                 break;
-//                }
             }
-//            for (int i=1; i<_forests.size(); i++) {
-//                _forests[i]._resample_species_tree = false;
-//            }
         }
         if (_species_first && _generation == 0) {
             buildEntireSpeciesTree();
         }
         
-//        _forests[0].showForest();
-        
         for (int i=1; i<_forests.size(); i++) {
             _forests[i]._theta = _forests[i]._starting_theta;
             pair<double, string> species_info = _forests[i].chooseDelta(_t);
-//            _forests[i].showForest();
             _forests[i].geneTreeProposal(species_info);
-//            _forests[i].showForest();
         }
         
         if (_running_on_empty == false) {

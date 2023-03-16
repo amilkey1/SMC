@@ -163,9 +163,7 @@ class Forest {
         int                         _species_join_number;
         int                         _num_coalescent_attempts_within_species_generation;
         int                         _num_lineages_at_beginning_of_species_generation;
-        bool                        _ready_to_join_species_forest;
         double                      _prev_gene_tree_log_likelihood;
-        bool                        _resample_species_tree;
 
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -216,7 +214,6 @@ class Forest {
         _species_join_number = 0;
         _num_coalescent_attempts_within_species_generation = 0.0;
         _num_lineages_at_beginning_of_species_generation = _ntaxa;
-        _resample_species_tree = false;
         
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -1214,10 +1211,8 @@ class Forest {
         _extended_increment = other._extended_increment;
         _species_join_number = other._species_join_number;
         _num_coalescent_attempts_within_species_generation = other._num_coalescent_attempts_within_species_generation;
-        _ready_to_join_species_forest = other._ready_to_join_species_forest;
         _num_lineages_at_beginning_of_species_generation = other._num_lineages_at_beginning_of_species_generation;
         _prev_gene_tree_log_likelihood = other._prev_gene_tree_log_likelihood;
-        _resample_species_tree = other._resample_species_tree;
 
         // copy tree itself
 
@@ -1447,7 +1442,6 @@ class Forest {
                 }
             }
         }
-//        _ready_to_join_species_forest = true;
     }
 
     inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info) {
@@ -1484,7 +1478,6 @@ class Forest {
             _species_partition.erase(species2);
             
             species_increment = species_info[_species_join_number].second;
-            _resample_species_tree = true;
         }
         
      // calculate coalescence rate for each population
@@ -1512,7 +1505,7 @@ class Forest {
         string species_for_join = eligible_species[index];
         
         bool done = false;
-        if (increment > species_increment) {
+        if (increment > species_increment && _species_partition.size() > 1) {
             double cum_time = species_increment;
             while (!done) {// TODO: what about multiple deep coalescent events?
                 // extend existing lineages to species barrier
@@ -1535,8 +1528,6 @@ class Forest {
                 
                 species_increment = species_info[_species_join_number].second;
                 cum_time += species_increment;
-                
-                _resample_species_tree = true;
                 
                 // choose a new species
                 eligible_species.clear();
@@ -1571,7 +1562,8 @@ class Forest {
                     nd->_edge_length += deep_coalescent_increment;
                 }
                 // check if there is another deep coalescent event
-                if (increment < cum_time || _species_partition.size() == 1) {
+                if (deep_coalescent_increment < species_increment || species_increment == 0.0) {
+//                if (increment < cum_time || _species_partition.size() == 1) {
                     done = true;
                 }
             }
@@ -2565,7 +2557,6 @@ class Forest {
 //        if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation || getTreeHeight() >= species_tree_height - 0.000001) { // TODO: I'm not sure this always works
         if (num_coalescent_attempts_needed <= _num_coalescent_attempts_within_species_generation || getTreeHeight() >= species_tree_height - 0.000001) { 
 //        if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation) {
-            _ready_to_join_species_forest = true;
             _species_join_number++;
             
             // need to now update the species partition

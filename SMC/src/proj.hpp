@@ -812,10 +812,10 @@ namespace proj {
                         double logLikelihood = 0.0;
                         if (!_run_on_empty) {
                             logLikelihood = p->calcLogLikelihood();
-                            p->setLogLikelihood(logLikelihood);
-    //                        p->setLogLikelihood(0.0);
-                            p->setLogWeight(logLikelihood);
-    //                        p->setLogWeight(0.0);// at this stage, log weight = log likelihood
+//                            p->setLogLikelihood(logLikelihood);
+                            p->setLogLikelihood(0.0);
+//                            p->setLogWeight(logLikelihood);
+                            p->setLogWeight(0.0);// at this stage, log weight = log likelihood
                         }
                         else {
                             p->setParticleGeneration(0);
@@ -823,7 +823,7 @@ namespace proj {
                         }
                     }
                 
-                normalizeWeights(my_vec, -1);
+//                normalizeWeights(my_vec, -1);
                 
                 for (auto &p:my_vec) {
                     p->setRunOnEmpty(_run_on_empty);
