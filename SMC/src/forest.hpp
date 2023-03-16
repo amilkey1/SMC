@@ -165,6 +165,7 @@ class Forest {
         int                         _num_lineages_at_beginning_of_species_generation;
         bool                        _ready_to_join_species_forest;
         double                      _prev_gene_tree_log_likelihood;
+        bool                        _resample_species_tree;
 
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -215,6 +216,7 @@ class Forest {
         _species_join_number = 0;
         _num_coalescent_attempts_within_species_generation = 0.0;
         _num_lineages_at_beginning_of_species_generation = _ntaxa;
+        _resample_species_tree = false;
         
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -1214,7 +1216,8 @@ class Forest {
         _num_coalescent_attempts_within_species_generation = other._num_coalescent_attempts_within_species_generation;
         _ready_to_join_species_forest = other._ready_to_join_species_forest;
         _num_lineages_at_beginning_of_species_generation = other._num_lineages_at_beginning_of_species_generation;
-        _prev_gene_tree_log_likelihood = _prev_gene_tree_log_likelihood;
+        _prev_gene_tree_log_likelihood = other._prev_gene_tree_log_likelihood;
+        _resample_species_tree = other._resample_species_tree;
 
         // copy tree itself
 
@@ -1481,8 +1484,8 @@ class Forest {
             _species_partition.erase(species2);
             
             species_increment = species_info[_species_join_number].second;
+            _resample_species_tree = true;
         }
-        
         
      // calculate coalescence rate for each population
         double coalescence_rate = 0.0;
@@ -1508,58 +1511,72 @@ class Forest {
         int index = selectPair(population_coalescent_rates);
         string species_for_join = eligible_species[index];
         
+        bool done = false;
         if (increment > species_increment) {
-            // extend existing lineages to species barrier
-            extendGeneTreeLineages(species_increment);
-            
-            // update species partition - two species must merge now to accommodate deep coalescence
-            _species_join_number++;
-            if (_species_join_number > species_info.size()-1) {
-                _species_join_number = (int) species_info.size()-1;
-            }
-            string species1 = get<0> (species_info[_species_join_number].first);
-            string species2 = get<1> (species_info[_species_join_number].first);
-            string new_name = get<2> (species_info[_species_join_number].first);
-            
-            list<Node*> &nodes = _species_partition[new_name];
-            copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
-            copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
-            _species_partition.erase(species1);
-            _species_partition.erase(species2);
-            
-            // choose a new species
-            eligible_species.clear();
-            population_coalescent_rates.clear();
-            coalescence_rate = 0.0;
-            
-            for (auto &s:_species_partition) {
-                if (s.second.size() > 1) {
-                    eligible_species.push_back(s.first);
-                    double population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta;
-                    population_coalescent_rates.push_back(population_coalescence_rate);
-                    coalescence_rate += population_coalescence_rate;
+            double cum_time = species_increment;
+            while (!done) {// TODO: what about multiple deep coalescent events?
+                // extend existing lineages to species barrier
+                extendGeneTreeLineages(species_increment);
+                
+                // update species partition - two species must merge now to accommodate deep coalescence
+                _species_join_number++;
+                if (_species_join_number > species_info.size()-1) {
+                    _species_join_number = (int) species_info.size()-1;
                 }
-            }
-            
-            int index = selectPair(population_coalescent_rates);
-            species_for_join = eligible_species[index];
-            
-            // draw a new increment
-            int nlineages = 0;
-            for (auto &s:_species_partition) {
-                if (s.first == new_name) {
-                    nlineages = (int) s.second.size();
-                    break;
+                string species1 = get<0> (species_info[_species_join_number].first);
+                string species2 = get<1> (species_info[_species_join_number].first);
+                string new_name = get<2> (species_info[_species_join_number].first);
+                
+                list<Node*> &nodes = _species_partition[new_name];
+                copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
+                copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
+                _species_partition.erase(species1);
+                _species_partition.erase(species2);
+                
+                species_increment = species_info[_species_join_number].second;
+                cum_time += species_increment;
+                
+                _resample_species_tree = true;
+                
+                // choose a new species
+                eligible_species.clear();
+                population_coalescent_rates.clear();
+                coalescence_rate = 0.0;
+                
+                for (auto &s:_species_partition) {
+                    if (s.second.size() > 1) {
+                        eligible_species.push_back(s.first);
+                        double population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta;
+                        population_coalescent_rates.push_back(population_coalescence_rate);
+                        coalescence_rate += population_coalescence_rate;
+                    }
                 }
-            }
-            
-            double deep_coalescence_rate = nlineages*(nlineages-1)/_theta;
-            double deep_coalescent_increment = rng.gamma(1.0, 1.0/(deep_coalescence_rate));
-            
-            for (auto &nd:_lineages) {
-                nd->_edge_length += deep_coalescent_increment;
+                
+                int index = selectPair(population_coalescent_rates);
+                species_for_join = eligible_species[index];
+                
+                // draw a new increment
+                int nlineages = 0;
+                for (auto &s:_species_partition) {
+                    if (s.first == new_name) {
+                        nlineages = (int) s.second.size();
+                        break;
+                    }
+                }
+                
+                double deep_coalescence_rate = nlineages*(nlineages-1)/_theta;
+                double deep_coalescent_increment = rng.gamma(1.0, 1.0/(deep_coalescence_rate));
+                
+                for (auto &nd:_lineages) {
+                    nd->_edge_length += deep_coalescent_increment;
+                }
+                // check if there is another deep coalescent event
+                if (increment < cum_time || _species_partition.size() == 1) {
+                    done = true;
+                }
             }
         }
+        
         else {
             for (auto &nd:_lineages) {
                 nd->_edge_length += increment;

@@ -195,11 +195,22 @@ class Particle {
         string event;
         
         if (_generation != 0) {
-            rebuildSpeciesTree();
+            for (int i=1; i<_forests.size(); i++) {
+//                if (_forests[i]._resample_species_tree) {
+//                    _forests[0].showForest();
+                rebuildSpeciesTree();
+//                    _forests[0].showForest();
+                break;
+//                }
+            }
+//            for (int i=1; i<_forests.size(); i++) {
+//                _forests[i]._resample_species_tree = false;
+//            }
         }
         if (_species_first && _generation == 0) {
             buildEntireSpeciesTree();
         }
+        
 //        _forests[0].showForest();
         
         for (int i=1; i<_forests.size(); i++) {
