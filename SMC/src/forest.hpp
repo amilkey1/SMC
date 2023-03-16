@@ -1479,6 +1479,8 @@ class Forest {
             copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
             _species_partition.erase(species1);
             _species_partition.erase(species2);
+            
+            species_increment = species_info[_species_join_number].second;
         }
         
         
@@ -1628,13 +1630,16 @@ class Forest {
 
     inline void Forest::geneTreeProposal(pair<double, string> species_info) {
         string species_name = species_info.second;
+        bool joined = false;
         double increment = species_info.first;
         for (auto &s:_species_partition) {
             if (s.first == species_name) {
                 evolveSpeciesFor(s.second, increment);
+                joined = true;
                 break;
             }
         }
+        assert (joined);
     }
 
     inline void Forest::debugForest() {
