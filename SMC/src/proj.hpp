@@ -313,7 +313,13 @@ namespace proj {
 
         for (auto & p : particles) {
             p->setLogWeight(p->getLogWeight() - log_particle_sum);
+//            cout << p->getLogWeight() << endl;
         }
+        
+//        for (auto &p:particles) {
+//            cout << "log weight: " << p->getLogWeight() << endl;
+//            p->showParticle();
+//        }
         
         _log_marginal_likelihood += log_particle_sum - log(_nparticles);
         cout << setprecision(12) << _log_marginal_likelihood << endl;
@@ -809,10 +815,11 @@ namespace proj {
                         p->setData(_data, _taxon_map);
                         p->mapSpecies(_taxon_map, _species_names);
                         p->setParticleGeneration(-1);
-                        double logLikelihood = 0.0;
+//                        double logLikelihood = 0.0;
                         if (!_run_on_empty) {
-                            logLikelihood = p->calcLogLikelihood();
+//                            logLikelihood = p->calcLogLikelihood();
 //                            p->setLogLikelihood(logLikelihood);
+                            p->setParticleGeneration(0);
                             p->setLogLikelihood(0.0);
 //                            p->setLogWeight(logLikelihood);
                             p->setLogWeight(0.0);// at this stage, log weight = log likelihood
@@ -858,7 +865,21 @@ namespace proj {
                         double ess = 1.0/ess_inverse;
                         cout << "ESS = " << ess << endl;
                     
+//                        for (auto &p:my_vec) {
+//                            vector<pair<string, string>> species = p->getSpeciesJoined();
+//                            if (species.size() == 1) {
+//                            if (species[0].first == "s1" || species[0].second == "s1") {
+//                                if (species[0].first == "s4" || species[0].second == "s4") {
+//                                    p->showParticle();
+//                                }
+//                            }
+//                            }
+//                        }
+                        
 //                        if (ess < 10000) {
+//                        for (auto &p:my_vec) {
+//                            p->showParticle();
+//                        }
                         resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                         //if use_first is true, my_vec = my_vec_2
                         //if use_first is false, my_vec = my_vec_1

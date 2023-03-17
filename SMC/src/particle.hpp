@@ -95,6 +95,7 @@ class Particle {
         vector<string>                                  getGeneTreeNewicks();
         double                                          getNumSpecies(){return _forests[0]._lineages.size();}
         void                                            rebuildSpeciesTree();
+        vector<pair<string, string>>                    getSpeciesJoined(){return _forests[1]._names_of_species_joined;}
 
     private:
 
@@ -104,8 +105,6 @@ class Particle {
         Data::SharedPtr                         _data;
         double                                  _log_likelihood;
         int                                     _generation = 0;
-        double                                  _gene_tree_marg_like;
-        double                                  _prev_gene_tree_marg_like;
         map<int, vector<double>>                     _random_seeds;
         bool                                    _running_on_empty = false;
         bool                                    _no_species_joined = true;
@@ -194,12 +193,29 @@ class Particle {
     inline double Particle::proposal() {
         string event;
         
-        if (_generation != 0) {
-            for (int i=1; i<_forests.size(); i++) {
-                rebuildSpeciesTree();
+        bool rebuild_tree = false;
+        
+        for (int i=1; i<_forests.size(); i++) {
+            if (_forests[i]._rebuild_tree) {
+                rebuild_tree = true;
                 break;
             }
         }
+        
+        if (rebuild_tree) {
+            rebuildSpeciesTree();
+            for (int i=1; i<_forests.size(); i++) {
+                _forests[i]._rebuild_tree = false;
+            }
+        }
+        
+//        if (_generation != 0) {
+//            for (int i=1; i<_forests.size(); i++) {
+//                rebuildSpeciesTree();
+//                break;
+//            }
+//        }
+        
         if (_species_first && _generation == 0) {
             buildEntireSpeciesTree();
         }
@@ -731,8 +747,6 @@ class Particle {
         _log_weight     = other._log_weight;
         _log_likelihood = other._log_likelihood;
         _forests         = other._forests;
-        _gene_tree_marg_like = other._gene_tree_marg_like;
-        _prev_gene_tree_marg_like = other._prev_gene_tree_marg_like;
         _data           = other._data;
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;

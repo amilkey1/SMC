@@ -164,6 +164,8 @@ class Forest {
         int                         _num_coalescent_attempts_within_species_generation;
         int                         _num_lineages_at_beginning_of_species_generation;
         double                      _prev_gene_tree_log_likelihood;
+        vector<pair<string, string>>        _names_of_species_joined;
+        bool                        _rebuild_tree;
 
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -214,6 +216,7 @@ class Forest {
         _species_join_number = 0;
         _num_coalescent_attempts_within_species_generation = 0.0;
         _num_lineages_at_beginning_of_species_generation = _ntaxa;
+        _rebuild_tree = false;
         
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -706,6 +709,7 @@ class Forest {
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list) {
         _node_choices.clear();
         _log_likelihood_choices.clear();
+        _gene_tree_log_weight = 0.0;
         
         // choose pair of nodes to try
         for (int i = 0; i < (int) node_list.size()-1; i++) {
@@ -1213,6 +1217,8 @@ class Forest {
         _num_coalescent_attempts_within_species_generation = other._num_coalescent_attempts_within_species_generation;
         _num_lineages_at_beginning_of_species_generation = other._num_lineages_at_beginning_of_species_generation;
         _prev_gene_tree_log_likelihood = other._prev_gene_tree_log_likelihood;
+        _names_of_species_joined = other._names_of_species_joined;
+        _rebuild_tree = other._rebuild_tree;
 
         // copy tree itself
 
@@ -1471,11 +1477,16 @@ class Forest {
             string species2 = get<1> (species_info[_species_join_number].first);
             string new_name = get<2> (species_info[_species_join_number].first);
             
+//            cout << "species1: " << species1<< " and " << "species2: " << species2 << endl;
+            
             list<Node*> &nodes = _species_partition[new_name];
             copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
             copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
             _species_partition.erase(species1);
             _species_partition.erase(species2);
+            
+            _names_of_species_joined.push_back(make_pair(species1, species2));
+            _rebuild_tree = true;
             
             species_increment = species_info[_species_join_number].second;
         }
@@ -1526,6 +1537,9 @@ class Forest {
                 _species_partition.erase(species1);
                 _species_partition.erase(species2);
                 
+                _names_of_species_joined.push_back(make_pair(species1, species2));
+                _rebuild_tree = true;
+                
                 species_increment = species_info[_species_join_number].second;
                 cum_time += species_increment;
                 
@@ -1543,8 +1557,18 @@ class Forest {
                     }
                 }
                 
+                // use combined rate to draw an increment
+//                double deep_coalescent_increment = rng.gamma(1.0, 1.0/coalescence_rate);
+                
+//                // choose which species coalescent event occurred in
+                for (auto &p:population_coalescent_rates) {
+                    p = p/coalescence_rate;
+                }
                 int index = selectPair(population_coalescent_rates);
                 species_for_join = eligible_species[index];
+                
+//                int index = selectPair(population_coalescent_rates);
+//                species_for_join = eligible_species[index];
                 
                 // draw a new increment
                 int nlineages = 0;
@@ -1563,7 +1587,6 @@ class Forest {
                 }
                 // check if there is another deep coalescent event
                 if (deep_coalescent_increment < species_increment || species_increment == 0.0) {
-//                if (increment < cum_time || _species_partition.size() == 1) {
                     done = true;
                 }
             }
@@ -1580,6 +1603,7 @@ class Forest {
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double increment) {
         // try prior-prior for now
         allowCoalescence(nodes, increment);
+        _gene_tree_log_likelihood = calcLogLikelihood();
     }
 
     inline void Forest::allowCoalescence(list<Node*> &nodes, double increment) {
