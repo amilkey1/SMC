@@ -202,19 +202,13 @@ class Particle {
             }
         }
         
-        if (rebuild_tree) {
+//        if (rebuild_tree && _generation > 0) {
+        if (_generation != 0) {
             rebuildSpeciesTree();
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i]._rebuild_tree = false;
             }
         }
-        
-//        if (_generation != 0) {
-//            for (int i=1; i<_forests.size(); i++) {
-//                rebuildSpeciesTree();
-//                break;
-//            }
-//        }
         
         if (_species_first && _generation == 0) {
             buildEntireSpeciesTree();
@@ -223,7 +217,8 @@ class Particle {
         for (int i=1; i<_forests.size(); i++) {
             _forests[i]._theta = _forests[i]._starting_theta;
             pair<double, string> species_info = _forests[i].chooseDelta(_t);
-            _forests[i].geneTreeProposal(species_info);
+            _forests[i].geneTreeProposal(species_info, _t);
+//            cout << _forests[i]._species_join_number << endl;
         }
         
         if (_running_on_empty == false) {

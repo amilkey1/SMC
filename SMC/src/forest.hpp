@@ -67,7 +67,7 @@ class Forest {
         tuple<string,string, string> speciesTreeProposal();
         void                        firstGeneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_merge_info);
 //        void                        geneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_merge_info);
-        void                        geneTreeProposal(pair<double, string> species_info);
+        void                        geneTreeProposal(pair<double, string> species_info, vector<pair<tuple<string, string, string>, double>> _t);
 //        void                        evolveSpeciesFor(list <Node*> &nodes, vector<pair<tuple<string, string, string>, double>> species_merge_info);
         void                        evolveSpeciesFor(list <Node*> &nodes, double increment);
 //        void                        fullyCoalesceGeneTree(list<Node*> &nodes);
@@ -166,6 +166,7 @@ class Forest {
         double                      _prev_gene_tree_log_likelihood;
         vector<pair<string, string>>        _names_of_species_joined;
         bool                        _rebuild_tree;
+        bool                        _ready_to_join_species;
 
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -217,6 +218,7 @@ class Forest {
         _num_coalescent_attempts_within_species_generation = 0.0;
         _num_lineages_at_beginning_of_species_generation = _ntaxa;
         _rebuild_tree = false;
+        _ready_to_join_species = false;
         
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -1219,6 +1221,7 @@ class Forest {
         _prev_gene_tree_log_likelihood = other._prev_gene_tree_log_likelihood;
         _names_of_species_joined = other._names_of_species_joined;
         _rebuild_tree = other._rebuild_tree;
+        _ready_to_join_species = other._ready_to_join_species;
 
         // copy tree itself
 
@@ -1455,39 +1458,68 @@ class Forest {
         double species_increment = species_info[_species_join_number].second;
         
         // first, check if gene lineages need to be extended
-        bool extend = true;
-        for (auto &s:_species_partition) {
-            if (s.second.size() != 1) {
-                extend = false;
-                break;
-            }
-        }
+        // TODO: try doing this at the end of the round so the next species join is not pre determined?
+//        bool extend = true;
+//        for (auto &s:_species_partition) {
+//            if (s.second.size() != 1) {
+//                extend = false;
+//                break;
+//            }
+//        }
         
-        if (extend) {
-            // extend all gene lineages down to the existing species barrier
-            extendGeneTreeLineages(species_increment);
+//        if (extend) {
+//            // extend all gene lineages down to the existing species barrier
+//            extendGeneTreeLineages(species_increment);
+            
+//            // update species partition
+//            _species_join_number++;
+//            if (_species_join_number > species_info.size() - 1) {
+//                _species_join_number = (int) species_info.size() - 1;
+//            }
+//
+//            string species1 = get<0> (species_info[_species_join_number].first);
+//            string species2 = get<1> (species_info[_species_join_number].first);
+//            string new_name = get<2> (species_info[_species_join_number].first);
+//
+////            cout << "species1: " << species1<< " and " << "species2: " << species2 << endl;
+//
+//            list<Node*> &nodes = _species_partition[new_name];
+//            copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
+//            copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
+//            _species_partition.erase(species1);
+//            _species_partition.erase(species2);
+//
+//            _names_of_species_joined.push_back(make_pair(species1, species2));
+//            _rebuild_tree = true;
+//
+//            species_increment = species_info[_species_join_number].second;
+//        }
+        
+        // join species if necessary
+        if (_ready_to_join_species) {
+            _ready_to_join_species = false;
             
             // update species partition
             _species_join_number++;
             if (_species_join_number > species_info.size() - 1) {
                 _species_join_number = (int) species_info.size() - 1;
             }
-            
+
             string species1 = get<0> (species_info[_species_join_number].first);
             string species2 = get<1> (species_info[_species_join_number].first);
             string new_name = get<2> (species_info[_species_join_number].first);
-            
+
 //            cout << "species1: " << species1<< " and " << "species2: " << species2 << endl;
-            
+
             list<Node*> &nodes = _species_partition[new_name];
             copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
             copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
             _species_partition.erase(species1);
             _species_partition.erase(species2);
-            
+
             _names_of_species_joined.push_back(make_pair(species1, species2));
             _rebuild_tree = true;
-            
+
             species_increment = species_info[_species_join_number].second;
         }
         
@@ -1516,7 +1548,7 @@ class Forest {
         string species_for_join = eligible_species[index];
         
         bool done = false;
-        if (increment > species_increment && _species_partition.size() > 1) {
+        if (increment > species_increment && _species_partition.size() > 1 && species_increment > 0.0) {
             double cum_time = species_increment;
             while (!done) {// TODO: what about multiple deep coalescent events?
                 // extend existing lineages to species barrier
@@ -1597,6 +1629,19 @@ class Forest {
                 nd->_edge_length += increment;
             }
         }
+        
+//        bool extend = true;
+//        for (auto &s:_species_partition) {
+//            if (s.second.size() != 1) {
+//                extend = false;
+//                break;
+//            }
+//        }
+//
+//        if (extend) {
+//            extendGeneTreeLineages(species_increment);
+//        }
+        
         return make_pair(increment, species_for_join);
     }
 
@@ -1661,8 +1706,9 @@ class Forest {
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
     }
 
-    inline void Forest::geneTreeProposal(pair<double, string> species_info) {
+    inline void Forest::geneTreeProposal(pair<double, string> species_info, vector<pair<tuple<string, string, string>, double>> _t) {
         string species_name = species_info.second;
+        double species_increment = _t[_species_join_number].second;
         bool joined = false;
         double increment = species_info.first;
         for (auto &s:_species_partition) {
@@ -1673,6 +1719,20 @@ class Forest {
             }
         }
         assert (joined);
+        
+        bool extend = true;
+        if (_species_partition.size() > 1) {
+            for (auto &s:_species_partition) {
+                if (s.second.size() != 1) {
+                    extend = false;
+                    break;
+                }
+            }
+        }
+        
+        if (extend && _species_partition.size() > 1) {
+            extendGeneTreeLineages(species_increment);
+        }
     }
 
     inline void Forest::debugForest() {
@@ -2624,6 +2684,7 @@ class Forest {
             _lineages[0]->_left_child->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child);
             _lineages[0]->_left_child->_right_sib->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child->_right_sib);
         }
+        _ready_to_join_species = true;
     }
 }
 
