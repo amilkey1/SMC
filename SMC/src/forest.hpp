@@ -117,12 +117,16 @@ class Forest {
         void                        extendGeneTreeLineages(double species_tree_increment);
         void                        finishGeneTree();
         double                      updateSpeciesPartition(Node* subtree1, Node* subtree2, Node* new_nd, double increment, vector<pair<tuple<string, string, string>, double>> species_merge_info);
+        void                        updateSpeciesPartitionTwo(tuple<string, string, string> species_info);
         void                        updateIncrements(double log_increment_prior);
         bool                        checkIfReadyToJoinSpecies(double species_tree_height, tuple<string, string, string> species_merge_info);
         vector<pair<Node*, Node*>>  getAllPossiblePairs(list<Node*> &nodes);
-        pair<double, string>                      chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info);
+        pair<double, string>                      chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info, bool gene_tree_only);
+        void                        combineSpeciesPartition();
         void                        chooseSpeciesForCoalescentEvent(double delta);
         pair<Node*, Node*>    chooseAllPairs(list<Node*> &nodes);
+        double                      calcMaxDepth(vector<string> species_names);
+        double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -892,6 +896,111 @@ class Forest {
         _extended_increment = 0.0;
     }
 
+    inline void Forest::updateSpeciesPartitionTwo(tuple<string, string, string> species_info) {
+        string spp1 = get<0>(species_info);
+        string spp2 = get<1>(species_info);
+        string new_spp = get<2>(species_info);
+
+        list<Node*> &nodes = _species_partition[new_spp];
+        copy(_species_partition[spp1].begin(), _species_partition[spp1].end(), back_inserter(nodes));
+        copy(_species_partition[spp2].begin(), _species_partition[spp2].end(), back_inserter(nodes));
+        _species_partition.erase(spp1);
+        _species_partition.erase(spp2);
+    }
+
+    inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {
+//        showForest();
+        // TODO: make sure this properly accounts for 3+ nodes in a species
+        double coalescence_rate = 0.0;
+        double coalescent_likelihood = 0.0;
+        double gene_increment = 0.0;
+        vector<pair<Node*, Node*>> nodes_to_join;
+        string new_species = get<2>(species_joined);
+        bool not_allowed = false;
+        
+            for (auto &s:_species_partition) {
+                for (auto &nd:s.second) {
+                        // if sibling of node is also in the species, they can join at any increment
+                    if (s.second.size() > 1) {
+                        if (nd->_right_sib) {
+                            bool found = (find(s.second.begin(), s.second.end(), nd->_right_sib) != s.second.end());
+                            if (!found) {
+                                // if sibling is in a different species, check if join is allowed
+                                double gene_lineage_height = getLineageHeight(nd);
+                                if (species_tree_height > gene_lineage_height) {
+                                    // species barrier separating the two species is deeper than the point at which they join
+                                    // coalescent likelihood is now 0 - this can't happen
+                                    // if join is not allowed, coalescent likelihood = 0
+                                    coalescent_likelihood += 0.0;
+                                    not_allowed = true;
+                                }
+                                else {
+                                    // if join is allowed, calculate the coalescent likelihood
+                                    if (nd->_deep_coalescent_extended_increment == 0.0) {
+                                        gene_increment = nd->_edge_length;
+                                    }
+                                    else {
+                                        gene_increment = nd->_deep_coalescent_extended_increment;
+                                        nd->_deep_coalescent_extended_increment = 0.0;
+                                    }
+                                    coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
+                                    coalescent_likelihood += log(coalescence_rate) - (gene_increment*coalescence_rate);
+//                                    nodes_to_join.push_back(make_pair(nd, nd->_right_sib));
+                                }
+                            }
+                            else {
+                                // siblings are in the same species
+                                // check for deep coalescence
+                                if (nd->_deep_coalescent_extended_increment == 0.0) {
+                                    gene_increment = nd->_edge_length;
+                                }
+                                else {
+                                    gene_increment = nd->_deep_coalescent_extended_increment;
+                                    nd->_deep_coalescent_extended_increment = 0.0;
+                                }
+                                
+                                coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
+                                
+                                double gene_lineage_height = getLineageHeight(nd);
+                                if (species_tree_height > gene_lineage_height) {
+                                    // no deep coalescence
+                                    coalescent_likelihood += log(coalescence_rate) - (gene_increment*coalescence_rate);
+                                    nodes_to_join.push_back(make_pair(nd, nd->_right_sib));
+                                }
+                                else {
+                                    // calculate probability of not coalescing (deep coalescence)
+                                    double deep_coal_incr = species_tree_height - (gene_lineage_height - gene_increment);
+                                    assert(deep_coal_incr > 0.0);
+                                        coalescent_likelihood -= (deep_coal_incr *coalescence_rate);
+                                    nd->_deep_coalescent_extended_increment = (nd->_edge_length - deep_coal_incr); // TODO: not sure if this works for 3+ lineages
+                                    // this is the increment that will be accounted for in the likelihood when these two lineages join
+                                    }
+                            }
+                        }
+                    }
+                }
+            }
+        
+        if (nodes_to_join.size() > 0) {
+            for (int i=0; i<nodes_to_join.size(); i++) {
+                for (auto &s:_species_partition) {
+                    for (auto &nd:s.second) {
+                        if (nd == nodes_to_join[i].first) {
+                            updateNodeList(s.second, nodes_to_join[i].first, nodes_to_join[i].second, nodes_to_join[i].first->_parent);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+//        if (not_allowed) {
+//            coalescent_likelihood = 0.0;
+//        }
+        
+        return coalescent_likelihood;
+    }
+
     inline double Forest::updateSpeciesPartition(Node* subtree1, Node* subtree2, Node* new_nd, double increment, vector<pair<tuple<string, string, string>, double>> species_merge_info) {
         // if the two taxa are from different species, must merge those species in the species partition before updating node lists
             string species1 = "blank";
@@ -1295,6 +1404,7 @@ class Forest {
                 nd->_visited = othernd._visited;
                 nd->_hybrid_newick_name = othernd._hybrid_newick_name;
                 nd->_n_descendants = othernd._n_descendants;
+                nd->_deep_coalescent_extended_increment = othernd._deep_coalescent_extended_increment;
             }
         }
 
@@ -1421,10 +1531,11 @@ class Forest {
     inline void Forest::setUpGeneForest(map<string, string> &taxon_map) {
         assert (_index >0);
         _species_partition.clear();
-        for (auto nd:_lineages) {
-            if (!nd->_left_child) {
-                string species_name = taxon_map[nd->_name];
-                _species_partition[species_name].push_back(nd);
+//        for (auto nd:_lineages) {
+        for (auto &nd:_nodes) {
+            if (!nd._left_child) {
+                string species_name = taxon_map[nd._name];
+                _species_partition[species_name].push_back(&nd);
             }
         }
         assert (_species_partition.size() > 0);
@@ -1453,50 +1564,69 @@ class Forest {
         }
     }
 
-    inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info) {
+    inline void Forest::combineSpeciesPartition() {
+        string new_name = "new_species";
+        vector<string> species;
+        
+//        list<Node*> &nodes = _species_partition[new_name];
+        
+        for (auto &s:_species_partition) {
+            species.push_back(s.first);
+        }
+        
+        for (int i=0; i<species.size(); i++) {
+            list<Node*> &nodes = _species_partition[new_name];
+            copy(_species_partition[species[i]].begin(), _species_partition[species[i]].end(), back_inserter(nodes));
+            _species_partition.erase(species[i]);
+        }
+    }
+
+    inline double Forest::calcMaxDepth(vector<string> species_names) {
+        // TODO: this function needs to know which species have just been joined
+        // walk through _lineages vector backwards, finding the earliest place in the tree nodes from different species share a parent
+        // build list of nodes joined
+        vector<pair<Node, Node>> nodes_joined_from_different_species;
+        for (auto &nd:_nodes) {
+            if (nd._right_sib != NULL) {
+                string species1 = nd._name;
+                Node nd2 = nd;
+                while (species1 == "") {
+                    nd2 = *nd2._left_child;
+                    species1 = nd2._name;
+                }
+                string species2 = nd._right_sib->_name;
+                Node nd3 = *nd._right_sib;
+                while (species2 == "") {
+                    nd3 = *nd3._left_child;
+                    species2 = nd3._name;
+                }
+                species1 = species1.substr(species1.find("^") + 1);
+                species2 = species2.substr(species2.find("^") + 1); 
+                if (species1 != species2) {
+                    nodes_joined_from_different_species.push_back(make_pair(nd, *nd._right_sib));
+                }
+            }
+        }
+        
+        vector<double> depths;
+        for (auto &nds:nodes_joined_from_different_species) {
+            // calculate distance between nodes
+            double depth = getLineageHeight(&nds.first);
+            depths.push_back(depth);
+        }
+        
+        double max_depth = *max_element(depths.begin(), depths.end());
+
+
+        return max_depth;
+    }
+
+    inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info, bool gene_tree_only) {
         // get species info
         double species_increment = species_info[_species_join_number].second;
         
-        // first, check if gene lineages need to be extended
-        // TODO: try doing this at the end of the round so the next species join is not pre determined?
-//        bool extend = true;
-//        for (auto &s:_species_partition) {
-//            if (s.second.size() != 1) {
-//                extend = false;
-//                break;
-//            }
-//        }
-        
-//        if (extend) {
-//            // extend all gene lineages down to the existing species barrier
-//            extendGeneTreeLineages(species_increment);
-            
-//            // update species partition
-//            _species_join_number++;
-//            if (_species_join_number > species_info.size() - 1) {
-//                _species_join_number = (int) species_info.size() - 1;
-//            }
-//
-//            string species1 = get<0> (species_info[_species_join_number].first);
-//            string species2 = get<1> (species_info[_species_join_number].first);
-//            string new_name = get<2> (species_info[_species_join_number].first);
-//
-////            cout << "species1: " << species1<< " and " << "species2: " << species2 << endl;
-//
-//            list<Node*> &nodes = _species_partition[new_name];
-//            copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
-//            copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
-//            _species_partition.erase(species1);
-//            _species_partition.erase(species2);
-//
-//            _names_of_species_joined.push_back(make_pair(species1, species2));
-//            _rebuild_tree = true;
-//
-//            species_increment = species_info[_species_join_number].second;
-//        }
-        
         // join species if necessary
-        if (_ready_to_join_species) {
+        if (_ready_to_join_species && !gene_tree_only) {
             _ready_to_join_species = false;
             
             // update species partition
@@ -1508,8 +1638,6 @@ class Forest {
             string species1 = get<0> (species_info[_species_join_number].first);
             string species2 = get<1> (species_info[_species_join_number].first);
             string new_name = get<2> (species_info[_species_join_number].first);
-
-//            cout << "species1: " << species1<< " and " << "species2: " << species2 << endl;
 
             list<Node*> &nodes = _species_partition[new_name];
             copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
@@ -1545,10 +1673,12 @@ class Forest {
             p = p/coalescence_rate;
         }
         int index = selectPair(population_coalescent_rates);
+        
         string species_for_join = eligible_species[index];
         
         bool done = false;
-        if (increment > species_increment && _species_partition.size() > 1 && species_increment > 0.0) {
+        if (increment > species_increment && _species_partition.size() > 1 && species_increment > 0.0 && !gene_tree_only) {
+            // deep coalescence
             double cum_time = species_increment;
             while (!done) {// TODO: what about multiple deep coalescent events?
                 // extend existing lineages to species barrier
@@ -1731,7 +1861,9 @@ class Forest {
         }
         
         if (extend && _species_partition.size() > 1) {
+//            showForest();
             extendGeneTreeLineages(species_increment);
+            showForest();
         }
     }
 

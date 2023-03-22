@@ -28,7 +28,7 @@ class Particle {
 
         void                                    debugParticle(std::string name);
         void                                    showParticle();
-        double                                  proposal();
+        double                                  proposal(bool gene_trees_only);
         void                                    setData(Data::SharedPtr d, map<string, string> &taxon_map) {
                                                     _nsubsets = d->getNumSubsets();
                                                     _data = d;
@@ -96,6 +96,9 @@ class Particle {
         double                                          getNumSpecies(){return _forests[0]._lineages.size();}
         void                                            rebuildSpeciesTree();
         vector<pair<string, string>>                    getSpeciesJoined(){return _forests[1]._names_of_species_joined;}
+        void                                            buildFakeSpeciesTree();
+        void                                            panmicticSpeciesPartition();
+        double                                          getCoalescentLikelihood(){return _log_coalescent_likelihood;}
 
     private:
 
@@ -104,10 +107,12 @@ class Particle {
         double                                  _log_weight;
         Data::SharedPtr                         _data;
         double                                  _log_likelihood;
+        double                                  _log_coalescent_likelihood;
         int                                     _generation = 0;
         map<int, vector<double>>                     _random_seeds;
         bool                                    _running_on_empty = false;
         bool                                    _no_species_joined = true;
+        double                                  _species_tree_height;
 //        tuple<string, string, string>           _t;
         vector<pair<tuple<string, string, string>, double>> _t;
         unsigned                                _gene_tree_proposal_attempts;
@@ -125,6 +130,8 @@ class Particle {
         _log_weight = 0.0;
         _log_likelihood = 0.0;
         _gene_tree_proposal_attempts = 0;
+        _log_coalescent_likelihood = 0.0;
+        _species_tree_height = 0.0;
     };
 
     inline Particle::~Particle() {
@@ -190,45 +197,57 @@ class Particle {
         return log_likelihood;
     }
 
-    inline double Particle::proposal() {
+    inline double Particle::proposal(bool gene_trees_only) {
         string event;
         
-        bool rebuild_tree = false;
-        
-        for (int i=1; i<_forests.size(); i++) {
-            if (_forests[i]._rebuild_tree) {
-                rebuild_tree = true;
-                break;
-            }
+        if (gene_trees_only && _generation == 0) {
+            buildFakeSpeciesTree();
+            panmicticSpeciesPartition();
         }
         
-//        if (rebuild_tree && _generation > 0) {
-        if (_generation != 0) {
-            rebuildSpeciesTree();
+        if (gene_trees_only) {
             for (int i=1; i<_forests.size(); i++) {
-                _forests[i]._rebuild_tree = false;
+                _forests[i]._theta = _forests[i]._starting_theta;
+                pair<double, string> species_info = _forests[i].chooseDelta(_t, gene_trees_only);
+                _forests[i].geneTreeProposal(species_info, _t);
             }
         }
         
-        if (_species_first && _generation == 0) {
-            buildEntireSpeciesTree();
-        }
-        
-        for (int i=1; i<_forests.size(); i++) {
-            _forests[i]._theta = _forests[i]._starting_theta;
-            pair<double, string> species_info = _forests[i].chooseDelta(_t);
-            _forests[i].geneTreeProposal(species_info, _t);
-//            cout << _forests[i]._species_join_number << endl;
-        }
+        double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
+        if (!gene_trees_only) {
+            tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+            if (_forests[0]._last_edge_length > 0.0) {
+                // choose species to join if past the first species generation
+                species_joined = _forests[0].speciesTreeProposal();
+            }
+                // choose a species tree increment
+                _forests[0].chooseSpeciesIncrement();
+            _species_tree_height += _forests[0]._last_edge_length;
+                // update gene tree species partitions
+//            showParticle();
+            for (int i = 1; i<_forests.size(); i++) {
+//                _log_coalescent_likelihood = 0.0;
+                _forests[i].updateSpeciesPartitionTwo(species_joined);
+                _log_coalescent_likelihood += _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
+//                if (_log_coalescent_likelihood == 0.0) {
+//                    cout << "stop";
+//                }
+            }
+            }
         
         if (_running_on_empty == false) {
-            double prev_log_likelihood = _log_likelihood;
-            _log_likelihood = calcLogLikelihood();
-            if (Forest::_proposal == "prior-prior") {
-                _log_weight = _log_likelihood - prev_log_likelihood;
+            if (gene_trees_only) {
+                double prev_log_likelihood = _log_likelihood;
+                _log_likelihood = calcLogLikelihood();
+                if (Forest::_proposal == "prior-prior") {
+                    _log_weight = _log_likelihood - prev_log_likelihood;
+                }
+                else {
+                    calcParticleWeight();
+                }
             }
             else {
-                calcParticleWeight();
+                _log_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood;
             }
         }
         else {
@@ -503,6 +522,34 @@ class Particle {
         }
     }
 
+    inline void Particle::buildFakeSpeciesTree() {
+        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+        _forests[0]._last_edge_length = 0.0;
+        
+        double edge_len = _forests[0]._last_edge_length;
+        
+        _t.push_back(make_pair(species_joined, edge_len));
+        
+        for (int i=0; i < _forests[0]._nspecies-1; i++) {
+            if (_forests[0]._lineages.size() > 1) {
+//                tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
+                tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+                
+                double edge_len = 0.0;
+                if (_forests[0]._lineages.size() > 1) {
+                    edge_len = _forests[0]._last_edge_length;
+                }
+                _t.push_back(make_pair(species_joined, edge_len));
+            }
+        }
+    }
+
+    inline void Particle::panmicticSpeciesPartition() {
+        for (int i=1; i<_forests.size(); i++) {
+            _forests[i].combineSpeciesPartition();
+        }
+    }
+
     inline void Particle::rebuildSpeciesTree() {
         // walk through gene trees and find deepest one
         int smallest_num_species = (int) _t.size();
@@ -752,5 +799,7 @@ class Particle {
         _random_seeds = other._random_seeds;
         _species_first = other._species_first;
         _no_species_joined = other._no_species_joined;
+        _log_coalescent_likelihood = other._log_coalescent_likelihood;
+        _species_tree_height = other._species_tree_height;
     };
 }
