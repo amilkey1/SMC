@@ -972,7 +972,7 @@ class Forest {
                                     double deep_coal_incr = species_tree_height - (gene_lineage_height - gene_increment);
                                     assert(deep_coal_incr > 0.0);
                                         coalescent_likelihood -= (deep_coal_incr *coalescence_rate);
-                                    nd->_deep_coalescent_extended_increment = (nd->_edge_length - deep_coal_incr); // TODO: not sure if this works for 3+ lineages
+                                    nd->_deep_coalescent_extended_increment += (nd->_edge_length - deep_coal_incr); // TODO: not sure if this works for 3+ lineages
                                     // this is the increment that will be accounted for in the likelihood when these two lineages join
                                     }
                             }
