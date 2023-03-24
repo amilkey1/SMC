@@ -715,7 +715,7 @@ class Forest {
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list) {
         _node_choices.clear();
         _log_likelihood_choices.clear();
-        _gene_tree_log_weight = 0.0;
+        _gene_tree_log_weight = 0.0; // TODO: should gene tree log weight be cumulative?
         
         // choose pair of nodes to try
         for (int i = 0; i < (int) node_list.size()-1; i++) {
@@ -723,6 +723,9 @@ class Forest {
                 // createNewSubtree returns subtree1, subtree2, new_nd
                 tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list);
                 _log_likelihood_choices.push_back(calcLogLikelihood());
+//                if (calcLogLikelihood() < _prev_gene_tree_log_likelihood) {
+//                    showForest();
+//                }
 
                 // revert _lineages
                 revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
@@ -741,7 +744,7 @@ class Forest {
             vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood);
             
             // sum unnormalized weights before choosing the pair
-            _gene_tree_log_weight = 0.0;
+//            _gene_tree_log_weight = 0.0;
                 // choices are already weighted
 
             // sum unnormalized weights before choosing the pair
@@ -909,8 +912,11 @@ class Forest {
     }
 
     inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {
+        // TODO: not allowed - don't include particle when summing & normalizing weights - it's -inf on log scale
+        // TODO: find largest negative allowed
 //        showForest();
         // TODO: make sure this properly accounts for 3+ nodes in a species
+        double a = -1*numeric_limits<double>::infinity();
         double coalescence_rate = 0.0;
         double coalescent_likelihood = 0.0;
         double gene_increment = 0.0;
@@ -931,7 +937,6 @@ class Forest {
                                     // species barrier separating the two species is deeper than the point at which they join
                                     // coalescent likelihood is now 0 - this can't happen
                                     // if join is not allowed, coalescent likelihood = 0
-                                    coalescent_likelihood += 0.0;
                                     not_allowed = true;
                                 }
                                 else {
@@ -994,9 +999,9 @@ class Forest {
             }
         }
         
-//        if (not_allowed) {
-//            coalescent_likelihood = 0.0;
-//        }
+        if (not_allowed) {
+            coalescent_likelihood = a;
+        }
         
         return coalescent_likelihood;
     }
@@ -1797,8 +1802,13 @@ class Forest {
             assert (t.first < nodes.size() && t.second < nodes.size());
         }
         else {
-            _prev_gene_tree_log_likelihood = calcLogLikelihood();
+            _prev_gene_tree_log_likelihood = 0.0; // prev log likelihood is 0 for the first gen
+            if (_lineages.size() != _ntaxa) {
+                _prev_gene_tree_log_likelihood = calcLogLikelihood();
+            }
+//            showForest();
             pair<Node*, Node*> t = chooseAllPairs(nodes);
+//            showForest();
             
             subtree1 = t.first;
             subtree2 = t.second;
@@ -1834,6 +1844,19 @@ class Forest {
         //update species list
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+        
+        // update increments and priors
+        double log_increment_prior = 0.0;
+        for (auto &s:_species_partition) {
+            if (s.second.size() > 1) {
+                double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
+                log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate);
+        }
+        if (s.second.size() > 1) {
+            _increments.push_back(make_pair(increment, log_increment_prior)); // TODO: this won't work if gene tree is constrained
+        }
+    }
+        
     }
 
     inline void Forest::geneTreeProposal(pair<double, string> species_info, vector<pair<tuple<string, string, string>, double>> _t) {
@@ -1863,7 +1886,7 @@ class Forest {
         if (extend && _species_partition.size() > 1) {
 //            showForest();
             extendGeneTreeLineages(species_increment);
-            showForest();
+//            showForest();
         }
     }
 

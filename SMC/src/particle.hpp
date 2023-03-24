@@ -224,15 +224,11 @@ class Particle {
                 _forests[0].chooseSpeciesIncrement();
             _species_tree_height += _forests[0]._last_edge_length;
                 // update gene tree species partitions
-//            showParticle();
             for (int i = 1; i<_forests.size(); i++) {
 //                _log_coalescent_likelihood = 0.0;
                 _forests[i].updateSpeciesPartitionTwo(species_joined);
                 _log_coalescent_likelihood += _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
-//                if (_log_coalescent_likelihood == 0.0) {
-//                    cout << "stop";
-//                }
-            }
+                }
             }
         
         if (_running_on_empty == false) {
@@ -388,11 +384,13 @@ class Particle {
 
     inline void Particle::calcParticleWeight() {
         // use the gene tree weights to calculate the particle weight
+//        double prev_log_weight = _log_weight;
         _log_weight = 0.0;
         for (int i = 1; i<_forests.size(); i++) {
             _log_weight += _forests[i]._gene_tree_log_weight;
 //            _log_weight += _forests[i]._gene_tree_log_likelihood;
         }
+//        _log_weight = prev_log_weight - _log_weight;
         _generation++;
     }
 

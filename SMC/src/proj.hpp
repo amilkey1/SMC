@@ -35,7 +35,7 @@ namespace proj {
             void                saveParticleWeights(vector<Particle::SharedPtr> &v) const;
             void                saveParticleLikelihoods(vector<Particle::SharedPtr> &v) const;
 
-            void                normalizeWeights(vector<Particle::SharedPtr> & particles, int g);
+            void                normalizeWeights(vector<Particle::SharedPtr> & particles, int g, bool calc_marg_like);
             unsigned            chooseRandomParticle(vector<Particle::SharedPtr> & particles, vector<double> & cum_prob);
             void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                resetWeights(vector<Particle::SharedPtr> & particles);
@@ -302,7 +302,7 @@ namespace proj {
         return log_particle_sum;
     }
 
-    inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles, int g) {
+    inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles, int g, bool calc_marg_like) {
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
         for (auto & p : particles) {
@@ -321,8 +321,10 @@ namespace proj {
 //            p->showParticle();
 //        }
         
-        _log_marginal_likelihood += log_particle_sum - log(_nparticles);
-        cout << setprecision(12) << _log_marginal_likelihood << endl;
+        if (calc_marg_like) {
+            _log_marginal_likelihood += log_particle_sum - log(_nparticles);
+            cout << setprecision(12) << _log_marginal_likelihood << endl;
+        }
         sort(particles.begin(), particles.end(), greater<Particle::SharedPtr>());
     }
 
@@ -815,22 +817,22 @@ namespace proj {
                         p->setData(_data, _taxon_map);
                         p->mapSpecies(_taxon_map, _species_names);
                         p->setParticleGeneration(-1);
-//                        double logLikelihood = 0.0;
+                        double logLikelihood = 0.0;
                         if (!_run_on_empty) {
 //                            logLikelihood = p->calcLogLikelihood();
 //                            p->setLogLikelihood(logLikelihood);
                             p->setParticleGeneration(0);
-                            p->setLogLikelihood(0.0);
-//                            p->setLogWeight(logLikelihood);
-                            p->setLogWeight(0.0);// at this stage, log weight = log likelihood
+//                            p->setLogLikelihood(0.0);
+                            p->setLogWeight(logLikelihood);
+//                            p->setLogWeight(0.0);// at this stage, log weight = log likelihood
                         }
                         else {
                             p->setParticleGeneration(0);
                             p->setLogLikelihood(0.0);
                         }
                     }
-                
-//                normalizeWeights(my_vec, -1);
+//                bool calc_marg_like = true;
+//                normalizeWeights(my_vec, -1, calc_marg_like);
                 
                 for (auto &p:my_vec) {
                     p->setRunOnEmpty(_run_on_empty);
@@ -853,12 +855,13 @@ namespace proj {
                     proposeParticles(my_vec, gene_trees_only);
                     
                     if (!_run_on_empty) {
-                        
-                        normalizeWeights(my_vec, g);
+                        bool calc_marg_like = true;
+                        normalizeWeights(my_vec, g, calc_marg_like);
                         
                         double ess_inverse = 0.0;
                         
                         for (auto & p:my_vec) {
+//                            cout << p->getLogWeight();
                             ess_inverse += exp(2.0*p->getLogWeight());
 //                            p->showParticle();
                         }
@@ -875,7 +878,6 @@ namespace proj {
                         //change use_first from true to false or false to true
                         use_first = !use_first;
                         saveParticleWeights(my_vec);
-//                        }
                     }
                     resetWeights(my_vec);
                     _accepted_particle_vec = my_vec;
@@ -886,6 +888,8 @@ namespace proj {
                     // reset forest species partitions
                     p->mapSpecies(_taxon_map, _species_names);
                 }
+                double gene_tree_marg_like = _log_marginal_likelihood;
+                _log_marginal_likelihood = 0.0;
                 
                 for (unsigned s=0; s<nspecies-1; s++){
                     //taxon joining and reweighting step
@@ -894,14 +898,13 @@ namespace proj {
                     proposeParticles(my_vec, gene_trees_only);
                     
                     if (!_run_on_empty) {
-                        
-                        normalizeWeights(my_vec, s);
+                        bool calc_marg_like = true;
+                        normalizeWeights(my_vec, s, calc_marg_like);
                         
                         double ess_inverse = 0.0;
                         
                         for (auto & p:my_vec) {
                             ess_inverse += exp(2.0*p->getLogWeight());
-//                            p->showParticle();
                         }
 
                         double ess = 1.0/ess_inverse;
@@ -916,14 +919,15 @@ namespace proj {
                         //change use_first from true to false or false to true
                         use_first = !use_first;
                         saveParticleWeights(my_vec);
-//                        }
                     }
                     resetWeights(my_vec);
                     _accepted_particle_vec = my_vec;
                 } // s loop
                 
+                cout << "gene tree marg like: " << gene_tree_marg_like << endl;
+                cout << "species tree marg like: " << _log_marginal_likelihood << endl;
+                _log_marginal_likelihood = gene_tree_marg_like - _log_marginal_likelihood;
                 for (auto &p:my_vec) {
-//                    p->showParticle();
                     p->getTopologyPriors();
                 }
                 
