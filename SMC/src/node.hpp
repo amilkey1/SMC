@@ -71,6 +71,8 @@ namespace proj {
             std::string         _hybrid_newick_name;
             unsigned            _n_descendants;
             double              _deep_coalescent_extended_increment;
+            double              _extended_increment;
+            bool                _done;
     };
     
     
@@ -92,6 +94,8 @@ namespace proj {
         _n_descendants = 0;
         _partial.reset();
         _deep_coalescent_extended_increment = 0.0;
+        _extended_increment = 0.0;
+        _done = false;
     }   
 
     inline void Node::setEdgeLength(double v) {
