@@ -282,7 +282,7 @@ class Particle {
             // update gene tree species partitions
         // must keep running through this until gene trees are the same height as the species tree
         for (int i = 1; i<_forests.size(); i++) {
-            showParticle();
+//            showParticle();
             _forests[i].updateSpeciesPartitionTwo(species_joined);
             _log_coalescent_likelihood += _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
             }
