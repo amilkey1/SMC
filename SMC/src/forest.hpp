@@ -1165,6 +1165,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                     }
                 }
             }
+        }
         return log_coalescent_likelihood;
     }
 

@@ -891,9 +891,6 @@ namespace proj {
                         _accepted_particle_vec = my_vec;
                     } // g loop
                 
-//                    for (auto &p:my_vec) {
-//                        p->showParticle();
-//                    }
                     
                     // filter species trees now
                     for (auto &p:my_vec) {
@@ -929,6 +926,9 @@ namespace proj {
 
                             double ess = 1.0/ess_inverse;
                             cout << "ESS = " << ess << endl;
+                            if (isnan(ess)) {
+                                throw XProj(format("no species trees can accommodate the gene trees; increase the number of particles and try again"));
+                            }
                          
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                             //if use_first is true, my_vec = my_vec_2
