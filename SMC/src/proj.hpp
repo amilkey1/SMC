@@ -838,6 +838,8 @@ namespace proj {
                     p->setBuildEntireSpeciesTree(_build_species_tree_first);
                 }
                 
+//                normalizeWeights(my_vec, -1, true);
+                
                 //run through each generation of particles
                 int ntaxa = (int) _taxon_map.size();
                 for (int i=0; i<_niterations; i++) {
@@ -848,6 +850,7 @@ namespace proj {
                             p->setLogCoalescentLikelihood(0.0);
                             p->setLogWeight(0.0);
                             p->mapSpecies(_taxon_map, _species_names);
+                            p->resetGeneIncrements();
                         }
                     }
                     // keep the species partition for the gene forests at this stage but clear the tree structure
@@ -896,10 +899,7 @@ namespace proj {
                     for (auto &p:my_vec) {
                         // reset forest species partitions
                         p->mapSpecies(_taxon_map, _species_names);
-                        p->setLogLikelihood(0.0);
-                        p->setLogWeight(0.0);
-                        p->resetSpeciesInfo();
-                        p->resetSpeciesTreeHeight();
+                        p->resetSpecies();
                     }
                     
                     _gene_tree_log_marginal_likelihood = _log_marginal_likelihood;

@@ -161,7 +161,6 @@ class Forest {
         string                      _last_direction;
         vector<double>              _rand_numbers;
         vector<pair<double, double>>         _increments;
-        vector<pair<int, double>> _increment_node_pairs;
         double                      _topology_prior;
         unsigned                    _num_coalescent_events_in_generation;
     vector<pair<double, double>> _searchable_branch_lengths; // pair is lineage height, increment
@@ -1024,8 +1023,17 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                     assert (gene_increment >= 0.0);
                     // descendants of internal node are now always in the same species
                     // calc log coalescent likelihood; do not worry about deep coalescence now
+                assert (_species_partition[spp].size() > 0);
                     double coalescence_rate = _species_partition[spp].size()*(_species_partition[spp].size()-1) / _theta;
-                    log_coalescent_likelihood += log(coalescence_rate) - (gene_increment*coalescence_rate);
+//                double log_prob_join = log(2/(_species_partition[spp].size()*(_species_partition[spp].size()-1)));
+//                if (log_prob_join != 0.0) {
+//                    cout << "stop";
+//                }
+                double test = (_species_partition[spp].size()*(_species_partition[spp].size()-1));
+                double test2 = 2/test;
+                double test3 = log(2/test);
+                double log_prob_join = test3;
+                    log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (gene_increment*coalescence_rate);
     //                // decrement remaining lineages vector
                     remaining_lineages[spp].first--;
     //
@@ -1098,8 +1106,19 @@ inline Node * Forest::findNextPreorder(Node * nd) {
 //                        if (gene_increment <= species_increment) {
                             // lineages are in the same species and have joined in this generation
                             if (spp_left_child == spp_right_child) {
+//                                cout << _species_partition[spp_right_child].size() << endl;
                                 double coalescence_rate = _species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1) / _theta;
-                                log_coalescent_likelihood += log(coalescence_rate) - (gene_increment*coalescence_rate); // prob of two lineages coalescing within the time frame
+                                double test = (_species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1));
+                                double test2 = 2/test;
+                                double test3 = log(2/test);
+                                double log_prob_join = test3;
+//                                double log_prob_join = log(2/(_species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1)));
+                                
+//                                log(2/(_species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1)));
+//                                if (log_prob_join != 0.0) {
+//                                    cout << "stop";
+//                                }
+                                log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (gene_increment*coalescence_rate); // prob of two lineages coalescing within the time frame
                                 
                                 // decrement remaining lineages vector
                                 remaining_lineages[spp_right_child].first--;
@@ -1501,7 +1520,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _names_of_species_joined = other._names_of_species_joined;
         _rebuild_tree = other._rebuild_tree;
         _ready_to_join_species = other._ready_to_join_species;
-        _increment_node_pairs = other._increment_node_pairs;
 //        _heights_and_nodes = other._heights_and_nodes;
 
         // copy tree itself
@@ -2030,8 +2048,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         
         _new_nodes.push_back(new_nd);
         calcPartialArray(new_nd);
-        
-        _increment_node_pairs.push_back(make_pair(new_nd->_number, increment));
 
         //update species list
         updateNodeList(nodes, subtree1, subtree2, new_nd);
@@ -2043,11 +2059,12 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             if (s.second.size() > 1) {
                 double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
                 log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate);
+            }
         }
-        if (s.second.size() > 1) {
-            _increments.push_back(make_pair(increment, log_increment_prior)); // TODO: this prior won't work if gene tree is constrained
-        }
-    }
+//        if (s.second.size() > 1) {
+            _increments.push_back(make_pair(increment, log_increment_prior)); // TODO: this prior won't work if gene tree is constrained?
+//        }
+//    }
         
     }
 
@@ -3069,6 +3086,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _ready_to_join_species = false;
         _deep_coalescent_increments.clear();
         _preorder.clear();
+        _increments.clear();
     }
 
 }

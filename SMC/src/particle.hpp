@@ -105,6 +105,8 @@ class Particle {
         void                                            speciesProposal();
         void                                            resetSpeciesInfo(){_t.clear();}
         void                                            resetSpeciesTreeHeight(){_species_tree_height = 0.0;}
+        void                                            resetSpecies();
+        void                                            resetGeneIncrements();
 
     private:
 
@@ -244,10 +246,9 @@ class Particle {
             _forests[i].geneTreeProposal(species_info, _t);
             if (_forests[i]._lineages.size() == 1) {
                 _forests[i].refreshPreorder();
-//                _forests[i].sortPreorder();
             }
         }
-        
+
         if (!_running_on_empty) {
             double prev_log_likelihood = _log_likelihood;
             _log_likelihood = calcLogLikelihood();
@@ -271,7 +272,7 @@ class Particle {
         }
             // choose a species tree increment
         if (_forests[0]._lineages.size() > 1) {
-                _forests[0].chooseSpeciesIncrement();
+            _forests[0].chooseSpeciesIncrement();
             _species_tree_height += _forests[0]._last_edge_length;
         }
         if (_forests[0]._lineages.size() == 1) {
@@ -282,7 +283,6 @@ class Particle {
             // update gene tree species partitions
         // must keep running through this until gene trees are the same height as the species tree
         for (int i = 1; i<_forests.size(); i++) {
-//            showParticle();
             _forests[i].updateSpeciesPartitionTwo(species_joined);
             _log_coalescent_likelihood += _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
             }
@@ -822,6 +822,20 @@ class Particle {
             newicks.push_back(newick);
         }
         return newicks;
+    }
+
+    inline void Particle::resetSpecies() {
+        setLogLikelihood(0.0);
+        setLogWeight(0.0);
+        resetSpeciesInfo();
+        resetSpeciesTreeHeight();
+        _forests[0]._increments.clear();
+    }
+
+    inline void Particle::resetGeneIncrements() {
+        for (int i=1; i<_forests.size(); i++) {
+            _forests[i]._increments.clear();
+        }
     }
 
     inline void Particle::operator=(const Particle & other) {
