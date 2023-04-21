@@ -849,7 +849,8 @@ namespace proj {
                             p->setLogLikelihood(0.0);
                             p->setLogCoalescentLikelihood(0.0);
                             p->setLogWeight(0.0);
-                            p->mapSpecies(_taxon_map, _species_names);
+//                            p->mapSpecies(_taxon_map, _species_names);
+                            p->mapGeneTrees(_taxon_map, _species_names);
                             p->resetGeneIncrements();
                         }
                     }
@@ -872,9 +873,7 @@ namespace proj {
                             double ess_inverse = 0.0;
                             
                             for (auto & p:my_vec) {
-    //                            cout << p->getLogWeight();
                                 ess_inverse += exp(2.0*p->getLogWeight());
-    //                            p->showParticle();
                             }
 
                             double ess = 1.0/ess_inverse;

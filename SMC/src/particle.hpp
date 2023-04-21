@@ -40,6 +40,7 @@ class Particle {
                                                     }
                                                 }
         void                                    mapSpecies(map<string, string> &taxon_map, vector<string> &species_names);
+        void                                    mapGeneTrees(map<string, string> &taxon_map, vector<string> &species_names);
         void                                    saveForest(std::string treefilename);
         void                                    saveMSCTrees(string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
@@ -261,32 +262,73 @@ class Particle {
         }
     }
 
-    inline void Particle::speciesProposal() {
-//        showParticle();
+    inline void Particle::speciesProposal() { // TODO: also check the _generation
         double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
 //        _log_coalescent_likelihood = 0.0;
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-        if (_forests[0]._last_edge_length > 0.0) {
-            // choose species to join if past the first species generation
-            species_joined = _forests[0].speciesTreeProposal();
-        }
-            // choose a species tree increment
-        if (_forests[0]._lineages.size() > 1) {
-            _forests[0].chooseSpeciesIncrement();
-            _species_tree_height += _forests[0]._last_edge_length;
-        }
-        if (_forests[0]._lineages.size() == 1) {
-            _forests[0]._last_edge_length = 0.0;
+        
+        // save existing species partition to revert to
+        vector<map<string, list<Node*>> > old_species_partition;
+        for (int i=1; i<_forests.size(); i++) {
+            old_species_partition.push_back(_forests[i]._species_partition);
         }
         
-        _t.push_back(make_pair(species_joined, _forests[0]._last_edge_length));
-            // update gene tree species partitions
-        // must keep running through this until gene trees are the same height as the species tree
-        for (int i = 1; i<_forests.size(); i++) {
-            _forests[i].updateSpeciesPartitionTwo(species_joined);
-            _log_coalescent_likelihood += _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
+        vector<tuple<tuple<string, string, string>, double, double>> species_tree_choices; // species names, coalescent likelihood, species increment
+        double prev_edge_length = _forests[0]._last_edge_length;
+        for (int s=0; s<5000; s++) {
+            if (_forests[0]._last_edge_length > 0.0) {
+                // choose species to join if past the first species generation
+                species_joined = _forests[0].speciesTreeProposal();
             }
+                // choose a species tree increment
+            if (_forests[0]._lineages.size() > 1) {
+                _forests[0].chooseSpeciesIncrement();
+                _species_tree_height += _forests[0]._last_edge_length;
+            }
+            if (_forests[0]._lineages.size() == 1) {
+                _forests[0]._last_edge_length = 0.0;
+            }
+            
+            // update gene tree species partitions
+            double log_coalescent_likelihood = 0.0;
+            for (int i = 1; i<_forests.size(); i++) {
+                _forests[i].updateSpeciesPartitionTwo(species_joined);
+                
+                bool mark_as_done = false;
+                log_coalescent_likelihood += _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height, mark_as_done);
+            }
+            species_tree_choices.push_back(make_tuple(species_joined, log_coalescent_likelihood, _forests[0]._last_edge_length));
+            for (int i = 1; i<_forests.size(); i++) {
+                _forests[i]._species_partition = old_species_partition[i-1];
+            }
+            
+            // reset species tree _lineages vector
+            _forests[0].revertSpeciesTree(make_pair(species_joined, _forests[0]._last_edge_length));
+                
+            _species_tree_height -= _forests[0]._last_edge_length;
+            _forests[0]._last_edge_length = prev_edge_length;
+        }
+        pair<tuple<string, string, string>, double> chosen_species;
+        // chosen species contains names of chosen species to join + chosen species increment
+        chosen_species = _forests[0].chooseSpeciesPair(species_tree_choices, prev_log_coalescent_likelihood); // species joined contains names of species and increment
+        if (_forests[0]._lineages.size() > 2) {
+            assert (chosen_species.second > 0.0);
+        }
         
+        _forests[0]._last_edge_length = chosen_species.second;
+        _species_tree_height += _forests[0]._last_edge_length;
+        _t.push_back(make_pair(chosen_species.first, _forests[0]._last_edge_length));
+        
+        // update lineages vector again with the chosen join
+        _forests[0].updateLineages(chosen_species);
+        
+//        _forests[0].showForest();
+        for (int i=1; i<_forests.size(); i++) {
+            _forests[i].updateSpeciesPartitionTwo(chosen_species.first);
+            bool mark_as_done = true;
+            _log_coalescent_likelihood += _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, chosen_species.first, _species_tree_height, mark_as_done);
+        }
+
         if (!_running_on_empty) {
             _log_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood;
         }
@@ -699,6 +741,13 @@ class Particle {
         //species tree
         _forests[0].setUpSpeciesForest(species_names);
 
+        //gene trees
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i].setUpGeneForest(taxon_map);
+        }
+    }
+
+    inline void Particle::mapGeneTrees(map<string, string> &taxon_map, vector<string> &species_names) {
         //gene trees
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].setUpGeneForest(taxon_map);

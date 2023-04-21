@@ -127,9 +127,12 @@ class Forest {
         void                        chooseSpeciesForCoalescentEvent(double delta);
         pair<Node*, Node*>    chooseAllPairs(list<Node*> &nodes);
         double                      calcMaxDepth(vector<string> species_names);
-        double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
-        double                      calcCoalescentLikelihoodForLastStep(tuple<string, string, string> species_joined, double species_tree_height);
-    vector< pair<double, Node *>>                      sortPreorder();
+        double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done);
+        double                      calcCoalescentLikelihoodForLastStep(tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done);
+        vector< pair<double, Node *>>      sortPreorder();
+    pair<tuple<string, string, string>, double>     chooseSpeciesPair(vector<tuple<tuple<string, string, string>, double, double>> species_choices, double prev_log_coalescent_likelihood);
+        void                        revertSpeciesTree(pair<tuple<string, string, string>, double> species_joined);
+        void                        updateLineages(pair<tuple<string, string, string>, double> chosen_species);
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -328,6 +331,74 @@ class Forest {
         }
         return sum_height;
     }
+
+    inline void Forest::revertSpeciesTree(pair<tuple<string, string, string>, double> species_joined) {
+        Node* addnode1;
+        Node* addnode2;
+        Node* delnode1;
+        for (auto &nd:_lineages) {
+            nd->_edge_length -= species_joined.second;
+            assert (nd->_edge_length >= 0.0);
+        }
+        if (get<0>(species_joined.first) != "null") {
+            for (auto &nd:_lineages) {
+                if (nd->_name == get<2>(species_joined.first)) {
+                    delnode1 = nd;
+                    addnode1 = nd->_left_child;
+                    addnode2 = nd->_left_child->_right_sib;
+                }
+            }
+            _nodes.pop_back();
+            _ninternals--;
+            revertNodeVector(_lineages, addnode1, addnode2, delnode1);
+        }
+        
+        for (auto &nd:_lineages) {
+            if (nd->_name == get<0>(species_joined.first)) {
+                nd->resetNode();
+            }
+            else if (nd->_name == get<1>(species_joined.first)) {
+                nd->resetNode();
+            }
+        }
+    }
+
+inline void Forest::updateLineages(pair<tuple<string, string, string>, double> species_joined) {
+    Node* delnode1;
+    Node* delnode2;
+    Node* addnode;
+    if (get<0>(species_joined.first) != "null") {
+        for (auto &nd:_lineages) {
+            if (nd->_name == get<0>(species_joined.first)) {
+                delnode1 = nd;
+            }
+            else if (nd->_name == get<1>(species_joined.first)) {
+                delnode2 = nd;
+            }
+        }
+        // make new node
+        Node nd;
+        _nodes.push_back(nd);
+        Node* new_nd = &_nodes.back();
+        new_nd->_parent=0;
+        new_nd->_number=_nleaves+_ninternals;
+        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+        new_nd->_right_sib=0;
+
+        new_nd->_left_child=delnode1;
+        delnode1->_right_sib=delnode2;
+
+        delnode1->_parent=new_nd;
+        delnode2->_parent=new_nd;
+        
+        updateNodeVector(_lineages, delnode1, delnode2, new_nd);
+    }
+    for (auto &nd:_lineages) {
+        nd->_edge_length += species_joined.second;
+    }
+}
 
     inline vector< pair<double, Node *>> Forest::sortPreorder() {
             vector< pair<double, Node *>> heights_and_nodes;
@@ -793,6 +864,33 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         return _gene_tree_log_likelihood;
     }
 
+    inline pair<tuple<string, string, string>, double> Forest::chooseSpeciesPair(vector<tuple<tuple<string, string, string>, double, double>> species_choices, double prev_log_coalescent_likelihood) {
+//        _gene_tree_log_weight = 0.0;
+        vector<double> coal_likelihood_choices;
+        for (int i=0; i<species_choices.size(); i++) {
+            coal_likelihood_choices.push_back(get<1>(species_choices[i]));
+        }
+        // reweight choices
+        vector<double> log_weight_choices = reweightChoices(coal_likelihood_choices, prev_log_coalescent_likelihood);
+        
+        // sum unnormalized weights before choosing the pair
+        // must include the likelihoods of all pairs in the final particle weight
+        double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
+//        _gene_tree_log_weight += log_weight_choices_sum; // TODO: use weight? not sure b/c delta is different for each particle
+        for (int b=0; b < (int) log_weight_choices.size(); b++) {
+            log_weight_choices[b] -= log_weight_choices_sum;
+        }
+        
+        // randomly select a pair
+        _index_of_choice = selectPair(log_weight_choices);
+
+        // find species to join in species_choices
+        tuple<string, string, string> species_to_join = get<0>(species_choices[_index_of_choice]);
+        double chosen_species_increment = get<2>(species_choices[_index_of_choice]);
+        
+        return make_pair(species_to_join, chosen_species_increment);
+    }
+
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list) {
         _node_choices.clear();
         _log_likelihood_choices.clear();
@@ -804,9 +902,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 // createNewSubtree returns subtree1, subtree2, new_nd
                 tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list);
                 _log_likelihood_choices.push_back(calcLogLikelihood());
-//                if (calcLogLikelihood() < _prev_gene_tree_log_likelihood) {
-//                    showForest();
-//                }
 
                 // revert _lineages
                 revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
@@ -992,7 +1087,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _species_partition.erase(spp2);
     }
 
-    inline double Forest::calcCoalescentLikelihoodForLastStep(tuple<string, string, string> species_joined, double species_tree_height) {
+    inline double Forest::calcCoalescentLikelihoodForLastStep(tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done) {
         // only call this function for the last step in the species tree
         assert (_species_partition.size() == 1);
         map<string, pair<int, double>> remaining_lineages; // remaining lineages associated with each species
@@ -1024,13 +1119,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                     // descendants of internal node are now always in the same species
                     // calc log coalescent likelihood; do not worry about deep coalescence now
                 assert (_species_partition[spp].size() > 0);
-                    double coalescence_rate = _species_partition[spp].size()*(_species_partition[spp].size()-1) / _theta;
-//                double log_prob_join = log(2/(_species_partition[spp].size()*(_species_partition[spp].size()-1)));
-//                if (log_prob_join != 0.0) {
-//                    cout << "stop";
-//                }
+                double coalescence_rate = _species_partition[spp].size()*(_species_partition[spp].size()-1) / _theta;
                 double test = (_species_partition[spp].size()*(_species_partition[spp].size()-1));
-                double test2 = 2/test;
                 double test3 = log(2/test);
                 double log_prob_join = test3;
                     log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (gene_increment*coalescence_rate);
@@ -1038,7 +1128,9 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                     remaining_lineages[spp].first--;
     //
                     updateNodeList(_species_partition[spp], nd->_left_child->_right_sib, nd->_left_child, nd);
+                if (mark_as_done) {
                     nd->_done = true;
+                }
                     
                     gene_tree_chunk += gene_increment;
                     remaining_lineages[spp].second = gene_tree_chunk;
@@ -1047,7 +1139,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         return log_coalescent_likelihood;
     }
 
-    inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {
+    inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done) {
+//        showForest();
         double log_coalescent_likelihood = 0.0;
         double neg_inf = -1*numeric_limits<double>::infinity();
         map<string, pair<int, double>> remaining_lineages; // remaining lineages associated with each species
@@ -1056,7 +1149,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         }
         
         if (species_increment == 0.0) {
-            log_coalescent_likelihood = calcCoalescentLikelihoodForLastStep(species_joined, species_tree_height);
+            log_coalescent_likelihood = calcCoalescentLikelihoodForLastStep(species_joined, species_tree_height, mark_as_done);
         }
         
         else {
@@ -1070,6 +1163,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                     Node* right_child = nd->_left_child->_right_sib;
                     string spp_left_child;
                     string spp_right_child;
+//                    showForest();
                     for (auto &s:_species_partition) {
                         for (auto &nd:s.second) {
                             if (nd == left_child) {
@@ -1093,12 +1187,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                         gene_tree_right_chunk = remaining_lineages[spp_right_child].second; // TODO: fix gene increment for these
                         gene_tree_left_chunk = remaining_lineages[spp_left_child].second;
                     }
+
                     double gene_increment = getLineageHeight(nd->_left_child) - (species_tree_height - species_increment) - gene_tree_chunk;
-//                    if (gene_increment > species_tree_height) {
-//                        // if the lineage is involved in a deep coalescence event, increment is the remaining part within the last species increment
-//                        gene_increment = species_increment - gene_tree_chunk;
-//                    }
-//                    assert (gene_increment <= species_tree_height);
                     assert (gene_increment > 0.0);
                     bool done = false;
                     while ((remaining_lineages[spp_right_child].first > 0 && remaining_lineages[spp_left_child].first > 0) && !done) {
@@ -1106,25 +1196,20 @@ inline Node * Forest::findNextPreorder(Node * nd) {
 //                        if (gene_increment <= species_increment) {
                             // lineages are in the same species and have joined in this generation
                             if (spp_left_child == spp_right_child) {
-//                                cout << _species_partition[spp_right_child].size() << endl;
                                 double coalescence_rate = _species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1) / _theta;
                                 double test = (_species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1));
-                                double test2 = 2/test;
                                 double test3 = log(2/test);
                                 double log_prob_join = test3;
-//                                double log_prob_join = log(2/(_species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1)));
-                                
-//                                log(2/(_species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1)));
-//                                if (log_prob_join != 0.0) {
-//                                    cout << "stop";
-//                                }
+
                                 log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (gene_increment*coalescence_rate); // prob of two lineages coalescing within the time frame
                                 
                                 // decrement remaining lineages vector
                                 remaining_lineages[spp_right_child].first--;
 
                                 updateNodeList(_species_partition[spp_right_child], right_child, left_child, nd);
-                                nd->_done = true;
+                                if (mark_as_done) {
+                                    nd->_done = true;
+                                }
                                 done = true;
                                 
                                 // this will be taken care of in the extension at the end of the function
@@ -1185,6 +1270,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 }
             }
         }
+//        assert (log_coalescent_likelihood != 0.0); // TODO: is this okay?
         return log_coalescent_likelihood;
     }
 
@@ -1835,7 +1921,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info, bool unconstrained) {
         // get species info
         double species_increment = species_info[_species_join_number].second;
-        
 
         // join species if necessary
         if (_ready_to_join_species) {
@@ -1877,7 +1962,9 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 coalescence_rate += population_coalescence_rate;
             }
         }
+
         assert(eligible_species.size() > 0);
+        
         // use combined rate to draw an increment (delta)
         double increment = rng.gamma(1.0, 1.0/(coalescence_rate));
         
@@ -1953,6 +2040,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                         break;
                     }
                 }
+                
+                assert (nlineages > 1);
                 
                 double deep_coalescence_rate = nlineages*(nlineages-1)/_theta;
                 double deep_coalescent_increment = rng.gamma(1.0, 1.0/(deep_coalescence_rate));
