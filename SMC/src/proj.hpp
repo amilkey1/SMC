@@ -316,17 +316,11 @@ namespace proj {
 
         for (auto & p : particles) {
             p->setLogWeight(p->getLogWeight() - log_particle_sum);
-//            cout << p->getLogWeight() << endl;
         }
-        
-//        for (auto &p:particles) {
-//            cout << "log weight: " << p->getLogWeight() << endl;
-//            p->showParticle();
-//        }
         
         if (calc_marg_like) {
             _log_marginal_likelihood += log_particle_sum - log(_nparticles);
-            cout << setprecision(12) << _log_marginal_likelihood << endl;
+            cout << setprecision(12) << "   " << _log_marginal_likelihood << endl;
         }
         sort(particles.begin(), particles.end(), greater<Particle::SharedPtr>());
     }
@@ -621,7 +615,7 @@ namespace proj {
             assert(sel_index > -1);
             Particle::SharedPtr p0 = from_particles[sel_index];
             to_particles[i]=Particle::SharedPtr(new Particle(*p0));
-        assert(nparticles == to_particles.size());
+            assert(nparticles == to_particles.size());
         }
     }
 
@@ -843,6 +837,7 @@ namespace proj {
                 //run through each generation of particles
                 int ntaxa = (int) _taxon_map.size();
                 for (int i=0; i<_niterations; i++) {
+                    cout << "beginning iteration: " << i << endl;
                     if (i > 0) {
                         for (auto &p:my_vec) {
                             p->setParticleGeneration(0);
@@ -877,7 +872,7 @@ namespace proj {
                             }
 
                             double ess = 1.0/ess_inverse;
-                            cout << "ESS = " << ess << endl;
+                            cout << "   " << "ESS = " << ess << endl;
                          
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                             //if use_first is true, my_vec = my_vec_2
@@ -902,46 +897,80 @@ namespace proj {
                     }
                     
                     _gene_tree_log_marginal_likelihood = _log_marginal_likelihood;
-//                    gene_tree_marg_like += _log_marginal_likelihood;
                     _log_marginal_likelihood = 0.0;
                     
                     for (unsigned s=0; s<nspecies; s++){
+                        cout << "beginning species tree proposals" << endl;
                         //taxon joining and reweighting step
                         
                         bool gene_trees_only = false;
                         bool unconstrained = false;
+                        
                         proposeParticles(my_vec, gene_trees_only, unconstrained);
                         
-                        if (!_run_on_empty) {
-                            bool calc_marg_like = true;
-                            normalizeWeights(my_vec, s, calc_marg_like);
+//                        if (!_run_on_empty) {
+                            // TODO: need to normalize and filter within the 1k species trees per particle
+//                            bool calc_marg_like = true;
+//                            normalizeWeights(my_vec, s, calc_marg_like);
                             
-                            double ess_inverse = 0.0;
+//                            double ess_inverse = 0.0;
                             
-                            for (auto & p:my_vec) {
-                                ess_inverse += exp(2.0*p->getLogWeight());
+//                            for (auto & p:my_vec) {
+//                                ess_inverse += exp(2.0*p->getLogWeight());
 //                                p->showParticle();
-                            }
+//                            }
 
-                            double ess = 1.0/ess_inverse;
-                            cout << "ESS = " << ess << endl;
-                            if (isnan(ess)) {
-                                throw XProj(format("no species trees can accommodate the gene trees; increase the number of particles and try again"));
-                            }
+//                            double ess = 1.0/ess_inverse;
+//                            cout << "   " << "ESS = " << ess << endl;
+//                            if (isnan(ess)) {
+//                                throw XProj(format("no species trees can accommodate the gene trees; increase the number of particles and try again"));
+//                            }
                          
-                            resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
+//                            resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                             //if use_first is true, my_vec = my_vec_2
                             //if use_first is false, my_vec = my_vec_1
                             
-                            my_vec = use_first ? my_vec_2:my_vec_1;
+//                            my_vec = use_first ? my_vec_2:my_vec_1;
 
                             //change use_first from true to false or false to true
-                            use_first = !use_first;
-                            saveParticleWeights(my_vec);
+//                            use_first = !use_first;
+//                            saveParticleWeights(my_vec);
+//                        }
+//                        resetWeights(my_vec);
+//                        _accepted_particle_vec = my_vec;
+                    } // s loop
+                    if (!_run_on_empty) {
+                        bool calc_marg_like = true;
+                        normalizeWeights(my_vec, nspecies, calc_marg_like);
+                        
+                        double ess_inverse = 0.0;
+                        
+                        for (auto & p:my_vec) {
+                            ess_inverse += exp(2.0*p->getLogWeight());
+                            p->showParticle();
                         }
+
+                        double ess = 1.0/ess_inverse;
+                        cout << "   " << "ESS = " << ess << endl;
+                        if (isnan(ess)) {
+                            throw XProj(format("no species trees can accommodate the gene trees; increase the number of particles and try again"));
+                        }
+                     
+                        resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
+//                        if use_first is true, my_vec = my_vec_2
+//                        if use_first is false, my_vec = my_vec_1
+                        
+                        my_vec = use_first ? my_vec_2:my_vec_1;
+
+//                        change use_first from true to false or false to true
+                        use_first = !use_first;
+                        saveParticleWeights(my_vec);
+
                         resetWeights(my_vec);
                         _accepted_particle_vec = my_vec;
-                    } // s loop
+                    }
+                    
+                    // TODO: resample the particles again
                 }
                 
 //                cout << "gene tree marg like: " << _gene_tree_log_marginal_likelihood << endl;

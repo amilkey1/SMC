@@ -86,17 +86,13 @@ class Particle {
         vector<double>                                  getGeneTreeLogLikelihoods();
         vector<double>                                  getTopologyPriors();
         void                                            hybridizationProposal();
-        void                                            joinSpeciesProposal();
         bool                                            checkForDeepCoalescence();
         void                                            priorPriorProposal();
         void                                            calcParticleWeight();
-        void                                            chooseNextMove();
-        void                                            noSpeciesJoinedProposal();
         void                                            speciesJoinedProposal();
         vector<string>                                  getGeneTreeNames(int j);
         vector<string>                                  getGeneTreeNewicks();
         double                                          getNumSpecies(){return _forests[0]._lineages.size();}
-        void                                            rebuildSpeciesTree();
         vector<pair<string, string>>                    getSpeciesJoined(){return _forests[1]._names_of_species_joined;}
         void                                            buildFakeSpeciesTree();
         void                                            panmicticSpeciesPartition();
@@ -104,34 +100,43 @@ class Particle {
         void                                            firstGen();
         void                                            geneTreeProposal(bool unconstrained);
         void                                            speciesProposal();
+        void                                            filterSpeciesTrees();
+        void                                            normalizeSpeciesTreeWeights();
+        void                                            resampleParticles();
         void                                            resetSpeciesInfo(){_t.clear();}
-        void                                            resetSpeciesTreeHeight(){_species_tree_height = 0.0;}
+        void                                            resetSpeciesTreeHeight(){ for (auto &s:_species_tree_height) {s = 0.0;};}
         void                                            resetSpecies();
         void                                            resetGeneIncrements();
+        void                                            increaseNumberOfForests();
+        double                                          getRunningSum();
 
     private:
 
         static unsigned                         _nsubsets;
         vector<Forest>                          _forests;
+        vector<vector<Forest>>                  _alt_forests;
         double                                  _log_weight;
+        vector<double>                          _log_weight_options;
         Data::SharedPtr                         _data;
         double                                  _log_likelihood;
         double                                  _log_coalescent_likelihood;
+        vector<double>                          _log_coalescent_likelihood_options;
         int                                     _generation = 0;
         map<int, vector<double>>                     _random_seeds;
         bool                                    _running_on_empty = false;
         bool                                    _no_species_joined = true;
-        double                                  _species_tree_height;
-//        tuple<string, string, string>           _t;
-        vector<pair<tuple<string, string, string>, double>> _t;
+        vector<double>                                  _species_tree_height;
+        vector<vector<pair<tuple<string, string, string>, double>>> _t;
         unsigned                                _gene_tree_proposal_attempts;
         bool                                    _ready_to_join_species;
         bool                                    _species_first;
-    
         bool                                    firstProposal();
         void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
         bool                                    checkIfReadyToJoinSpecies();
+        int                                     _nspecies_forests = 1000;
+        bool                                    _use_first = true;
+        bool                                    _inf = false;
 };
 
     inline Particle::Particle() {
@@ -140,7 +145,7 @@ class Particle {
         _log_likelihood = 0.0;
         _gene_tree_proposal_attempts = 0;
         _log_coalescent_likelihood = 0.0;
-        _species_tree_height = 0.0;
+        _species_tree_height.clear();
     };
 
     inline Particle::~Particle() {
@@ -218,7 +223,33 @@ class Particle {
         }
         
         else if (!gene_trees_only) {
+            if (_generation == Forest::_ntaxa - 1) {
+                increaseNumberOfForests();
+            }
             speciesProposal();
+            filterSpeciesTrees();
+            
+            if (_generation == Forest::_ntaxa+Forest::_nspecies-2) { // TODO: double check what the generation should be here
+                // once species trees are fully resolved, choose a species tree based on their weights // TODO: does this happen before or after filtering?
+                int choice = _forests[0].selectPair(_log_weight_options);
+                // reset _forests to the chosen species tree in _alt_forests
+                _forests[0] = _alt_forests[choice][0];
+                _log_weight = _log_weight_options[choice];
+                _alt_forests.clear();
+                vector<pair<tuple<string, string, string>, double>> chosen_species = _t[choice];
+                _t.clear();
+                _t.push_back(chosen_species);
+                
+                _species_tree_height.clear();
+                _log_coalescent_likelihood_options.clear();
+                _log_weight_options.clear();
+                if (_inf) {
+                    double neg_inf = -1*numeric_limits<double>::infinity();
+                    _log_weight = neg_inf;
+                }
+            }
+            
+            _generation++;
         }
         
         if (_running_on_empty) {
@@ -243,8 +274,9 @@ class Particle {
         }
         for (int i=1; i<_forests.size(); i++) {
             _forests[i]._theta = _forests[i]._starting_theta;
-            pair<double, string> species_info = _forests[i].chooseDelta(_t, unconstrained);
-            _forests[i].geneTreeProposal(species_info, _t);
+            assert (_t.size() == 1);
+            pair<double, string> species_info = _forests[i].chooseDelta(_t[0], unconstrained);
+            _forests[i].geneTreeProposal(species_info, _t[0]);
             if (_forests[i]._lineages.size() == 1) {
                 _forests[i].refreshPreorder();
             }
@@ -262,204 +294,188 @@ class Particle {
         }
     }
 
-    inline void Particle::speciesProposal() { // TODO: also check the _generation
-        double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
-//        _log_coalescent_likelihood = 0.0;
-        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-        
-        // save existing species partition to revert to
-        vector<map<string, list<Node*>> > old_species_partition;
-        for (int i=1; i<_forests.size(); i++) {
-            old_species_partition.push_back(_forests[i]._species_partition);
-        }
-        
-        vector<tuple<tuple<string, string, string>, double, double>> species_tree_choices; // species names, coalescent likelihood, species increment
-        double prev_edge_length = _forests[0]._last_edge_length;
-        for (int s=0; s<5000; s++) {
-            if (_forests[0]._last_edge_length > 0.0) {
-                // choose species to join if past the first species generation
-                species_joined = _forests[0].speciesTreeProposal();
-            }
-                // choose a species tree increment
-            if (_forests[0]._lineages.size() > 1) {
-                _forests[0].chooseSpeciesIncrement();
-                _species_tree_height += _forests[0]._last_edge_length;
-            }
-            if (_forests[0]._lineages.size() == 1) {
-                _forests[0]._last_edge_length = 0.0;
-            }
-            
-            // update gene tree species partitions
-            double log_coalescent_likelihood = 0.0;
-            for (int i = 1; i<_forests.size(); i++) {
-                _forests[i].updateSpeciesPartitionTwo(species_joined);
-                
-                bool mark_as_done = false;
-                log_coalescent_likelihood += _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height, mark_as_done);
-            }
-            species_tree_choices.push_back(make_tuple(species_joined, log_coalescent_likelihood, _forests[0]._last_edge_length));
-            for (int i = 1; i<_forests.size(); i++) {
-                _forests[i]._species_partition = old_species_partition[i-1];
-            }
-            
-            // reset species tree _lineages vector
-            _forests[0].revertSpeciesTree(make_pair(species_joined, _forests[0]._last_edge_length));
-                
-            _species_tree_height -= _forests[0]._last_edge_length;
-            _forests[0]._last_edge_length = prev_edge_length;
-        }
-        pair<tuple<string, string, string>, double> chosen_species;
-        // chosen species contains names of chosen species to join + chosen species increment
-        chosen_species = _forests[0].chooseSpeciesPair(species_tree_choices, prev_log_coalescent_likelihood); // species joined contains names of species and increment
-        if (_forests[0]._lineages.size() > 2) {
-            assert (chosen_species.second > 0.0);
-        }
-        
-        _forests[0]._last_edge_length = chosen_species.second;
-        _species_tree_height += _forests[0]._last_edge_length;
-        _t.push_back(make_pair(chosen_species.first, _forests[0]._last_edge_length));
-        
-        // update lineages vector again with the chosen join
-        _forests[0].updateLineages(chosen_species);
-        
-//        _forests[0].showForest();
-        for (int i=1; i<_forests.size(); i++) {
-            _forests[i].updateSpeciesPartitionTwo(chosen_species.first);
-            bool mark_as_done = true;
-            _log_coalescent_likelihood += _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, chosen_species.first, _species_tree_height, mark_as_done);
-        }
+    inline double Particle::getRunningSum() {
+        double running_sum = 0.0;
+        double log_particle_sum = 0.0;
 
-        if (!_running_on_empty) {
-            _log_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood;
+        double log_max_weight = *max_element(_log_weight_options.begin(), _log_weight_options.end());
+        
+        for (auto & i:_log_weight_options) {
+            running_sum += exp(i - log_max_weight);
+        }
+        log_particle_sum = log(running_sum) + log_max_weight;
+
+        return log_particle_sum;
+    }
+
+    inline void Particle::normalizeSpeciesTreeWeights() {
+        double log_particle_sum = getRunningSum();
+        
+        for (int a=0; a<_log_weight_options.size(); a++) {
+            _log_weight_options[a] = _log_weight_options[a] - log_particle_sum;
         }
     }
 
-    inline void Particle::chooseNextMove() {
-        bool extend = false;
-        for (int i = 1; i < _forests.size(); i++) {
-            int a = _forests[i]._species_join_number;
-            double species_tree_height = 0.0;
-            for (int i = 0; i<a+1; i++) {
-                species_tree_height += _t[i].second;
+    inline void Particle::resampleParticles() {
+        vector<pair<double, double>> cum_probs;
+        vector<double> alt_log_weights;
+        vector<vector<Forest>> to_forests;
+        vector<double> heights;
+        heights.resize(_nspecies_forests);
+        
+        vector<double> log_coal_likelihoods;
+        log_coal_likelihoods.resize(_nspecies_forests);
+        
+        vector<vector<pair<tuple<string, string, string>, double>>> t;
+        t.resize(_nspecies_forests); // TODO: check this one
+        
+        alt_log_weights.resize(_nspecies_forests);
+        // Create vector of pairs p, with p.first = log weight and p.second = particle index
+        cum_probs.resize(_nspecies_forests);
+        unsigned i = 0;
+        for(int a=0; a<_log_weight_options.size(); a++) {
+            cum_probs[i].first = _log_weight_options[a];
+            cum_probs[i].second = i;
+            ++i;
+        }
+            
+        // Sort cum_probs vector so that largest log weights come first
+        sort(cum_probs.begin(), cum_probs.end(), greater< pair<double,unsigned> >());
+
+        // Convert vector from storing log weights to storing cumulative weights
+        double cumpr = 0.0;
+        for (auto & w : cum_probs) {
+            cumpr += exp(w.first);
+            w.first = cumpr;
+        }
+        
+        // Last element in cum_probs should hold 1.0 if weights were indeed normalized coming in
+        if (!isnan(cumpr)) {
+        assert( fabs( 1.0 - cum_probs[_nspecies_forests-1].first ) < 0.0000001);
+        }
+
+        
+        // Draw new set of particles by sampling with replacement according to cum_probs
+        to_forests.resize(_nspecies_forests);
+        for (unsigned i = 0; i < _nspecies_forests; i++) {
+        
+            // Select a particle to copy to the ith slot in to_particles
+            int sel_index = -1;
+            double u = rng.uniform();
+            for(unsigned j = 0; j < _nspecies_forests; j++) {
+                if (u < cum_probs[j].first) {
+                    sel_index = cum_probs[j].second;
+                    break;
+                }
             }
-            extend = _forests[i].checkIfReadyToJoinSpecies(species_tree_height, _t[a].first); // TODO: this fails for multiple genes
-            if (extend) {
-                if (_forests[i]._lineages.size() > 1) {
-                    if (_forests[i]._lineages.size() > 1) {
-                        _forests[i].extendGeneTreeLineages(species_tree_height);
-                        }
+            assert(sel_index > -1);
+            vector<Forest> forests = _alt_forests[sel_index];
+            to_forests[i] = forests;
+            heights[i] = _species_tree_height[sel_index];
+            alt_log_weights[i] = _log_weight_options[sel_index];
+            log_coal_likelihoods[i] = _log_coalescent_likelihood_options[sel_index];
+//            Particle::SharedPtr p0 = from_particles[sel_index];
+//            to_particles[i]=Particle::SharedPtr(new Particle(*p0));
+            assert(_nspecies_forests == to_forests.size());
+            t[i] = _t[sel_index];
+        }
+        _log_weight_options.clear();
+        _log_weight_options = alt_log_weights;
+        _log_coalescent_likelihood_options.clear();
+        _log_coalescent_likelihood_options = log_coal_likelihoods;
+        _species_tree_height.clear();
+        _species_tree_height = heights;
+        _t.clear();
+        _t = t;
+        _alt_forests = to_forests;
+    }
+
+    inline void Particle::filterSpeciesTrees() {
+        normalizeSpeciesTreeWeights();
+        
+        double ess_inverse = 0.0;
+        for (int b = 0; b<_log_weight_options.size(); b++) {
+            ess_inverse += exp(_log_weight_options[b]);
+        }
+        
+        double ess = 1.0/ess_inverse;
+        cout << "   " << "ESS = " << ess << endl;
+        
+        if (isnan(ess)) {
+            _inf = true;
+//            throw XProj(format("no species trees can accommodate the gene trees; increase the number of particles and try again"));
+        }
+     
+        if (!_inf) {
+        resampleParticles();
+        }
+//        for (auto &forest:_alt_forests) {
+//            forest[0].showForest();
+//        }
+        //if use_first is true, my_vec = my_vec_2
+        //if use_first is false, my_vec = my_vec_1
+        
+//        _alt_forests = _use_first ? _alt_forests2:_alt_forests;
+
+        //change use_first from true to false or false to true
+//        _use_first = !_use_first;
+    }
+
+    inline void Particle::speciesProposal() {
+//        double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
+        if (!_inf) { // if the species trees all have weight of neg inf, stop the particle where it is; the particle will get filtered out when the particles are resampled after species trees are complete
+            for (int a = 0; a<_alt_forests.size(); a++) {
+    //            bool is_infinity = isinf(_log_weight_options[a]);
+                // if weight is already -inf, don't do any more calculations or proposals; weight remains at -inf
+    //            if (!is_infinity) {
+                    tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+                    double prev_log_coalescent_likelihood = _log_coalescent_likelihood_options[a];
+                    if (_alt_forests[a][0]._last_edge_length > 0.0) {
+                    // choose species to join if past the first species generation for each forest vector
+                        species_joined = _alt_forests[a][0].speciesTreeProposal();
                     }
-                else {
-                    _forests[i].finishGeneTree();
-                }
+                        
+                    // choose a species tree increment
+                    if (_alt_forests[a][0]._lineages.size() > 1) {
+                        _alt_forests[a][0].chooseSpeciesIncrement();
+                        _species_tree_height[a] += _alt_forests[a][0]._last_edge_length;
+                    }
+                    if (_alt_forests[a][0]._lineages.size() == 1) {
+                        _alt_forests[a][0]._last_edge_length = 0.0;
+                    }
+                        
+                    _t[a].push_back(make_pair(species_joined, _alt_forests[a][0]._last_edge_length));
+//                _alt_forests[a][0].showForest();
+    //            bool is_infinity = isinf(_log_weight_options[a]);
+    //            // if weight is already -inf, don't do any more calculations or proposals; weight remains at -inf
+    //            if (!is_infinity) {
+                    for (int i = 1; i<_alt_forests[a].size(); i++) {
+    //                    _alt_forests[a][i].showForest();
+                        _alt_forests[a][i].updateSpeciesPartitionTwo(species_joined);
+                        _log_coalescent_likelihood_options[a] += _alt_forests[a][i].calcCoalescentLikelihood(_alt_forests[a][0]._last_edge_length, species_joined, _species_tree_height[a], true);
+                    }
+                    if (!_running_on_empty) {
+                        _log_weight_options[a] = _log_coalescent_likelihood_options[a] - prev_log_coalescent_likelihood; // TODO: need to reset _t also and _log_coalescent_likelihood_options
+                    }
+    //            }
             }
         }
-//        checkIfReadyToJoinSpecies();
-    }
-
-    inline void Particle::noSpeciesJoinedProposal() {
-        // propose gene tree moves if there have been no species joined at all
         
-        if (!_species_first) {
-            for (unsigned i=1; i<_forests.size(); i++){
-                assert (_forests[i]._lineages.size() > 1);
-//                _forests[i].firstGeneTreeProposal(_t);
-                assert (_forests[0]._last_edge_length == _forests[0].getTreeHeight());
-                if (Forest::_proposal != "prior-prior") {
-                    priorPostIshChoice(i, _t);
-                }
-            }
-        }
-        else {
-            for (unsigned i=1; i<_forests.size(); i++){
-//                _forests[i].firstGeneTreeProposal(_t);
-                if (Forest::_proposal != "prior-prior") {
-                    priorPostIshChoice(i, _t);
-                }
-            }
-        }
+        // recalculate log weight now
+//        _log_weight = 0.0;
+//        for (int b=0; b<_log_weight_options.size(); b++) {
+//            bool is_infinity = isinf(_log_weight_options[b]);
+//            if (!is_infinity) {
+//                _log_weight += _log_weight_options[b];
+//            }
+//        }
+//        if (_log_weight == 0.0) {
+//            double neg_inf = -1*numeric_limits<double>::infinity();
+//            _log_weight = neg_inf;
+//        }
+//        assert (_log_weight !=0.0);
     }
 
-//    inline bool Particle::firstProposal() {
-//        bool coalescence = true;
-//        // set starting variables
-//        assert (_generation == 0);
-//        assert (_gene_tree_proposal_attempts == 0);
-//        _no_species_joined = true;
-//
-//        for (unsigned i=1; i<_forests.size(); i++) {
-//            _forests[i]._theta = _forests[i]._starting_theta;
-//        }
-//
-//        if (!_species_first) {
-//            _ready_to_join_species = false;
-//
-//            // choose a species tree height if species tree is unfinished, but don't join species yet
-//            if (_forests[0]._lineages.size() > 1) {
-//                _forests[0].chooseSpeciesIncrement();
-//            }
-//        }
-//
-//        for (int i = 1; i<_forests.size(); i++) {
-//            _forests[i]._extended_increment = 0.0;
-//        }
-//        if (!_species_first) {
-//            tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-//            double edge_len = _forests[0]._last_edge_length;
-//
-//            _t.push_back(make_pair(species_joined, edge_len));
-//
-//            for (unsigned i=1; i<_forests.size(); i++){
-//                assert (_forests[i]._lineages.size() > 1);
-//                _gene_tree_proposal_attempts++;
-////                _forests[i].firstGeneTreeProposal(_t);
-//                if (Forest::_proposal != "prior-prior") {
-//                    priorPostIshChoice(i, _t);
-//                }
-//            }
-//        }
-//
-//        else {
-//            for (unsigned i=1; i<_forests.size(); i++){
-//                assert (_forests[i]._lineages.size() > 1);
-//                _gene_tree_proposal_attempts++;
-////                _forests[i].firstGeneTreeProposal(_t);
-//                if (Forest::_proposal != "prior-prior") {
-//                    priorPostIshChoice(i, _t);
-//                }
-//            }
-//        }
-//
-//        // check if there has been a deep coalescent event
-//        for (unsigned i=1; i<_forests.size(); i++) {
-//            if (_forests[i]._num_coalescent_events_in_generation == 0) {
-//                coalescence = false;
-//                break;
-//            }
-//        }
-//        return coalescence;
-//    }
-
-//    inline void Particle::joinSpeciesProposal() {
-//        // reset _ready_to_join_species
-//        _ready_to_join_species = false;
-//
-//        if (!_species_first) {
-//            assert (_forests[0]._lineages.size() > 1);
-//            tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
-//
-//            // if the species tree is not finished, add another species increment
-//            if (_forests[0]._lineages.size()>1) {
-//                _forests[0].addSpeciesIncrement();
-//            }
-//
-//            double edge_len = 0.0;
-//            if (_forests[0]._lineages.size() > 1) {
-//                edge_len = _forests[0]._last_edge_length;
-//            }
-//            _t.push_back(make_pair(species_joined, edge_len));
-//        }
-//    }
 
     inline void Particle::calcParticleWeight() {
         // use the gene tree weights to calculate the particle weight
@@ -470,101 +486,9 @@ class Particle {
 //            _log_weight += _forests[i]._gene_tree_log_likelihood;
         }
 //        _log_weight = prev_log_weight - _log_weight;
-        _generation++;
+//        _generation++;
     }
 
-//    inline void Particle::priorPriorProposal() {
-//        assert (Forest::_proposal == "prior-prior");
-//        for (int i = 1; i<_forests.size(); i++) {
-//            if (_forests[i]._num_coalescent_events_in_generation > 1) {
-//                double smallest_branch = _forests[i].findShallowestCoalescence();
-//                _forests[i].revertToShallowest(smallest_branch);
-//                }
-//            }
-//    }
-
-//    inline bool Particle::checkIfReadyToJoinSpecies() {
-//        _ready_to_join_species = false;
-//        double species_tree_height = 0.0;
-//
-//        if (!_species_first) {
-//            species_tree_height = _forests[0].getTreeHeight();
-//        }
-//        else {
-//            // find gene forest that has advanced the furthest
-//            vector<int> species_times;
-//            for (int i=1; i<_forests.size(); i++) {
-//                species_times.push_back(_forests[i]._species_join_number);
-//            }
-//            double max = *max_element(species_times.begin(), species_times.end());
-//            // get height of species tree at time of deepest gene tree coalescence
-//            species_tree_height = _t[max].second;
-//        }
-//
-//        if (!_species_first) {
-//            for (int i=1; i<_forests.size(); i++) {
-//                double gene_tree_height = _forests[i].getTreeHeight();
-//                if (gene_tree_height >= species_tree_height-0.000001 && _forests[0]._lineages.size() > 1) {
-//                    _ready_to_join_species = true;
-//                    break;
-//                }
-//            }
-//        }
-//        else {
-//            for (int i=1; i<_forests.size(); i++) {
-//                double gene_tree_height = _forests[i].getTreeHeight();
-//                if (gene_tree_height >= species_tree_height-0.000001) {
-//                    _ready_to_join_species = true;
-//                    break;
-//                }
-//            }
-//        }
-//
-//        return _ready_to_join_species;
-//    }
-
-//    inline void Particle::priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t) {
-//        // attempt first gene tree proposal for all lineages, then select the one to keep
-//        _forests[i].chooseCoalescentEvent();
-//        // if species tree is finished, deep coalescence is not a concern anymore
-//            _forests[i].mergeChosenPair(_t);
-//    }
-
-//    inline void Particle::speciesJoinedProposal() {
-//        for (int i=1; i<_forests.size(); i++) {
-////            if (_forests[i]._num_coalescent_events_in_generation == 0) {
-////                // if the forest has already had a coalescent event, need to wait for filtering to attempt another coalescence
-////                int a = _forests[i]._species_join_number;
-////                if (_forests[i]._ready_to_join_species_forest) {
-////                    a++;
-////                    _forests[i]._ready_to_join_species_forest = false;
-////                }   // TODO: this might be wrong - what is going on here?
-////                if (a > _t.size()-1) { // TODO: not sure why this is happening still
-////                    a = (int) _t.size()-1;
-////                }
-////                double species_tree_height = 0.0;
-////                for (int i=0; i<a+1; i++) {
-////                    species_tree_height += _t[i].second;
-////                }
-////                _forests[i].geneTreeProposal(_t);
-//            if (Forest::_proposal != "prior-prior") {
-//                priorPostIshChoice(i, _t);
-//            }
-//        }
-////        }
-//    }
-
-//    inline bool Particle::checkForDeepCoalescence() {
-//        bool coalescence = true;
-//        for (int i=1; i<_forests.size(); i++) {
-//            // if one forest has a deep coalescent event, need to continue in this generation
-//            if (_forests[i]._num_coalescent_events_in_generation == 0 && _forests[i]._lineages.size() > 1) {
-//                coalescence = false;
-//                break;
-//            }
-//        }
-//        return coalescence;
-//    }
 
     inline void Particle::resetVariables() {
         for (int i = 1; i<_forests.size(); i++) {
@@ -574,49 +498,25 @@ class Particle {
         }
     }
 
-//    inline void Particle::buildEntireSpeciesTree() {
-//        _forests[0].chooseSpeciesIncrement();
-//        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-//        double edge_len = _forests[0]._last_edge_length;
-//
-//        _t.push_back(make_pair(species_joined, edge_len));
-//
-//        for (int i=0; i < _forests[0]._nspecies-1; i++) {
-//            if (_forests[0]._lineages.size() > 1) {
-//                tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
-//
-//                // if the species tree is not finished, add another species increment
-//                if (_forests[0]._lineages.size()>1) {
-//                    _forests[0].addSpeciesIncrement();
-//                }
-//
-//                double edge_len = 0.0;
-//                if (_forests[0]._lineages.size() > 1) {
-//                    edge_len = _forests[0]._last_edge_length;
-//                }
-//                _t.push_back(make_pair(species_joined, edge_len));
-//            }
-//        }
-//    }
-
     inline void Particle::buildFakeSpeciesTree() {
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
         _forests[0]._last_edge_length = 0.0;
-        
+
         double edge_len = _forests[0]._last_edge_length;
-        
+        _t.resize(1);
+
 //        _t.push_back(make_pair(species_joined, edge_len));
-        
+
         for (int i=0; i < _forests[0]._nspecies-1; i++) {
             if (_forests[0]._lineages.size() > 1) {
 //                tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
                 tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-                
+
                 double edge_len = 0.0;
                 if (_forests[0]._lineages.size() > 1) {
                     edge_len = _forests[0]._last_edge_length;
                 }
-                _t.push_back(make_pair(species_joined, edge_len));
+                _t[0].push_back(make_pair(species_joined, edge_len));
             }
         }
     }
@@ -624,39 +524,6 @@ class Particle {
     inline void Particle::panmicticSpeciesPartition() {
         for (int i=1; i<_forests.size(); i++) {
             _forests[i].combineSpeciesPartition();
-        }
-    }
-
-    inline void Particle::rebuildSpeciesTree() {
-        // walk through gene trees and find deepest one
-        int smallest_num_species = (int) _t.size();
-        for (int i=1; i<_forests.size(); i++) {
-            if (_forests[i]._species_partition.size() < smallest_num_species) {
-                smallest_num_species = (int) _forests[i]._species_partition.size();
-            }
-        }
-        
-        _forests[0].resetSpeciesTree(_t, smallest_num_species);
-        
-        // subtract those species from _t to rebuild the species tree below deepest gene tree
-        _t.resize(_t.size() - (smallest_num_species-1));
-        
-        // now rebuild the tree below that point
-        for (int i=0; i < _forests[0]._nspecies-1; i++) {
-            if (_forests[0]._lineages.size() > 1) {
-                tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
-                
-                // if the species tree is not finished, add another species increment
-                if (_forests[0]._lineages.size()>1) {
-                    _forests[0].addSpeciesIncrement();
-                }
-                
-                double edge_len = 0.0;
-                if (_forests[0]._lineages.size() > 1) {
-                    edge_len = _forests[0]._last_edge_length;
-                }
-                _t.push_back(make_pair(species_joined, edge_len));
-            }
         }
     }
 
@@ -887,10 +754,23 @@ class Particle {
         }
     }
 
+    inline void Particle::increaseNumberOfForests() {
+        _t.resize(_nspecies_forests);
+        _species_tree_height.resize(_nspecies_forests);
+        _log_coalescent_likelihood_options.resize(_nspecies_forests);
+        _log_weight_options.resize(_nspecies_forests);
+        
+        for (int i=0; i<_nspecies_forests; i++) {
+            vector<Forest> f = _forests;
+            _alt_forests.push_back(f);
+        }
+    }
+
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_likelihood = other._log_likelihood;
         _forests         = other._forests;
+        _alt_forests = other._alt_forests;
         _data           = other._data;
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;
@@ -903,5 +783,10 @@ class Particle {
         _no_species_joined = other._no_species_joined;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _species_tree_height = other._species_tree_height;
+        _nspecies_forests = other._nspecies_forests;
+        _log_coalescent_likelihood_options = other._log_coalescent_likelihood_options;
+        _log_weight_options = other._log_weight_options;
+        _use_first = other._use_first;
+        _inf = other._inf;
     };
 }

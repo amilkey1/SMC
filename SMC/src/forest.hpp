@@ -1701,17 +1701,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 m++;
             }
         }
-        
-//        if (other._heights_and_nodes.size() > 0) { // TODO: I don't think this is right
-//            unsigned j = 0;
-//            for (auto othernd : other._heights_and_nodes) {
-//                unsigned k = othernd.second->_number;
-//                Node* nd = &*next(_heights_and_nodes.begin(), k)->second;
-//                _heights_and_nodes[j].first = other._heights_and_nodes[j].first;
-//                _heights_and_nodes[j].second = nd;
-//                j++;
-//            }
-//        }
     }
 
     inline void Forest::setUpSpeciesForest(vector<string> &species_names) {
