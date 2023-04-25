@@ -70,6 +70,7 @@ namespace proj {
             bool                _visited = false;
             std::string         _hybrid_newick_name;
             unsigned            _n_descendants;
+            bool                _done;
     };
     
     
@@ -90,6 +91,7 @@ namespace proj {
         _edge_length = _smallest_edge_length;
         _n_descendants = 0;
         _partial.reset();
+        _done = false;
     }   
 
     inline void Node::setEdgeLength(double v) {

@@ -100,12 +100,16 @@ class Particle {
         vector<tuple<string, string, string>> _triple;
         vector<string>                          _newicks;
         Split::treemap_t                        _treeIDs;
+        double                                  _log_coalescent_likelihood;
+        double                                  _species_tree_height;
 };
 
     inline Particle::Particle() {
         //log weight and log likelihood are 0 for first generation
         _log_weight = 0.0;
         _log_likelihood = 0.0;
+        _log_coalescent_likelihood = 0.0;
+        _species_tree_height = 0.0;
     };
 
     inline Particle::~Particle() {
@@ -172,19 +176,27 @@ class Particle {
 
     inline double Particle::proposal() {
         string event;
+        tuple<string, string, string> t = make_tuple("null", "null", "null");
+        vector<int> increment_numbers; // contains number of increments after step - number of increments before step
         if (_generation == 0) {
             for (unsigned i=1; i<_forests.size(); i++) {
                 _forests[i]._theta = _forests[i]._starting_theta;
             }
             _forests[0].chooseSpeciesIncrement();
             for (unsigned i=1; i<_forests.size(); i++){
+                int before = (int) _forests[i]._increments.size();
                 _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
+                int after = (int) _forests[i]._increments.size();
+                increment_numbers.push_back(after-before);
             }
         }
         else if (_forests[0]._lineages.size()==1) {
             for (unsigned i=1; i<_forests.size(); i++) {
+                int before = (int) _forests[i]._increments.size();
                 list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
                 _forests[i].fullyCoalesceGeneTree(lineages_list);
+                int after = (int) _forests[i]._increments.size();
+                increment_numbers.push_back(after-before);
             }
         }
         else {
@@ -200,12 +212,16 @@ class Particle {
                 calculateGamma();
             }
             else if (event == "speciation") {
-                tuple<string, string, string> t = _forests[0].speciesTreeProposal();
+                t = _forests[0].speciesTreeProposal();
+//                tuple<string, string, string> t = _forests[0].speciesTreeProposal();
                 if (_forests[0]._lineages.size()>1) {
                     _forests[0].addSpeciesIncrement();
                 }
                 for (unsigned i=1; i<_forests.size(); i++){
+                    int before = (int) _forests[i]._increments.size();
                     _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
+                    int after = (int) _forests[i]._increments.size();
+                    increment_numbers.push_back(after-before);
                 }
             }
         }
@@ -213,12 +229,23 @@ class Particle {
         if (_running_on_empty == false) {
             double prev_log_likelihood = _log_likelihood;
             _log_likelihood = calcLogLikelihood();
+            _species_tree_height += _forests[0]._last_edge_length;
+            for (int i=1; i<_forests.size(); i++) {
+//                showParticle();
+                // coalescent likelihoods are the increment priors
+                for (int j=0; j<increment_numbers[i-1]; j++) {
+                    _log_coalescent_likelihood += _forests[i]._increments[j].second; // TODO: don't think this is correct for deep coalescence
+                }
+//                _forests[i].refreshPreorder();
+//                _log_coalescent_likelihood += _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, t, _species_tree_height);
+            }
             if (Forest::_proposal == "prior-prior") {
                 _log_weight = _log_likelihood - prev_log_likelihood;
             }
             else {
                 calcParticleWeight();
             }
+            _log_weight += _log_coalescent_likelihood;
         }
         
         else {
@@ -460,5 +487,6 @@ class Particle {
         _generation     = other._generation;
         _triple         = other._triple;
         _newicks = other._newicks;
+        _log_coalescent_likelihood = other._log_coalescent_likelihood;
     };
 }

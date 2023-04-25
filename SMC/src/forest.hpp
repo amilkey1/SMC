@@ -106,6 +106,10 @@ class Forest {
         unsigned                    countDescendants(Node* nd, unsigned count);
         double                      calcDeepCoalescentPrior();
         double                      calcIncrementPrior();
+        vector< pair<double, Node *>>      sortPreorder();
+        double                      getLineageHeight(Node* nd);
+        void                        refreshPreorder();
+
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -146,6 +150,7 @@ class Forest {
 //        Split::treemap_t            _treeIDs;
 //        std::vector<std::string>    _newicks;
 //        vector<double>              _gene_tree_increments;
+        vector<Node*>               _preorder;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -205,6 +210,7 @@ class Forest {
             }
         _nleaves=_ntaxa;
         _ninternals=0;
+        vector<Node*>               _preorder;
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -263,13 +269,85 @@ class Forest {
         return (unsigned)_nodes.size();
     }
 
+//    inline vector< pair<double, Node *>> Forest::sortPreorder() {
+//            vector< pair<double, Node *>> heights_and_nodes;
+//            for (auto it = _preorder.rbegin(); it != _preorder.rend(); it++) {
+//                Node * nd = *it;
+//                if (nd->_left_child) {
+//                    // if internal node, store cumulative height in _height
+//                    double height = getLineageHeight(nd->_left_child); //
+//                    heights_and_nodes.push_back(make_pair(height, nd));
+//    //                nd->_height = nd->_left_child->_height + nd->_left_child->_edge_length;
+//    //                heights_and_nodes.push_back(make_pair(nd->_height, nd));
+//                }
+//                else {
+//                    // if leaf node, initialize _height to zero
+//    //                nd->_height = 0.0;
+//                }
+//            }
+//
+//            // sort heights_and_nodes so that smallest heights will be first
+//            sort(heights_and_nodes.begin(), heights_and_nodes.end());
+//            return(heights_and_nodes);
+//        }
+
+    inline void Forest::refreshPreorder() {
+       // Create vector of node pointers in preorder sequence
+        Node *nd = &_nodes.back();
+       _preorder.clear();
+       _preorder.reserve(_nodes.size()); // _preorder must include root node
+
+        _preorder.push_back(nd);
+        
+       while (true) {
+           nd = findNextPreorder(nd);
+           if (nd)
+               _preorder.push_back(nd);
+           else
+               break;
+       }   // end while loop
+    }
+
+//    inline Node * Forest::findNextPreorder(Node * nd) {
+//        assert(nd);
+//        Node * next = 0;
+//        if (nd->_major_parent) { // TODO: not sure
+//            next = nd->_parent->_right_sib;
+//        }
+//        else if (!nd->_left_child && !nd->_right_sib) {
+//            // nd has no children and no siblings, so next preorder is the right sibling of
+//            // the first ancestral node that has a right sibling.
+//            Node * anc = nd->_parent;
+//            while (anc && !anc->_right_sib)
+//                anc = anc->_parent;
+//            if (anc) {
+//                // We found an ancestor with a right sibling
+//                next = anc->_right_sib;
+//            }
+//            else {
+//                // nd is last preorder node in the tree
+//                next = 0;
+//            }
+//        }
+//        else if (nd->_right_sib && !nd->_left_child) {
+//            // nd has no children (it is a tip), but does have a sibling on its right
+//            next = nd->_right_sib;
+//        }
+//        else if (nd->_left_child && !nd->_right_sib) {
+//            // nd has children (it is an internal node) but no siblings on its right
+//            next = nd->_left_child;
+//        }
+//        else {
+//            // nd has both children and siblings on its right
+//            next = nd->_left_child;
+//        }
+//        return next;
+//    }
+
     inline Node * Forest::findNextPreorder(Node * nd) {
         assert(nd);
         Node * next = 0;
-        if (nd->_major_parent) { // TODO: not sure
-            next = nd->_parent->_right_sib;
-        }
-        else if (!nd->_left_child && !nd->_right_sib) {
+        if (!nd->_left_child && !nd->_right_sib) {
             // nd has no children and no siblings, so next preorder is the right sibling of
             // the first ancestral node that has a right sibling.
             Node * anc = nd->_parent;
@@ -765,6 +843,18 @@ class Forest {
         return s;
     }
 
+    inline double Forest::getLineageHeight(Node* nd) {
+        double sum_height = 0.0;
+        
+        sum_height += nd->getEdgeLength();
+        if (nd->_left_child) {
+            for (Node* child = nd->_left_child; child; child=child->_left_child) {
+                sum_height += child->getEdgeLength();
+            }
+        }
+        return sum_height;
+    }
+
     inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, double increment) {
         pair<Node*, Node*> p = getSubtreeAt(t, node_list);
 
@@ -845,6 +935,7 @@ class Forest {
     inline void Forest::operator=(const Forest & other) {
         _nstates = other._nstates;
         _npatterns = other._npatterns;
+        _preorder.resize(other._preorder.size());
         _nodes.clear();
         _nodes.resize(other._nodes.size());
         _lineages.resize(other._lineages.size());
@@ -956,6 +1047,7 @@ class Forest {
                 nd->_visited = othernd._visited;
                 nd->_hybrid_newick_name = othernd._hybrid_newick_name;
                 nd->_n_descendants = othernd._n_descendants;
+                nd->_done = othernd._done;
             }
         }
 
@@ -965,6 +1057,16 @@ class Forest {
             Node* nd = &*next(_nodes.begin(), k);
             _lineages[j] = nd;
             j++;
+        }
+        
+        if (other._preorder.size() > 0) {
+            unsigned m = 0;
+            for (auto othernd : other._preorder) {
+                unsigned n = othernd->_number;
+                Node* nd = &*next(_nodes.begin(), n);
+                _preorder[m] = nd;
+                m++;
+            }
         }
     }
 
@@ -1059,6 +1161,28 @@ class Forest {
 
         return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
     }
+
+    inline vector< pair<double, Node *>> Forest::sortPreorder() {
+            vector< pair<double, Node *>> heights_and_nodes;
+            for (auto it = _preorder.rbegin(); it != _preorder.rend(); it++) {
+                Node * nd = *it;
+                if (nd->_left_child) {
+                    // if internal node, store cumulative height in _height
+                    double height = getLineageHeight(nd->_left_child); //
+                    heights_and_nodes.push_back(make_pair(height, nd));
+    //                nd->_height = nd->_left_child->_height + nd->_left_child->_edge_length;
+    //                heights_and_nodes.push_back(make_pair(nd->_height, nd));
+                }
+                else {
+                    // if leaf node, initialize _height to zero
+    //                nd->_height = 0.0;
+                }
+            }
+             
+            // sort heights_and_nodes so that smallest heights will be first
+            sort(heights_and_nodes.begin(), heights_and_nodes.end());
+            return(heights_and_nodes);
+        }
 
     inline void Forest::showSpeciesJoined() {
         assert (_index==0);
