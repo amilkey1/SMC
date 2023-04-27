@@ -1254,6 +1254,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
 
     inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done) {
 //        showForest();
+        vector<double> branch_lengths_used;
         double log_coalescent_likelihood = 0.0;
         double neg_inf = -1*numeric_limits<double>::infinity();
         map<string, pair<int, double>> remaining_lineages; // remaining lineages associated with each species
@@ -1302,6 +1303,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
 
                     double gene_increment = getLineageHeight(nd->_left_child) - (species_tree_height - species_increment) - gene_tree_chunk;
                     assert (gene_increment > 0.0);
+                    
                     bool done = false;
                     while ((remaining_lineages[spp_right_child].first > 0 && remaining_lineages[spp_left_child].first > 0) && !done) {
                         if (getLineageHeight(nd->_left_child) <= species_tree_height) {
@@ -1312,7 +1314,9 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                                 double test = (_species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1));
                                 double test3 = log(2/test);
                                 double log_prob_join = test3;
-
+                                cout << log_prob_join + log(coalescence_rate) - (gene_increment*coalescence_rate) << endl;
+                                branch_lengths_used.push_back(gene_increment);
+                                
                                 log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (gene_increment*coalescence_rate); // prob of two lineages coalescing within the time frame
                                 
                                 // decrement remaining lineages vector
@@ -1357,6 +1361,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                                 remaining_lineages[spp_right_child].second = 0.0;
                                 double coalescence_rate = _species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1) / _theta;
                                 log_coalescent_likelihood -= gene_increment*coalescence_rate;
+                                branch_lengths_used.push_back(gene_increment);
+                                
                                 remaining_lineages[spp_right_child].first = 0;
                                 remaining_lineages[spp_left_child].first = 0;
                             }
@@ -1370,11 +1376,20 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                                 remaining_lineages[spp_right_child].second = 0.0;
                                 remaining_lineages[spp_left_child].second = 0.0;
                                 
-                                double right_coalescence_rate = _species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1) / _theta;
-                                log_coalescent_likelihood -= right_deep_coal_incr * right_coalescence_rate;
+                                if (!count(branch_lengths_used.begin(), branch_lengths_used.end(), right_deep_coal_incr)) {
+                                    double right_coalescence_rate = _species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1) / _theta;
+                                    log_coalescent_likelihood -= right_deep_coal_incr * right_coalescence_rate; // TODO: make sure these are not being double counted - when to stop?
+                                    cout << right_deep_coal_incr * right_coalescence_rate << endl;
+                                    branch_lengths_used.push_back(right_deep_coal_incr);
+                                }
                                 
-                                double left_coalescence_rate = _species_partition[spp_left_child].size()*(_species_partition[spp_left_child].size()-1 )/ _theta;
-                                log_coalescent_likelihood -= left_deep_coal_incr * left_coalescence_rate;
+                                if (!count(branch_lengths_used.begin(), branch_lengths_used.end(), left_deep_coal_incr)) {
+                                    double left_coalescence_rate = _species_partition[spp_left_child].size()*(_species_partition[spp_left_child].size()-1 )/ _theta;
+                                    log_coalescent_likelihood -= left_deep_coal_incr * left_coalescence_rate;
+                                    cout << left_deep_coal_incr * left_coalescence_rate << endl;
+                                    branch_lengths_used.push_back(left_deep_coal_incr); // TODO: need to do this for other cases?
+                                }
+                                
                             }
                         }
                     }
