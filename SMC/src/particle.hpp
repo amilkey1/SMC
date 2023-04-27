@@ -134,9 +134,10 @@ class Particle {
         void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
         bool                                    checkIfReadyToJoinSpecies();
-        int                                     _nspecies_forests = 1000;
-        bool                                    _use_first = true;
+        int                                     _nspecies_forests = 100;
         bool                                    _inf = false;
+//        bool                                    _reset_min = false;
+        vector<bool>                             _reset_min;
 };
 
     inline Particle::Particle() {
@@ -146,6 +147,7 @@ class Particle {
         _gene_tree_proposal_attempts = 0;
         _log_coalescent_likelihood = 0.0;
         _species_tree_height.clear();
+//        _reset_min = false;
     };
 
     inline Particle::~Particle() {
@@ -225,12 +227,31 @@ class Particle {
         else if (!gene_trees_only) {
             if (_generation == Forest::_ntaxa - 1) {
                 increaseNumberOfForests();
+//                _reset_min = true;
+                for (int a = 0; a<_alt_forests.size(); a++) {
+                    for (int i=1; i<_alt_forests[a].size(); i++) {
+                        _alt_forests[a][i].calcMinDepth();
+//                        _reset_min.push_back(false);
+                    }
+                }
             }
+//            if (_reset_min) {
+//                for (int a = 0; a<_alt_forests.size(); a++) { // TODO: only redo this if min species is joined
+//                    if (_reset_min[a] == true) {
+//                        _alt_forests[a][0].showForest();
+//                        _alt_forests[a][1].showForest();
+//                    for (int i=1; i<_alt_forests[a].size(); i++) {
+//                        _alt_forests[a][i].calcMinDepth(); // TODO: check this works for future generations
+//                    }
+//                }
+//                _reset_min = false;
+//            _reset_min.clear();
+//            }
             speciesProposal();
             filterSpeciesTrees();
             
-            if (_generation == Forest::_ntaxa+Forest::_nspecies-2) { // TODO: double check what the generation should be here
-                // once species trees are fully resolved, choose a species tree based on their weights // TODO: does this happen before or after filtering?
+            if (_generation == Forest::_ntaxa+Forest::_nspecies-2) {
+                // once species trees are fully resolved, choose a species tree based on their weights
                 int choice = _forests[0].selectPair(_log_weight_options);
                 // reset _forests to the chosen species tree in _alt_forests
                 _forests[0] = _alt_forests[choice][0];
@@ -374,8 +395,6 @@ class Particle {
             heights[i] = _species_tree_height[sel_index];
             alt_log_weights[i] = _log_weight_options[sel_index];
             log_coal_likelihoods[i] = _log_coalescent_likelihood_options[sel_index];
-//            Particle::SharedPtr p0 = from_particles[sel_index];
-//            to_particles[i]=Particle::SharedPtr(new Particle(*p0));
             assert(_nspecies_forests == to_forests.size());
             t[i] = _t[sel_index];
         }
@@ -391,6 +410,9 @@ class Particle {
     }
 
     inline void Particle::filterSpeciesTrees() {
+//        for (auto &forest:_alt_forests) {
+//            forest[0].showForest();
+//        }
         normalizeSpeciesTreeWeights();
         
         double ess_inverse = 0.0;
@@ -399,7 +421,7 @@ class Particle {
         }
         
         double ess = 1.0/ess_inverse;
-        cout << "   " << "ESS = " << ess << endl;
+//        cout << "   " << "ESS = " << ess << endl;
         
         if (isnan(ess)) {
             _inf = true;
@@ -423,50 +445,93 @@ class Particle {
 
     inline void Particle::speciesProposal() {
 //        double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
-        if (!_inf) { // if the species trees all have weight of neg inf, stop the particle where it is; the particle will get filtered out when the particles are resampled after species trees are complete
+//        if (!_inf) { // if the species trees all have weight of neg inf, stop the particle where it is; the particle will get filtered out when the particles are resampled after species trees are complete
+        assert (!_inf);
             for (int a = 0; a<_alt_forests.size(); a++) {
-    //            bool is_infinity = isinf(_log_weight_options[a]);
-                // if weight is already -inf, don't do any more calculations or proposals; weight remains at -inf
-    //            if (!is_infinity) {
-                    tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-                    double prev_log_coalescent_likelihood = _log_coalescent_likelihood_options[a];
-                    if (_alt_forests[a][0]._last_edge_length > 0.0) {
-                    // choose species to join if past the first species generation for each forest vector
-                        species_joined = _alt_forests[a][0].speciesTreeProposal();
-                    }
-                        
-                    // choose a species tree increment
-                    if (_alt_forests[a][0]._lineages.size() > 1) {
-                        _alt_forests[a][0].chooseSpeciesIncrement();
-                        _species_tree_height[a] += _alt_forests[a][0]._last_edge_length;
-                    }
-                    if (_alt_forests[a][0]._lineages.size() == 1) {
-                        _alt_forests[a][0]._last_edge_length = 0.0;
-                    }
-                        
-                    _t[a].push_back(make_pair(species_joined, _alt_forests[a][0]._last_edge_length));
 //                _alt_forests[a][0].showForest();
-    //            bool is_infinity = isinf(_log_weight_options[a]);
-    //            // if weight is already -inf, don't do any more calculations or proposals; weight remains at -inf
-    //            if (!is_infinity) {
-                    for (int i = 1; i<_alt_forests[a].size(); i++) {
-    //                    _alt_forests[a][i].showForest();
-                        _alt_forests[a][i].updateSpeciesPartitionTwo(species_joined);
-                        _log_coalescent_likelihood_options[a] += _alt_forests[a][i].calcCoalescentLikelihood(_alt_forests[a][0]._last_edge_length, species_joined, _species_tree_height[a], true);
+//                _alt_forests[a][1].showForest();
+                tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+                double prev_log_coalescent_likelihood = _log_coalescent_likelihood_options[a];
+                if (_alt_forests[a][0]._last_edge_length > 0.0) {
+                // choose species to join if past the first species generation for each forest vector
+                    species_joined = _alt_forests[a][0].speciesTreeProposal();
+                }
+                
+                vector<double> max_depth_vector;
+                double max_depth = 0.0;
+
+                for (int i=1; i<_alt_forests[a].size(); i++) {
+                    _alt_forests[a][i].updateSpeciesPartitionTwo(species_joined);
+//                    _alt_forests[a][i].resetDepthVector(species_joined);
+                    string species1 = get<0>(species_joined);
+                    string species2 = get<1>(species_joined);
+                    
+                    bool match1 = false;
+                    bool match2 = false;
+                    
+                    if (_alt_forests[a][i].getMinDepths()[0].second.first == species1 || _alt_forests[a][i].getMinDepths()[0].second.first == species2) {
+                        match1 = true;
                     }
-                    if (!_running_on_empty) {
-                        _log_weight_options[a] = _log_coalescent_likelihood_options[a] - prev_log_coalescent_likelihood; // TODO: need to reset _t also and _log_coalescent_likelihood_options
+                    if (_alt_forests[a][i].getMinDepths()[0].second.second == species2 || _alt_forests[a][i].getMinDepths()[0].second.second == species1) {
+                        match2 = true;
                     }
-    //            }
+                    
+                    if (match1 && match2) {
+//                    if (_alt_forests[a][i].getMinDepths()[0].second == species_joined) {
+                        _reset_min.push_back(true);
+                        _alt_forests[a][i].trimDepthVector();
+                    }
+                    else {
+                        _reset_min.push_back(false);
+                    }
+                    
+                    if (_alt_forests[a][0]._lineages.size() > 1) {
+                        max_depth = (_alt_forests[a][i].getMinDepths())[0].first;
+                        max_depth_vector.push_back(max_depth);
+                        _alt_forests[a][i].resetDepthVector(species_joined);
+                    }
+                }
+                if (_alt_forests[a][0]._lineages.size() > 1) {
+                    max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
+    //                cout << _alt_forests[a][0].getTreeHeight() << endl;
+                    max_depth -= _alt_forests[a][0].getTreeHeight();
+                    // choose a species tree increment
+                }
+                
+                if (_alt_forests[a][0]._lineages.size() > 1) {
+                    _alt_forests[a][0].chooseSpeciesIncrement(max_depth);
+                    _species_tree_height[a] += _alt_forests[a][0]._last_edge_length;
+                }
+                if (_alt_forests[a][0]._lineages.size() == 1) {
+                    _alt_forests[a][0]._last_edge_length = 0.0;
+                }
+                        
+                _t[a].push_back(make_pair(species_joined, _alt_forests[a][0]._last_edge_length));
+                for (int i = 1; i<_alt_forests[a].size(); i++) {
+//                        _alt_forests[a][i].updateSpeciesPartitionTwo(species_joined);
+//                    _alt_forests[a][0].showForest();
+//                    _alt_forests[a][1].showForest();
+                    double coal_like_increment = _alt_forests[a][i].calcCoalescentLikelihood(_alt_forests[a][0]._last_edge_length, species_joined, _species_tree_height[a], true); // TODO: why are coalescent likelihood increments so small after the first generation?
+                    _log_coalescent_likelihood_options[a] += coal_like_increment;
+//                    _log_coalescent_likelihood_options[a] += _alt_forests[a][i].calcCoalescentLikelihood(_alt_forests[a][0]._last_edge_length, species_joined, _species_tree_height[a], true);
+                }
+                if (!_running_on_empty) {
+                    double nlineages = _alt_forests[a][0]._lineages.size();
+                    double phi = 0.0;
+                    if (nlineages > 1) {
+                        phi = log(1-exp(-1*max_depth*nlineages*Forest::_speciation_rate));
+                    }
+                    _log_weight_options[a] = _log_coalescent_likelihood_options[a] - prev_log_coalescent_likelihood + phi;
+                }
             }
-        }
+//        }
         
-        // recalculate log weight now
+//         recalculate log weight now
 //        _log_weight = 0.0;
 //        for (int b=0; b<_log_weight_options.size(); b++) {
 //            bool is_infinity = isinf(_log_weight_options[b]);
 //            if (!is_infinity) {
-//                _log_weight += _log_weight_options[b];
+//                _log_weight += _log_weight_options[b]; // TODO: need to include prior in weight
 //            }
 //        }
 //        if (_log_weight == 0.0) {
@@ -474,6 +539,7 @@ class Particle {
 //            _log_weight = neg_inf;
 //        }
 //        assert (_log_weight !=0.0);
+//    cout << "stop";
     }
 
 
@@ -786,7 +852,7 @@ class Particle {
         _nspecies_forests = other._nspecies_forests;
         _log_coalescent_likelihood_options = other._log_coalescent_likelihood_options;
         _log_weight_options = other._log_weight_options;
-        _use_first = other._use_first;
         _inf = other._inf;
+        _reset_min = other._reset_min;
     };
 }

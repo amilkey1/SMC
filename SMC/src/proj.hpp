@@ -947,7 +947,7 @@ namespace proj {
                         
                         for (auto & p:my_vec) {
                             ess_inverse += exp(2.0*p->getLogWeight());
-                            p->showParticle();
+//                            p->showParticle();
                         }
 
                         double ess = 1.0/ess_inverse;
