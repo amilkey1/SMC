@@ -1314,7 +1314,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                                 double test = (_species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1));
                                 double test3 = log(2/test);
                                 double log_prob_join = test3;
-                                cout << log_prob_join + log(coalescence_rate) - (gene_increment*coalescence_rate) << endl;
+//                                cout << log_prob_join + log(coalescence_rate) - (gene_increment*coalescence_rate) << endl;
                                 branch_lengths_used.push_back(gene_increment);
                                 
                                 log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (gene_increment*coalescence_rate); // prob of two lineages coalescing within the time frame
@@ -1379,14 +1379,14 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                                 if (!count(branch_lengths_used.begin(), branch_lengths_used.end(), right_deep_coal_incr)) {
                                     double right_coalescence_rate = _species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1) / _theta;
                                     log_coalescent_likelihood -= right_deep_coal_incr * right_coalescence_rate; // TODO: make sure these are not being double counted - when to stop?
-                                    cout << right_deep_coal_incr * right_coalescence_rate << endl;
+//                                    cout << right_deep_coal_incr * right_coalescence_rate << endl;
                                     branch_lengths_used.push_back(right_deep_coal_incr);
                                 }
                                 
                                 if (!count(branch_lengths_used.begin(), branch_lengths_used.end(), left_deep_coal_incr)) {
                                     double left_coalescence_rate = _species_partition[spp_left_child].size()*(_species_partition[spp_left_child].size()-1 )/ _theta;
                                     log_coalescent_likelihood -= left_deep_coal_incr * left_coalescence_rate;
-                                    cout << left_deep_coal_incr * left_coalescence_rate << endl;
+//                                    cout << left_deep_coal_incr * left_coalescence_rate << endl;
                                     branch_lengths_used.push_back(left_deep_coal_incr); // TODO: need to do this for other cases?
                                 }
                                 
