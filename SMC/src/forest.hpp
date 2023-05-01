@@ -1087,13 +1087,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
     inline vector<pair<double, pair<string, string>>> Forest::getMinDepths() {
-//        if (_depths.size() > 0) {
-            return _depths;
-//        }
-//        else {
-//            double inf = numeric_limits<double>::infinity();
-//            return make_pair(0.0, make_pair("null", "null"));
-//        }
+        return _depths;
     }
 
     inline void Forest::resetDepthVector(tuple<string, string, string> species_joined) {
@@ -2090,8 +2084,10 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         
         // use combined rate to draw an increment (delta)
         double increment = rng.gamma(1.0, 1.0/(coalescence_rate));
+//        cout << "proposed increment is: " << increment << endl;
         
         // choose which species coalescent event occurred in
+        
         for (auto &p:population_coalescent_rates) {
             p = p/coalescence_rate;
         }
@@ -2268,11 +2264,34 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         // update increments and priors
         double log_increment_prior = 0.0;
         for (auto &s:_species_partition) {
-            if (s.second.size() > 1) {
-                double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
-                log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate);
+            if (s.second.size() == 1) {
+                cout << "stop";
             }
-        }
+            bool coalescence = false;
+            for (auto &nd:s.second) {
+                if (nd == new_nd) {
+                    coalescence = true;
+                    break;
+                }
+                else {
+                    coalescence = false;
+                }
+            }
+//            double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
+            if (coalescence) {
+//            if (s.second.size() > 1) {
+                // if there is coalescence, need to use number of lineagse before the join
+                double coalescence_rate = (s.second.size()+1)*(s.second.size()) / _theta;
+//                double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
+                log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate);
+//            }
+            }
+            else {
+                double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
+                log_increment_prior -= increment*coalescence_rate;
+            }
+        } // TODO: need to figure out if there was coalescence in the lineage or not
+        
 //        if (s.second.size() > 1) {
             _increments.push_back(make_pair(increment, log_increment_prior)); // TODO: this prior won't work if gene tree is constrained?
 //        }

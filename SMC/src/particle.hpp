@@ -227,26 +227,12 @@ class Particle {
         else if (!gene_trees_only) {
             if (_generation == Forest::_ntaxa - 1) {
                 increaseNumberOfForests();
-//                _reset_min = true;
                 for (int a = 0; a<_alt_forests.size(); a++) {
                     for (int i=1; i<_alt_forests[a].size(); i++) {
                         _alt_forests[a][i].calcMinDepth();
-//                        _reset_min.push_back(false);
                     }
                 }
             }
-//            if (_reset_min) {
-//                for (int a = 0; a<_alt_forests.size(); a++) { // TODO: only redo this if min species is joined
-//                    if (_reset_min[a] == true) {
-//                        _alt_forests[a][0].showForest();
-//                        _alt_forests[a][1].showForest();
-//                    for (int i=1; i<_alt_forests[a].size(); i++) {
-//                        _alt_forests[a][i].calcMinDepth(); // TODO: check this works for future generations
-//                    }
-//                }
-//                _reset_min = false;
-//            _reset_min.clear();
-//            }
             speciesProposal();
             filterSpeciesTrees();
             
@@ -448,8 +434,6 @@ class Particle {
 //        if (!_inf) { // if the species trees all have weight of neg inf, stop the particle where it is; the particle will get filtered out when the particles are resampled after species trees are complete
         assert (!_inf);
             for (int a = 0; a<_alt_forests.size(); a++) {
-//                _alt_forests[a][0].showForest();
-//                _alt_forests[a][1].showForest();
                 tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
                 double prev_log_coalescent_likelihood = _log_coalescent_likelihood_options[a];
                 if (_alt_forests[a][0]._last_edge_length > 0.0) {

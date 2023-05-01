@@ -869,6 +869,7 @@ namespace proj {
                             
                             for (auto & p:my_vec) {
                                 ess_inverse += exp(2.0*p->getLogWeight());
+//                                p->showParticle();
                             }
 
                             double ess = 1.0/ess_inverse;
@@ -907,37 +908,7 @@ namespace proj {
                         bool unconstrained = false;
                         
                         proposeParticles(my_vec, gene_trees_only, unconstrained);
-                        
-//                        if (!_run_on_empty) {
-                            // TODO: need to normalize and filter within the 1k species trees per particle
-//                            bool calc_marg_like = true;
-//                            normalizeWeights(my_vec, s, calc_marg_like);
-                            
-//                            double ess_inverse = 0.0;
-                            
-//                            for (auto & p:my_vec) {
-//                                ess_inverse += exp(2.0*p->getLogWeight());
-//                                p->showParticle();
-//                            }
 
-//                            double ess = 1.0/ess_inverse;
-//                            cout << "   " << "ESS = " << ess << endl;
-//                            if (isnan(ess)) {
-//                                throw XProj(format("no species trees can accommodate the gene trees; increase the number of particles and try again"));
-//                            }
-                         
-//                            resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
-                            //if use_first is true, my_vec = my_vec_2
-                            //if use_first is false, my_vec = my_vec_1
-                            
-//                            my_vec = use_first ? my_vec_2:my_vec_1;
-
-                            //change use_first from true to false or false to true
-//                            use_first = !use_first;
-//                            saveParticleWeights(my_vec);
-//                        }
-//                        resetWeights(my_vec);
-//                        _accepted_particle_vec = my_vec;
                     } // s loop
                     if (!_run_on_empty) {
                         bool calc_marg_like = true;
