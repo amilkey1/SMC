@@ -2268,9 +2268,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         // update increments and priors
         double log_increment_prior = 0.0;
         for (auto &s:_species_partition) {
-            if (s.second.size() == 1) {
-                cout << "stop";
-            }
             bool coalescence = false;
             for (auto &nd:s.second) {
                 if (nd == new_nd) {
