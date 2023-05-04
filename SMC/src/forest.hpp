@@ -1881,21 +1881,34 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
     inline void Forest::chooseSpeciesIncrement(double max_depth) {
-        // hybridization prior
-        double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
-        
-        double u = rng.uniform();
-        double inner_term = 1-exp(-rate*max_depth);
-//        double exp = rng.gamma(1.0, 1.0/(rate*max_depth));
-        _last_edge_length = -log(1-u*inner_term)/rate;
-        assert (_last_edge_length < max_depth);
+        if (max_depth > 0.0) {
+            // hybridization prior
+            double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
+            
+            double u = rng.uniform();
+            double inner_term = 1-exp(-rate*max_depth);
+    //        double exp = rng.gamma(1.0, 1.0/(rate*max_depth));
+            _last_edge_length = -log(1-u*inner_term)/rate;
+            assert (_last_edge_length < max_depth);
 
-//        _last_edge_length = rng.gamma(1.0, 1.0/rate);
+    //        _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
-        for (auto nd:_lineages) {
-            nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
+            for (auto nd:_lineages) {
+                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
+            }
+            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
         }
-        _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+        else {
+            // hybridization prior
+            double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
+
+            _last_edge_length = rng.gamma(1.0, 1.0/rate);
+
+            for (auto nd:_lineages) {
+                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
+            }
+            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+        }
     }
 
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
@@ -2078,7 +2091,15 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         for (auto &s:_species_partition) {
             if (s.second.size() > 1) {
                 eligible_species.push_back(s.first);
-                double population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta;
+                double population_coalescence_rate = 0.0;
+//                if (unconstrained) {
+//                    population_coalescence_rate = s.second.size()*(s.second.size()-1)/(100*_theta);
+//                }
+//                else {
+                    population_coalescence_rate = s.second.size()*(s.second.size()-1)/(_theta);
+//                }
+                
+//                double population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta;
                 population_coalescent_rates.push_back(population_coalescence_rate);
                 coalescence_rate += population_coalescence_rate;
             }
@@ -2228,6 +2249,9 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             if (_lineages.size() != _ntaxa) {
                 _prev_gene_tree_log_likelihood = calcLogLikelihood();
             }
+            else {
+                _prev_gene_tree_log_likelihood = 0.0;
+            }
             pair<Node*, Node*> t = chooseAllPairs(nodes);
             
             subtree1 = t.first;
@@ -2291,12 +2315,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
                 log_increment_prior -= increment*coalescence_rate;
             }
-        } // TODO: need to figure out if there was coalescence in the lineage or not
-        
-//        if (s.second.size() > 1) {
-            _increments.push_back(make_pair(increment, log_increment_prior)); // TODO: this prior won't work if gene tree is constrained?
-//        }
-//    }
+        }
+            _increments.push_back(make_pair(increment, log_increment_prior));
         
     }
 
@@ -3277,6 +3297,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             _lineages[0]->_left_child->_right_sib->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child->_right_sib);
         }
         _ready_to_join_species = true;
+//        showForest();
     }
 
     inline void Forest::deconstructGeneTree() {
