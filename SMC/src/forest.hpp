@@ -65,6 +65,7 @@ class Forest {
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
         tuple<string,string, string> speciesTreeProposal();
+        inline tuple<string,string, string> preDeterminedSpeciesTreeProposal(pair<unsigned, unsigned> t);
         void                        firstGeneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_merge_info);
 //        void                        geneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_merge_info);
         void                        geneTreeProposal(pair<double, string> species_info, vector<pair<tuple<string, string, string>, double>> _t);
@@ -1911,6 +1912,39 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         }
     }
 
+    inline tuple<string,string, string> Forest::preDeterminedSpeciesTreeProposal(pair<unsigned, unsigned> t) {
+        // this function creates a new node and joins two species
+
+//        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
+        Node *subtree1=_lineages[t.first];
+        Node *subtree2=_lineages[t.second];
+        assert(!subtree1->_parent && !subtree2->_parent);
+
+        Node nd;
+        _nodes.push_back(nd);
+        Node* new_nd = &_nodes.back();
+        new_nd->_parent=0;
+        new_nd->_number=_nleaves+_ninternals;
+        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+        new_nd->_right_sib=0;
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+
+        calcTopologyPrior((int) _lineages.size());
+
+        updateNodeVector (_lineages, subtree1, subtree2, new_nd);
+
+        _species_joined = make_pair(subtree1, subtree2);
+
+        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
+    }
+
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
         // this function creates a new node and joins two species
 
@@ -2080,7 +2114,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             _names_of_species_joined.push_back(make_pair(species1, species2));
             _rebuild_tree = true;
 
-            species_increment = species_info[_species_join_number].second;
+            species_increment = species_info[_species_join_number].second; // TODO: I don't think this is correct?
         }
         
      // calculate coalescence rate for each population
@@ -2091,15 +2125,15 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         for (auto &s:_species_partition) {
             if (s.second.size() > 1) {
                 eligible_species.push_back(s.first);
-                double population_coalescence_rate = 0.0;
+//                double population_coalescence_rate = 0.0;
 //                if (unconstrained) {
-//                    population_coalescence_rate = s.second.size()*(s.second.size()-1)/(100*_theta);
+//                    population_coalescence_rate = s.second.size()*(s.second.size()-1)/(10*_theta);
 //                }
 //                else {
-                    population_coalescence_rate = s.second.size()*(s.second.size()-1)/(_theta);
+//                    population_coalescence_rate = s.second.size()*(s.second.size()-1)/(_theta);
 //                }
                 
-//                double population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta;
+                double population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta;
                 population_coalescent_rates.push_back(population_coalescence_rate);
                 coalescence_rate += population_coalescence_rate;
             }
@@ -2120,19 +2154,28 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         
         string species_for_join = eligible_species[index];
         
+        double species_tree_height = 0.0;
+        for (int a=0; a<_species_join_number+1; a++) {
+            species_tree_height += species_info[a].second;
+        }
+        
         bool done = false;
         if (increment > species_increment && _species_partition.size() > 1 && species_increment > 0.0 && !unconstrained) {
             // deep coalescence
             double cum_time = species_increment;
             while (!done) {// TODO: what about multiple deep coalescent events?
                 // extend existing lineages to species barrier
-                extendGeneTreeLineages(species_increment);
+//                extendGeneTreeLineages(species_increment);
+                extendGeneTreeLineages(species_tree_height);
                 
                 // update species partition - two species must merge now to accommodate deep coalescence
                 _species_join_number++;
                 if (_species_join_number > species_info.size()-1) {
                     _species_join_number = (int) species_info.size()-1;
                 }
+                
+                species_tree_height += species_info[_species_join_number].second;
+                
                 string species1 = get<0> (species_info[_species_join_number].first);
                 string species2 = get<1> (species_info[_species_join_number].first);
                 string new_name = get<2> (species_info[_species_join_number].first);
@@ -2216,7 +2259,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             }
 
             if (extend) {
-                extendGeneTreeLineages(species_increment);
+//                extendGeneTreeLineages(species_increment);
+                extendGeneTreeLineages(species_tree_height);
             }
         }
         
@@ -2344,8 +2388,14 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             }
         }
         
+        double species_tree_height = 0.0;
+        for (int a=0; a<_species_join_number+1; a++) {
+            species_tree_height += _t[a].second;
+        }
+        
         if (extend && _species_partition.size() > 1) {
-            extendGeneTreeLineages(species_increment);
+//            extendGeneTreeLineages(species_increment);
+            extendGeneTreeLineages(species_tree_height);
         }
     }
 

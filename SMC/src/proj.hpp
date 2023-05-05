@@ -937,7 +937,7 @@ namespace proj {
 //                        use_first = !use_first;
                         saveParticleWeights(my_vec);
 
-                        resetWeights(my_vec);
+//                        resetWeights(my_vec);
                         _accepted_particle_vec = my_vec;
                     }
                     
