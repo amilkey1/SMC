@@ -1882,6 +1882,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
     inline void Forest::chooseSpeciesIncrement(double max_depth) {
+        assert (max_depth >= 0.0);
         if (max_depth > 0.0) {
             // hybridization prior
             double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();

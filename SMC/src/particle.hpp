@@ -134,7 +134,7 @@ class Particle {
         void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
         bool                                    checkIfReadyToJoinSpecies();
-        int                                     _nspecies_forests = 100;
+        int                                     _nspecies_forests = 1000;
         bool                                    _inf = false;
 //        bool                                    _reset_min = false;
         vector<bool>                             _reset_min;
@@ -269,10 +269,10 @@ class Particle {
 
     inline void Particle::firstGen() {
         assert (_generation == 0); // species tree should only be rebuilt in the first round of the first iteration of gene trees
-        buildFakeSpeciesTree();
-//        buildEntireSpeciesTree();
+//        buildFakeSpeciesTree();
+        buildEntireSpeciesTree();
 //        _forests[0].showForest();
-        panmicticSpeciesPartition();
+//        panmicticSpeciesPartition();
     }
 
     inline void Particle::geneTreeProposal(bool unconstrained) {
@@ -418,7 +418,7 @@ class Particle {
         
         if (isnan(ess)) {
             _inf = true;
-//            throw XProj(format("no species trees can accommodate the gene trees; increase the number of particles and try again"));
+            throw XProj(format("no species trees can accommodate the gene trees; increase the number of particles and try again"));
         }
      
         if (!_inf) {
@@ -437,9 +437,10 @@ class Particle {
     }
 
     inline void Particle::speciesProposal() {
-        assert (!_inf);
-//        if (!_inf) {
+//        assert (!_inf);
+        if (!_inf) {
         for (int a = 0; a<_alt_forests.size(); a++) {
+//            _alt_forests[a][0].showForest();
             tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
             double prev_log_coalescent_likelihood = _log_coalescent_likelihood_options[a];
             if (_alt_forests[a][0]._last_edge_length > 0.0) {
@@ -465,21 +466,27 @@ class Particle {
                 if (_alt_forests[a][i].getMinDepths()[0].second.second == species2 || _alt_forests[a][i].getMinDepths()[0].second.second == species1) {
                     match2 = true;
                 }
-                
-                if (match1 && match2) {
-//                    if (_alt_forests[a][i].getMinDepths()[0].second == species_joined) {
-                    _reset_min.push_back(true);
-                    _alt_forests[a][i].trimDepthVector();
-                }
-                else {
-                    _reset_min.push_back(false);
-                }
-                
+                    
                 if (_alt_forests[a][0]._lineages.size() > 1) {
                     max_depth = (_alt_forests[a][i].getMinDepths())[0].first;
                     max_depth_vector.push_back(max_depth);
                     _alt_forests[a][i].resetDepthVector(species_joined);
                 }
+                
+//                if (match1 && match2) { // TODO: I don't think is necessary - resetdepthvector will take care of it
+////                    if (_alt_forests[a][i].getMinDepths()[0].second == species_joined) {
+//                    _reset_min.push_back(true);
+//                    _alt_forests[a][i].trimDepthVector();
+//                }
+                else {
+                    _reset_min.push_back(false);
+                }
+                
+//                if (_alt_forests[a][0]._lineages.size() > 1) {
+//                    max_depth = (_alt_forests[a][i].getMinDepths())[0].first;
+//                    max_depth_vector.push_back(max_depth);
+//                    _alt_forests[a][i].resetDepthVector(species_joined);
+//                }
             }
             if (_alt_forests[a][0]._lineages.size() > 1) {
                 max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
@@ -489,8 +496,9 @@ class Particle {
             }
             
             if (_alt_forests[a][0]._lineages.size() > 1) {
-//                _alt_forests[a][0].chooseSpeciesIncrement(0.0);
-                _alt_forests[a][0].chooseSpeciesIncrement(max_depth);
+                _alt_forests[a][0].chooseSpeciesIncrement(0.0);
+//                assert (max_depth > 0.0);
+//                _alt_forests[a][0].chooseSpeciesIncrement(max_depth);
                 _species_tree_height[a] += _alt_forests[a][0]._last_edge_length;
             }
             if (_alt_forests[a][0]._lineages.size() == 1) {
@@ -498,6 +506,7 @@ class Particle {
             }
                     
             _t[a].push_back(make_pair(species_joined, _alt_forests[a][0]._last_edge_length));
+            
             for (int i = 1; i<_alt_forests[a].size(); i++) {
                 double coal_like_increment = _alt_forests[a][i].calcCoalescentLikelihood(_alt_forests[a][0]._last_edge_length, species_joined, _species_tree_height[a], true);
                 _log_coalescent_likelihood_options[a] += coal_like_increment;
@@ -511,7 +520,8 @@ class Particle {
                 _log_weight_options[a] = _log_coalescent_likelihood_options[a] - prev_log_coalescent_likelihood + phi;
             }
         }
-//        }
+//            _alt_forests[a][0].showForest();
+        }
         
 //         recalculate log weight now
 //        _log_weight = 0.0;
@@ -829,25 +839,25 @@ class Particle {
 
         for (int i=0; i < _forests[0]._nspecies-1; i++) {
             if (_forests[0]._lineages.size() > 1) {
-                species_joined = _forests[0].speciesTreeProposal();
-//                pair<unsigned, unsigned> example;
-//                if (i == 0) {
-////                    species_joined = make_tuple("s1", "s4", "node-5");
-//                    example = make_pair(1, 4);
-//                }
-//                else if (i == 1) {
-////                    species_joined = make_tuple("s2", "s3", "node-6");
-//                    example = make_pair(1,2 );
-//                }
-//                else if (i == 2) {
-////                    species_joined = make_tuple("node-5", "node-6", "node-7");
-//                    example = make_pair(1, 2);
-//                }
-//                else if (i == 3) {
-////                    species_joined = make_tuple("s0", "node-7", "node-8");
-//                    example = make_pair(0, 1);
-//                }
-//                species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
+//                species_joined = _forests[0].speciesTreeProposal();
+                pair<unsigned, unsigned> example;
+                if (i == 0) {
+//                    species_joined = make_tuple("s1", "s4", "node-5");
+                    example = make_pair(1, 4);
+                }
+                else if (i == 1) {
+//                    species_joined = make_tuple("s2", "s3", "node-6");
+                    example = make_pair(1,2 );
+                }
+                else if (i == 2) {
+//                    species_joined = make_tuple("node-5", "node-6", "node-7");
+                    example = make_pair(1, 2);
+                }
+                else if (i == 3) {
+//                    species_joined = make_tuple("s0", "node-7", "node-8");
+                    example = make_pair(0, 1);
+                }
+                species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
 
                 // if the species tree is not finished, add another species increment
                 if (_forests[0]._lineages.size()>1) {
