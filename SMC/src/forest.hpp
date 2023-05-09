@@ -947,6 +947,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             // find nodes to join in node_list
             Node *subtree1 = _node_choices[_index_of_choice].first;
             Node *subtree2 = _node_choices[_index_of_choice].second;
+        
+        _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
             
             // erase extra nodes created from node list
             for (int i = 0; i < _node_choices.size(); i++) {
@@ -2115,7 +2117,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             _names_of_species_joined.push_back(make_pair(species1, species2));
             _rebuild_tree = true;
 
-            species_increment = species_info[_species_join_number].second; // TODO: I don't think this is correct?
+            species_increment = species_info[_species_join_number].second;
         }
         
      // calculate coalescence rate for each population

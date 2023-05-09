@@ -166,10 +166,14 @@ namespace proj {
         sort(v.begin(), v.end(), greater<Particle::SharedPtr>());
         
         ofstream weightf("weights.txt");
-        for (auto &p:v) {
-            weightf << "particle\n";
-            weightf << p->getCoalescentLikelihood() << "\t" << p->saveParticleWeights() << "\t" << p->getSpeciesNewick() << "\n";
+        weightf << "begin trees;" << endl;
+//        for (auto &p:v) {
+        for (int i=0; i<v.size(); i++) {
+//            weightf << "particle\n";
+//            weightf << p->getCoalescentLikelihood() << "\t" << p->saveParticleWeights() << "\t" << p->getSpeciesNewick() << "\n";
+            weightf << "tree " << i << " = " << v[i]->getSpeciesNewick() << "; " << "\n";
         }
+        weightf << "end trees;" << endl;
         weightf.close();
     }
 
@@ -847,6 +851,7 @@ namespace proj {
 //                            p->mapSpecies(_taxon_map, _species_names);
                             p->mapGeneTrees(_taxon_map, _species_names);
                             p->resetGeneIncrements();
+//                            p->showParticle();
                         }
                     }
                     // keep the species partition for the gene forests at this stage but clear the tree structure
@@ -863,6 +868,7 @@ namespace proj {
                         
                         if (!_run_on_empty) {
                             bool calc_marg_like = true;
+                            
                             normalizeWeights(my_vec, g, calc_marg_like);
                             
                             double ess_inverse = 0.0;
@@ -937,7 +943,7 @@ namespace proj {
 //                        use_first = !use_first;
                         saveParticleWeights(my_vec);
 
-//                        resetWeights(my_vec);
+                        resetWeights(my_vec);
                         _accepted_particle_vec = my_vec;
                     }
                     

@@ -134,7 +134,7 @@ class Particle {
         void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
         bool                                    checkIfReadyToJoinSpecies();
-        int                                     _nspecies_forests = 1000;
+        int                                     _nspecies_forests = 5000;
         bool                                    _inf = false;
 //        bool                                    _reset_min = false;
         vector<bool>                             _reset_min;
@@ -216,10 +216,12 @@ class Particle {
     inline double Particle::proposal(bool gene_trees_only, bool unconstrained) {
         string event;
         
+//        _forests[1].showForest();
         if (unconstrained && _generation == 0) {
             firstGen();
         }
 //        _forests[0].showForest();
+//        _forests[1].showForest();
         if (gene_trees_only) {
             geneTreeProposal(unconstrained);
 //            _forests[1].showForest();
@@ -281,6 +283,7 @@ class Particle {
                 _forests[i].deconstructGeneTree();
             }
         }
+//        _forests[1].showForest();
         for (int i=1; i<_forests.size(); i++) {
             _forests[i]._theta = _forests[i]._starting_theta;
             assert (_t.size() == 1);
@@ -365,7 +368,7 @@ class Particle {
         
         // Last element in cum_probs should hold 1.0 if weights were indeed normalized coming in
         if (!isnan(cumpr)) {
-        assert( fabs( 1.0 - cum_probs[_nspecies_forests-1].first ) < 0.0000001);
+            assert( fabs( 1.0 - cum_probs[_nspecies_forests-1].first ) < 0.0000001);
         }
 
         
@@ -403,9 +406,6 @@ class Particle {
     }
 
     inline void Particle::filterSpeciesTrees() {
-//        for (auto &forest:_alt_forests) {
-//            forest[0].showForest();
-//        }
         normalizeSpeciesTreeWeights();
         
         double ess_inverse = 0.0;
@@ -437,7 +437,7 @@ class Particle {
     }
 
     inline void Particle::speciesProposal() {
-//        assert (!_inf);
+        assert (!_inf);
         if (!_inf) {
         for (int a = 0; a<_alt_forests.size(); a++) {
 //            _alt_forests[a][0].showForest();
@@ -837,28 +837,29 @@ class Particle {
         vector<pair<tuple<string, string, string>, double>> test;
         test.push_back(make_pair(species_joined, edge_len));
 
+//        cout << "new particle" << endl;
         for (int i=0; i < _forests[0]._nspecies-1; i++) {
             if (_forests[0]._lineages.size() > 1) {
-//                species_joined = _forests[0].speciesTreeProposal();
-                pair<unsigned, unsigned> example;
-                if (i == 0) {
-//                    species_joined = make_tuple("s1", "s4", "node-5");
-                    example = make_pair(1, 4);
-                }
-                else if (i == 1) {
-//                    species_joined = make_tuple("s2", "s3", "node-6");
-                    example = make_pair(1,2 );
-                }
-                else if (i == 2) {
-//                    species_joined = make_tuple("node-5", "node-6", "node-7");
-                    example = make_pair(1, 2);
-                }
-                else if (i == 3) {
-//                    species_joined = make_tuple("s0", "node-7", "node-8");
-                    example = make_pair(0, 1);
-                }
-                species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
-
+                species_joined = _forests[0].speciesTreeProposal();
+//                pair<unsigned, unsigned> example;
+//                if (i == 0) {
+////                    species_joined = make_tuple("s1", "s4", "node-5");
+//                    example = make_pair(1, 4);
+//                }
+//                else if (i == 1) {
+////                    species_joined = make_tuple("s2", "s3", "node-6");
+//                    example = make_pair(1,2 );
+//                }
+//                else if (i == 2) {
+////                    species_joined = make_tuple("node-5", "node-6", "node-7");
+//                    example = make_pair(1, 2);
+//                }
+//                else if (i == 3) {
+////                    species_joined = make_tuple("s0", "node-7", "node-8");
+//                    example = make_pair(0, 1);
+//                }
+//                species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
+                
                 // if the species tree is not finished, add another species increment
                 if (_forests[0]._lineages.size()>1) {
                     _forests[0].addSpeciesIncrement();
