@@ -84,6 +84,7 @@ class Forest {
         int                         selectPair(vector<double> weight_vec);
         void                        chooseSpeciesIncrement(double max_depth);
         void                        addSpeciesIncrement();
+        void                        addPredeterminedSpeciesIncrement(double increment);
         string                      chooseEvent();
         void                        allowMigration(list<Node*> &nodes);
         void                        setGeneration(double g) {_generationf = g;}
@@ -3154,6 +3155,13 @@ inline Node * Forest::findNextPreorder(Node * nd) {
 
         // update _lineages vector with major new_nd
         return hybridized_nodes;
+    }
+
+    inline void Forest::addPredeterminedSpeciesIncrement(double increment) {
+        _last_edge_length = increment;
+        for (auto nd:_lineages) {
+            nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
+        }
     }
 
     inline void Forest::addSpeciesIncrement() {
