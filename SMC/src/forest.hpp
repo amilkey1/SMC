@@ -1399,7 +1399,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 }
             }
         }
-//        assert (log_coalescent_likelihood != 0.0); // TODO: is this okay?
         return log_coalescent_likelihood;
     }
 
@@ -2337,6 +2336,9 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         
+        // TODO: increment must include extended increment
+        // TODO: it's not the extended increment, it's the branch back to the deepest node in the prev gen?
+//        showForest();
         // update increments and priors
         double log_increment_prior = 0.0;
         for (auto &s:_species_partition) {
@@ -2364,7 +2366,9 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 log_increment_prior -= increment*coalescence_rate;
             }
         }
+        increment += _extended_increment;
             _increments.push_back(make_pair(increment, log_increment_prior));
+        _extended_increment = 0.0;
         
     }
 
@@ -3336,28 +3340,40 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
     inline void Forest::extendGeneTreeLineages(double species_tree_height) {
+        vector<double> extended_increment_options;
+        _extended_increment = 0.0;
+        
         if (_lineages.size() > 1) {
             for (auto &l:_lineages) {
                 if (l->_left_child) {
                     if (getLineageHeight(l) < species_tree_height) {
-                        _extended_increment += species_tree_height - getLineageHeight(l);
+//                        _extended_increment += species_tree_height - getLineageHeight(l);
+                        double extended_increment = species_tree_height - getLineageHeight(l);
+                        extended_increment_options.push_back(extended_increment);
                         l->_edge_length += species_tree_height - getLineageHeight(l);
                     }
                 }
                 else {
                     if (l->_edge_length < species_tree_height) {
-                        _extended_increment += species_tree_height - getLineageHeight(l);
+//                        _extended_increment += species_tree_height - getLineageHeight(l);
+                        double extended_increment = species_tree_height - getLineageHeight(l);
+                        extended_increment_options.push_back(extended_increment);
                         l->_edge_length += species_tree_height - getLineageHeight(l);
                     }
                 }
             }
         }
         else {
-            _extended_increment += species_tree_height - getLineageHeight(_lineages[0]->_left_child);
+//            _extended_increment += species_tree_height - getLineageHeight(_lineages[0]->_left_child);
+            double extended_increment = species_tree_height - getLineageHeight(_lineages[0]->_left_child);
+            extended_increment_options.push_back(extended_increment);
             _lineages[0]->_left_child->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child);
             _lineages[0]->_left_child->_right_sib->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child->_right_sib);
         }
         _ready_to_join_species = true;
+        if (extended_increment_options.size() > 0) {
+            _extended_increment = *min_element(extended_increment_options.begin(), extended_increment_options.end()); // extended increment is the smallest one added
+        }
 //        showForest();
     }
 
@@ -3401,6 +3417,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _deep_coalescent_increments.clear();
         _preorder.clear();
         _increments.clear();
+        _extended_increment = 0.0;
     }
 
 }

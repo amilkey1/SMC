@@ -73,6 +73,7 @@ namespace proj {
 //            double                      _avg_marg_like;
             double                      _log_marginal_likelihood;
             double                      _gene_tree_log_marginal_likelihood;
+            double                      _species_tree_log_marginal_likelihood;
             bool                        _run_on_empty;
             bool                        _build_species_tree_first;
             double                      _theta_prior;
@@ -660,10 +661,16 @@ namespace proj {
             sum_h += h;
         }
         sum_h/=my_vec.size();
+//        cout << "mean height equals " << sum_h << endl;
+////        cout << "log marginal likelihood = " << setprecision(12) << _log_marginal_likelihood << endl;
+//        cout << "gene tree marg like: " << _gene_tree_log_marginal_likelihood << endl;
+//        cout << "species tree marg like: " << _log_marginal_likelihood << endl;
+//        cout << "starting theta = " << Forest::_starting_theta << endl;
+//        cout << "speciation rate = " << Forest::_speciation_rate << endl;
+//        cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
+        
         cout << "mean height equals " << sum_h << endl;
-//        cout << "log marginal likelihood = " << setprecision(12) << _log_marginal_likelihood << endl;
-        cout << "gene tree marg like: " << _gene_tree_log_marginal_likelihood << endl;
-        cout << "species tree marg like: " << _log_marginal_likelihood << endl;
+        cout << "log marginal likelihood = " << setprecision(12) << _log_marginal_likelihood << endl;
         cout << "starting theta = " << Forest::_starting_theta << endl;
         cout << "speciation rate = " << Forest::_speciation_rate << endl;
         cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
@@ -840,13 +847,15 @@ namespace proj {
                 
                 //run through each generation of particles
                 int ntaxa = (int) _taxon_map.size();
+//                p->setLogCoalescentLikelihood(0.0);
                 for (int i=0; i<_niterations; i++) {
+                    _log_marginal_likelihood = 0.0;
                     cout << "beginning iteration: " << i << endl;
                     if (i > 0) {
                         for (auto &p:my_vec) {
                             p->setParticleGeneration(0);
                             p->setLogLikelihood(0.0);
-                            p->setLogCoalescentLikelihood(0.0);
+//                            p->setLogCoalescentLikelihood(0.0);
                             p->setLogWeight(0.0);
 //                            p->mapSpecies(_taxon_map, _species_names);
                             p->mapGeneTrees(_taxon_map, _species_names);
@@ -894,28 +903,33 @@ namespace proj {
                         resetWeights(my_vec);
                         _accepted_particle_vec = my_vec;
                     } // g loop
-                
                     
                     // filter species trees now
+                if (i < _niterations-1) {
                     for (auto &p:my_vec) {
                         // reset forest species partitions
                         p->mapSpecies(_taxon_map, _species_names);
                         p->resetSpecies();
                     }
                     
-                    _gene_tree_log_marginal_likelihood = _log_marginal_likelihood;
+//                    _gene_tree_log_marginal_likelihood = _log_marginal_likelihood;
                     _log_marginal_likelihood = 0.0;
                     
-                    for (unsigned s=0; s<nspecies; s++){
-                        cout << "beginning species tree proposals" << endl;
-                        //taxon joining and reweighting step
-                        
-                        bool gene_trees_only = false;
-                        bool unconstrained = false;
-                        
-                        proposeParticles(my_vec, gene_trees_only, unconstrained);
+                        // TODO: don't run through this loop on the last round
+                        for (unsigned s=0; s<nspecies; s++){
+                            cout << "beginning species tree proposals" << endl;
+                            //taxon joining and reweighting step
+                            
+                            bool gene_trees_only = false;
+                            bool unconstrained = false;
+                            
+                            proposeParticles(my_vec, gene_trees_only, unconstrained);
 
-                    } // s loop
+                        } // s loop
+                    normalizeWeights(my_vec, 0, true);
+//                    _species_tree_log_marginal_likelihood = _log_marginal_likelihood;
+                    }
+                    
 //                    if (!_run_on_empty) {
 //                        bool calc_marg_like = true;
 //                        normalizeWeights(my_vec, nspecies, calc_marg_like);
@@ -970,6 +984,7 @@ namespace proj {
                     vector<double> branch_length_vec;
                     for (auto &b:p->getBranchLengths()) {
                         branch_length_vec.push_back(log(b));
+//                        branch_length_vec.push_back(b);
                     }
                     
                     vector<double> prior_vec;
@@ -987,18 +1002,26 @@ namespace proj {
                         log_topology_priors.push_back(t);
                     }
                     
+                    double log_coalescent_likelihood;
+                    log_coalescent_likelihood = p->getCoalescentLikelihood();
+                    
                     assert(branch_length_vec.size() == prior_vec.size());
                     
                     if (col_count == 0) {
                         logf << "iter" << "\t" << "theta" << "\t" << "gene_tree_log_like";
-                        for (int i = 0; i < branch_length_vec.size(); i++) {
-                            logf << "\t" << "increment" << "\t" << "increment_prior";
+                        for (int i=0; i<nspecies-1; i++) {
+//                        for (int i = 0; i < branch_length_vec.size(); i++) {
+                            logf << "\t" << "species_tree_increment" << "\t" << "increment_prior";
                         }
-                        logf << "\t" << "topology_prior" << "\t" << "topology_prior" << endl;
+                        for (int j=nspecies; j<nspecies+ntaxa-1; j++) {
+                            logf << "\t" << "gene_tree_increment" << "\t" << "increment_prior";
+                        }
+                        logf << "\t" << "species_tree_topology_prior" << "\t" << "gene_tree_topology_prior" << "\t" << "log_coal_like" << endl; // TODO: only works for one gene
                     }
                     
                     logf << a << "\t" << Forest::_starting_theta;
-                    logf << "\t" << setprecision(11) << gene_tree_log_like[0]+exp(gene_tree_log_like[0]);
+                    logf << "\t" << setprecision(11) << gene_tree_log_like[0]; // TODO: this won't work for multiple genes
+
                     
                     for (int i=0; i<prior_vec.size(); i++) {
                         logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i]+branch_length_vec[i];
@@ -1007,6 +1030,8 @@ namespace proj {
                     for (int i=0; i<log_topology_priors.size(); i++) {
                         logf << "\t" << setprecision(11) << log_topology_priors[i];
                     }
+                    
+                    logf << "\t" << setprecision(11) << log_coalescent_likelihood;
                     
                     logf << endl;
                     a++;
