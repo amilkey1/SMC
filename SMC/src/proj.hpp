@@ -1020,7 +1020,11 @@ namespace proj {
                     }
                     
                     logf << a << "\t" << Forest::_starting_theta;
-                    logf << "\t" << setprecision(11) << gene_tree_log_like[0]; // TODO: this won't work for multiple genes
+                    double logJ = 0.0;
+                    for (auto &m:prior_vec) {
+                        logJ += prior_vec[m];
+                    }
+                    logf << "\t" << setprecision(11) << gene_tree_log_like[0] + logJ; // TODO: this won't work for multiple genes
 
                     
                     for (int i=0; i<prior_vec.size(); i++) {
@@ -1031,7 +1035,7 @@ namespace proj {
                         logf << "\t" << setprecision(11) << log_topology_priors[i];
                     }
                     
-                    logf << "\t" << setprecision(11) << log_coalescent_likelihood;
+                    logf << "\t" << setprecision(11) << log_coalescent_likelihood + logJ;
                     
                     logf << endl;
                     a++;
