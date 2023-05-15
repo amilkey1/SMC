@@ -134,7 +134,7 @@ class Particle {
         void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
         bool                                    checkIfReadyToJoinSpecies();
-        int                                     _nspecies_forests = 100;
+        int                                     _nspecies_forests = 1;
         bool                                    _inf = false;
 //        bool                                    _reset_min = false;
         vector<bool>                             _reset_min;
@@ -442,6 +442,7 @@ class Particle {
 
     inline void Particle::speciesProposal() {
         assert (!_inf);
+        _alt_forests[0][0].showForest();
         vector<double> species_tree_proposals;
         if (!_inf) {
             for (int a = 0; a<_alt_forests.size(); a++) {
@@ -501,6 +502,7 @@ class Particle {
                         
                 _t[a].push_back(make_pair(species_joined, _alt_forests[a][0]._last_edge_length));
                 
+//                _alt_forests[0][0].showForest();
                 for (int i = 1; i<_alt_forests[a].size(); i++) {
                     double coal_like_increment = _alt_forests[a][i].calcCoalescentLikelihood(_alt_forests[a][0]._last_edge_length, species_joined, _species_tree_height[a], true);
                     _log_coalescent_likelihood_options[a] += coal_like_increment;
@@ -520,6 +522,7 @@ class Particle {
                 }
             }
         }
+//        _forests[0].showForest();
 //        _forests[1].showForest();
 //        for (int a=0; a<_alt_forests.size(); a++) {
 //            cout << a << " : " << endl;

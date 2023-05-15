@@ -1378,19 +1378,19 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                                 remaining_lineages[spp_right_child].second = 0.0;
                                 remaining_lineages[spp_left_child].second = 0.0;
                                 
-                                if (!count(branch_lengths_used.begin(), branch_lengths_used.end(), right_deep_coal_incr)) {
+                                if ((!count(branch_lengths_used.begin(), branch_lengths_used.end(), right_deep_coal_incr)) && (!count(branch_lengths_used.begin(), branch_lengths_used.end(), left_deep_coal_incr))) {
                                     double right_coalescence_rate = _species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1) / _theta;
                                     log_coalescent_likelihood -= right_deep_coal_incr * right_coalescence_rate;
 //                                    cout << right_deep_coal_incr * right_coalescence_rate << endl;
                                     branch_lengths_used.push_back(right_deep_coal_incr);
                                 }
                                 
-                                if (!count(branch_lengths_used.begin(), branch_lengths_used.end(), left_deep_coal_incr)) {
+//                                if (!count(branch_lengths_used.begin(), branch_lengths_used.end(), left_deep_coal_incr)) {
                                     double left_coalescence_rate = _species_partition[spp_left_child].size()*(_species_partition[spp_left_child].size()-1 )/ _theta;
                                     log_coalescent_likelihood -= left_deep_coal_incr * left_coalescence_rate;
 //                                    cout << left_deep_coal_incr * left_coalescence_rate << endl;
-                                    branch_lengths_used.push_back(left_deep_coal_incr); // TODO: need to do this for other cases?
-                                }
+                                    branch_lengths_used.push_back(left_deep_coal_incr);
+//                                }
                                 
                             }
                         }
