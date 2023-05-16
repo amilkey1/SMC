@@ -134,7 +134,7 @@ class Particle {
         void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
         bool                                    checkIfReadyToJoinSpecies();
-        int                                     _nspecies_forests = 1;
+        int                                     _nspecies_forests = 100;
         bool                                    _inf = false;
 //        bool                                    _reset_min = false;
         vector<bool>                             _reset_min;
@@ -442,7 +442,7 @@ class Particle {
 
     inline void Particle::speciesProposal() {
         assert (!_inf);
-        _alt_forests[0][0].showForest();
+//        _alt_forests[0][0].showForest();
         vector<double> species_tree_proposals;
         if (!_inf) {
             for (int a = 0; a<_alt_forests.size(); a++) {
@@ -503,17 +503,14 @@ class Particle {
                 _t[a].push_back(make_pair(species_joined, _alt_forests[a][0]._last_edge_length));
                 
 //                _alt_forests[0][0].showForest();
+//                _forests[1].showForest();
                 for (int i = 1; i<_alt_forests[a].size(); i++) {
+//                    vector<pair<double, string>> gene_tree_increments = _forests[i]._gene_tree_increments;
                     double coal_like_increment = _alt_forests[a][i].calcCoalescentLikelihood(_alt_forests[a][0]._last_edge_length, species_joined, _species_tree_height[a], true);
                     _log_coalescent_likelihood_options[a] += coal_like_increment;
                 }
     //            _alt_forests[a][0].showForest();
                 if (!_running_on_empty) {
-                    double nlineages = _alt_forests[a][0]._lineages.size();
-                    double phi = 0.0;
-//                    if (nlineages > 1) {
-//                        phi = log(1-exp(-1*max_depth*nlineages*Forest::_speciation_rate));
-//                    }
                     _log_weight_options[a] = _log_coalescent_likelihood_options[a] - prev_log_coalescent_likelihood;
                     double test = 1/_log_weight_options[a];
                     if (test == -0) {
@@ -522,24 +519,6 @@ class Particle {
                 }
             }
         }
-//        _forests[0].showForest();
-//        _forests[1].showForest();
-//        for (int a=0; a<_alt_forests.size(); a++) {
-//            cout << a << " : " << endl;
-//            cout << "   ";
-//            _alt_forests[a][0].showForest();
-//        }
-        ofstream proposalf("proposals.txt");
-        proposalf << "values" << endl;
-        for (int p=0; p<species_tree_proposals.size(); p++) {
-            double test = 1/_log_weight_options[p];
-//            cout << species_tree_proposals[p] << endl;
-            if (test != -0) {
-                proposalf << species_tree_proposals[p] << endl;
-            }
-        }
-        proposalf.close();
-//    cout << "stop";
     }
 
 

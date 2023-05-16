@@ -199,6 +199,8 @@ class Forest {
         void                        calcDeepCoalescentPrior();
         void                        deconstructGeneTree();
         void                        refreshPreorder();
+        vector<pair<double, string>>              _gene_tree_increments;
+        int                         _nincrements = 0;
 
     public:
 
@@ -1251,156 +1253,354 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
     inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done) {
-//        showForest();
-        vector<double> branch_lengths_used;
+        
+        vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
         double log_coalescent_likelihood = 0.0;
-        double neg_inf = -1*numeric_limits<double>::infinity();
-        map<string, pair<int, double>> remaining_lineages; // remaining lineages associated with each species
-        for (auto &s:_species_partition) {
-            remaining_lineages[s.first] = make_pair((int) s.second.size(), 0.0);
-        }
-        
-        if (species_increment == 0.0) {
-            log_coalescent_likelihood = calcCoalescentLikelihoodForLastStep(species_joined, species_tree_height, mark_as_done);
-        }
-        
-        else {
-            vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
-        // post order traversal is the reverse of pre order, now sorted by node heights
-            for (int i=0; i<heights_and_nodes.size(); i++) {
-                Node* nd = heights_and_nodes[i].second;
-                // figure out if descendants of internal node are in the same species
-                if (nd->_left_child && !nd->_done) {
-                    Node* left_child = nd->_left_child;
-                    Node* right_child = nd->_left_child->_right_sib;
-                    string spp_left_child;
-                    string spp_right_child;
+        double cum_time = 0.0;
+        int a = 0;
+
+        if (species_increment > 0) {
+            for (int i=_nincrements; i<heights_and_nodes.size(); i++) {
+                Node* node;
+                if (heights_and_nodes[i].first < species_tree_height) {
+                    // calc coalescent prob and update species partition
+                    double increment = heights_and_nodes[i].first - (species_tree_height - species_increment) - cum_time;
+                    cum_time += increment;
+                    assert (increment > 0.0);
+                    // find node in species partition and calculate nlineages
+                    string species;
                     for (auto &s:_species_partition) {
                         for (auto &nd:s.second) {
-                            if (nd == left_child) {
-                                spp_left_child = s.first;
-                            }
-                            else if (nd == right_child) {
-                                spp_right_child = s.first;
+                            if (nd == heights_and_nodes[i].second->_left_child) {
+                                species = s.first;
+                                node = nd;
                             }
                         }
                     }
-                // if the node is below the species barrier, spp_right_child & spp_left_child will be ""
-                if (spp_right_child != "" && spp_left_child != "") {
-                // if node is a tip node, do not consider it
-                    double gene_tree_chunk = 0.0; // chunk of branch length lineage has already evolved
-                    double gene_tree_right_chunk = 0.0;
-                    double gene_tree_left_chunk = 0.0;
-                    if (spp_right_child == spp_left_child) {
-                        gene_tree_chunk = remaining_lineages[spp_right_child].second;
-                    }
-                    else {
-                        gene_tree_right_chunk = remaining_lineages[spp_right_child].second; // TODO: fix gene increment for these
-                        gene_tree_left_chunk = remaining_lineages[spp_left_child].second;
-                    }
+                    for (auto &s:_species_partition) {
+                        if (s.first == species) {
+                            // coalescence
+                            int nlineages = (int) s.second.size();
+                            
+                            double coalescence_rate = nlineages*(nlineages-1) / _theta;
+                            double nChooseTwo = nlineages*(nlineages-1);
+                            double log_prob_join = log(2/nChooseTwo);
+                            log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
 
-                    double gene_increment = getLineageHeight(nd->_left_child) - (species_tree_height - species_increment) - gene_tree_chunk;
-                    assert (gene_increment > 0.0);
+                            updateNodeList(s.second, node, node->_right_sib, node->_parent); // update the species lineage
+                            a++;
+                        }
+                        else {
+                            // no coalescence
+                            int nlineages = (int) s.second.size();
+                            
+                            double coalescence_rate = nlineages*(nlineages-1) / _theta;
+                            log_coalescent_likelihood -= increment * coalescence_rate;
+                        }
+                    }
                     
-                    bool done = false;
-                    while ((remaining_lineages[spp_right_child].first > 0 && remaining_lineages[spp_left_child].first > 0) && !done) {
-                        if (getLineageHeight(nd->_left_child) <= species_tree_height) {
-//                        if (gene_increment <= species_increment) {
-                            // lineages are in the same species and have joined in this generation
-                            if (spp_left_child == spp_right_child) {
-                                double coalescence_rate = _species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1) / _theta;
-                                double test = (_species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1));
-                                double test3 = log(2/test);
-                                double log_prob_join = test3;
-                                assert(!count(branch_lengths_used.begin(), branch_lengths_used.end(), gene_increment));
-//                                cout << log_prob_join + log(coalescence_rate) - (gene_increment*coalescence_rate) << endl;
-                                branch_lengths_used.push_back(gene_increment);
-                                
-//                                if (!count(branch_lengths_used.begin(), branch_lengths_used.end(), right_deep_coal_incr)) {
-
-                                    
-                                log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (gene_increment*coalescence_rate); // prob of two lineages coalescing within the time frame
-                                
-                                // decrement remaining lineages vector
-                                remaining_lineages[spp_right_child].first--;
-
-                                updateNodeList(_species_partition[spp_right_child], right_child, left_child, nd);
-                                if (mark_as_done) {
-                                    nd->_done = true;
-                                }
-                                done = true;
-                                
-                                // this will be taken care of in the extension at the end of the function
-//                                remaining_lineages[spp_right_child].first--;
-                                
-                                gene_tree_chunk += gene_increment;
-                                remaining_lineages[spp_right_child].second = gene_tree_chunk;
-                            }
-                            
-                            // different species trying to join across a species boundary is illegal
-                            else if (spp_left_child != spp_right_child) {
-                                log_coalescent_likelihood = neg_inf;
-                                for (auto &l:remaining_lineages) {
-                                    l.second.first = 0;
-                                }
-                            }
-                        }
-//                        else if (gene_increment > species_increment) {
-                        // deep coalescence
-                        else if (getLineageHeight(nd->_left_child) > species_tree_height) {
-                            done = true;
-                                // if the lineage is involved in a deep coalescence event, increment is the remaining part within the last species increment
-                            // deep coalescence is allowed regardless of whether the lineages are in the same species
-                            // join is allowed in the next generation
-                            // for now, calculate the prob of each lineage not coalescing in its respective species
-                            // join is allowed in a subsequent stage; calculate probability of lineages not coalescing yet
-                            
-//                                gene_increment = species_increment - gene_tree_chunk;
-                            if (spp_right_child == spp_left_child) {
-                                gene_increment = species_increment - gene_tree_chunk;
-                                assert (gene_increment > 0.0);
-
-                                remaining_lineages[spp_right_child].second = 0.0;
-                                double coalescence_rate = _species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1) / _theta;
-                                log_coalescent_likelihood -= gene_increment*coalescence_rate;
-                                branch_lengths_used.push_back(gene_increment);
-                                
-                                remaining_lineages[spp_right_child].first = 0;
-                                remaining_lineages[spp_left_child].first = 0;
-                            }
-                            else {
-                                // deep coalescence between different species - this may happen in a subsequent generation
-                                double right_deep_coal_incr = species_increment - gene_tree_right_chunk;
-                                double left_deep_coal_incr = species_increment - gene_tree_left_chunk;
-                                assert (right_deep_coal_incr > 0.0);
-                                assert (left_deep_coal_incr > 0.0);
-                                
-                                remaining_lineages[spp_right_child].second = 0.0;
-                                remaining_lineages[spp_left_child].second = 0.0;
-                                
-                                if ((!count(branch_lengths_used.begin(), branch_lengths_used.end(), right_deep_coal_incr)) && (!count(branch_lengths_used.begin(), branch_lengths_used.end(), left_deep_coal_incr))) {
-                                    double right_coalescence_rate = _species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1) / _theta;
-                                    log_coalescent_likelihood -= right_deep_coal_incr * right_coalescence_rate;
-//                                    cout << right_deep_coal_incr * right_coalescence_rate << endl;
-                                    branch_lengths_used.push_back(right_deep_coal_incr);
-                                }
-                                
-//                                if (!count(branch_lengths_used.begin(), branch_lengths_used.end(), left_deep_coal_incr)) {
-                                    double left_coalescence_rate = _species_partition[spp_left_child].size()*(_species_partition[spp_left_child].size()-1 )/ _theta;
-                                    log_coalescent_likelihood -= left_deep_coal_incr * left_coalescence_rate;
-//                                    cout << left_deep_coal_incr * left_coalescence_rate << endl;
-                                    branch_lengths_used.push_back(left_deep_coal_incr);
-//                                }
-                                
-                            }
-                        }
-                    }
-                    }
                 }
             }
+            double remaining_chunk_of_branch = species_increment - cum_time;
+            // no coalescence
+            for (auto &s:_species_partition) {
+                int nlineages = (int) s.second.size();
+                double coalescence_rate = nlineages*(nlineages-1) / _theta;
+                log_coalescent_likelihood -= remaining_chunk_of_branch * coalescence_rate;
+            }
+            _nincrements += a;
         }
+        else {
+            // final step; no deep coalescence; one species
+            assert (species_increment == 0.0);
+            assert (_species_partition.size() == 1);
+            for (int i=_nincrements; i<heights_and_nodes.size(); i++) {
+                // there must be coalescence at this point
+                Node* node;
+                string species;
+                for (auto &s:_species_partition) {
+                    for (auto &nd:s.second) {
+                        if (nd == heights_and_nodes[i].second->_left_child) {
+                            node = nd;
+                        }
+                    }
+                    for (auto &s:_species_partition) {
+                        // coalescence
+                        int nlineages = (int) s.second.size();
+                        
+                        double coalescence_rate = nlineages*(nlineages-1) / _theta;
+                        double nChooseTwo = nlineages*(nlineages-1);
+                        double log_prob_join = log(2/nChooseTwo);
+                        double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
+                        log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
+
+                        updateNodeList(s.second, node, node->_right_sib, node->_parent); // update the species lineage
+                        a++;
+                        cum_time += increment;
+                    }
+                        // no deep coalescence
+                    }
+                }
+        }
+        
+        
+        
+//        double cum_time = 0.0;
+//        int g = 0;
+//        bool extend = true;
+//        bool redistribute = true;
+//        while (cum_time <= species_increment) {
+//            double increment = _gene_tree_increments[g].first;
+//            string species = _gene_tree_increments[g].second;
+//            cum_time += increment;
+//            for (auto &s:_species_partition) {
+//                if ((s.first == species && cum_time < species_increment) || species_increment == 0.0) {
+//                    // calc prob of coalescence within the increment
+//                    // coalescence happened if increment < species increment
+//                    Node* shallowest_node_in_lineage = s.second.front();
+//                    double shallowest_height = getLineageHeight(shallowest_node_in_lineage); // TODO: this only works if lineages trying to join are in the same species
+//                // TODO: must check for this; if they try to join and are not species it is an illegal join or this will occur in a subsequent generation if the increment is longer than the species barrier
+//                    for (auto &nd:s.second) {
+//                        if (getLineageHeight(nd) < shallowest_height) {
+//                            shallowest_node_in_lineage = nd;
+//                            shallowest_height = getLineageHeight(nd);
+//                        }
+//                    }
+//                    if (!shallowest_node_in_lineage -> _right_sib) {
+//                        shallowest_node_in_lineage = shallowest_node_in_lineage->_parent->_left_child;
+//                    }
+//
+//                    if (shallowest_height < species_increment) {
+//
+//                        double coalescence_rate = s.second.size()*(s.second.size()-1) / _theta;
+//                        double nChooseTwo = s.second.size()*(s.second.size()-1);
+//                        double log_prob_join = log(2/nChooseTwo);
+//                        log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
+//
+//                        updateNodeList(s.second, shallowest_node_in_lineage, shallowest_node_in_lineage->_right_sib, shallowest_node_in_lineage->_parent); // update the species lineage
+//                    }
+//                    else {
+//                        double coalescence_rate = s.second.size()*(s.second.size()-1) / _theta;
+//                        log_coalescent_likelihood -= increment * coalescence_rate;
+//                    }
+//                }
+//                  else if (species == "extend") {
+//                    // deal with case of extension
+//                    if (extend) {
+//                        // case 1: extension is beyond the species boundary
+//                        if (cum_time > species_increment) {
+//                            increment = species_increment - (cum_time - _gene_tree_increments[g].first);
+//                            // next increment must include the leftover part of extended increment
+//                            double remaining_increment = _gene_tree_increments[g].first - increment;
+//                            assert (remaining_increment > 0.0);
+////                            _gene_tree_increments[g+1].first += cum_time - species_increment;
+//                            _gene_tree_increments[g+1].first += remaining_increment;
+//                        }
+//
+//                        // case 2: extension is shorter than the species boundary
+//                        // increment must be redistributed
+//                        else {
+//                            double redistributed_increment = species_increment - increment;
+//                            increment += redistributed_increment; // draw from next increment to get down to the species boundary
+//                            // remove that amount from the next increment
+//                            _gene_tree_increments[g+1].first -= redistributed_increment;
+//                            assert (redistributed_increment > 0.0);
+//                        }
+//                        extend = false;
+//                    }
+//                    double coalescence_rate = s.second.size()*(s.second.size()-1) / _theta;
+//                    log_coalescent_likelihood -= increment * coalescence_rate;
+//                }
+//                else {
+//                    // calc prob of not coalescing within the increment
+//                    if (cum_time > species_increment && species_increment > 0.0) {
+////                        increment = increment - (increment - species_increment);
+//                        increment = species_increment - (cum_time - _gene_tree_increments[g].first);
+//                        assert (increment > 0.0);
+//                    }
+//                    double coalescence_rate = s.second.size()*(s.second.size()-1) / _theta;
+//                    log_coalescent_likelihood -= increment * coalescence_rate;
+//
+//                    if (redistribute && cum_time > species_increment) {
+//                        // next increment must subtract the part of the increment already accounted for
+//                        double remaining_increment = _gene_tree_increments[g].first - increment;
+//                        assert (remaining_increment > 0.0);
+////                            _gene_tree_increments[g+1].first += cum_time - species_increment;
+//                        _gene_tree_increments[g+1].first += remaining_increment;
+//                        redistribute = false;
+//                    }
+//                }
+//            }
+//            g++;
+//        }
+//        _nincrements = g;
+//        // erase increments already dealt with in previous generation
+//        _gene_tree_increments.erase(_gene_tree_increments.begin(), _gene_tree_increments.begin() + (_nincrements));
         return log_coalescent_likelihood;
     }
+
+//    inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done) {
+////        showForest();
+//        vector<double> branch_lengths_used;
+//        double log_coalescent_likelihood = 0.0;
+//        double neg_inf = -1*numeric_limits<double>::infinity();
+//        map<string, pair<int, double>> remaining_lineages; // remaining lineages associated with each species
+//        for (auto &s:_species_partition) {
+//            remaining_lineages[s.first] = make_pair((int) s.second.size(), 0.0);
+//        }
+//
+//        if (species_increment == 0.0) {
+//            log_coalescent_likelihood = calcCoalescentLikelihoodForLastStep(species_joined, species_tree_height, mark_as_done);
+//        }
+//
+//        else {
+//            vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
+//        // post order traversal is the reverse of pre order, now sorted by node heights
+//            for (int i=0; i<heights_and_nodes.size(); i++) {
+//                Node* nd = heights_and_nodes[i].second;
+//                // figure out if descendants of internal node are in the same species
+//                if (nd->_left_child && !nd->_done) {
+//                    Node* left_child = nd->_left_child;
+//                    Node* right_child = nd->_left_child->_right_sib;
+//                    string spp_left_child;
+//                    string spp_right_child;
+//                    for (auto &s:_species_partition) {
+//                        for (auto &nd:s.second) {
+//                            if (nd == left_child) {
+//                                spp_left_child = s.first;
+//                            }
+//                            else if (nd == right_child) {
+//                                spp_right_child = s.first;
+//                            }
+//                        }
+//                    }
+//                    // TODO: this doesn't always work?
+//                // if the node is below the species barrier, spp_right_child & spp_left_child will be ""
+//                if (spp_right_child != "" && spp_left_child != "") {
+//                // if node is a tip node, do not consider it
+//                    double gene_tree_chunk = 0.0; // chunk of branch length lineage has already evolved
+//                    double gene_tree_right_chunk = 0.0;
+//                    double gene_tree_left_chunk = 0.0;
+//                    if (spp_right_child == spp_left_child) {
+//                        gene_tree_chunk = remaining_lineages[spp_right_child].second;
+//                    }
+//                    else {
+//                        gene_tree_right_chunk = remaining_lineages[spp_right_child].second;
+//                        gene_tree_left_chunk = remaining_lineages[spp_left_child].second;
+//                    }
+//
+//                    double gene_increment = getLineageHeight(nd->_left_child) - (species_tree_height - species_increment) - gene_tree_chunk;
+//                    assert (gene_increment > 0.0);
+//
+//                    bool done = false;
+//                    while ((remaining_lineages[spp_right_child].first > 0 && remaining_lineages[spp_left_child].first > 0) && !done) {
+//                        if (getLineageHeight(nd->_left_child) <= species_tree_height) {
+////                        if (gene_increment <= species_increment) {
+//                            // lineages are in the same species and have joined in this generation
+//                            if (spp_left_child == spp_right_child) {
+//                                double coalescence_rate = _species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1) / _theta;
+//                                double test = (_species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1));
+//                                double test3 = log(2/test);
+//                                double log_prob_join = test3;
+//                                assert(!count(branch_lengths_used.begin(), branch_lengths_used.end(), gene_increment));
+////                                cout << log_prob_join + log(coalescence_rate) - (gene_increment*coalescence_rate) << endl;
+//                                branch_lengths_used.push_back(gene_increment);
+//
+//                                log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (gene_increment*coalescence_rate); // prob of two lineages coalescing within the time frame
+//
+//                                // decrement remaining lineages vector
+//                                remaining_lineages[spp_right_child].first--;
+//
+//                                updateNodeList(_species_partition[spp_right_child], right_child, left_child, nd);
+//                                if (mark_as_done) {
+//                                    nd->_done = true;
+//                                }
+//                                done = true;
+//
+//                                // this will be taken care of in the extension at the end of the function
+////                                remaining_lineages[spp_right_child].first--;
+//
+//                                gene_tree_chunk += gene_increment;
+//                                remaining_lineages[spp_right_child].second = gene_tree_chunk;
+//                                branch_lengths_used.push_back(gene_increment);
+//                            }
+//
+//                            // different species trying to join across a species boundary is illegal
+//                            else if (spp_left_child != spp_right_child) {
+//                                log_coalescent_likelihood = neg_inf;
+//                                for (auto &l:remaining_lineages) {
+//                                    l.second.first = 0;
+//                                }
+//                            }
+//                        }
+////                        else if (gene_increment > species_increment) {
+//                        // deep coalescence
+//                        else if (getLineageHeight(nd->_left_child) > species_tree_height) {
+//                            done = true;
+//                                // if the lineage is involved in a deep coalescence event, increment is the remaining part within the last species increment
+//                            // deep coalescence is allowed regardless of whether the lineages are in the same species
+//                            // join is allowed in the next generation
+//                            // for now, calculate the prob of each lineage not coalescing in its respective species
+//                            // join is allowed in a subsequent stage; calculate probability of lineages not coalescing yet
+//
+////                                gene_increment = species_increment - gene_tree_chunk;
+//                            if (spp_right_child == spp_left_child) {
+//                                gene_increment = species_increment - gene_tree_chunk;
+//                                assert (gene_increment > 0.0);
+//
+//                                remaining_lineages[spp_right_child].second = 0.0;
+//                                double coalescence_rate = _species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1) / _theta;
+//                                log_coalescent_likelihood -= gene_increment*coalescence_rate;
+//                                branch_lengths_used.push_back(gene_increment);
+//
+//                                remaining_lineages[spp_right_child].first = 0;
+//                                remaining_lineages[spp_left_child].first = 0;
+//                            }
+//                            else {
+//                                // deep coalescence between different species - this may happen in a subsequent generation
+//                                double right_deep_coal_incr = 0.0;
+//                                if (spp_right_child != "") {
+//                                    right_deep_coal_incr = species_increment - gene_tree_right_chunk;
+//                                }
+//                                double left_deep_coal_incr = 0.0;
+//                                if (spp_left_child != "") {
+//                                    left_deep_coal_incr = species_increment - gene_tree_left_chunk;
+//                                }
+////                                assert (right_deep_coal_incr > 0.0);
+////                                assert (left_deep_coal_incr > 0.0);
+//
+//                                if (spp_right_child != "") {
+//                                    remaining_lineages[spp_right_child].second = 0.0;
+//                                }
+//                                if (spp_left_child != "") {
+//                                    remaining_lineages[spp_left_child].second = 0.0;
+//                                }
+//
+//                                if ((!count(branch_lengths_used.begin(), branch_lengths_used.end(), right_deep_coal_incr)) && spp_right_child != "") {
+//                                    double right_coalescence_rate = _species_partition[spp_right_child].size()*(_species_partition[spp_right_child].size()-1) / _theta;
+//                                    log_coalescent_likelihood -= right_deep_coal_incr * right_coalescence_rate;
+////                                    cout << right_deep_coal_incr * right_coalescence_rate << endl;
+////                                    branch_lengths_used.push_back(right_deep_coal_incr);
+//                                }
+//
+//                                if ((!count(branch_lengths_used.begin(), branch_lengths_used.end(), left_deep_coal_incr)) && spp_left_child != "") { // TODO: this doesn't work if there is deep coalescence in multiple lineages - all will use the same increment
+//                                    double left_coalescence_rate = _species_partition[spp_left_child].size()*(_species_partition[spp_left_child].size()-1 )/ _theta;
+//                                    log_coalescent_likelihood -= left_deep_coal_incr * left_coalescence_rate;
+////                                    cout << left_deep_coal_incr * left_coalescence_rate << endl;
+////                                    branch_lengths_used.push_back(left_deep_coal_incr);
+//                                }
+//                                branch_lengths_used.push_back(right_deep_coal_incr);
+//                                branch_lengths_used.push_back(left_deep_coal_incr);
+//
+//                            }
+//                        }
+//                    }
+//                    }
+//                }
+//            }
+//        }
+//        return log_coalescent_likelihood;
+//    }
 
     inline double Forest::updateSpeciesPartition(Node* subtree1, Node* subtree2, Node* new_nd, double increment, vector<pair<tuple<string, string, string>, double>> species_merge_info) {
         // if the two taxa are from different species, must merge those species in the species partition before updating node lists
@@ -1736,6 +1936,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _ready_to_join_species = other._ready_to_join_species;
 //        _heights_and_nodes = other._heights_and_nodes;
         _depths = other._depths;
+        _gene_tree_increments = other._gene_tree_increments;
+        _nincrements = other._nincrements;
 
         // copy tree itself
 
@@ -2157,6 +2359,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         
         string species_for_join = eligible_species[index];
         
+        _gene_tree_increments.push_back(make_pair(increment, species_for_join));
+        
         double species_tree_height = 0.0;
         for (int a=0; a<_species_join_number+1; a++) {
             species_tree_height += species_info[a].second;
@@ -2335,9 +2539,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         //update species list
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+//        _gene_tree_increments.push_back(increment);
         
-        // TODO: increment must include extended increment
-        // TODO: it's not the extended increment, it's the branch back to the deepest node in the prev gen?
 //        showForest();
         // update increments and priors
         double log_increment_prior = 0.0;
@@ -3374,6 +3577,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         if (extended_increment_options.size() > 0) {
             _extended_increment = *min_element(extended_increment_options.begin(), extended_increment_options.end()); // extended increment is the smallest one added
         }
+        _gene_tree_increments.push_back(make_pair(_extended_increment, "extend"));
 //        showForest();
     }
 
