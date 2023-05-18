@@ -1253,7 +1253,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
     inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done) {
-        
+        double neg_inf = -1*numeric_limits<double>::infinity();
         vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
         double log_coalescent_likelihood = 0.0;
         double cum_time = 0.0;
@@ -1286,8 +1286,15 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                             double nChooseTwo = nlineages*(nlineages-1);
                             double log_prob_join = log(2/nChooseTwo);
                             log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
+                            
+                            bool found = (find(s.second.begin(), s.second.end(), node->_right_sib) != s.second.end());
 
-                            updateNodeList(s.second, node, node->_right_sib, node->_parent); // update the species lineage
+                            if (found) {
+                                updateNodeList(s.second, node, node->_right_sib, node->_parent); // update the species lineage
+                            }
+                            else {
+                                log_coalescent_likelihood = neg_inf;
+                            }
                             a++;
                         }
                         else {

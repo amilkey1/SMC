@@ -915,7 +915,6 @@ namespace proj {
 //                    _gene_tree_log_marginal_likelihood = _log_marginal_likelihood;
                     _log_marginal_likelihood = 0.0;
                     
-                        // TODO: don't run through this loop on the last round
                         for (unsigned s=0; s<nspecies; s++){
                             cout << "beginning species tree proposals" << endl;
                             //taxon joining and reweighting step
@@ -1024,19 +1023,21 @@ namespace proj {
                     for (auto &m:branch_length_vec) {
                         logJ += branch_length_vec[m];
                     }
-                    logf << "\t" << setprecision(11) << gene_tree_log_like[0]; // TODO: this won't work for multiple genes
+                    for (int g=0; g<gene_tree_log_like.size(); g++) {
+                        logf << "\t" << setprecision(11) << gene_tree_log_like[g] + logJ;
+                    }
 
                     
                     for (int i=0; i<prior_vec.size(); i++) {
-//                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i]+branch_length_vec[i];
-                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
+                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i]+branch_length_vec[i];
+//                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
                     }
                     
                     for (int i=0; i<log_topology_priors.size(); i++) {
                         logf << "\t" << setprecision(11) << log_topology_priors[i];
                     }
                     
-                    logf << "\t" << setprecision(11) << log_coalescent_likelihood;
+                    logf << "\t" << setprecision(11) << log_coalescent_likelihood + logJ;
                     
                     logf << endl;
                     a++;
