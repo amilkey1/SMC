@@ -1024,20 +1024,20 @@ namespace proj {
                         logJ += branch_length_vec[m];
                     }
                     for (int g=0; g<gene_tree_log_like.size(); g++) {
-                        logf << "\t" << setprecision(11) << gene_tree_log_like[g] + logJ;
+                        logf << "\t" << setprecision(12) << gene_tree_log_like[g];
                     }
 
                     
                     for (int i=0; i<prior_vec.size(); i++) {
-                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i]+branch_length_vec[i];
+                        logf << "\t" << setprecision(12) << branch_length_vec[i] << "\t" << prior_vec[i]+branch_length_vec[i];
 //                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
                     }
                     
                     for (int i=0; i<log_topology_priors.size(); i++) {
-                        logf << "\t" << setprecision(11) << log_topology_priors[i];
+                        logf << "\t" << setprecision(12) << log_topology_priors[i];
                     }
                     
-                    logf << "\t" << setprecision(11) << log_coalescent_likelihood + logJ;
+                    logf << "\t" << setprecision(12) << log_coalescent_likelihood;
                     
                     logf << endl;
                     a++;

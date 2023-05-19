@@ -109,7 +109,7 @@ class Particle {
         void                                            resetGeneIncrements();
         void                                            increaseNumberOfForests();
         double                                          getRunningSum();
-        int                                             getNGenes(){return _forests.size() - 1;}
+        int                                             getNGenes(){return (int) _forests.size() - 1;}
 
     private:
 
@@ -257,7 +257,6 @@ class Particle {
                     _log_weight = neg_inf;
                 }
             }
-            
             _generation++;
         }
         
