@@ -2243,6 +2243,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             if (coalescence) {
                 // if there is coalescence, need to use number of lineagse before the join
                 double coalescence_rate = (s.second.size()+1)*(s.second.size()) / _theta;
+                assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
                 double nChooseTwo = s.second.size()+1*(s.second.size());
                 double log_prob_join = log(2/nChooseTwo);
 //                double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
@@ -3234,6 +3235,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
     inline void Forest::extendGeneTreeLineages(double species_tree_height) {
+        showForest();
         vector<double> extended_increment_options;
         double deep_coalescent_increment = 0.0;
 //        _extended_increment = 0.0;

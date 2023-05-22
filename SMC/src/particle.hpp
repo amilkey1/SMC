@@ -135,7 +135,7 @@ class Particle {
         void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
         bool                                    checkIfReadyToJoinSpecies();
-        int                                     _nspecies_forests = 100;
+        int                                     _nspecies_forests = 1;
         bool                                    _inf = false;
 //        bool                                    _reset_min = false;
         vector<bool>                             _reset_min;
@@ -284,6 +284,7 @@ class Particle {
         for (int i=1; i<_forests.size(); i++) {
             _forests[i]._theta = _forests[i]._starting_theta;
             assert (_t.size() == 1);
+            _forests[0].showForest();
             pair<double, string> species_info = _forests[i].chooseDelta(_t[0], false);
 //            pair<double, string> species_info = _forests[i].chooseDelta(_t[0], unconstrained);
             _forests[i].geneTreeProposal(species_info, _t[0]);
@@ -829,45 +830,72 @@ class Particle {
 //                species_joined = _forests[0].speciesTreeProposal();
                 pair<unsigned, unsigned> example;
                 // for sim.nex
-//                if (i == 0) {
-////                    species_joined = make_tuple("s1", "s4", "node-5");
-//                    example = make_pair(1, 4);
-////                    increment = 0.00322;
-////                    example = make_pair(1,2);
-//                }
-//                else if (i == 1) {
-////                    species_joined = make_tuple("s2", "s3", "node-6");
-//                    example = make_pair(1,2 );
-////                    increment = 0.01051;
-////                    example = make_pair(1, 2);
-//                }
-//                else if (i == 2) {
-////                    species_joined = make_tuple("node-5", "node-6", "node-7");
-//                    example = make_pair(1, 2);
-////                    increment = 0.00193;
-////                    example = make_pair(1,2);
-//                }
-//                else if (i == 3) {
-////                    species_joined = make_tuple("s0", "node-7", "node-8");
-//                    example = make_pair(0, 1);
-////                    increment = 0.0;
-////                    example = make_pair(0, 1);
-//                }
-                // for low_info.,nex
                 if (i == 0) {
-                    example = make_pair(1,2);
+//                    species_joined = make_tuple("s1", "s4", "node-5");
+                    example = make_pair(1, 4);
+//                    increment = 0.00322;
+//                    example = make_pair(1,2);
                 }
-                else if (i==1) {
-                    example = make_pair(1,2);
+                else if (i == 1) {
+//                    species_joined = make_tuple("s2", "s3", "node-6");
+                    example = make_pair(1,2 );
+//                    increment = 0.01051;
+//                    example = make_pair(1, 2);
                 }
                 else if (i == 2) {
-                    example = make_pair(1,2);
+//                    species_joined = make_tuple("node-5", "node-6", "node-7");
+                    example = make_pair(1, 2);
+//                    increment = 0.00193;
+//                    example = make_pair(1,2);
                 }
                 else if (i == 3) {
-                    example = make_pair(0,1);
+//                    species_joined = make_tuple("s0", "node-7", "node-8");
+                    example = make_pair(0, 1);
+//                    increment = 0.0;
+//                    example = make_pair(0, 1);
+                }
+                // for low_info.,nex
+                bool low_info = false;
+                if (low_info) {
+                    if (i == 0) {
+                        example = make_pair(1,2);
+                    }
+                    else if (i==1) {
+                        example = make_pair(1,2);
+                    }
+                    else if (i == 2) {
+                        example = make_pair(1,2);
+                    }
+                    else if (i == 3) {
+                        example = make_pair(0,1);
+                    }
+                }
+                // for gopher.nex
+                bool gopher = true;
+                if (gopher) {
+                    if (i == 0) {
+                        example = make_pair(1,7);
+                    }
+                    else if (i == 1) {
+                        example = make_pair(5,6);
+                    }
+                    else if (i == 2) {
+                        example = make_pair(2,4);
+                    }
+                    else if (i == 3) {
+                        example = make_pair(1,4);
+                    }
+                    else if (i == 4) {
+                        example = make_pair(1,3);
+                    }
+                    else if (i == 5) {
+                        example = make_pair(1,2);
+                    }
+                    else if (i == 6) {
+                        example = make_pair(0,1);
+                    }
                 }
                 species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
-                
                 // if the species tree is not finished, add another species increment
                 if (_forests[0]._lineages.size()>1) {
                     _forests[0].addSpeciesIncrement();
