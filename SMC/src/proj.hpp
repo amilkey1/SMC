@@ -923,37 +923,10 @@ namespace proj {
                             bool unconstrained = false;
                             
                             proposeParticles(my_vec, gene_trees_only, unconstrained);
-
+                            
                         } // s loop
                     normalizeWeights(my_vec, 0, true);
-//                    _species_tree_log_marginal_likelihood = _log_marginal_likelihood;
                     }
-                    
-//                    if (!_run_on_empty) {
-//                        bool calc_marg_like = true;
-//                        normalizeWeights(my_vec, nspecies, calc_marg_like);
-//
-//                        double ess_inverse = 0.0;
-//
-//                        for (auto & p:my_vec) {
-//                            ess_inverse += exp(2.0*p->getLogWeight());
-////                            p->showParticle();
-//                        }
-////
-//                        double ess = 1.0/ess_inverse;
-//                        cout << "   " << "ESS = " << ess << endl;
-//                        if (isnan(ess)) {
-//                            throw XProj(format("no species trees can accommodate the gene trees; increase the number of particles and try again"));
-//                        }
-//
-//                        resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
-////                        if use_first is true, my_vec = my_vec_2
-////                        if use_first is false, my_vec = my_vec_1
-//
-//                        my_vec = use_first ? my_vec_2:my_vec_1;
-//
-////                        change use_first from true to false or false to true
-//                        use_first = !use_first;
                         saveParticleWeights(my_vec);
 
                         resetWeights(my_vec);
@@ -1023,18 +996,29 @@ namespace proj {
                     for (auto &m:branch_length_vec) {
                         logJ += branch_length_vec[m];
                     }
+                    
+                    double species_logJ = 0.0;
+                    for (int s=0; s<nspecies-1; s++) {
+                        species_logJ += branch_length_vec[s];
+                    }
+                    
+                    double gene_logJ = 0.0;
+                    for (int h=nspecies-1; h<nspecies+ntaxa-1; h++) {
+                        gene_logJ += branch_length_vec[h];
+                    }
+                    
                     for (int g=0; g<gene_tree_log_like.size(); g++) {
                         logf << "\t" << setprecision(12) << gene_tree_log_like[g];
                     }
 
                     
                     for (int i=0; i<prior_vec.size(); i++) {
-                        logf << "\t" << setprecision(12) << branch_length_vec[i] << "\t" << prior_vec[i]+branch_length_vec[i];
-//                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
+//                        logf << "\t" << setprecision(12) << branch_length_vec[i] << "\t" << prior_vec[i]+branch_length_vec[i];
+                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
                     }
                     
-                    for (int i=0; i<log_topology_priors.size(); i++) {
-                        logf << "\t" << setprecision(12) << log_topology_priors[i];
+                    for (int j=0; j<log_topology_priors.size(); j++) {
+                        logf << "\t" << setprecision(12) << log_topology_priors[j];
                     }
                     
                     logf << "\t" << setprecision(12) << log_coalescent_likelihood;

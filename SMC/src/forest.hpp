@@ -1754,33 +1754,38 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _lineages.resize(_nspecies);
     }
 
-    inline string Forest::chooseEvent() {
-        string event;
-        // hybridization prior
-        double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
-
-        double hybridization_prob = _hybridization_rate/(_hybridization_rate+_speciation_rate);
-
-        double u = rng.uniform();
-        _rand_numbers.push_back(u);
-        if (u<hybridization_prob && _lineages.size()>2) {
-            event = "hybridization";
-        }
-        else if (_lineages.size() == 1) {
-            event = "null";
-        }
-        else {
-            event = "speciation";
-        }
-        // choose edge length but don't add it yet
-        _last_edge_length = rng.gamma(1.0, 1.0/rate);
-
-        if (_lineages.size()>2) {
-            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
-        }
-
-        return event;
-    }
+//    inline string Forest::chooseEvent() {
+//        string event;
+//        // hybridization prior
+//        double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
+//
+//        double hybridization_prob = _hybridization_rate/(_hybridization_rate+_speciation_rate);
+//
+//        double u = rng.uniform();
+//        _rand_numbers.push_back(u);
+//        if (u<hybridization_prob && _lineages.size()>2) {
+//            event = "hybridization";
+//        }
+//        else if (_lineages.size() == 1) {
+//            event = "null";
+//        }
+//        else {
+//            event = "speciation";
+//        }
+//        // choose edge length but don't add it yet
+//        _last_edge_length = rng.gamma(1.0, 1.0/rate);
+//
+//        double nChooseTwo = _lineages.size()*(_lineages.size()-1);
+//        double log_prob_join = log(2/nChooseTwo);
+//        double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
+//
+//        if (_lineages.size()>2) {
+////            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+//            _increments.push_back(make_pair(_last_edge_length, increment_prior));
+//        }
+//
+//        return event;
+//    }
 
     inline void Forest::chooseSpeciesIncrement(double max_depth) {
         assert (max_depth >= 0.0);
@@ -1799,7 +1804,13 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             for (auto nd:_lineages) {
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
             }
-            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+            double nChooseTwo = _lineages.size()*_lineages.size();
+            double log_prob_join = log(2/nChooseTwo);
+            double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
+            
+            _increments.push_back(make_pair(_last_edge_length, increment_prior));
+            
+//            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
         }
         else {
             // hybridization prior
@@ -2128,6 +2139,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                     nd->_edge_length += deep_coalescence_increment;
                 }
                 
+                increment = deep_coalescence_increment;
+                
                 // check if there is another deep coalescent event
                 if (deep_coalescence_increment < species_increment || species_increment == 0.0) {
                     done = true;
@@ -2150,6 +2163,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 }
             }
 
+            assert (!extend);
             if (extend) {
 //                extendGeneTreeLineages(species_increment);
                 extendGeneTreeLineages(species_tree_height);
@@ -2241,10 +2255,10 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             }
 //            double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
             if (coalescence) {
-                // if there is coalescence, need to use number of lineagse before the join
+                // if there is coalescence, need to use number of lineages before the join
                 double coalescence_rate = (s.second.size()+1)*(s.second.size()) / _theta;
                 assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
-                double nChooseTwo = s.second.size()+1*(s.second.size());
+                double nChooseTwo = (s.second.size()+1)*(s.second.size());
                 double log_prob_join = log(2/nChooseTwo);
 //                double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
                 log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate) + log_prob_join;
@@ -2297,8 +2311,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         }
         
         if (extend && _species_partition.size() > 1) {
-//            extendGeneTreeLineages(species_increment);
-            extendGeneTreeLineages(species_tree_height); // TODO: when does this get accounted for?
+            extendGeneTreeLineages(species_tree_height);
         }
     }
 
@@ -3072,7 +3085,13 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
         if (_lineages.size()>1) {
-            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+            double nChooseTwo = _lineages.size()*_lineages.size();
+            double log_prob_join = log(2/nChooseTwo);
+            double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
+            
+            _increments.push_back(make_pair(_last_edge_length, increment_prior));
+            
+//            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
         }
 
         // add the previously chosen edge length
@@ -3235,7 +3254,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
     inline void Forest::extendGeneTreeLineages(double species_tree_height) {
-        showForest();
+//        showForest();
         vector<double> extended_increment_options;
         double deep_coalescent_increment = 0.0;
 //        _extended_increment = 0.0;
@@ -3283,6 +3302,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         }
         
         _deep_coalescent_increments.push_back(make_pair(deep_coalescent_increment, deep_coalescent_prior));
+//        showForest();
     }
 
     inline void Forest::deconstructGeneTree() {
