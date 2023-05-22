@@ -2165,7 +2165,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
 
             assert (!extend);
             if (extend) {
-//                extendGeneTreeLineages(species_increment);
                 extendGeneTreeLineages(species_tree_height);
             }
         }
@@ -3085,7 +3084,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
         if (_lineages.size()>1) {
-            double nChooseTwo = _lineages.size()*_lineages.size();
+            double nChooseTwo = _lineages.size()*(_lineages.size()-1);
             double log_prob_join = log(2/nChooseTwo);
             double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
             
