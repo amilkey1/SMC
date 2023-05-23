@@ -51,9 +51,10 @@ class Particle {
         double                                  calcHeight();
         void                                    buildEntireSpeciesTree();
         string                                  getSpeciesNewick() {return _forests[0].makeNewick(9, true);}
-        double                                  getLogWeight() const {return _log_weight;}
+        double                                  getLogWeight(string a);
         map<int, vector<double>>                     getRandomSeeds() {return _random_seeds;}
-        void                                    setLogWeight(double w){_log_weight = w;}
+//        void                                    setLogWeight(double w){_log_weight = w;}
+        void                                    setLogWeight(double w, string a);
         void                                    operator=(const Particle & other);
         const vector<Forest> &                  getForest() const {return _forests;}
         std::string                             saveForestNewick() {
@@ -100,34 +101,29 @@ class Particle {
         void                                            firstGen();
         void                                            geneTreeProposal(bool unconstrained);
         void                                            speciesProposal();
-        void                                            filterSpeciesTrees();
-        void                                            normalizeSpeciesTreeWeights();
-        void                                            resampleParticles();
         void                                            resetSpeciesInfo(){_t.clear();}
-        void                                            resetSpeciesTreeHeight(){ for (auto &s:_species_tree_height) {s = 0.0;};}
+        void                                            resetSpeciesTreeHeight(){ _species_tree_height = 0.0;}
         void                                            resetSpecies();
         void                                            resetGeneIncrements();
-        void                                            increaseNumberOfForests();
-        double                                          getRunningSum();
         int                                             getNGenes(){return (int) _forests.size() - 1;}
 
     private:
 
         static unsigned                         _nsubsets;
         vector<Forest>                          _forests;
-        vector<vector<Forest>>                  _alt_forests;
         double                                  _log_weight;
-        vector<double>                          _log_weight_options;
+        double                                  _species_log_weight;
+//        vector<double>                          _log_weight_options;
         Data::SharedPtr                         _data;
         double                                  _log_likelihood;
         double                                  _log_coalescent_likelihood;
-        vector<double>                          _log_coalescent_likelihood_options;
         int                                     _generation = 0;
         map<int, vector<double>>                     _random_seeds;
         bool                                    _running_on_empty = false;
         bool                                    _no_species_joined = true;
-        vector<double>                                  _species_tree_height;
-        vector<vector<pair<tuple<string, string, string>, double>>> _t;
+//        vector<double>                                  _species_tree_height;
+        double                                  _species_tree_height;
+        vector<pair<tuple<string, string, string>, double>> _t;
         unsigned                                _gene_tree_proposal_attempts;
         bool                                    _ready_to_join_species;
         bool                                    _species_first;
@@ -135,7 +131,6 @@ class Particle {
         void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
         bool                                    checkIfReadyToJoinSpecies();
-        int                                     _nspecies_forests = 500;
         bool                                    _inf = false;
 //        bool                                    _reset_min = false;
         vector<bool>                             _reset_min;
@@ -148,8 +143,10 @@ class Particle {
         _log_likelihood = 0.0;
         _gene_tree_proposal_attempts = 0;
         _log_coalescent_likelihood = 0.0;
-        _species_tree_height.clear();
+        _species_tree_height = 0.0;
 //        _reset_min = false;
+        _species_tree_height = 0.0;
+        _species_log_weight = 0.0;
     };
 
     inline Particle::~Particle() {
@@ -226,37 +223,12 @@ class Particle {
         }
         else if (!gene_trees_only) {
             if (_generation == Forest::_ntaxa - 1) {
-                increaseNumberOfForests();
-                for (int a = 0; a<_alt_forests.size(); a++) {
-                    for (int i=1; i<_alt_forests[a].size(); i++) {
-                        _alt_forests[a][i].calcMinDepth();
-                    }
+                for (int i=1; i<_forests.size(); i++) {
+                    _forests[i].calcMinDepth();
+                    _forests[i]._nincrements = 0;
                 }
             }
             speciesProposal();
-            filterSpeciesTrees();
-            
-            if (_generation == Forest::_ntaxa+Forest::_nspecies-2) {
-                // once species trees are fully resolved, choose a species tree based on their weights
-                int choice = _forests[0].selectPair(_log_weight_options);
-                // reset _forests to the chosen species tree in _alt_forests
-                _forests[0] = _alt_forests[choice][0];
-//                _log_weight = _log_weight_options[choice];
-                _log_weight = _unnormalized_weights[choice];
-                _log_coalescent_likelihood = _log_coalescent_likelihood_options[choice];
-                _alt_forests.clear();
-                vector<pair<tuple<string, string, string>, double>> chosen_species = _t[choice];
-                _t.clear();
-                _t.push_back(chosen_species);
-
-                _species_tree_height.clear();
-                _log_coalescent_likelihood_options.clear();
-                _log_weight_options.clear();
-                if (_inf) {
-                    double neg_inf = -1*numeric_limits<double>::infinity();
-                    _log_weight = neg_inf;
-                }
-            }
             _generation++;
         }
         
@@ -265,6 +237,8 @@ class Particle {
             _log_weight = 0.0;
         }
         resetVariables();
+//        _forests[0].showForest();
+//        _forests[1].showForest();
         return _log_weight;
     }
 
@@ -284,10 +258,9 @@ class Particle {
 //        _forests[0].showForest();
         for (int i=1; i<_forests.size(); i++) {
             _forests[i]._theta = _forests[i]._starting_theta;
-            assert (_t.size() == 1);
-            pair<double, string> species_info = _forests[i].chooseDelta(_t[0], false);
-//            pair<double, string> species_info = _forests[i].chooseDelta(_t[0], unconstrained);
-            _forests[i].geneTreeProposal(species_info, _t[0]);
+            assert (_t.size() == _forests[0]._nspecies);
+            pair<double, string> species_info = _forests[i].chooseDelta(_t, false);
+            _forests[i].geneTreeProposal(species_info, _t);
             if (_forests[i]._lineages.size() == 1) {
                 _forests[i].refreshPreorder();
             }
@@ -305,170 +278,60 @@ class Particle {
         }
     }
 
-    inline double Particle::getRunningSum() {
-        double running_sum = 0.0;
-        double log_particle_sum = 0.0;
-
-        double log_max_weight = *max_element(_log_weight_options.begin(), _log_weight_options.end());
-        
-        for (auto & i:_log_weight_options) {
-            running_sum += exp(i - log_max_weight);
+    inline double Particle::getLogWeight(string a) {
+        if (a == "s") {
+            return _species_log_weight;
         }
-        log_particle_sum = log(running_sum) + log_max_weight;
-
-        return log_particle_sum;
+        else {
+            return _log_weight;
+        }
+        
     }
 
-    inline void Particle::normalizeSpeciesTreeWeights() {
-        double log_particle_sum = getRunningSum();
-        
-        for (int a=0; a<_log_weight_options.size(); a++) {
-            _log_weight_options[a] = _log_weight_options[a] - log_particle_sum;
+    inline void Particle::setLogWeight(double w, string a) {
+        if (a == "s") {
+            _species_log_weight = w;
         }
+        else {
+            _log_weight = w;
+        }
+        
     }
 
-    inline void Particle::resampleParticles() {
-        vector<pair<double, double>> cum_probs;
-        vector<double> alt_log_weights;
-        vector<vector<Forest>> to_forests;
-        vector<double> heights;
-        heights.resize(_nspecies_forests);
-        vector<double> unnorm_weights;
-        unnorm_weights.resize(_unnormalized_weights.size());
-        
-        vector<double> log_coal_likelihoods;
-        log_coal_likelihoods.resize(_nspecies_forests);
-        
-        vector<vector<pair<tuple<string, string, string>, double>>> t;
-        t.resize(_nspecies_forests); // TODO: check this one
-        
-        alt_log_weights.resize(_nspecies_forests);
-        // Create vector of pairs p, with p.first = log weight and p.second = particle index
-        cum_probs.resize(_nspecies_forests);
-        unsigned i = 0;
-        for(int a=0; a<_log_weight_options.size(); a++) {
-            cum_probs[i].first = _log_weight_options[a];
-            cum_probs[i].second = i;
-            ++i;
-        }
-            
-        // Sort cum_probs vector so that largest log weights come first
-        sort(cum_probs.begin(), cum_probs.end(), greater< pair<double,unsigned> >());
-
-        // Convert vector from storing log weights to storing cumulative weights
-        double cumpr = 0.0;
-        for (auto & w : cum_probs) {
-            cumpr += exp(w.first);
-            w.first = cumpr;
-        }
-        
-        // Last element in cum_probs should hold 1.0 if weights were indeed normalized coming in
-        if (!isnan(cumpr)) {
-            assert( fabs( 1.0 - cum_probs[_nspecies_forests-1].first ) < 0.0000001);
-        }
-
-        
-        // Draw new set of particles by sampling with replacement according to cum_probs
-        to_forests.resize(_nspecies_forests);
-        for (unsigned i = 0; i < _nspecies_forests; i++) {
-        
-            // Select a particle to copy to the ith slot in to_particles
-            int sel_index = -1;
-            double u = rng.uniform();
-            for(unsigned j = 0; j < _nspecies_forests; j++) {
-                if (u < cum_probs[j].first) {
-                    sel_index = cum_probs[j].second;
-                    break;
-                }
-            }
-            assert(sel_index > -1);
-            vector<Forest> forests = _alt_forests[sel_index];
-            to_forests[i] = forests;
-            heights[i] = _species_tree_height[sel_index];
-            alt_log_weights[i] = _log_weight_options[sel_index];
-            log_coal_likelihoods[i] = _log_coalescent_likelihood_options[sel_index];
-            assert(_nspecies_forests == to_forests.size());
-            t[i] = _t[sel_index];
-            unnorm_weights[i] = _unnormalized_weights[sel_index];
-        }
-        _log_weight_options.clear();
-        _log_weight_options = alt_log_weights;
-        _log_coalescent_likelihood_options.clear();
-        _log_coalescent_likelihood_options = log_coal_likelihoods;
-        _species_tree_height.clear();
-        _species_tree_height = heights;
-        _t.clear();
-        _t = t;
-        _alt_forests = to_forests; // TODO: clear alt forests first?
-        _unnormalized_weights.clear();
-        _unnormalized_weights = unnorm_weights;
-    }
-
-    inline void Particle::filterSpeciesTrees() {
-        for (auto &w:_log_weight_options) {
-            _unnormalized_weights.push_back(w);
-        }
-        normalizeSpeciesTreeWeights();
-        
-        double ess_inverse = 0.0;
-        for (int b = 0; b<_log_weight_options.size(); b++) {
-            ess_inverse += exp(_log_weight_options[b]);
-        }
-        
-        double ess = 1.0/ess_inverse;
-//        cout << "   " << "ESS = " << ess << endl;
-        
-        if (isnan(ess)) {
-            _inf = true;
-            throw XProj(format("no species trees can accommodate the gene trees; increase the number of particles and try again"));
-        }
-     
-        if (!_inf) {
-            resampleParticles();
-        }
-//        }
-        //if use_first is true, my_vec = my_vec_2
-        //if use_first is false, my_vec = my_vec_1
-        
-//        _alt_forests = _use_first ? _alt_forests2:_alt_forests;
-
-        //change use_first from true to false or false to true
-//        _use_first = !_use_first;
-    }
 
     inline void Particle::speciesProposal() {
+//        _forests[0].showForest();
         assert (!_inf);
         vector<double> species_tree_proposals;
         if (!_inf) {
-            for (int a = 0; a<_alt_forests.size(); a++) {
-                tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-                double prev_log_coalescent_likelihood = _log_coalescent_likelihood_options[a];
-                if (_alt_forests[a][0]._last_edge_length > 0.0) {
-                // choose species to join if past the first species generation for each forest vector
-                    species_joined = _alt_forests[a][0].speciesTreeProposal();
-                }
+            tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+            double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
+            if (_forests[0]._last_edge_length > 0.0) {
+            // choose species to join if past the first species generation for each forest vector
+                species_joined = _forests[0].speciesTreeProposal();
+            }
                 
-                vector<double> max_depth_vector;
-                double max_depth = 0.0;
+            vector<double> max_depth_vector;
+            double max_depth = 0.0;
 
-                for (int i=1; i<_alt_forests[a].size(); i++) {
-                    _alt_forests[a][i].updateSpeciesPartitionTwo(species_joined);
+                for (int i=1; i<_forests.size(); i++) {
+                    _forests[i].updateSpeciesPartitionTwo(species_joined);
                     string species1 = get<0>(species_joined);
                     string species2 = get<1>(species_joined);
                     
                     bool match1 = false;
                     bool match2 = false;
                     
-                    if (_alt_forests[a][i].getMinDepths()[0].second.first == species1 || _alt_forests[a][i].getMinDepths()[0].second.first == species2) {
+                    if (_forests[i].getMinDepths()[0].second.first == species1 || _forests[i].getMinDepths()[0].second.first == species2) {
                         match1 = true;
                     }
-                    if (_alt_forests[a][i].getMinDepths()[0].second.second == species2 || _alt_forests[a][i].getMinDepths()[0].second.second == species1) {
+                    if (_forests[i].getMinDepths()[0].second.second == species2 || _forests[i].getMinDepths()[0].second.second == species1) {
                         match2 = true;
                     }
                         
-                    if (_alt_forests[a][0]._lineages.size() > 1) {
-                        _alt_forests[a][i].resetDepthVector(species_joined);
-                        max_depth = (_alt_forests[a][i].getMinDepths())[0].first;
+                    if (_forests[0]._lineages.size() > 1) {
+                        _forests[i].resetDepthVector(species_joined);
+                        max_depth = (_forests[i].getMinDepths())[0].first;
                         max_depth_vector.push_back(max_depth);
     //                    _alt_forests[a][i].resetDepthVector(species_joined);
                     }
@@ -477,41 +340,41 @@ class Particle {
                         _reset_min.push_back(false);
                     }
                 }
-                if (_alt_forests[a][0]._lineages.size() > 1) {
+                if (_forests[0]._lineages.size() > 1) {
                     max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
     //                cout << _alt_forests[a][0].getTreeHeight() << endl;
-                    max_depth -= _alt_forests[a][0].getTreeHeight();
+                    max_depth -= _forests[0].getTreeHeight();
                     // choose a species tree increment
                 }
                 
-                if (_alt_forests[a][0]._lineages.size() > 1) {
+                if (_forests[0]._lineages.size() > 1) {
 //                    _alt_forests[a][0].chooseSpeciesIncrement(0.0);
                     assert (max_depth > 0.0);
-                    _alt_forests[a][0].chooseSpeciesIncrement(max_depth);
-                    species_tree_proposals.push_back(_alt_forests[a][0]._last_edge_length);
-                    _species_tree_height[a] += _alt_forests[a][0]._last_edge_length;
+                    _forests[0].chooseSpeciesIncrement(max_depth);
+                    species_tree_proposals.push_back(_forests[0]._last_edge_length);
+                    _species_tree_height += _forests[0]._last_edge_length;
                 }
-                if (_alt_forests[a][0]._lineages.size() == 1) {
-                    _alt_forests[a][0]._last_edge_length = 0.0;
+                if (_forests[0]._lineages.size() == 1) {
+                    _forests[0]._last_edge_length = 0.0;
                 }
                         
-                _t[a].push_back(make_pair(species_joined, _alt_forests[a][0]._last_edge_length));
+                _t.push_back(make_pair(species_joined, _forests[0]._last_edge_length));
                 
-                for (int i = 1; i<_alt_forests[a].size(); i++) {
-//                    vector<pair<double, string>> gene_tree_increments = _forests[i]._gene_tree_increments;
-                    double coal_like_increment = _alt_forests[a][i].calcCoalescentLikelihood(_alt_forests[a][0]._last_edge_length, species_joined, _species_tree_height[a], true);
-                    _log_coalescent_likelihood_options[a] += coal_like_increment;
+                for (int i = 1; i<_forests.size(); i++) {
+//                    _forests[0].showForest();
+//                    _forests[1].showForest();
+                    double coal_like_increment = _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height, true);
+                    _log_coalescent_likelihood += coal_like_increment;
                 }
                 if (!_running_on_empty) {
-                    _log_weight_options[a] = _log_coalescent_likelihood_options[a] - prev_log_coalescent_likelihood;
-                    double test = 1/_log_weight_options[a];
+                    _species_log_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood;
+                    double test = 1/_species_log_weight;
                     if (test == -0) {
                         _inf = true;
                     }
                 }
             }
         }
-    }
 
 
     inline void Particle::calcParticleWeight() {
@@ -535,28 +398,28 @@ class Particle {
         }
     }
 
-    inline void Particle::buildFakeSpeciesTree() {
-        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-        _forests[0]._last_edge_length = 0.0;
-
-        double edge_len = _forests[0]._last_edge_length;
-        _t.resize(1);
-
-//        _t.push_back(make_pair(species_joined, edge_len));
-
-        for (int i=0; i < _forests[0]._nspecies-1; i++) {
-            if (_forests[0]._lineages.size() > 1) {
-//                tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
-                tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-
-                double edge_len = 0.0;
-                if (_forests[0]._lineages.size() > 1) {
-                    edge_len = _forests[0]._last_edge_length;
-                }
-                _t[0].push_back(make_pair(species_joined, edge_len));
-            }
-        }
-    }
+//    inline void Particle::buildFakeSpeciesTree() {
+//        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+//        _forests[0]._last_edge_length = 0.0;
+//
+//        double edge_len = _forests[0]._last_edge_length;
+//        _t.resize(1);
+//
+////        _t.push_back(make_pair(species_joined, edge_len));
+//
+//        for (int i=0; i < _forests[0]._nspecies-1; i++) {
+//            if (_forests[0]._lineages.size() > 1) {
+////                tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
+//                tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+//
+//                double edge_len = 0.0;
+//                if (_forests[0]._lineages.size() > 1) {
+//                    edge_len = _forests[0]._last_edge_length;
+//                }
+//                _t.push_back(make_pair(species_joined, edge_len));
+//            }
+//        }
+//    }
 
     inline void Particle::panmicticSpeciesPartition() {
         for (int i=1; i<_forests.size(); i++) {
@@ -779,7 +642,7 @@ class Particle {
 
     inline void Particle::resetSpecies() {
         setLogLikelihood(0.0);
-        setLogWeight(0.0);
+        setLogWeight(0.0, "s");
         resetSpeciesInfo();
         resetSpeciesTreeHeight();
         _forests[0]._increments.clear();
@@ -791,18 +654,6 @@ class Particle {
         }
     }
 
-    inline void Particle::increaseNumberOfForests() {
-        _t.resize(_nspecies_forests);
-        _species_tree_height.resize(_nspecies_forests);
-        _log_coalescent_likelihood_options.resize(_nspecies_forests);
-        _log_weight_options.resize(_nspecies_forests);
-        
-        for (int i=0; i<_nspecies_forests; i++) {
-            vector<Forest> f = _forests;
-            _alt_forests.push_back(f);
-        }
-    }
-
     inline void Particle::buildEntireSpeciesTree() {
         double max_depth = 0.0;
         _forests[0].chooseSpeciesIncrement(max_depth);
@@ -811,8 +662,7 @@ class Particle {
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
         double edge_len = _forests[0]._last_edge_length;
-        vector<pair<tuple<string, string, string>, double>> test;
-        test.push_back(make_pair(species_joined, edge_len));
+        _t.push_back(make_pair(species_joined, edge_len));
 //        double increment = 0.0;
 
 //        cout << "new particle" << endl;
@@ -821,7 +671,7 @@ class Particle {
 //                species_joined = _forests[0].speciesTreeProposal();
                 pair<unsigned, unsigned> example;
                 // for sim.nex
-                bool sim = false;
+                bool sim = true;
                 if (sim) {
                     if (i == 0) {
                         example = make_pair(1, 4);
@@ -857,7 +707,7 @@ class Particle {
                         }
                     }
                 // for gopher.nex
-                bool gopher = true;
+                bool gopher = false;
                     if (gopher) {
                         if (i == 0) {
                             example = make_pair(1,7);
@@ -893,18 +743,16 @@ class Particle {
                 if (_forests[0]._lineages.size() > 1) {
                     edge_len = _forests[0]._last_edge_length;
                 }
-                test.push_back(make_pair(species_joined, edge_len));
+                _t.push_back(make_pair(species_joined, edge_len));
 //                _t.push_back(make_pair(species_joined, edge_len));
             }
         }
-        _t.push_back(test);
     }
 
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_likelihood = other._log_likelihood;
         _forests         = other._forests;
-        _alt_forests = other._alt_forests;
         _data           = other._data;
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;
@@ -917,11 +765,9 @@ class Particle {
         _no_species_joined = other._no_species_joined;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _species_tree_height = other._species_tree_height;
-        _nspecies_forests = other._nspecies_forests;
-        _log_coalescent_likelihood_options = other._log_coalescent_likelihood_options;
-        _log_weight_options = other._log_weight_options;
         _inf = other._inf;
         _reset_min = other._reset_min;
         _unnormalized_weights = other._unnormalized_weights;
+        _species_log_weight = other._species_log_weight;
     };
 }

@@ -35,13 +35,13 @@ namespace proj {
             void                saveParticleWeights(vector<Particle::SharedPtr> &v) const;
             void                saveParticleLikelihoods(vector<Particle::SharedPtr> &v) const;
 
-            void                normalizeWeights(vector<Particle::SharedPtr> & particles, int g, bool calc_marg_like);
-            unsigned            chooseRandomParticle(vector<Particle::SharedPtr> & particles, vector<double> & cum_prob);
-            void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
-            void                resetWeights(vector<Particle::SharedPtr> & particles);
+            void                normalizeWeights(vector<Particle::SharedPtr> & particles, string a, bool calc_marg_like);
+            unsigned            chooseRandomParticle(vector<Particle::SharedPtr> & particles, vector<double> & cum_prob, string a);
+            void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles, string a);
+            void                resetWeights(vector<Particle::SharedPtr> & particles, string a);
             double              getWeightAverage(vector<double> log_weight_vec);
             void                createSpeciesMap(Data::SharedPtr);
-            void                showParticlesByWeight(vector<Particle::SharedPtr> my_vec);
+            void                showParticlesByWeight(vector<Particle::SharedPtr> my_vec, string a);
             void                proposeTheta();
             void                proposeSpeciationRate();
             void                proposeHybridizationRate();
@@ -52,12 +52,12 @@ namespace proj {
             string              acceptParameters();
             void                showFinal(vector<Particle::SharedPtr>);
             double              tune(bool accepted, double lambda);
-            void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained);
-            void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained);
+            void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained, string a);
+            void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained, string a);
             void                printSpeciationRates();
             void                printThetas();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
-        vector< pair<double,unsigned> >                throwDarts(vector< pair<double,unsigned> > & cum_probs, vector<Particle::SharedPtr> &particles);
+        vector< pair<double,unsigned> >                throwDarts(vector< pair<double,unsigned> > & cum_probs, vector<Particle::SharedPtr> &particles, string a);
             void                writeGeneTreeFile();
         
         private:
@@ -310,17 +310,17 @@ namespace proj {
         return log_particle_sum;
     }
 
-    inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles, int g, bool calc_marg_like) {
+    inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles, string a, bool calc_marg_like) {
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
         for (auto & p : particles) {
-            log_weight_vec[i++] = p->getLogWeight();
+            log_weight_vec[i++] = p->getLogWeight(a);
         }
 
         double log_particle_sum = getRunningSum(log_weight_vec);
 
         for (auto & p : particles) {
-            p->setLogWeight(p->getLogWeight() - log_particle_sum);
+            p->setLogWeight(p->getLogWeight(a) - log_particle_sum, a);
         }
         
         if (calc_marg_like) {
@@ -511,7 +511,7 @@ namespace proj {
         return (log(exponential_rate) - hybridization_rate*exponential_rate);
     }
 
-    inline unsigned Proj::chooseRandomParticle(vector<Particle::SharedPtr> & particles, vector<double> & cum_probs) {
+    inline unsigned Proj::chooseRandomParticle(vector<Particle::SharedPtr> & particles, vector<double> & cum_probs, string a) {
         int chosen_index = -1;
         unsigned nparticles = (unsigned)particles.size();
         double u = rng.uniform();
@@ -519,7 +519,7 @@ namespace proj {
         
         for(unsigned j = 0; j < nparticles; j++) {
             if (cum_probs[j]<0.0){
-                cum_prob += exp(particles[j]->getLogWeight());
+                cum_prob += exp(particles[j]->getLogWeight(a));
                 cum_probs[j] = cum_prob;
             }
             else
@@ -534,12 +534,12 @@ namespace proj {
         return chosen_index;
     }
 
-    inline vector< pair<double,unsigned> > Proj::throwDarts(vector< pair<double,unsigned> > & cum_probs, vector<Particle::SharedPtr> &particles) {
+    inline vector< pair<double,unsigned> > Proj::throwDarts(vector< pair<double,unsigned> > & cum_probs, vector<Particle::SharedPtr> &particles, string a) {
         // Create vector of pairs p, with p.first = log weight and p.second = particle index
         cum_probs.resize(_nparticles);
         unsigned i = 0;
         for(auto & p : particles) {
-            cum_probs[i].first = p->getLogWeight();
+            cum_probs[i].first = p->getLogWeight(a);
             cum_probs[i].second = i;
             ++i;
         }
@@ -578,14 +578,14 @@ namespace proj {
         genef.close();
     }
 
-    inline void Proj::resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles) {
+    inline void Proj::resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles, string a) {
         unsigned nparticles = (unsigned)from_particles.size();
         vector<pair<double, double>> cum_probs;
             // Create vector of pairs p, with p.first = log weight and p.second = particle index
             cum_probs.resize(nparticles);
             unsigned i = 0;
             for(auto & p : from_particles) {
-                cum_probs[i].first = p->getLogWeight();
+                cum_probs[i].first = p->getLogWeight(a);
                 cum_probs[i].second = i;
                 ++i;
             }
@@ -624,10 +624,10 @@ namespace proj {
         }
     }
 
-    inline void Proj::resetWeights(vector<Particle::SharedPtr> & particles) {
+    inline void Proj::resetWeights(vector<Particle::SharedPtr> & particles, string a) {
         double logw = -log(particles.size());
         for (auto & p : particles) {
-            p->setLogWeight(logw);
+            p->setLogWeight(logw, a);
         }
     }
     
@@ -676,7 +676,7 @@ namespace proj {
         cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
     }
 
-    inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained) {
+    inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained, string a) {
         assert(_nthreads > 0);
         if (_nthreads == 1) {
           for (auto & p : particles) {
@@ -694,7 +694,7 @@ namespace proj {
 
             while (true) {
             // create a thread to handle particles first through last - 1
-              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles), gene_trees_only, unconstrained));
+              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles), gene_trees_only, unconstrained, a));
             // update first and last
             first = last;
             last += incr;
@@ -713,18 +713,18 @@ namespace proj {
         }
     }
 
-    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained) {
+    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained, string a) {
         for (unsigned i=first; i<last; i++){
             particles[i]->proposal(gene_trees_only, unconstrained);
         }
     }
 
-    inline void Proj::showParticlesByWeight(vector<Particle::SharedPtr> my_vec) {
+    inline void Proj::showParticlesByWeight(vector<Particle::SharedPtr> my_vec, string a) {
         vector <double> weights;
         
         //create weight vector
         for (auto & p:my_vec) {
-            weights.push_back(p->getLogWeight());
+            weights.push_back(p->getLogWeight(a));
         }
         
         //sort particles by weight
@@ -830,7 +830,8 @@ namespace proj {
                         if (!_run_on_empty) {
                             p->setParticleGeneration(0);
                             p->setLogLikelihood(0.0);
-                            p->setLogWeight(0.0);// at this stage, log weight = log likelihood
+                            p->setLogWeight(0.0, "g");
+                            p->setLogWeight(0.0, "s");
                         }
                         else {
                             p->setParticleGeneration(0);
@@ -856,7 +857,8 @@ namespace proj {
                             p->setParticleGeneration(0);
                             p->setLogLikelihood(0.0);
 //                            p->setLogCoalescentLikelihood(0.0);
-                            p->setLogWeight(0.0);
+                            p->setLogWeight(0.0, "g");
+                            p->setLogWeight(0.0, "s");
 //                            p->mapSpecies(_taxon_map, _species_names);
                             p->mapGeneTrees(_taxon_map, _species_names);
                             p->resetGeneIncrements();
@@ -873,24 +875,24 @@ namespace proj {
                         if (i > 0) {
                             unconstrained = false;
                         }
-                        proposeParticles(my_vec, gene_trees_only, unconstrained);
+                        proposeParticles(my_vec, gene_trees_only, unconstrained, "g");
                         
                         if (!_run_on_empty) {
                             bool calc_marg_like = true;
                             
-                            normalizeWeights(my_vec, g, calc_marg_like);
+                            normalizeWeights(my_vec, "g", calc_marg_like);
                             
                             double ess_inverse = 0.0;
                             
                             for (auto & p:my_vec) {
-                                ess_inverse += exp(2.0*p->getLogWeight());
+                                ess_inverse += exp(2.0*p->getLogWeight("g"));
 //                                p->showParticle();
                             }
 
                             double ess = 1.0/ess_inverse;
                             cout << "   " << "ESS = " << ess << endl;
                          
-                            resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
+                            resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1, "g");
                             //if use_first is true, my_vec = my_vec_2
                             //if use_first is false, my_vec = my_vec_1
                             
@@ -900,12 +902,12 @@ namespace proj {
                             use_first = !use_first;
                             saveParticleWeights(my_vec);
                         }
-                        resetWeights(my_vec);
+                        resetWeights(my_vec, "g");
                         _accepted_particle_vec = my_vec;
                     } // g loop
                     
                     // filter species trees now
-                if (i < _niterations-1) {
+//                if (i < _niterations-1) {
                     for (auto &p:my_vec) {
                         // reset forest species partitions
                         p->mapSpecies(_taxon_map, _species_names);
@@ -913,7 +915,7 @@ namespace proj {
                     }
                     
 //                    _gene_tree_log_marginal_likelihood = _log_marginal_likelihood;
-                    _log_marginal_likelihood = 0.0;
+//                    _log_marginal_likelihood = 0.0;
                     
                         for (unsigned s=0; s<nspecies; s++){
                             cout << "beginning species tree proposals" << endl;
@@ -922,16 +924,38 @@ namespace proj {
                             bool gene_trees_only = false;
                             bool unconstrained = false;
                             
-                            proposeParticles(my_vec, gene_trees_only, unconstrained);
+                            proposeParticles(my_vec, gene_trees_only, unconstrained, "s");
                             
-                        } // s loop
-//                    normalizeWeights(my_vec, 0, true);
-                    }
-                    saveParticleWeights(my_vec);
+                            if (!_run_on_empty) {
+                                bool calc_marg_like = false;
+                                
+                                normalizeWeights(my_vec, "s", calc_marg_like);
+                                
+                                double ess_inverse = 0.0;
+                                
+                                for (auto & p:my_vec) {
+                                    ess_inverse += exp(2.0*p->getLogWeight("s"));
+    //                                p->showParticle();
+                                }
 
-                    resetWeights(my_vec);
-                    _accepted_particle_vec = my_vec;
+                                double ess = 1.0/ess_inverse;
+                                cout << "   " << "ESS = " << ess << endl;
+                             
+                                resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1, "s");
+                                //if use_first is true, my_vec = my_vec_2
+                                //if use_first is false, my_vec = my_vec_1
+                                
+                                my_vec = use_first ? my_vec_2:my_vec_1;
+
+                                //change use_first from true to false or false to true
+                                use_first = !use_first;
+                                saveParticleWeights(my_vec);
+                            }
+                            resetWeights(my_vec, "s");
+                            _accepted_particle_vec = my_vec;
+                        } // s loop
                     }
+//                }
                     
 //                }
                 
