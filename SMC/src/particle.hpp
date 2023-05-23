@@ -135,7 +135,7 @@ class Particle {
         void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
         bool                                    checkIfReadyToJoinSpecies();
-        int                                     _nspecies_forests = 100;
+        int                                     _nspecies_forests = 500;
         bool                                    _inf = false;
 //        bool                                    _reset_min = false;
         vector<bool>                             _reset_min;
@@ -821,31 +821,23 @@ class Particle {
 //                species_joined = _forests[0].speciesTreeProposal();
                 pair<unsigned, unsigned> example;
                 // for sim.nex
-                bool sim = true;
+                bool sim = false;
                 if (sim) {
                     if (i == 0) {
-    //                    species_joined = make_tuple("s1", "s4", "node-5");
                         example = make_pair(1, 4);
     //                    increment = 0.00322;
-    //                    example = make_pair(1,2);
                     }
                     else if (i == 1) {
-    //                    species_joined = make_tuple("s2", "s3", "node-6");
                         example = make_pair(1,2 );
     //                    increment = 0.01051;
-    //                    example = make_pair(1, 2);
                     }
                     else if (i == 2) {
-    //                    species_joined = make_tuple("node-5", "node-6", "node-7");
                         example = make_pair(1, 2);
     //                    increment = 0.00193;
-    //                    example = make_pair(1,2);
                     }
                     else if (i == 3) {
-    //                    species_joined = make_tuple("s0", "node-7", "node-8");
                         example = make_pair(0, 1);
     //                    increment = 0.0;
-    //                    example = make_pair(0, 1);
                     }
                 }
                 // for low_info.,nex
@@ -865,7 +857,7 @@ class Particle {
                         }
                     }
                 // for gopher.nex
-                bool gopher = false;
+                bool gopher = true;
                     if (gopher) {
                         if (i == 0) {
                             example = make_pair(1,7);

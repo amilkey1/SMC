@@ -925,12 +925,12 @@ namespace proj {
                             proposeParticles(my_vec, gene_trees_only, unconstrained);
                             
                         } // s loop
-                    normalizeWeights(my_vec, 0, true);
+//                    normalizeWeights(my_vec, 0, true);
                     }
-                        saveParticleWeights(my_vec);
+                    saveParticleWeights(my_vec);
 
-                        resetWeights(my_vec);
-                        _accepted_particle_vec = my_vec;
+                    resetWeights(my_vec);
+                    _accepted_particle_vec = my_vec;
                     }
                     
 //                }
