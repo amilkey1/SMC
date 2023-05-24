@@ -911,7 +911,7 @@ namespace proj {
                     } // g loop
                     
                     // filter species trees now
-//                if (i < _niterations-1) {
+                if (i < _niterations-1) {
                     _species_tree_log_marginal_likelihood = 0.0;
                     for (auto &p:my_vec) {
                         // reset forest species partitions
@@ -959,7 +959,7 @@ namespace proj {
                             resetWeights(my_vec, "s");
                             _accepted_particle_vec = my_vec;
                         } // s loop
-//                    }
+                    }
                 }
                     
 //                }
@@ -1007,17 +1007,27 @@ namespace proj {
                     log_coalescent_likelihood = p->getCoalescentLikelihood();
                     
                     assert(branch_length_vec.size() == prior_vec.size());
+                    int ngenes = p->getNGenes();
                     
                     if (col_count == 0) {
-                        logf << "iter" << "\t" << "theta" << "\t" << "gene_tree_log_like";
+                        logf << "iter" << "\t" << "theta";
+                        for (int g=0; g<ngenes; g++) {
+                            logf << "\t" << "gene_tree_log_like";
+                        }
                         for (int i=0; i<nspecies-1; i++) {
 //                        for (int i = 0; i < branch_length_vec.size(); i++) {
                             logf << "\t" << "species_tree_increment" << "\t" << "increment_prior";
                         }
-                        for (int j=nspecies; j<nspecies+ntaxa-1; j++) {
-                            logf << "\t" << "gene_tree_increment" << "\t" << "increment_prior";
+                        for (int g=0; g<ngenes; g++) {
+                            for (int j=nspecies; j<nspecies+ntaxa-1; j++) {
+                                logf << "\t" << "gene_tree_increment" << "\t" << "increment_prior";
+                            }
                         }
-                        logf << "\t" << "species_tree_topology_prior" << "\t" << "gene_tree_topology_prior" << "\t" << "log_coal_like" << endl; // TODO: only works for one gene
+                        logf << "\t" << "species_tree_topology_prior";
+                        for (int g=0; g<ngenes; g++) {
+                            logf << "\t" << "gene_tree_topology_prior";
+                        }
+                        logf << "\t" << "log_coal_like" << endl;
                     }
                     
                     logf << a << "\t" << Forest::_starting_theta;
