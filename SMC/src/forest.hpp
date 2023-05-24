@@ -2194,9 +2194,10 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             assert (t.first < nodes.size() && t.second < nodes.size());
         }
         else {
-            _prev_gene_tree_log_likelihood = 0.0; // prev log likelihood is 0 for the first gen
+//            _prev_gene_tree_log_likelihood = 0.0; // prev log likelihood is 0 for the first gen
             if (_lineages.size() != _ntaxa) {
-                _prev_gene_tree_log_likelihood = calcLogLikelihood();
+//                _prev_gene_tree_log_likelihood = calcLogLikelihood();
+                _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
             }
             else {
                 _prev_gene_tree_log_likelihood = 0.0;

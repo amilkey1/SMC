@@ -641,7 +641,7 @@ class Particle {
     }
 
     inline void Particle::resetSpecies() {
-        setLogLikelihood(0.0);
+//        setLogLikelihood(0.0);
         setLogWeight(0.0, "s");
         resetSpeciesInfo();
         resetSpeciesTreeHeight();
@@ -655,15 +655,16 @@ class Particle {
     }
 
     inline void Particle::buildEntireSpeciesTree() {
-        double max_depth = 0.0;
-        _forests[0].chooseSpeciesIncrement(max_depth);
+//        double max_depth = 0.0;
+//        _forests[0].chooseSpeciesIncrement(max_depth);
 //        double first_edge = 0.00304;
-//        _forests[0].addPredeterminedSpeciesIncrement(first_edge);
+        double first_edge = 3.0161e-12;
+        _forests[0].addPredeterminedSpeciesIncrement(first_edge);
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
         double edge_len = _forests[0]._last_edge_length;
         _t.push_back(make_pair(species_joined, edge_len));
-//        double increment = 0.0;
+        double increment = 0.0;
 
 //        cout << "new particle" << endl;
         for (int i=0; i < _forests[0]._nspecies-1; i++) {
@@ -671,23 +672,23 @@ class Particle {
 //                species_joined = _forests[0].speciesTreeProposal();
                 pair<unsigned, unsigned> example;
                 // for sim.nex
-                bool sim = true;
+                bool sim = false;
                 if (sim) {
                     if (i == 0) {
                         example = make_pair(1, 4);
-    //                    increment = 0.00322;
+                        increment = 0.00322;
                     }
                     else if (i == 1) {
                         example = make_pair(1,2 );
-    //                    increment = 0.01051;
+                        increment = 0.01051;
                     }
                     else if (i == 2) {
                         example = make_pair(1, 2);
-    //                    increment = 0.00193;
+                        increment = 0.00193;
                     }
                     else if (i == 3) {
                         example = make_pair(0, 1);
-    //                    increment = 0.0;
+                        increment = 0.0;
                     }
                 }
                 // for low_info.,nex
@@ -707,36 +708,43 @@ class Particle {
                         }
                     }
                 // for gopher.nex
-                bool gopher = false;
+                bool gopher = true;
                     if (gopher) {
                         if (i == 0) {
                             example = make_pair(1,7);
+                            increment = 3.0161e-12;
                         }
                         else if (i == 1) {
                             example = make_pair(5,6);
+                            increment = 0.00237780 - 3.0161e-12;
                         }
                         else if (i == 2) {
-                            example = make_pair(2,4);
+                            example = make_pair(1,2);
+                            increment = (0.00340594 - 0.00237780);
                         }
                         else if (i == 3) {
-                            example = make_pair(1,4);
+                            example = make_pair(2,4);
+                            increment = 0.00554410 - (0.00340594);
                         }
                         else if (i == 4) {
                             example = make_pair(1,3);
+                            increment = 0.01366147 - 0.00554410;
                         }
                         else if (i == 5) {
                             example = make_pair(1,2);
+                            increment = 0.00728109;
                         }
                         else if (i == 6) {
                             example = make_pair(0,1);
+                            increment = 0.0;
                         }
                     }
                 species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
                 // if the species tree is not finished, add another species increment
                 if (_forests[0]._lineages.size()>1) {
-                    _forests[0].addSpeciesIncrement();
-//                    assert (increment > 0.0);
-//                    _forests[0].addPredeterminedSpeciesIncrement(increment);
+//                    _forests[0].addSpeciesIncrement();
+                    assert (increment > 0.0);
+                    _forests[0].addPredeterminedSpeciesIncrement(increment);
                 }
                 
                 double edge_len = 0.0;

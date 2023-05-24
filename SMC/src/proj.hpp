@@ -327,6 +327,10 @@ namespace proj {
             _log_marginal_likelihood += log_particle_sum - log(_nparticles);
             cout << setprecision(12) << "   " << _log_marginal_likelihood << endl;
         }
+        else {
+            _species_tree_log_marginal_likelihood += log_particle_sum - log(_nparticles);
+            cout << setprecision(12) << "   " << _species_tree_log_marginal_likelihood << endl;
+        }
         sort(particles.begin(), particles.end(), greater<Particle::SharedPtr>());
     }
 
@@ -664,7 +668,7 @@ namespace proj {
 //        cout << "mean height equals " << sum_h << endl;
 ////        cout << "log marginal likelihood = " << setprecision(12) << _log_marginal_likelihood << endl;
 //        cout << "gene tree marg like: " << _gene_tree_log_marginal_likelihood << endl;
-//        cout << "species tree marg like: " << _log_marginal_likelihood << endl;
+        cout << "species tree marg like: " << _species_tree_log_marginal_likelihood << endl;
 //        cout << "starting theta = " << Forest::_starting_theta << endl;
 //        cout << "speciation rate = " << Forest::_speciation_rate << endl;
 //        cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
@@ -908,6 +912,7 @@ namespace proj {
                     
                     // filter species trees now
 //                if (i < _niterations-1) {
+                    _species_tree_log_marginal_likelihood = 0.0;
                     for (auto &p:my_vec) {
                         // reset forest species partitions
                         p->mapSpecies(_taxon_map, _species_names);
@@ -954,8 +959,8 @@ namespace proj {
                             resetWeights(my_vec, "s");
                             _accepted_particle_vec = my_vec;
                         } // s loop
-                    }
-//                }
+//                    }
+                }
                     
 //                }
                 
