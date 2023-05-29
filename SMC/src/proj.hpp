@@ -176,6 +176,16 @@ namespace proj {
         }
         weightf << "end trees;" << endl;
         weightf.close();
+        
+        ofstream alltreesf("alltrees.txt");
+        for (int i=0; i<v.size(); i++) {
+            alltreesf << "particle " << i << endl;
+            alltreesf << "species tree = " << v[i]->getSpeciesNewick() << "; " << "\n";
+            vector<string> gene_newicks = v[i]->getGeneTreeNewicks();
+            for (int g=0; g<gene_newicks.size(); g++) {
+                alltreesf << "gene tree " << g+1 << " = " << gene_newicks[g] << "\n";
+            }
+        }
     }
 
     inline void Proj::saveParticleLikelihoods(vector<Particle::SharedPtr> &v) const {
@@ -854,6 +864,9 @@ namespace proj {
                 int ntaxa = (int) _taxon_map.size();
 //                p->setLogCoalescentLikelihood(0.0);
                 for (int i=0; i<_niterations; i++) {
+//                        for (auto &p:my_vec) {
+//                            p->showParticle();
+//                        }
                     _log_marginal_likelihood = 0.0;
                     cout << "beginning iteration: " << i << endl;
                     if (i > 0) {
@@ -910,6 +923,10 @@ namespace proj {
                         _accepted_particle_vec = my_vec;
                     } // g loop
                     
+//                    for (auto &p:my_vec) {
+//                        p->showParticle();
+//                    }
+                    
                     // filter species trees now
                 if (i < _niterations-1) {
                     _species_tree_log_marginal_likelihood = 0.0;
@@ -930,6 +947,10 @@ namespace proj {
                             bool unconstrained = false;
                             
                             proposeParticles(my_vec, gene_trees_only, unconstrained, "s");
+                            
+//                            for (auto &p:my_vec) {
+//                                p->showParticle();
+//                            }
                             
                             if (!_run_on_empty) {
                                 bool calc_marg_like = false;

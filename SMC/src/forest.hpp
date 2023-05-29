@@ -139,6 +139,10 @@ class Forest {
 //    vector<double>                  getMinDepths() {return _depths;}
         void                        trimDepthVector();
         void                        resetDepthVector(tuple<string, string, string> species_joined);
+        vector<pair<int, int>>      priorPostSpeciesOptions();
+        tuple<string,string, string> priorPostSpeciesProposal(pair<int, int> t);
+        void                        undoSpeciesJoin(tuple<string, string, string> species_names);
+        tuple<string,string,string> getSpeciesNames(pair<int, int>);
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -904,7 +908,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list) {
         _node_choices.clear();
         _log_likelihood_choices.clear();
-        _gene_tree_log_weight = 0.0; // TODO: should gene tree log weight be cumulative?
+        _gene_tree_log_weight = 0.0;
         
         // choose pair of nodes to try
         for (int i = 0; i < (int) node_list.size()-1; i++) {
@@ -1829,6 +1833,85 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         // this function creates a new node and joins two species
 
 //        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
+        Node *subtree1=_lineages[t.first];
+        Node *subtree2=_lineages[t.second];
+        assert(!subtree1->_parent && !subtree2->_parent);
+
+        Node nd;
+        _nodes.push_back(nd);
+        Node* new_nd = &_nodes.back();
+        new_nd->_parent=0;
+        new_nd->_number=_nleaves+_ninternals;
+        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+        new_nd->_right_sib=0;
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+
+        calcTopologyPrior((int) _lineages.size());
+
+        updateNodeVector (_lineages, subtree1, subtree2, new_nd);
+
+        _species_joined = make_pair(subtree1, subtree2);
+
+        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
+    }
+
+    inline vector<pair<int, int>> Forest::priorPostSpeciesOptions() {
+        // returns list of all possible species pairings
+        vector<pair<int, int>> species_choices;
+        
+    //    choose pair of nodes to try
+        for (int i = 0; i < (int) _lineages.size()-1; i++) {
+            for (int j = i+1; j < (int) _lineages.size(); j++) {
+                species_choices.push_back(make_pair(i, j));
+            }
+        }
+        return species_choices;
+    }
+
+    inline tuple<string,string,string> Forest::getSpeciesNames(pair<int, int> p) {
+        if (p.first > 0 && p.second > 0) {
+        string species1 = _lineages[p.first]->_name;
+        string species2 = _lineages[p.second]->_name;
+        int num = _nleaves + _ninternals;
+        string new_nd = boost::str(boost::format("node-%d")%num);
+        
+        return make_tuple(species1, species2, new_nd);
+        }
+        else {
+            return make_tuple("null", "null", "null");
+        }
+    }
+
+//    inline void Forest::undoSpeciesJoin(tuple<string, string, string> species_names) {
+//        Node* addnode1;
+//        Node* addnode2;
+//        Node* delnode1;
+//        for (auto &nd:_lineages) {
+//            if (nd->_name == get<0>(species_names)) {
+//                addnode1 = nd;
+//            }
+//            else if (nd->_name == get<1>(species_names)) {
+//                addnode2 = nd;
+//            }
+//            else if (nd->_name == get<2>(species_names)) {
+//                delnode1 = nd;
+//            }
+//        }
+//
+//        revertNodeList(_lineages, addnode1, addnode2, delnode1);
+//        list<Node *> & node_vector,
+//    }
+
+    inline tuple<string,string, string> Forest::priorPostSpeciesProposal(pair<int, int> t) {
+        // this function creates a new node and joins two species
+
         Node *subtree1=_lineages[t.first];
         Node *subtree2=_lineages[t.second];
         assert(!subtree1->_parent && !subtree2->_parent);

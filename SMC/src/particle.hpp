@@ -306,16 +306,36 @@ class Particle {
         if (!_inf) {
             tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
             double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
+//            bool prior_post = true;
+            vector<pair<int, int>> species_choices;
+            
             if (_forests[0]._last_edge_length > 0.0) {
             // choose species to join if past the first species generation for each forest vector
-                species_joined = _forests[0].speciesTreeProposal();
+//                if (!prior_post) {
+                    species_joined = _forests[0].speciesTreeProposal();
+//                }
+//                else {
+//                    species_choices = _forests[0].priorPostSpeciesOptions();
+//                }
             }
-                
-            vector<double> max_depth_vector;
-            double max_depth = 0.0;
+//            if (species_choices.size() == 0 && prior_post) {
+//                species_choices.push_back(make_pair(-1, -1));
+//            }
+            
+//            for (auto &s:species_choices) {
+//                species_joined = _forests[0].getSpeciesNames(s);
+                vector<double> max_depth_vector;
+                double max_depth = 0.0;
 
                 for (int i=1; i<_forests.size(); i++) {
-                    _forests[i].updateSpeciesPartitionTwo(species_joined);
+//                    if (!prior_post) {
+                        _forests[i].updateSpeciesPartitionTwo(species_joined);
+//                    }
+//                    else {
+//                        if (s.first > 0 && s.second > 0) {
+//                        _forests[i].priorPostSpeciesProposal(s);
+//                    }
+//                    }
                     string species1 = get<0>(species_joined);
                     string species2 = get<1>(species_joined);
                     
@@ -342,7 +362,6 @@ class Particle {
                 }
                 if (_forests[0]._lineages.size() > 1) {
                     max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
-    //                cout << _alt_forests[a][0].getTreeHeight() << endl;
                     max_depth -= _forests[0].getTreeHeight();
                     // choose a species tree increment
                 }
@@ -361,19 +380,21 @@ class Particle {
                 _t.push_back(make_pair(species_joined, _forests[0]._last_edge_length));
                 
                 for (int i = 1; i<_forests.size(); i++) {
-//                    _forests[0].showForest();
-//                    _forests[1].showForest();
                     double coal_like_increment = _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height, true);
                     _log_coalescent_likelihood += coal_like_increment;
                 }
-                if (!_running_on_empty) {
-                    _species_log_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood;
-                    double test = 1/_species_log_weight;
-                    if (test == -0) {
-                        _inf = true;
-                    }
+//            }
+//            if (prior_post) {
+//                // choose one
+//            }
+            if (!_running_on_empty) {
+                _species_log_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood;
+                double test = 1/_species_log_weight;
+                if (test == -0) {
+                    _inf = true;
                 }
             }
+        }
         }
 
 
@@ -634,7 +655,8 @@ class Particle {
     inline vector<string> Particle::getGeneTreeNewicks() {
         vector<string> newicks;
         for (int i=1; i<_forests.size(); i++) {
-            string newick = "newick:\"" + _forests[i].makeNewick(9, true) + "\"";
+//            string newick = "newick:\"" + _forests[i].makeNewick(9, true) + "\"";
+            string newick = _forests[i].makeNewick(9, true);
             newicks.push_back(newick);
         }
         return newicks;
@@ -646,6 +668,7 @@ class Particle {
         resetSpeciesInfo();
         resetSpeciesTreeHeight();
         _forests[0]._increments.clear();
+        _log_coalescent_likelihood = 0.0;
     }
 
     inline void Particle::resetGeneIncrements() {
@@ -655,11 +678,11 @@ class Particle {
     }
 
     inline void Particle::buildEntireSpeciesTree() {
-//        double max_depth = 0.0;
-//        _forests[0].chooseSpeciesIncrement(max_depth);
-//        double first_edge = 0.00304;
-        double first_edge = 3.0161e-12;
-        _forests[0].addPredeterminedSpeciesIncrement(first_edge);
+        double max_depth = 0.0;
+        _forests[0].chooseSpeciesIncrement(max_depth);
+//        double first_edge = 0.0015;
+//        double first_edge = 3.0161e-12;
+//        _forests[0].addPredeterminedSpeciesIncrement(first_edge);
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
         double edge_len = _forests[0]._last_edge_length;
@@ -669,7 +692,7 @@ class Particle {
 //        cout << "new particle" << endl;
         for (int i=0; i < _forests[0]._nspecies-1; i++) {
             if (_forests[0]._lineages.size() > 1) {
-//                species_joined = _forests[0].speciesTreeProposal();
+                species_joined = _forests[0].speciesTreeProposal();
                 pair<unsigned, unsigned> example;
                 // for sim.nex
                 bool sim = false;
@@ -708,43 +731,87 @@ class Particle {
                         }
                     }
                 // for gopher.nex
-                bool gopher = true;
+                bool gopher = false;
                     if (gopher) {
                         if (i == 0) {
                             example = make_pair(1,7);
-                            increment = 3.0161e-12;
+//                            increment = 3.0161e-12;
+//                            increment = 0.0015;
                         }
                         else if (i == 1) {
                             example = make_pair(5,6);
-                            increment = 0.00237780 - 3.0161e-12;
+//                            increment = 0.00237780 - 3.0161e-12;
+//                            increment = 0.00237780 - 0.003;
                         }
                         else if (i == 2) {
                             example = make_pair(1,2);
-                            increment = (0.00340594 - 0.00237780);
+//                            increment = (0.00340594 - 0.00237780);
                         }
                         else if (i == 3) {
                             example = make_pair(2,4);
-                            increment = 0.00554410 - (0.00340594);
+//                            increment = 0.00554410 - (0.00340594);
                         }
                         else if (i == 4) {
                             example = make_pair(1,3);
-                            increment = 0.01366147 - 0.00554410;
+//                            increment = 0.01366147 - 0.00554410;
                         }
                         else if (i == 5) {
                             example = make_pair(1,2);
-                            increment = 0.00728109;
+//                            increment = 0.00728109;
                         }
                         else if (i == 6) {
                             example = make_pair(0,1);
-                            increment = 0.0;
+//                            increment = 0.0;
                         }
                     }
-                species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
+                bool snake = false;
+                if (snake) {
+                    if (i == 0) {
+                        example = make_pair(2,3);
+                    }
+                    else if (i == 1) {
+                        example = make_pair(2,3);
+                    }
+                    else if (i == 2) {
+                        example = make_pair(1,3);
+                    }
+                    else if (i == 3) {
+                        example = make_pair(1,2);
+                    }
+                    else if (i == 4) {
+                        example = make_pair(1,2);
+                    }
+                    else if (i == 5) {
+                        example = make_pair(0,1);
+                    }
+                }
+                bool sim19 = false;
+                if (sim19) {
+                    if (i == 0) {
+                        example = make_pair(4,5);
+                    }
+                    else if (i == 1) {
+                        example = make_pair(1,2);
+                    }
+                    else if (i == 2) {
+                        example = make_pair(2,3);
+                    }
+                    else if (i == 3) {
+                        example = make_pair(0,2);
+                    }
+                    else if (i == 4) {
+                        example = make_pair(0,2);
+                    }
+                    else if (i == 5) {
+                        example = make_pair(0,1);
+                    }
+                }
+//                species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
                 // if the species tree is not finished, add another species increment
                 if (_forests[0]._lineages.size()>1) {
-//                    _forests[0].addSpeciesIncrement();
-                    assert (increment > 0.0);
-                    _forests[0].addPredeterminedSpeciesIncrement(increment);
+                    _forests[0].addSpeciesIncrement();
+//                    assert (increment > 0.0);
+//                    _forests[0].addPredeterminedSpeciesIncrement(increment);
                 }
                 
                 double edge_len = 0.0;
