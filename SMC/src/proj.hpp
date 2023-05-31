@@ -845,11 +845,15 @@ namespace proj {
                 string newick;
                 vector<string> newicks;
                 while (getline(infile, newick)) {
-                    istringstream iss(newick);
                     newicks.push_back(newick);
-                    int a, b;
-                    if (!(iss >> a >> b)) { break; }
                 }
+                
+//                while (getline(infile, newick)) {
+//                    istringstream iss(newick);
+//                    newicks.push_back(newick);
+//                    int a, b;
+//                    if (!(iss >> a >> b)) { break; }
+//                }
                 
                     for (auto & p:my_vec ) {
                         p->setData(_data, _taxon_map);
