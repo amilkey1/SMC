@@ -1069,12 +1069,12 @@ namespace proj {
                         logJ += branch_length_vec[m];
                     }
                     
-                    double species_logJ = 0.0;
+//                    double species_logJ = 0.0;
 //                    for (int s=0; s<nspecies-1; s++) {
 //                        species_logJ += branch_length_vec[s];
 //                    }
                     
-                    double gene_logJ = 0.0;
+//                    double gene_logJ = 0.0;
 //                    for (int h=nspecies-1; h<nspecies+ntaxa-1; h++) {
 //                        gene_logJ += branch_length_vec[h];
 //                    }

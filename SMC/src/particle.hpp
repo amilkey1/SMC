@@ -206,7 +206,7 @@ class Particle {
             assert(!isnan (gene_tree_log_likelihood));
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
-            log_likelihood += _forests[i]._gene_tree_log_coalescent_likelihood; // TODO: do this in forest to use in prior-post decision
+            log_likelihood += _forests[i]._gene_tree_log_coalescent_likelihood;
         }
 
         // set _generation for each forest
@@ -234,7 +234,6 @@ class Particle {
 //            firstGen();
         }
         if (_generation == 0) {
-            _log_coalescent_likelihood = 0.0;
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i]._nincrements = 0;
                 _forests[i]._gene_tree_log_coalescent_likelihood = 0.0;
