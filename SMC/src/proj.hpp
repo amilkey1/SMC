@@ -848,18 +848,10 @@ namespace proj {
                     newicks.push_back(newick);
                 }
                 
-//                while (getline(infile, newick)) {
-//                    istringstream iss(newick);
-//                    newicks.push_back(newick);
-//                    int a, b;
-//                    if (!(iss >> a >> b)) { break; }
-//                }
-                
                     for (auto & p:my_vec ) {
                         p->setData(_data, _taxon_map);
 //                        p->mapSpecies(_taxon_map, _species_names);
                         p->setParticleGeneration(-1);
-//                        p->processSpeciesNewick(newick);
                         p->processGeneNewicks(newicks);
                         p->mapSpecies(_taxon_map, _species_names);
                         if (!_run_on_empty) {
@@ -1078,14 +1070,14 @@ namespace proj {
                     }
                     
                     double species_logJ = 0.0;
-                    for (int s=0; s<nspecies-1; s++) {
-                        species_logJ += branch_length_vec[s];
-                    }
+//                    for (int s=0; s<nspecies-1; s++) {
+//                        species_logJ += branch_length_vec[s];
+//                    }
                     
                     double gene_logJ = 0.0;
-                    for (int h=nspecies-1; h<nspecies+ntaxa-1; h++) {
-                        gene_logJ += branch_length_vec[h];
-                    }
+//                    for (int h=nspecies-1; h<nspecies+ntaxa-1; h++) {
+//                        gene_logJ += branch_length_vec[h];
+//                    }
                     
                     for (int g=0; g<gene_tree_log_like.size(); g++) {
                         logf << "\t" << setprecision(12) << gene_tree_log_like[g];
