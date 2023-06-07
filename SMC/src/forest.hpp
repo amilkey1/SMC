@@ -2785,6 +2785,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
 //        _gene_tree_increments.push_back(increment);
         
+        showForest();
         // update increments and priors
         double log_increment_prior = 0.0;
         for (auto &s:_species_partition) {
@@ -3845,7 +3846,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             deep_coalescent_prior -= deep_coalescent_increment * rate;
         }
         
-        _gene_tree_log_coalescent_likelihood += deep_coalescent_prior;
+//        _gene_tree_log_coalescent_likelihood += deep_coalescent_prior;
         _deep_coalescent_increments.push_back(make_pair(deep_coalescent_increment, deep_coalescent_prior));
     }
 
