@@ -107,7 +107,7 @@ class Particle {
         void                                            resetSpecies();
         void                                            resetGeneIncrements();
         int                                             getNGenes(){return (int) _forests.size() - 1;}
-        void                                            processSpeciesNewick(string newick);
+        void                                            processSpeciesNewick(vector<string> newicks);
         void                                            processGeneNewicks(vector<string> newicks);
         void                                            remakeGeneTrees(map<string, string> &taxon_map) ;
 
@@ -158,6 +158,8 @@ class Particle {
 //	cout << "test" << endl;
     }
     inline void Particle::showParticle() {
+//        cout << "log coalescent likelihood: " << _log_coalescent_likelihood << endl;
+//        _forests[0].showForest();
         //print out weight of each particle
         cout << "\nParticle:\n";
         cout << "  _log_weight: " << _log_weight << "\n" ;
@@ -206,8 +208,6 @@ class Particle {
             assert(!isnan (gene_tree_log_likelihood));
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
-            _forests[0].showForest();
-            _forests[1].showForest();
             log_likelihood += _forests[i]._gene_tree_log_coalescent_likelihood;
         }
 
@@ -232,7 +232,7 @@ class Particle {
             _forests[i]._theta = _forests[i]._starting_theta;
         }
 
-        bool no_newick = false;
+        bool no_newick = true;
         if (unconstrained && _generation == 0 && no_newick) {
             firstGen();
         }
@@ -387,7 +387,6 @@ class Particle {
                     // choose a species tree increment
                 }
                 
-//            _forests[0].showForest();
                 if (_forests[0]._lineages.size() > 1) {
 //                    _alt_forests[a][0].chooseSpeciesIncrement(0.0);
                     assert (max_depth > 0.0);
@@ -519,8 +518,14 @@ class Particle {
         paupf.close();
     }
 
-    inline void Particle::processSpeciesNewick(string newick) {
-        _forests[0].buildFromNewick(newick, true, false);
+    inline void Particle::processSpeciesNewick(vector<string> newicks) {
+        if (newicks.size() != 1) {
+            throw XProj(boost::str(boost::format("only one species tree newick may be specified")));
+        }
+//        assert(newicks.size() == 1);
+        string newick = newicks[0];
+//        _forests[0].buildFromNewickTopology(newick, true, false);
+        buildEntireSpeciesTree();
     }
 
     inline void Particle::processGeneNewicks(vector<string> newicks) {
@@ -528,17 +533,7 @@ class Particle {
         for (int i=1; i<_forests.size(); i++) {
             _forests[i].buildFromNewick(newicks[i-1], true, false);
             _forests[i].refreshPreorder();
-//            _forests[i].calcMinDepth();
         }
-        // TODO: be careful
-//        bool add_edge = false;
-//        if (add_edge) {
-//            for (int i=1; i<_forests.size(); i++) {
-//                for (auto &nd:_forests[i]._nodes) {
-//                    nd._edge_length += 0.5;
-//                }
-//            }
-//        }
 }
 
     inline double Particle::calcHeight() {
@@ -829,7 +824,7 @@ class Particle {
                         example = make_pair(0,1);
                     }
                 }
-                bool sim19 = false;
+                bool sim19 = true;
                 if (sim19) {
                     if (i == 0) {
                         example = make_pair(4,5);

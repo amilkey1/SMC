@@ -121,6 +121,7 @@ namespace proj {
             double                      _small_enough;
             int                         _niterations;
             string                      _species_newicks_name;
+            string                      _gene_newicks_names;
     };
 
     inline Proj::Proj() {
@@ -228,7 +229,8 @@ namespace proj {
         ("run_on_empty", boost::program_options::value(&_run_on_empty)->default_value(false), "run with no data")
         ("build_species_tree_first", boost::program_options::value(&_build_species_tree_first)->default_value(true), "build the complete species tree before starting the gene trees")
         ("niterations", boost::program_options::value(&_niterations)->default_value(1.0), "number of times to alternate between species and gene trees")
-        ("species_newicks", boost::program_options::value(&_species_newicks_name), "name of file containing species newick descriptions")
+        ("species_newicks", boost::program_options::value(&_species_newicks_name)->default_value("null"), "name of file containing species newick descriptions")
+        ("gene_newicks", boost::program_options::value(&_gene_newicks_names)->default_value("null"), "name of file containing gene newick descriptions")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -841,11 +843,27 @@ namespace proj {
                 bool use_first = true;
                 int h = 0;
                 
-                ifstream infile(_species_newicks_name);
-                string newick;
                 vector<string> newicks;
-                while (getline(infile, newick)) {
-                    newicks.push_back(newick);
+                if (_gene_newicks_names != "null" && _species_newicks_name != "null") {
+                    throw XProj(boost::str(boost::format("cannot specify gene newicks and species newicks; choose one")));
+
+                }
+                
+                if (_gene_newicks_names != "null") {
+                    ifstream infile(_species_newicks_name);
+                    string newick;
+//                    vector<string> newicks;
+                    while (getline(infile, newick)) {
+                        newicks.push_back(newick);
+                    }
+                }
+                else if (_species_newicks_name != "null") {
+                    ifstream infile(_species_newicks_name);
+                    string newick;
+//                    vector<string> newicks;
+                    while (getline(infile, newick)) {
+                        newicks.push_back(newick);
+                    }
                 }
                 
                     for (auto & p:my_vec ) {
@@ -853,7 +871,12 @@ namespace proj {
 //                        p->mapSpecies(_taxon_map, _species_names);
                         p->setParticleGeneration(-1);
                         if (newicks.size() > 0) {
-                            p->processGeneNewicks(newicks);
+                            if (_gene_newicks_names != "null") {
+                                p->processGeneNewicks(newicks);
+                            }
+                            else if (_species_newicks_name != "null") {
+                                p->processSpeciesNewick(newicks);
+                            }
                         }
                         p->mapSpecies(_taxon_map, _species_names);
                         if (!_run_on_empty) {
@@ -878,7 +901,7 @@ namespace proj {
                 
                 //run through each generation of particles
                 int ntaxa = (int) _taxon_map.size();
-                bool skip = true;
+                bool skip = false;
                 bool deconstruct = true;
 //                p->setLogCoalescentLikelihood(0.0);
                 for (int i=0; i<_niterations; i++) {
@@ -899,7 +922,7 @@ namespace proj {
                     }
                     // keep the species partition for the gene forests at this stage but clear the tree structure
                     if (!skip) {
-                        bool no_newick = false;
+                        bool no_newick = true;
                         if (!no_newick) {
                             if (i == 1) {
                                 for (auto &p:my_vec) {
@@ -979,6 +1002,7 @@ namespace proj {
                                 
                                 for (auto & p:my_vec) {
                                     ess_inverse += exp(2.0*p->getLogWeight("s"));
+//                                    p->showParticle();
                                 }
 
                                 double ess = 1.0/ess_inverse;
