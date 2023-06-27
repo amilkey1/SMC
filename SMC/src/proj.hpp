@@ -828,6 +828,7 @@ namespace proj {
         // loop for number of samples (either theta or speciation rate)
             for (_sample=0; _sample<_nsamples; _sample++) {
                 cout << "sample: " << _sample << endl;
+                // TODO: number of particles should be number of genes * nparticles
                 vector<Particle::SharedPtr> my_vec_1(nparticles);
                 vector<Particle::SharedPtr> my_vec_2(nparticles);
                 vector<Particle::SharedPtr> &my_vec = my_vec_1;
