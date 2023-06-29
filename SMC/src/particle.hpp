@@ -43,7 +43,6 @@ class Particle {
         void                                    mapSpecies(map<string, string> &taxon_map, vector<string> &species_names);
         void                                    mapGeneTrees(map<string, string> &taxon_map, vector<string> &species_names);
         void                                    saveForest(std::string treefilename);
-        void                                    saveMSCTrees(string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
         void                                    setLogLikelihood(double log_likelihood);
@@ -428,16 +427,6 @@ class Particle {
         treef.close();
     }
 
-    inline void Particle::saveMSCTrees(string treefilename) {
-        // this function writes the species tree all particles to the same file
-        ofstream treef(treefilename);
-        treef << "#nexus\n\n";
-        treef << "begin trees;\n";
-        treef << "  tree test = [&R] " << _forests[0].makeNewick(8, true)  << ";\n";
-        treef << "end;\n";
-        treef.close();
-    }
-
     inline void Particle::savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const {
         ofstream paupf(paupfilename);
         paupf << "#nexus\n\n";
@@ -636,7 +625,7 @@ class Particle {
     }
 
     inline void Particle::resetSpecies() {
-//        setLogLikelihood(0.0);
+        setLogLikelihood(0.0);
         setLogWeight(0.0, "s");
         resetSpeciesInfo();
         resetSpeciesTreeHeight();
