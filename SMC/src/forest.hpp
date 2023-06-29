@@ -71,7 +71,6 @@ class Forest {
         void                        geneTreeProposal(pair<double, string> species_info, vector<pair<tuple<string, string, string>, double>> _t);
 //        void                        evolveSpeciesFor(list <Node*> &nodes, vector<pair<tuple<string, string, string>, double>> species_merge_info);
         void                        evolveSpeciesFor(list <Node*> &nodes, double increment, string species);
-//        void                        fullyCoalesceGeneTree(list<Node*> &nodes);
         void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
         void                        hybridizeNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node* delnode3, Node * addnode1);
@@ -126,10 +125,8 @@ class Forest {
         bool                        checkIfReadyToJoinSpecies(double species_tree_height, tuple<string, string, string> species_merge_info);
         vector<pair<Node*, Node*>>  getAllPossiblePairs(list<Node*> &nodes);
         pair<double, string>                      chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info, bool unconstrained);
-        void                        combineSpeciesPartition();
         void                        chooseSpeciesForCoalescentEvent(double delta);
         pair<Node*, Node*>    chooseAllPairs(list<Node*> &nodes, double increment, string species);
-        double                      calcMaxDepth();
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done);
         vector< pair<double, Node *>>      sortPreorder();
     pair<tuple<string, string, string>, double>     chooseSpeciesPair(vector<tuple<tuple<string, string, string>, double, double>> species_choices, double prev_log_coalescent_likelihood);
@@ -137,7 +134,6 @@ class Forest {
         void                        updateLineages(pair<tuple<string, string, string>, double> chosen_species);
         void                        calcMinDepth();
         vector<pair<double, pair<string, string>>>             getMinDepths();
-//    vector<double>                  getMinDepths() {return _depths;}
         void                        trimDepthVector();
         void                        resetDepthVector(tuple<string, string, string> species_joined);
         vector<pair<int, int>>      priorPostSpeciesOptions();
@@ -2795,63 +2791,6 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
                 }
             }
         }
-    }
-
-    inline void Forest::combineSpeciesPartition() {
-        string new_name = "new_species";
-        vector<string> species;
-        
-//        list<Node*> &nodes = _species_partition[new_name];
-        
-        for (auto &s:_species_partition) {
-            species.push_back(s.first);
-        }
-        
-        for (int i=0; i<species.size(); i++) {
-            list<Node*> &nodes = _species_partition[new_name];
-            copy(_species_partition[species[i]].begin(), _species_partition[species[i]].end(), back_inserter(nodes));
-            _species_partition.erase(species[i]);
-        }
-    }
-
-    inline double Forest::calcMaxDepth() {
-        // TODO: this function needs to know which species have just been joined
-        // walk through _lineages vector backwards, finding the earliest place in the tree nodes from different species share a parent
-        // build list of nodes joined
-        vector<pair<Node, Node>> nodes_joined_from_different_species;
-        for (auto &nd:_nodes) {
-            if (nd._right_sib != NULL) {
-                string species1 = nd._name;
-                Node nd2 = nd;
-                while (species1 == "") {
-                    nd2 = *nd2._left_child;
-                    species1 = nd2._name;
-                }
-                string species2 = nd._right_sib->_name;
-                Node nd3 = *nd._right_sib;
-                while (species2 == "") {
-                    nd3 = *nd3._left_child;
-                    species2 = nd3._name;
-                }
-                species1 = species1.substr(species1.find("^") + 1);
-                species2 = species2.substr(species2.find("^") + 1); 
-                if (species1 != species2) {
-                    nodes_joined_from_different_species.push_back(make_pair(nd, *nd._right_sib));
-                }
-            }
-        }
-        
-        vector<double> depths;
-        for (auto &nds:nodes_joined_from_different_species) {
-            // calculate distance between nodes
-            double depth = getLineageHeight(&nds.first);
-            depths.push_back(depth);
-        }
-        
-        double max_depth = *max_element(depths.begin(), depths.end());
-
-
-        return max_depth;
     }
 
     inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info, bool unconstrained) {

@@ -53,8 +53,7 @@ class Particle {
         void                                    buildEntireSpeciesTree();
         string                                  getSpeciesNewick() {return _forests[0].makeNewick(9, true);}
         double                                  getLogWeight(string a);
-        map<int, vector<double>>                     getRandomSeeds() {return _random_seeds;}
-//        void                                    setLogWeight(double w){_log_weight = w;}
+
         void                                    setLogWeight(double w, string a);
         void                                    operator=(const Particle & other);
         const vector<Forest> &                  getForest() const {return _forests;}
@@ -96,8 +95,6 @@ class Particle {
         vector<string>                                  getGeneTreeNewicks();
         double                                          getNumSpecies(){return _forests[0]._lineages.size();}
         vector<pair<string, string>>                    getSpeciesJoined(){return _forests[1]._names_of_species_joined;}
-        void                                            buildFakeSpeciesTree();
-        void                                            panmicticSpeciesPartition();
         double                                          getCoalescentLikelihood(){return _log_coalescent_likelihood;}
         void                                            firstGen();
         void                                            geneTreeProposal(bool unconstrained, bool deconstruct);
@@ -268,9 +265,7 @@ class Particle {
 
     inline void Particle::firstGen() {
         assert (_generation == 0); // species tree should only be rebuilt in the first round of the first iteration of gene trees
-//        buildFakeSpeciesTree();
         buildEntireSpeciesTree();
-//        panmicticSpeciesPartition();
     }
 
     inline void Particle::geneTreeProposal(bool unconstrained, bool deconstruct) {
@@ -405,35 +400,6 @@ class Particle {
             _forests[i]._num_coalescent_events_in_generation = 0;
             _forests[i]._searchable_branch_lengths.clear();
             _forests[i]._new_nodes.clear();
-        }
-    }
-
-//    inline void Particle::buildFakeSpeciesTree() {
-//        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-//        _forests[0]._last_edge_length = 0.0;
-//
-//        double edge_len = _forests[0]._last_edge_length;
-//        _t.resize(1);
-//
-////        _t.push_back(make_pair(species_joined, edge_len));
-//
-//        for (int i=0; i < _forests[0]._nspecies-1; i++) {
-//            if (_forests[0]._lineages.size() > 1) {
-////                tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
-//                tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-//
-//                double edge_len = 0.0;
-//                if (_forests[0]._lineages.size() > 1) {
-//                    edge_len = _forests[0]._last_edge_length;
-//                }
-//                _t.push_back(make_pair(species_joined, edge_len));
-//            }
-//        }
-//    }
-
-    inline void Particle::panmicticSpeciesPartition() {
-        for (int i=1; i<_forests.size(); i++) {
-            _forests[i].combineSpeciesPartition();
         }
     }
 
@@ -699,7 +665,7 @@ class Particle {
 //        cout << "new particle" << endl;
         for (int i=0; i < _forests[0]._nspecies-1; i++) {
             if (_forests[0]._lineages.size() > 1) {
-                species_joined = _forests[0].speciesTreeProposal();
+//                species_joined = _forests[0].speciesTreeProposal();
                 pair<unsigned, unsigned> example;
                 // for sim.nex
                 bool sim = false;
@@ -771,7 +737,7 @@ class Particle {
                             increment = 0.0;
                         }
                     }
-                bool snake = false;
+                bool snake = true;
                 if (snake) {
                     if (i == 0) {
                         example = make_pair(2,3);
@@ -813,7 +779,7 @@ class Particle {
                         example = make_pair(0,1);
                     }
                 }
-//                species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
+                species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
                 // if the species tree is not finished, add another species increment
                 if (_forests[0]._lineages.size()>1) {
                     _forests[0].addSpeciesIncrement();
