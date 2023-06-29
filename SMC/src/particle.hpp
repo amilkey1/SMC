@@ -328,53 +328,25 @@ class Particle {
         if (!_inf) {
             tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
             double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
-//            bool prior_post = true;
             vector<pair<int, int>> species_choices;
             
             if (_forests[0]._last_edge_length > 0.0) {
             // choose species to join if past the first species generation for each forest vector
-//                if (!prior_post) {
-                    species_joined = _forests[0].speciesTreeProposal();
-//                }
-//                else {
-//                    species_choices = _forests[0].priorPostSpeciesOptions();
-//                }
+                species_joined = _forests[0].speciesTreeProposal();
             }
-//            if (species_choices.size() == 0 && prior_post) {
-//                species_choices.push_back(make_pair(-1, -1));
-//            }
-            
-//            for (auto &s:species_choices) {
-//                species_joined = _forests[0].getSpeciesNames(s);
                 vector<double> max_depth_vector;
                 double max_depth = 0.0;
 
                 for (int i=1; i<_forests.size(); i++) {
-//                    if (!prior_post) {
-                        _forests[i].updateSpeciesPartitionTwo(species_joined);
-//                    }
-//                    else {
-//                        if (s.first > 0 && s.second > 0) {
-//                        _forests[i].priorPostSpeciesProposal(s);
-//                    }
-//                    }
+                    
+                    _forests[i].updateSpeciesPartitionTwo(species_joined);
                     string species1 = get<0>(species_joined);
                     string species2 = get<1>(species_joined);
-                    
-                    bool match1 = false;
-                    bool match2 = false;
-                    if (_forests[i].getMinDepths()[0].second.first == species1 || _forests[i].getMinDepths()[0].second.first == species2) {
-                        match1 = true;
-                    }
-                    if (_forests[i].getMinDepths()[0].second.second == species2 || _forests[i].getMinDepths()[0].second.second == species1) {
-                        match2 = true;
-                    }
                         
                     if (_forests[0]._lineages.size() > 1) {
                         _forests[i].resetDepthVector(species_joined);
                         max_depth = (_forests[i].getMinDepths())[0].first;
                         max_depth_vector.push_back(max_depth);
-    //                    _alt_forests[a][i].resetDepthVector(species_joined);
                     }
 
                     else {
@@ -388,7 +360,6 @@ class Particle {
                 }
                 
                 if (_forests[0]._lineages.size() > 1) {
-//                    _alt_forests[a][0].chooseSpeciesIncrement(0.0);
                     assert (max_depth > 0.0);
                     _forests[0].chooseSpeciesIncrement(max_depth);
                     species_tree_proposals.push_back(_forests[0]._last_edge_length);
@@ -404,10 +375,7 @@ class Particle {
                     double coal_like_increment = _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height, true);
                     _log_coalescent_likelihood += coal_like_increment;
                 }
-//            }
-//            if (prior_post) {
-//                // choose one
-//            }
+            
             if (!_running_on_empty) {
                 _species_log_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood;
                 double test = 1/_species_log_weight;
@@ -731,7 +699,7 @@ class Particle {
 //        cout << "new particle" << endl;
         for (int i=0; i < _forests[0]._nspecies-1; i++) {
             if (_forests[0]._lineages.size() > 1) {
-//                species_joined = _forests[0].speciesTreeProposal();
+                species_joined = _forests[0].speciesTreeProposal();
                 pair<unsigned, unsigned> example;
                 // for sim.nex
                 bool sim = false;
@@ -824,7 +792,7 @@ class Particle {
                         example = make_pair(0,1);
                     }
                 }
-                bool sim19 = true;
+                bool sim19 = false;
                 if (sim19) {
                     if (i == 0) {
                         example = make_pair(4,5);
@@ -845,7 +813,7 @@ class Particle {
                         example = make_pair(0,1);
                     }
                 }
-                species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
+//                species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
                 // if the species tree is not finished, add another species increment
                 if (_forests[0]._lineages.size()>1) {
                     _forests[0].addSpeciesIncrement();
