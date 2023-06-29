@@ -113,7 +113,6 @@ class Particle {
         vector<Forest>                          _forests;
         double                                  _log_weight;
         double                                  _species_log_weight;
-//        vector<double>                          _log_weight_options;
         Data::SharedPtr                         _data;
         double                                  _log_likelihood;
         double                                  _log_coalescent_likelihood;
@@ -121,7 +120,6 @@ class Particle {
         map<int, vector<double>>                     _random_seeds;
         bool                                    _running_on_empty = false;
         bool                                    _no_species_joined = true;
-//        vector<double>                                  _species_tree_height;
         double                                  _species_tree_height;
         vector<pair<tuple<string, string, string>, double>> _t;
         unsigned                                _gene_tree_proposal_attempts;
@@ -132,8 +130,6 @@ class Particle {
         void                                    resetVariables();
         bool                                    checkIfReadyToJoinSpecies();
         bool                                    _inf = false;
-//        bool                                    _reset_min = false;
-        vector<bool>                             _reset_min;
         vector<double>                          _unnormalized_weights;
 };
 
@@ -144,7 +140,6 @@ class Particle {
         _gene_tree_proposal_attempts = 0;
         _log_coalescent_likelihood = 0.0;
         _species_tree_height = 0.0;
-//        _reset_min = false;
         _species_tree_height = 0.0;
         _species_log_weight = 0.0;
     };
@@ -342,10 +337,7 @@ class Particle {
                         max_depth = (_forests[i].getMinDepths())[0].first;
                         max_depth_vector.push_back(max_depth);
                     }
-
-                    else {
-                        _reset_min.push_back(false);
-                    }
+                    
                 }
                 if (_forests[0]._lineages.size() > 1) {
                     max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
@@ -812,7 +804,6 @@ class Particle {
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _species_tree_height = other._species_tree_height;
         _inf = other._inf;
-        _reset_min = other._reset_min;
         _unnormalized_weights = other._unnormalized_weights;
         _species_log_weight = other._species_log_weight;
     };
