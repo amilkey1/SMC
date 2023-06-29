@@ -132,7 +132,6 @@ class Forest {
         double                      calcMaxDepth();
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done);
         vector< pair<double, Node *>>      sortPreorder();
-    pair<tuple<string, string, string>, double>     chooseSpeciesPair(vector<tuple<tuple<string, string, string>, double, double>> species_choices, double prev_log_coalescent_likelihood);
         void                        revertSpeciesTree(pair<tuple<string, string, string>, double> species_joined);
         void                        updateLineages(pair<tuple<string, string, string>, double> chosen_species);
         void                        calcMinDepth();
@@ -262,6 +261,7 @@ class Forest {
         _gene_tree_log_likelihood = 0.0;
         _gene_tree_log_weight = 0.0;
         _gene_tree_log_coalescent_likelihood = 0.0;
+        _theta = 0.0;
         
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -900,33 +900,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         }
 //        _gene_tree_log_likelihood += _gene_tree_log_coalescent_likelihood;
         return _gene_tree_log_likelihood;
-    }
-
-    inline pair<tuple<string, string, string>, double> Forest::chooseSpeciesPair(vector<tuple<tuple<string, string, string>, double, double>> species_choices, double prev_log_coalescent_likelihood) {
-//        _gene_tree_log_weight = 0.0;
-        vector<double> coal_likelihood_choices;
-        for (int i=0; i<species_choices.size(); i++) {
-            coal_likelihood_choices.push_back(get<1>(species_choices[i]));
-        }
-        // reweight choices
-        vector<double> log_weight_choices = reweightChoices(coal_likelihood_choices, prev_log_coalescent_likelihood);
-        
-        // sum unnormalized weights before choosing the pair
-        // must include the likelihoods of all pairs in the final particle weight
-        double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-//        _gene_tree_log_weight += log_weight_choices_sum; // TODO: use weight? not sure b/c delta is different for each particle
-        for (int b=0; b < (int) log_weight_choices.size(); b++) {
-            log_weight_choices[b] -= log_weight_choices_sum;
-        }
-        
-        // randomly select a pair
-        _index_of_choice = selectPair(log_weight_choices);
-
-        // find species to join in species_choices
-        tuple<string, string, string> species_to_join = get<0>(species_choices[_index_of_choice]);
-        double chosen_species_increment = get<2>(species_choices[_index_of_choice]);
-        
-        return make_pair(species_to_join, chosen_species_increment);
     }
 
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment, string species) {
@@ -2508,7 +2481,7 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
     }
 
     inline void Forest::setUpSpeciesForest(vector<string> &species_names) {
-        assert (_index==0);
+//        assert (_index==0);
         assert (_nspecies = (unsigned) species_names.size());
         clear();
         //create species
@@ -2644,6 +2617,8 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
                 species_choices.push_back(make_pair(i, j));
             }
         }
+        
+        _species_join_number++;
         return species_choices;
     }
 
