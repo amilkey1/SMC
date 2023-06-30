@@ -604,14 +604,13 @@ namespace proj {
         
         unsigned nparticles = (unsigned)from_particles.size();
         
-        for(unsigned i = 0; i < _nparticles; i++) {
-            for (int s=0; s<sel_indices.size(); s++) {
-                Particle::SharedPtr p0 = from_particles[s];
-                to_particles[i]=Particle::SharedPtr(new Particle(*p0));
-                assert(nparticles == to_particles.size());
-            }
+        for (unsigned i = 0; i < _nparticles; i++) {
+            int sel_index = sel_indices[i];
+            assert(sel_index > -1);
+            Particle::SharedPtr p0 = from_particles[sel_index]; // TODO: to_particles does not have the correct gene particles - they're not updated?
+            to_particles[i]=Particle::SharedPtr(new Particle(*p0));
+            assert(nparticles == to_particles.size());
         }
-        // TODO: use sel_indices to reset gene particles
     }
 
     inline vector<int> Proj::resampleSpeciesParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles, string a) {
@@ -1097,17 +1096,18 @@ namespace proj {
                                 
                                 assert(my_vec[s].size() == nparticles);
                                 assert(my_vec[0].size() == nparticles);
-                                
-                                saveParticleWeights(my_vec[s]);
                             }
     //                            }
-                            resetWeights(my_vec[s], "g");
+                                resetWeights(my_vec[s], "g");
                                 assert (_accepted_particle_vec.size() == nsubsets+1);
-                            _accepted_particle_vec[s] = my_vec[s];
+                                _accepted_particle_vec[s] = my_vec[s];
+                                _accepted_particle_vec[0] = my_vec[0];
+                                saveParticleWeights(my_vec[0]);
                             }
 //                    } // p loop
                     } // g loop
                     }
+                    
                     skip = false;
                     
                     for (int p=0; p<my_vec[0].size(); p++) {
@@ -1151,7 +1151,7 @@ namespace proj {
                                 }
                                 
                                 // now finish the species tree branch length proposal
-                                    my_vec[0][p]->speciesProposal(max_depths, species_joined);
+                                my_vec[0][p]->speciesProposal(max_depths, species_joined);
                                 
                                 double log_coalescent_likelihood = 0.0;
                                 
@@ -1160,7 +1160,7 @@ namespace proj {
 //                                    double last_edge_len, tuple<string, string, string> species_joined
                                     double last_edge_len = my_vec[0][p]->getLastEdgeLen();
                                     double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
-                                    
+                                    // TODO: issue must be species partition is not being reset properly - double check this
                                     log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
                                 }
                                 
@@ -1189,16 +1189,21 @@ namespace proj {
                                 
                                 my_vec[0] = use_first ? my_vec_2[0]:my_vec_1[0];
 
-                                //change use_first from true to false or false to true
-                                use_first = !use_first;
-                                saveParticleWeights(my_vec[0]);
+//                                //change use_first from true to false or false to true
+//                                use_first = !use_first;
                                 
+                                // TODO: this function is not copying correctly
                                 for (int s=1; s<nsubsets+1; s++) {
                                     resetGeneParticles(sel_indices, my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s]);
+                                    my_vec[s] = use_first ? my_vec_2[s]:my_vec_1[s];
                                 }
+                                
+                                //change use_first from true to false or false to true
+                                use_first = !use_first;
                             }
                             resetWeights(my_vec[0], "s");
                             _accepted_particle_vec[0] = my_vec[0];
+                            saveParticleWeights(my_vec[0]);
                         } // s loop
                     }
                 }

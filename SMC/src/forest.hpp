@@ -1911,12 +1911,18 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
         string spp1 = get<0>(species_info);
         string spp2 = get<1>(species_info);
         string new_spp = get<2>(species_info);
+        
+        int before = _species_partition.size();
 
         list<Node*> &nodes = _species_partition[new_spp];
         copy(_species_partition[spp1].begin(), _species_partition[spp1].end(), back_inserter(nodes));
         copy(_species_partition[spp2].begin(), _species_partition[spp2].end(), back_inserter(nodes));
         _species_partition.erase(spp1);
         _species_partition.erase(spp2);
+        
+        if (spp1 != "null") {
+            assert (_species_partition.size() == before - 1);
+        }
     }
 
     inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done) {

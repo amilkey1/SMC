@@ -373,10 +373,8 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
     inline void Particle::speciesProposal(vector<double> max_depth_vector, tuple<string, string, string> species_joined ) {
         assert (!_inf);
-//        vector<double> species_tree_proposals;
+
         if (!_inf) {
-            double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
-            
                 double max_depth = 0.0;
         
                 if (_forest._lineages.size() > 1) {
