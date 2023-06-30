@@ -337,7 +337,6 @@ class Particle {
                         max_depth = (_forests[i].getMinDepths())[0].first;
                         max_depth_vector.push_back(max_depth);
                     }
-                    
                 }
                 if (_forests[0]._lineages.size() > 1) {
                     max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
