@@ -1861,6 +1861,7 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
                 _depths.erase(_depths.begin()+i);
             }
         }
+        assert (_depths.size() > 0);
     }
 
     inline void Forest::calcMinDepth() {

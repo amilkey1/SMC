@@ -645,7 +645,7 @@ class Particle {
 //        cout << "new particle" << endl;
         for (int i=0; i < _forests[0]._nspecies-1; i++) {
             if (_forests[0]._lineages.size() > 1) {
-//                species_joined = _forests[0].speciesTreeProposal();
+                species_joined = _forests[0].speciesTreeProposal();
                 pair<unsigned, unsigned> example;
                 // for sim.nex
                 bool sim = false;
@@ -717,7 +717,7 @@ class Particle {
                             increment = 0.0;
                         }
                     }
-                bool snake = true;
+                bool snake = false;
                 if (snake) {
                     if (i == 0) {
                         example = make_pair(2,3);
@@ -759,7 +759,7 @@ class Particle {
                         example = make_pair(0,1);
                     }
                 }
-                species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
+//                species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
                 // if the species tree is not finished, add another species increment
                 if (_forests[0]._lineages.size()>1) {
                     _forests[0].addSpeciesIncrement();
