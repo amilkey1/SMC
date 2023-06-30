@@ -992,7 +992,7 @@ namespace proj {
                             else {
                                 if (s == 0) {
                                 // sample from species tree prior
-                                    my_vec[0][p]->buildEntireSpeciesTree(); // TODO: double check with multiple particles
+                                    my_vec[0][p]->buildEntireSpeciesTree();
                                 }
                             }
                             if (!_run_on_empty) {
@@ -1011,7 +1011,6 @@ namespace proj {
                 for (int s=0; s<nsubsets+1; s++) {
                     for (auto &p:my_vec[s]) {
                         p->setRunOnEmpty(_run_on_empty);
-    //                    p->setBuildEntireSpeciesTree(_build_species_tree_first);
                     }
                 }
                 
@@ -1033,10 +1032,13 @@ namespace proj {
     //                            p->setLogCoalescentLikelihood(0.0);
                                 p->setLogWeight(0.0, "g");
                                 p->setLogWeight(0.0, "s");
-    //                            p->mapSpecies(_taxon_map, _species_names);
-                                p->mapGeneTrees(_taxon_map, _species_names);
+//                                if (s == 0) {
+//                                    p->mapSpecies(_taxon_map, _species_names, 0);
+//                                }
+                                if (s > 0) {
+                                    p->mapGeneTrees(_taxon_map, _species_names);
+                                }
                                 p->resetGeneIncrements();
-    //                            p->showParticle();
                             }
                         }
                     }
@@ -1066,8 +1068,8 @@ namespace proj {
                         }
                         
                             for (int s=1; s<nsubsets+1; s++) { // skip species tree particles
-                            proposeParticles(my_vec[s], gene_trees_only, unconstrained, "g", deconstruct, my_vec[0]); // TODO: need to pass in _t from species tree
-    //                        deconstruct = true;
+                            proposeParticles(my_vec[s], gene_trees_only, unconstrained, "g", deconstruct, my_vec[0]);
+                            deconstruct = true;
                             
                             if (!_run_on_empty) {
                                 bool calc_marg_like = true;
@@ -1110,6 +1112,9 @@ namespace proj {
                     
                     for (int p=0; p<my_vec[0].size(); p++) {
                         my_vec[0][p]->showParticle();
+                    }
+                    for (int p=0; p<my_vec[0].size(); p++) {
+                        my_vec[1][p]->showParticle();
                     }
                     
                     // filter species trees now
