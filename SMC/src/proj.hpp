@@ -1142,6 +1142,7 @@ namespace proj {
                             cout << "beginning species tree proposals" << endl;
                             //taxon joining and reweighting step
                             
+                            my_vec[0][0]->showParticle();
                             for (int p=0; p<nparticles; p++) {
                                 vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
                                 tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
