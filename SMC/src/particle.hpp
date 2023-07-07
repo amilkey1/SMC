@@ -332,7 +332,7 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
         
         if (_forest._last_edge_length > 0.0) {
         // choose species to join if past the first species generation for each forest vector
-                species_joined = _forest.speciesTreeProposal(); // TODO: do the species join proposal first in Proj, then go into this function
+            species_joined = _forest.speciesTreeProposal();
         }
         
         _t.push_back(make_pair(species_joined, -1.0));

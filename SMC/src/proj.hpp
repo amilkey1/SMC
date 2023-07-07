@@ -743,9 +743,10 @@ namespace proj {
     
     inline void Proj::showFinal(vector<vector<Particle::SharedPtr>> my_vec) {
         for (int s=0; s<my_vec.size(); s++) {
-            for (auto &p:my_vec[s]){
-                p->showParticle();
-        }
+        for (int p=0; p<_nparticles; p++) {
+//            for (auto &p:my_vec[s]){
+                my_vec[p][s]->showParticle();
+            }
         }
         
         double sum_h = 0.0;
@@ -1160,7 +1161,7 @@ namespace proj {
 //                                    double last_edge_len, tuple<string, string, string> species_joined
                                     double last_edge_len = my_vec[0][p]->getLastEdgeLen();
                                     double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
-                                    // TODO: issue must be species partition is not being reset properly - double check this
+                                    // TODO: issue may be species partition is not being reset properly - check resampling?
                                     log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
                                 }
                                 
