@@ -45,7 +45,6 @@ class Forest {
         static void                 setNumSpecies(unsigned n);
         static void                 setNumTaxa(unsigned n);
         double                      calcLogLikelihood();
-        double                      calcLineageLogLikelihood(list<Node*> ndoes);
         void                        createDefaultTree();
         void operator=(const Forest & other);
         void                        debugForest();
@@ -113,9 +112,6 @@ class Forest {
         pair<Node*, Node*>    chooseAllPairs(list<Node*> &nodes, double increment, string species);
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done);
         vector< pair<double, Node *>>      sortPreorder();
-    pair<tuple<string, string, string>, double>     chooseSpeciesPair(vector<tuple<tuple<string, string, string>, double, double>> species_choices, double prev_log_coalescent_likelihood);
-        void                        revertSpeciesTree(pair<tuple<string, string, string>, double> species_joined);
-        void                        updateLineages(pair<tuple<string, string, string>, double> chosen_species);
         void                        calcMinDepth();
         vector<pair<double, pair<string, string>>>             getMinDepths();
         void                        trimDepthVector();
@@ -337,74 +333,6 @@ class Forest {
         }
     }
 
-    inline void Forest::revertSpeciesTree(pair<tuple<string, string, string>, double> species_joined) {
-        Node* addnode1;
-        Node* addnode2;
-        Node* delnode1;
-        for (auto &nd:_lineages) {
-            nd->_edge_length -= species_joined.second;
-            assert (nd->_edge_length >= 0.0);
-        }
-        if (get<0>(species_joined.first) != "null") {
-            for (auto &nd:_lineages) {
-                if (nd->_name == get<2>(species_joined.first)) {
-                    delnode1 = nd;
-                    addnode1 = nd->_left_child;
-                    addnode2 = nd->_left_child->_right_sib;
-                }
-            }
-            _nodes.pop_back();
-            _ninternals--;
-            revertNodeVector(_lineages, addnode1, addnode2, delnode1);
-        }
-        
-        for (auto &nd:_lineages) {
-            if (nd->_name == get<0>(species_joined.first)) {
-                nd->resetNode();
-            }
-            else if (nd->_name == get<1>(species_joined.first)) {
-                nd->resetNode();
-            }
-        }
-    }
-
-inline void Forest::updateLineages(pair<tuple<string, string, string>, double> species_joined) {
-    Node* delnode1;
-    Node* delnode2;
-    Node* addnode;
-    if (get<0>(species_joined.first) != "null") {
-        for (auto &nd:_lineages) {
-            if (nd->_name == get<0>(species_joined.first)) {
-                delnode1 = nd;
-            }
-            else if (nd->_name == get<1>(species_joined.first)) {
-                delnode2 = nd;
-            }
-        }
-        // make new node
-        Node nd;
-        _nodes.push_back(nd);
-        Node* new_nd = &_nodes.back();
-        new_nd->_parent=0;
-        new_nd->_number=_nleaves+_ninternals;
-        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
-        new_nd->_edge_length=0.0;
-        _ninternals++;
-        new_nd->_right_sib=0;
-
-        new_nd->_left_child=delnode1;
-        delnode1->_right_sib=delnode2;
-
-        delnode1->_parent=new_nd;
-        delnode2->_parent=new_nd;
-        
-        updateNodeVector(_lineages, delnode1, delnode2, new_nd);
-    }
-    for (auto &nd:_lineages) {
-        nd->_edge_length += species_joined.second;
-    }
-}
-
     inline vector< pair<double, Node *>> Forest::sortPreorder() {
             vector< pair<double, Node *>> heights_and_nodes;
             for (auto it = _preorder.rbegin(); it != _preorder.rend(); it++) {
@@ -444,74 +372,38 @@ inline void Forest::updateLineages(pair<tuple<string, string, string>, double> s
        }   // end while loop
    }
 
-//    inline Node * Forest::findNextPreorder(Node * nd) {
-//        assert(nd);
-//        Node * next = 0;
-//        if (nd->_major_parent) { // TODO: not sure
-//            next = nd->_parent->_right_sib;
-//        }
-//        else if (!nd->_left_child && !nd->_right_sib) {
-//            // nd has no children and no siblings, so next preorder is the right sibling of
-//            // the first ancestral node that has a right sibling.
-//            Node * anc = nd->_parent;
-//            while (anc && !anc->_right_sib)
-//                anc = anc->_parent;
-//            if (anc) {
-//                // We found an ancestor with a right sibling
-//                next = anc->_right_sib;
-//            }
-//            else {
-//                // nd is last preorder node in the tree
-//                next = 0;
-//            }
-//        }
-//        else if (nd->_right_sib && !nd->_left_child) {
-//            // nd has no children (it is a tip), but does have a sibling on its right
-//            next = nd->_right_sib;
-//        }
-//        else if (nd->_left_child && !nd->_right_sib) {
-//            // nd has children (it is an internal node) but no siblings on its right
-//            next = nd->_left_child;
-//        }
-//        else {
-//            // nd has both children and siblings on its right
-//            next = nd->_left_child;
-//        }
-//        return next;
-//    }
-
-inline Node * Forest::findNextPreorder(Node * nd) {
-    assert(nd);
-    Node * next = 0;
-    if (!nd->_left_child && !nd->_right_sib) {
-        // nd has no children and no siblings, so next preorder is the right sibling of
-        // the first ancestral node that has a right sibling.
-        Node * anc = nd->_parent;
-        while (anc && !anc->_right_sib)
-            anc = anc->_parent;
-        if (anc) {
-            // We found an ancestor with a right sibling
-            next = anc->_right_sib;
+    inline Node * Forest::findNextPreorder(Node * nd) {
+        assert(nd);
+        Node * next = 0;
+        if (!nd->_left_child && !nd->_right_sib) {
+            // nd has no children and no siblings, so next preorder is the right sibling of
+            // the first ancestral node that has a right sibling.
+            Node * anc = nd->_parent;
+            while (anc && !anc->_right_sib)
+                anc = anc->_parent;
+            if (anc) {
+                // We found an ancestor with a right sibling
+                next = anc->_right_sib;
+            }
+            else {
+                // nd is last preorder node in the tree
+                next = 0;
+            }
+        }
+        else if (nd->_right_sib && !nd->_left_child) {
+            // nd has no children (it is a tip), but does have a sibling on its right
+            next = nd->_right_sib;
+        }
+        else if (nd->_left_child && !nd->_right_sib) {
+            // nd has children (it is an internal node) but no siblings on its right
+            next = nd->_left_child;
         }
         else {
-            // nd is last preorder node in the tree
-            next = 0;
+            // nd has both children and siblings on its right
+            next = nd->_left_child;
         }
+        return next;
     }
-    else if (nd->_right_sib && !nd->_left_child) {
-        // nd has no children (it is a tip), but does have a sibling on its right
-        next = nd->_right_sib;
-    }
-    else if (nd->_left_child && !nd->_right_sib) {
-        // nd has children (it is an internal node) but no siblings on its right
-        next = nd->_left_child;
-    }
-    else {
-        // nd has both children and siblings on its right
-        next = nd->_left_child;
-    }
-    return next;
-}
 
     inline void Forest::showForest() {
         if (_index > 0) {
@@ -821,30 +713,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         return child_transition_prob;
     }
 
-    inline double Forest::calcLineageLogLikelihood(list<Node*> nodes) {
-        double lineage_log_likelihood = 0.0;
-        auto data_matrix=_data->getDataMatrix();
-
-        //calc likelihood for each lineage separately
-        auto &counts = _data->getPatternCounts();
-
-        for (auto nd:nodes) {
-            double log_like = 0.0;
-            for (unsigned p=0; p<_npatterns; p++) {
-                double site_like = 0.0;
-                for (unsigned s=0; s<_nstates; s++) {
-                    double partial = (*nd->_partial)[p*_nstates+s];
-                    site_like += 0.25*partial;
-                }
-                assert(site_like>0);
-                log_like += log(site_like)*counts[_first_pattern+p];
-            }
-            lineage_log_likelihood += log_like;
-//            debugLogLikelihood(nd, log_like);
-        }
-        return lineage_log_likelihood;
-    }
-
     inline double Forest::calcLogLikelihood() {
         auto data_matrix=_data->getDataMatrix();
 
@@ -866,35 +734,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             _gene_tree_log_likelihood += log_like;
 //            debugLogLikelihood(nd, log_like);
         }
-//        _gene_tree_log_likelihood += _gene_tree_log_coalescent_likelihood;
         return _gene_tree_log_likelihood;
-    }
-
-    inline pair<tuple<string, string, string>, double> Forest::chooseSpeciesPair(vector<tuple<tuple<string, string, string>, double, double>> species_choices, double prev_log_coalescent_likelihood) {
-//        _gene_tree_log_weight = 0.0;
-        vector<double> coal_likelihood_choices;
-        for (int i=0; i<species_choices.size(); i++) {
-            coal_likelihood_choices.push_back(get<1>(species_choices[i]));
-        }
-        // reweight choices
-        vector<double> log_weight_choices = reweightChoices(coal_likelihood_choices, prev_log_coalescent_likelihood);
-        
-        // sum unnormalized weights before choosing the pair
-        // must include the likelihoods of all pairs in the final particle weight
-        double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-//        _gene_tree_log_weight += log_weight_choices_sum; // TODO: use weight? not sure b/c delta is different for each particle
-        for (int b=0; b < (int) log_weight_choices.size(); b++) {
-            log_weight_choices[b] -= log_weight_choices_sum;
-        }
-        
-        // randomly select a pair
-        _index_of_choice = selectPair(log_weight_choices);
-
-        // find species to join in species_choices
-        tuple<string, string, string> species_to_join = get<0>(species_choices[_index_of_choice]);
-        double chosen_species_increment = get<2>(species_choices[_index_of_choice]);
-        
-        return make_pair(species_to_join, chosen_species_increment);
     }
 
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment, string species) {
@@ -1032,7 +872,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         return nd_can_have_sibling;
     }
 
-    inline void Forest::buildFromNewick(const std::string newick) { // TODO: remove rooted and polytomies
+    inline void Forest::buildFromNewick(const std::string newick) {
         // assume tree is rooted
         // do not allow polytomies
         bool rooted = true;
@@ -1331,318 +1171,316 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
 
-inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNewickTopology(const std::string newick) {
-    // assume tree is rooted
-    // do not allow polytomies
-    bool rooted = true;
-    bool allow_polytomies = false;
-    
-    vector<pair<tuple<string, string, string>, double>> species_joined;
-    species_joined.push_back(make_pair(make_tuple("null", "null", "null"), 0.0));
-    
-    set<unsigned> used; // used to ensure that no two leaf nodes have the same number
-    unsigned curr_leaf = 0;
-    unsigned num_edge_lengths = 0;
-    unsigned curr_node_index = 0;
+    inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNewickTopology(const std::string newick) {
+        // assume tree is rooted
+        // do not allow polytomies
+        bool rooted = true;
+        bool allow_polytomies = false;
+        
+        vector<pair<tuple<string, string, string>, double>> species_joined;
+        species_joined.push_back(make_pair(make_tuple("null", "null", "null"), 0.0));
+        
+        set<unsigned> used; // used to ensure that no two leaf nodes have the same number
+        unsigned curr_leaf = 0;
+        unsigned num_edge_lengths = 0;
+        unsigned curr_node_index = 0;
 
-    // Remove comments from the supplied newick string
-    string commentless_newick = newick;
-    stripOutNexusComments(commentless_newick);
+        // Remove comments from the supplied newick string
+        string commentless_newick = newick;
+        stripOutNexusComments(commentless_newick);
 
-    // Resize the _nodes vector
-    _nleaves = countNewickLeaves(commentless_newick);
-    if (_nleaves < 4)
-        throw XProj("Expecting newick tree description to have at least 4 leaves");
-        unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
-        _nodes.resize(max_nodes);
-        for (auto & nd : _nodes ) {
-            nd._name = "";
-            nd._number = -1;
-        }
+        // Resize the _nodes vector
+        _nleaves = countNewickLeaves(commentless_newick);
+        if (_nleaves < 4)
+            throw XProj("Expecting newick tree description to have at least 4 leaves");
+            unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
+            _nodes.resize(max_nodes);
+            for (auto & nd : _nodes ) {
+                nd._name = "";
+                nd._number = -1;
+            }
 
-    try {
-        // Root node is the last node in _nodes
-        auto l_front = _nodes.begin();
-        advance(l_front, curr_node_index);
-        Node *nd = &*l_front;
-
-        if (rooted) {
+        try {
+            // Root node is the last node in _nodes
             auto l_front = _nodes.begin();
-            advance(l_front, ++curr_node_index);
-            nd = &*l_front;
+            advance(l_front, curr_node_index);
+            Node *nd = &*l_front;
 
-            auto parent = _nodes.begin();
-            advance(parent, curr_node_index - 1);
-            nd->_parent = &*parent;
-            nd->_parent->_left_child = nd;
-        }
+            if (rooted) {
+                auto l_front = _nodes.begin();
+                advance(l_front, ++curr_node_index);
+                nd = &*l_front;
 
-        // Some flags to keep track of what we did last
-        enum {
-            Prev_Tok_LParen        = 0x01,    // previous token was a left parenthesis ('(')
-            Prev_Tok_RParen        = 0x02,    // previous token was a right parenthesis (')')
-            Prev_Tok_Colon        = 0x04,    // previous token was a colon (':')
-            Prev_Tok_Comma        = 0x08,    // previous token was a comma (',')
-            Prev_Tok_Name        = 0x10,    // previous token was a node name (e.g. '2', 'P._articulata')
-            Prev_Tok_EdgeLen    = 0x20    // previous token was an edge length (e.g. '0.1', '1.7e-3')
-        };
-        unsigned previous = Prev_Tok_LParen;
-
-        // Some useful flag combinations
-        unsigned LParen_Valid = (Prev_Tok_LParen | Prev_Tok_Comma);
-        unsigned RParen_Valid = (Prev_Tok_RParen | Prev_Tok_Name | Prev_Tok_EdgeLen);
-        unsigned Comma_Valid  = (Prev_Tok_RParen | Prev_Tok_Name | Prev_Tok_EdgeLen);
-        unsigned Colon_Valid  = (Prev_Tok_RParen | Prev_Tok_Name);
-        unsigned Name_Valid   = (Prev_Tok_RParen | Prev_Tok_LParen | Prev_Tok_Comma);
-
-        // Set to true while reading an edge length
-        bool inside_edge_length = false;
-        std::string edge_length_str;
-        unsigned edge_length_position = 0;
-
-        // Set to true while reading a node name surrounded by (single) quotes
-        bool inside_quoted_name = false;
-
-        // Set to true while reading a node name not surrounded by (single) quotes
-        bool inside_unquoted_name = false;
-
-        // Set to start of each node name and used in case of error
-        unsigned node_name_position = 0;
-
-        // loop through the characters in newick, building up tree as we go
-        unsigned position_in_string = 0;
-        for (auto ch : commentless_newick) {
-            position_in_string++;
-
-            if (inside_quoted_name) {
-                if (ch == '\'') {
-                    inside_quoted_name = false;
-                    node_name_position = 0;
-                    if (!nd->_left_child) {
-                        curr_leaf++;
-                    }
-                    previous = Prev_Tok_Name;
-                }
-                else if (iswspace(ch))
-                    nd->_name += ' ';
-                else
-                    nd->_name += ch;
-
-                continue;
+                auto parent = _nodes.begin();
+                advance(parent, curr_node_index - 1);
+                nd->_parent = &*parent;
+                nd->_parent->_left_child = nd;
             }
-            else if (inside_unquoted_name) {
-                if (ch == '(')
-                    throw XProj(boost::str(boost::format("Unexpected left parenthesis inside node name at position %d in tree description") % node_name_position));
 
-                if (iswspace(ch) || ch == ':' || ch == ',' || ch == ')') {
-                    inside_unquoted_name = false;
+            // Some flags to keep track of what we did last
+            enum {
+                Prev_Tok_LParen        = 0x01,    // previous token was a left parenthesis ('(')
+                Prev_Tok_RParen        = 0x02,    // previous token was a right parenthesis (')')
+                Prev_Tok_Colon        = 0x04,    // previous token was a colon (':')
+                Prev_Tok_Comma        = 0x08,    // previous token was a comma (',')
+                Prev_Tok_Name        = 0x10,    // previous token was a node name (e.g. '2', 'P._articulata')
+                Prev_Tok_EdgeLen    = 0x20    // previous token was an edge length (e.g. '0.1', '1.7e-3')
+            };
+            unsigned previous = Prev_Tok_LParen;
 
-                    // Expect node name only after a left paren (child's name), a comma (sib's name) or a right paren (parent's name)
-                    if (!(previous & Name_Valid))
-                        throw XProj(boost::str(boost::format("Unexpected node name (%s) at position %d in tree description") % nd->_name % node_name_position));
+            // Some useful flag combinations
+            unsigned LParen_Valid = (Prev_Tok_LParen | Prev_Tok_Comma);
+            unsigned RParen_Valid = (Prev_Tok_RParen | Prev_Tok_Name | Prev_Tok_EdgeLen);
+            unsigned Comma_Valid  = (Prev_Tok_RParen | Prev_Tok_Name | Prev_Tok_EdgeLen);
+            unsigned Colon_Valid  = (Prev_Tok_RParen | Prev_Tok_Name);
+            unsigned Name_Valid   = (Prev_Tok_RParen | Prev_Tok_LParen | Prev_Tok_Comma);
 
-                    if (!nd->_left_child) {
-                        curr_leaf++;
+            // Set to true while reading an edge length
+            bool inside_edge_length = false;
+            std::string edge_length_str;
+            unsigned edge_length_position = 0;
+
+            // Set to true while reading a node name surrounded by (single) quotes
+            bool inside_quoted_name = false;
+
+            // Set to true while reading a node name not surrounded by (single) quotes
+            bool inside_unquoted_name = false;
+
+            // Set to start of each node name and used in case of error
+            unsigned node_name_position = 0;
+
+            // loop through the characters in newick, building up tree as we go
+            unsigned position_in_string = 0;
+            for (auto ch : commentless_newick) {
+                position_in_string++;
+
+                if (inside_quoted_name) {
+                    if (ch == '\'') {
+                        inside_quoted_name = false;
+                        node_name_position = 0;
+                        if (!nd->_left_child) {
+                            curr_leaf++;
+                        }
+                        previous = Prev_Tok_Name;
                     }
+                    else if (iswspace(ch))
+                        nd->_name += ' ';
+                    else
+                        nd->_name += ch;
 
-                    previous = Prev_Tok_Name;
-                }
-                else {
-                    nd->_name += ch;
                     continue;
                 }
-            }
-            else if (inside_edge_length) {
-                if (ch == ',' || ch == ')' || iswspace(ch)) {
-                    inside_edge_length = false;
-                    edge_length_position = 0;
-                    extractEdgeLen(nd, edge_length_str);
-                    ++num_edge_lengths;
-                    previous = Prev_Tok_EdgeLen;
-                }
-                else {
-                    bool valid = (ch =='e' || ch == 'E' || ch =='.' || ch == '-' || ch == '+' || isdigit(ch));
-                    if (!valid)
-                        throw XProj(boost::str(boost::format("Invalid branch length character (%c) at position %d in tree description") % ch % position_in_string));
-                    edge_length_str += ch;
-                    continue;
-                }
-            }
+                else if (inside_unquoted_name) {
+                    if (ch == '(')
+                        throw XProj(boost::str(boost::format("Unexpected left parenthesis inside node name at position %d in tree description") % node_name_position));
 
-            if (iswspace(ch))
-                continue;
+                    if (iswspace(ch) || ch == ':' || ch == ',' || ch == ')') {
+                        inside_unquoted_name = false;
 
-            switch(ch) {
-                case ';':
-                    break;
+                        // Expect node name only after a left paren (child's name), a comma (sib's name) or a right paren (parent's name)
+                        if (!(previous & Name_Valid))
+                            throw XProj(boost::str(boost::format("Unexpected node name (%s) at position %d in tree description") % nd->_name % node_name_position));
 
-                case ')':
-                    // If nd is bottommost node, expecting left paren or semicolon, but not right paren
-                    if (!nd->_parent)
-                        throw XProj(boost::str(boost::format("Too many right parentheses at position %d in tree description") % position_in_string));
+                        if (!nd->_left_child) {
+                            curr_leaf++;
+                        }
 
-                    // Expect right paren only after an edge length, a node name, or another right paren
-                    if (!(previous & RParen_Valid))
-                        throw XProj(boost::str(boost::format("Unexpected right parenthesisat position %d in tree description") % position_in_string));
-
-                    // Go down a level
-                    nd = nd->_parent;
-                    if (!nd->_left_child->_right_sib)
-                        throw XProj(boost::str(boost::format("Internal node has only one child at position %d in tree description") % position_in_string));
-                    previous = Prev_Tok_RParen;
-                    break;
-
-                case ':':
-                    // Expect colon only after a node name or another right paren
-                    if (!(previous & Colon_Valid))
-                        throw XProj(boost::str(boost::format("Unexpected colon at position %d in tree description") % position_in_string));
-                    previous = Prev_Tok_Colon;
-                    break;
-
-                case ',':
-                {
-                    // Expect comma only after an edge length, a node name, or a right paren
-                    if (!nd->_parent || !(previous & Comma_Valid))
-                        throw XProj(boost::str(boost::format("Unexpected comma at position %d in tree description") % position_in_string));
-
-                    // Check for polytomies
-                    if (!canHaveSibling(nd, rooted, allow_polytomies)) {
-                        throw XProj(boost::str(boost::format("Polytomy found in the following tree description but polytomies prohibited:\n%s") % newick));
-                    }
-
-                    // Create the sibling
-                    curr_node_index++;
-                    if (curr_node_index == _nodes.size())
-                        throw XProj(boost::str(boost::format("Too many nodes specified by tree description (%d nodes allocated for %d leaves)") % _nodes.size() % _nleaves));
-
-                    auto l_front = _nodes.begin();
-                    advance(l_front, curr_node_index);
-                    nd->_right_sib = &*l_front;
-
-                    nd->_right_sib->_parent = nd->_parent;
-                    nd = nd->_right_sib;
-                    previous = Prev_Tok_Comma;
-                    break;
-                }
-
-                case '(':
-                {
-                    // Expect left paren only after a comma or another left paren
-                    if (!(previous & LParen_Valid))
-                        throw XProj(boost::str(boost::format("Not expecting left parenthesis at position %d in tree description") % position_in_string));
-
-                    // Create new node above and to the left of the current node
-                    assert(!nd->_left_child);
-                    curr_node_index++;
-                    if (curr_node_index == _nodes.size())
-                        throw XProj(boost::str(boost::format("malformed tree description (more than %d nodes specified)") % _nodes.size()));
-
-                    auto l_front = _nodes.begin();
-                    advance(l_front, curr_node_index);
-                    nd->_left_child = &*l_front;
-
-                    nd->_left_child->_parent = nd;
-                    nd = nd->_left_child;
-                    previous = Prev_Tok_LParen;
-                    break;
-                }
-
-                case '\'':
-                    // Encountered an apostrophe, which always indicates the start of a
-                    // node name (but note that node names do not have to be quoted)
-
-                    // Expect node name only after a left paren (child's name), a comma (sib's name)
-                    // or a right paren (parent's name)
-                    if (!(previous & Name_Valid))
-                        throw XProj(boost::str(boost::format("Not expecting node name at position %d in tree description") % position_in_string));
-
-                    // Get the rest of the name
-                    nd->_name.clear();
-
-                    inside_quoted_name = true;
-                    node_name_position = position_in_string;
-
-                    break;
-
-                default:
-                    // Get here if ch is not one of ();:,'
-
-                    // Expecting either an edge length or an unquoted node name
-                    if (previous == Prev_Tok_Colon) {
-                        // Edge length expected (e.g. "235", "0.12345", "1.7e-3")
-                        inside_edge_length = true;
-                        edge_length_position = position_in_string;
-                        edge_length_str = ch;
+                        previous = Prev_Tok_Name;
                     }
                     else {
-                        // Get the node name
-                        nd->_name = ch;
-
-                        inside_unquoted_name = true;
-                        node_name_position = position_in_string;
+                        nd->_name += ch;
+                        continue;
                     }
-            }   // end of switch statement
-        }   // loop over characters in newick string
+                }
+                else if (inside_edge_length) {
+                    if (ch == ',' || ch == ')' || iswspace(ch)) {
+                        inside_edge_length = false;
+                        edge_length_position = 0;
+                        extractEdgeLen(nd, edge_length_str);
+                        ++num_edge_lengths;
+                        previous = Prev_Tok_EdgeLen;
+                    }
+                    else {
+                        bool valid = (ch =='e' || ch == 'E' || ch =='.' || ch == '-' || ch == '+' || isdigit(ch));
+                        if (!valid)
+                            throw XProj(boost::str(boost::format("Invalid branch length character (%c) at position %d in tree description") % ch % position_in_string));
+                        edge_length_str += ch;
+                        continue;
+                    }
+                }
 
-        if (inside_unquoted_name)
-            throw XProj(boost::str(boost::format("Tree description ended before end of node name starting at position %d was found") % node_name_position));
-        if (inside_edge_length)
-            throw XProj(boost::str(boost::format("Tree description ended before end of edge length starting at position %d was found") % edge_length_position));
-        if (inside_quoted_name)
-            throw XProj(boost::str(boost::format("Expecting single quote to mark the end of node name at position %d in tree description") % node_name_position));
+                if (iswspace(ch))
+                    continue;
 
-        if (rooted) {
-            refreshPreorder();
+                switch(ch) {
+                    case ';':
+                        break;
+
+                    case ')':
+                        // If nd is bottommost node, expecting left paren or semicolon, but not right paren
+                        if (!nd->_parent)
+                            throw XProj(boost::str(boost::format("Too many right parentheses at position %d in tree description") % position_in_string));
+
+                        // Expect right paren only after an edge length, a node name, or another right paren
+                        if (!(previous & RParen_Valid))
+                            throw XProj(boost::str(boost::format("Unexpected right parenthesisat position %d in tree description") % position_in_string));
+
+                        // Go down a level
+                        nd = nd->_parent;
+                        if (!nd->_left_child->_right_sib)
+                            throw XProj(boost::str(boost::format("Internal node has only one child at position %d in tree description") % position_in_string));
+                        previous = Prev_Tok_RParen;
+                        break;
+
+                    case ':':
+                        // Expect colon only after a node name or another right paren
+                        if (!(previous & Colon_Valid))
+                            throw XProj(boost::str(boost::format("Unexpected colon at position %d in tree description") % position_in_string));
+                        previous = Prev_Tok_Colon;
+                        break;
+
+                    case ',':
+                    {
+                        // Expect comma only after an edge length, a node name, or a right paren
+                        if (!nd->_parent || !(previous & Comma_Valid))
+                            throw XProj(boost::str(boost::format("Unexpected comma at position %d in tree description") % position_in_string));
+
+                        // Check for polytomies
+                        if (!canHaveSibling(nd, rooted, allow_polytomies)) {
+                            throw XProj(boost::str(boost::format("Polytomy found in the following tree description but polytomies prohibited:\n%s") % newick));
+                        }
+
+                        // Create the sibling
+                        curr_node_index++;
+                        if (curr_node_index == _nodes.size())
+                            throw XProj(boost::str(boost::format("Too many nodes specified by tree description (%d nodes allocated for %d leaves)") % _nodes.size() % _nleaves));
+
+                        auto l_front = _nodes.begin();
+                        advance(l_front, curr_node_index);
+                        nd->_right_sib = &*l_front;
+
+                        nd->_right_sib->_parent = nd->_parent;
+                        nd = nd->_right_sib;
+                        previous = Prev_Tok_Comma;
+                        break;
+                    }
+
+                    case '(':
+                    {
+                        // Expect left paren only after a comma or another left paren
+                        if (!(previous & LParen_Valid))
+                            throw XProj(boost::str(boost::format("Not expecting left parenthesis at position %d in tree description") % position_in_string));
+
+                        // Create new node above and to the left of the current node
+                        assert(!nd->_left_child);
+                        curr_node_index++;
+                        if (curr_node_index == _nodes.size())
+                            throw XProj(boost::str(boost::format("malformed tree description (more than %d nodes specified)") % _nodes.size()));
+
+                        auto l_front = _nodes.begin();
+                        advance(l_front, curr_node_index);
+                        nd->_left_child = &*l_front;
+
+                        nd->_left_child->_parent = nd;
+                        nd = nd->_left_child;
+                        previous = Prev_Tok_LParen;
+                        break;
+                    }
+
+                    case '\'':
+                        // Encountered an apostrophe, which always indicates the start of a
+                        // node name (but note that node names do not have to be quoted)
+
+                        // Expect node name only after a left paren (child's name), a comma (sib's name)
+                        // or a right paren (parent's name)
+                        if (!(previous & Name_Valid))
+                            throw XProj(boost::str(boost::format("Not expecting node name at position %d in tree description") % position_in_string));
+
+                        // Get the rest of the name
+                        nd->_name.clear();
+
+                        inside_quoted_name = true;
+                        node_name_position = position_in_string;
+
+                        break;
+
+                    default:
+                        // Get here if ch is not one of ();:,'
+
+                        // Expecting either an edge length or an unquoted node name
+                        if (previous == Prev_Tok_Colon) {
+                            // Edge length expected (e.g. "235", "0.12345", "1.7e-3")
+                            inside_edge_length = true;
+                            edge_length_position = position_in_string;
+                            edge_length_str = ch;
+                        }
+                        else {
+                            // Get the node name
+                            nd->_name = ch;
+
+                            inside_unquoted_name = true;
+                            node_name_position = position_in_string;
+                        }
+                }   // end of switch statement
+            }   // loop over characters in newick string
+
+            if (inside_unquoted_name)
+                throw XProj(boost::str(boost::format("Tree description ended before end of node name starting at position %d was found") % node_name_position));
+            if (inside_edge_length)
+                throw XProj(boost::str(boost::format("Tree description ended before end of edge length starting at position %d was found") % edge_length_position));
+            if (inside_quoted_name)
+                throw XProj(boost::str(boost::format("Expecting single quote to mark the end of node name at position %d in tree description") % node_name_position));
+
+            if (rooted) {
+                refreshPreorder();
+            }
+            renumberInternals();
         }
-        renumberInternals();
-    }
-    catch(XProj x) {
-        clear();
-        throw x;
-    }
-
-    _nodes.pop_front(); // remove node at beginning of list because it's an extra root
-    // remove parent from new last node
-    _nodes.front()._parent = NULL;
-    // TODO: be careful - should change this so this is not an issue
-    
-    // order _nodes by height
-//        vector<pair<Node, double>> node_heights;
-//        for (auto &nd:_nodes) {
-//            node_heights.push_back(make_pair(nd, getLineageHeight(&nd)));
-//        }
-    
-    _nodes.sort(
-         [this](Node& lhs, Node& rhs) {
-             // TODO: first n should be the tips, then do this to sort the internal nodes
-             return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } ); // TODO: sort by children instead?
-    
-//        list::sort(_nodes.begin(), _nodes.end(),
-//             [this](const Node& lhs, const Node& rhs) {
-//                     return getLineageHeight(&lhs) < getLineageHeight(&rhs); } );
-    
-    _lineages.clear();
-    _lineages.push_back(&_nodes.back());
-    
-    // reset node numbers and names that are not tips
-    int j = 0;
-    for (auto &nd:_nodes) {
-        nd._number = j;
-        if (nd._name == "") {
-            nd._name=boost::str(boost::format("node-%d")%nd._number);
+        catch(XProj x) {
+            clear();
+            throw x;
         }
-        j++;
-    }
-    
-    refreshPreorder();
-    vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
-    for (auto &entry:heights_and_nodes) {
-        species_joined.push_back(make_pair(make_tuple(entry.second->_left_child->_name, entry.second->_left_child->_right_sib->_name, entry.second->_name), 0.0));
-    }
-    return species_joined;
-}
 
-
+        _nodes.pop_front(); // remove node at beginning of list because it's an extra root
+        // remove parent from new last node
+        _nodes.front()._parent = NULL;
+        // TODO: be careful - should change this so this is not an issue
+        
+        // order _nodes by height
+    //        vector<pair<Node, double>> node_heights;
+    //        for (auto &nd:_nodes) {
+    //            node_heights.push_back(make_pair(nd, getLineageHeight(&nd)));
+    //        }
+        
+        _nodes.sort(
+             [this](Node& lhs, Node& rhs) {
+                 // TODO: first n should be the tips, then do this to sort the internal nodes
+                 return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } ); // TODO: sort by children instead?
+        
+    //        list::sort(_nodes.begin(), _nodes.end(),
+    //             [this](const Node& lhs, const Node& rhs) {
+    //                     return getLineageHeight(&lhs) < getLineageHeight(&rhs); } );
+        
+        _lineages.clear();
+        _lineages.push_back(&_nodes.back());
+        
+        // reset node numbers and names that are not tips
+        int j = 0;
+        for (auto &nd:_nodes) {
+            nd._number = j;
+            if (nd._name == "") {
+                nd._name=boost::str(boost::format("node-%d")%nd._number);
+            }
+            j++;
+        }
+        
+        refreshPreorder();
+        vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
+        for (auto &entry:heights_and_nodes) {
+            species_joined.push_back(make_pair(make_tuple(entry.second->_left_child->_name, entry.second->_left_child->_right_sib->_name, entry.second->_name), 0.0));
+        }
+        return species_joined;
+    }
 
     inline void Forest::renumberInternals() {
         assert(_preorder.size() > 0);
@@ -2227,38 +2065,38 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         _lineages.resize(_nspecies);
     }
 
-//    inline string Forest::chooseEvent() {
-//        string event;
-//        // hybridization prior
-//        double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
-//
-//        double hybridization_prob = _hybridization_rate/(_hybridization_rate+_speciation_rate);
-//
-//        double u = rng.uniform();
-//        _rand_numbers.push_back(u);
-//        if (u<hybridization_prob && _lineages.size()>2) {
-//            event = "hybridization";
-//        }
-//        else if (_lineages.size() == 1) {
-//            event = "null";
-//        }
-//        else {
-//            event = "speciation";
-//        }
-//        // choose edge length but don't add it yet
-//        _last_edge_length = rng.gamma(1.0, 1.0/rate);
-//
-//        double nChooseTwo = _lineages.size()*(_lineages.size()-1);
-//        double log_prob_join = log(2/nChooseTwo);
-//        double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
-//
-//        if (_lineages.size()>2) {
-////            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
-//            _increments.push_back(make_pair(_last_edge_length, increment_prior));
-//        }
-//
-//        return event;
-//    }
+    inline string Forest::chooseEvent() {
+        string event;
+        // hybridization prior
+        double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
+
+        double hybridization_prob = _hybridization_rate/(_hybridization_rate+_speciation_rate);
+
+        double u = rng.uniform();
+        _rand_numbers.push_back(u);
+        if (u<hybridization_prob && _lineages.size()>2) {
+            event = "hybridization";
+        }
+        else if (_lineages.size() == 1) {
+            event = "null";
+        }
+        else {
+            event = "speciation";
+        }
+        // choose edge length but don't add it yet
+        _last_edge_length = rng.gamma(1.0, 1.0/rate);
+
+        double nChooseTwo = _lineages.size()*(_lineages.size()-1);
+        double log_prob_join = log(2/nChooseTwo);
+        double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
+
+        if (_lineages.size()>2) {
+//            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+            _increments.push_back(make_pair(_last_edge_length, increment_prior));
+        }
+
+        return event;
+    }
 
     inline vector<string> Forest::setUpExistingLineagesVector() {
         vector<string> existing_lineages;
@@ -2693,7 +2531,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
 
     inline void Forest::geneTreeProposal(pair<double, string> species_info, vector<pair<tuple<string, string, string>, double>> _t) {
         string species_name = species_info.second;
-        double species_increment = _t[_species_join_number].second;
         bool joined = false;
         double increment = species_info.first;
         for (auto &s:_species_partition) {
@@ -3263,7 +3100,7 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         }
     }
 
-    inline void Forest::resetSpeciesTree(vector<pair<tuple<string, string, string>, double>> t, int smallest_num_species) {
+    inline void Forest::resetSpeciesTree(vector<pair<tuple<string, string, string>, double>> t, int smallest_num_species) { // TODO: walk thru this function
         // walk through species partition up to smallest_num_species - 1, separating species again
         int a = 0;
         int edge_len_pos = (int) t.size() - 1;
@@ -3420,8 +3257,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
             double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
             
             _increments.push_back(make_pair(_last_edge_length, increment_prior));
-            
-//            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
         }
 
         // add the previously chosen edge length
