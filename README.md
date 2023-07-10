@@ -8,6 +8,8 @@ datafile: specify the name of the nexus file containing the raw sequence data
 
 nparticles: number of particles to use in the SMC
 
+proposal: specify the prior-prior or prior-post proposal (default is prior-post if nothing is specified)
+
 seed: random seed
 
 theta: specify the population-scaled mutation rate
