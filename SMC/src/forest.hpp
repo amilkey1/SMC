@@ -2972,6 +2972,8 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
                     }
                 }
                 
+                assert (eligible_species.size() > 0);
+                
 //                // choose which species coalescent event occurred in
                 for (auto &p:population_coalescent_rates) {
                     p = p/coalescence_rate;

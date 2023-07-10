@@ -75,7 +75,6 @@ namespace proj {
             double                      _gene_tree_log_marginal_likelihood;
             double                      _species_tree_log_marginal_likelihood;
             bool                        _run_on_empty;
-            bool                        _build_species_tree_first;
             double                      _theta_prior;
             double                      _prev_theta_prior;
             double                      _speciation_rate_prior;
@@ -227,9 +226,8 @@ namespace proj {
         ("migration_rate", boost::program_options::value(&Forest::_migration_rate)->default_value(0.0), "migration rate")
         ("hybridization_rate", boost::program_options::value(&Forest::_hybridization_rate)->default_value(0.0), "hybridization rate")
         ("run_on_empty", boost::program_options::value(&_run_on_empty)->default_value(false), "run with no data")
-        ("build_species_tree_first", boost::program_options::value(&_build_species_tree_first)->default_value(true), "build the complete species tree before starting the gene trees")
         ("niterations", boost::program_options::value(&_niterations)->default_value(1.0), "number of times to alternate between species and gene trees")
-        ("species_newicks", boost::program_options::value(&_species_newicks_name)->default_value("null"), "name of file containing species newick descriptions")
+        ("species_newick", boost::program_options::value(&_species_newicks_name)->default_value("null"), "name of file containing species newick descriptions")
         ("gene_newicks", boost::program_options::value(&_gene_newicks_names)->default_value("null"), "name of file containing gene newick descriptions")
         ;
 
@@ -894,7 +892,6 @@ namespace proj {
                 
                 for (auto &p:my_vec) {
                     p->setRunOnEmpty(_run_on_empty);
-                    p->setBuildEntireSpeciesTree(_build_species_tree_first);
                 }
                 
 //                normalizeWeights(my_vec, -1, true);

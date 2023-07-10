@@ -80,7 +80,6 @@ class Particle {
         string                                          saveGamma();
         void                                            calculateGamma();
         void                                            setRunOnEmpty(bool a) {_running_on_empty = a;}
-        void                                            setBuildEntireSpeciesTree(bool a) {_species_first = a;}
         vector<double>                                  getBranchLengths();
         vector<double>                                  getBranchLengthPriors();
         vector<double>                                  getGeneTreeLogLikelihoods();
@@ -125,7 +124,6 @@ class Particle {
         vector<pair<tuple<string, string, string>, double>> _t;
         unsigned                                _gene_tree_proposal_attempts;
         bool                                    _ready_to_join_species;
-        bool                                    _species_first;
         bool                                    firstProposal();
         void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
@@ -269,6 +267,7 @@ class Particle {
                 _forests[i].deconstructGeneTree();
             }
         }
+        
         for (int i=1; i<_forests.size(); i++) {
             _forests[i]._theta = _forests[i]._starting_theta;
             assert (_t.size() == _forests[0]._nspecies);
@@ -701,7 +700,6 @@ class Particle {
         _ready_to_join_species = other._ready_to_join_species;
         _running_on_empty = other._running_on_empty;
         _random_seeds = other._random_seeds;
-        _species_first = other._species_first;
         _no_species_joined = other._no_species_joined;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _species_tree_height = other._species_tree_height;
