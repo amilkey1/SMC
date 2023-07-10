@@ -85,7 +85,6 @@ class Particle {
         vector<double>                                  getGeneTreeLogLikelihoods();
         vector<double>                                  getTopologyPriors();
         void                                            hybridizationProposal();
-        bool                                            checkForDeepCoalescence();
         void                                            priorPriorProposal();
         void                                            calcParticleWeight();
         void                                            speciesJoinedProposal();
@@ -94,7 +93,6 @@ class Particle {
         double                                          getNumSpecies(){return _forests[0]._lineages.size();}
         vector<pair<string, string>>                    getSpeciesJoined(){return _forests[1]._names_of_species_joined;}
         double                                          getCoalescentLikelihood(){return _log_coalescent_likelihood;}
-        void                                            firstGen();
         void                                            geneTreeProposal(bool unconstrained, bool deconstruct);
         void                                            speciesProposal();
         void                                            resetSpeciesInfo(){_t.clear();}
@@ -222,10 +220,6 @@ class Particle {
             _forests[i]._theta = _forests[i]._starting_theta;
         }
 
-        bool no_newick = true;
-//        if (unconstrained && _generation == 0 && no_newick) {
-//            firstGen();
-//        }
         if (_generation == 0) {
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i]._nincrements = 0;
@@ -254,11 +248,6 @@ class Particle {
         }
         resetVariables();
         return _log_weight;
-    }
-
-    inline void Particle::firstGen() {
-        assert (_generation == 0); // species tree should only be rebuilt in the first round of the first iteration of gene trees
-        buildEntireSpeciesTree();
     }
 
     inline void Particle::geneTreeProposal(bool unconstrained, bool deconstruct) {
