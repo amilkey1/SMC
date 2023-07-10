@@ -125,7 +125,6 @@ class Forest {
         double                      updateSpeciesPartition(Node* subtree1, Node* subtree2, Node* new_nd, double increment, vector<pair<tuple<string, string, string>, double>> species_merge_info);
         void                        updateSpeciesPartitionTwo(tuple<string, string, string> species_info);
         void                        updateIncrements(double log_increment_prior);
-        bool                        checkIfReadyToJoinSpecies(double species_tree_height, tuple<string, string, string> species_merge_info);
         vector<pair<Node*, Node*>>  getAllPossiblePairs(list<Node*> &nodes);
         pair<double, string>                      chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info, bool unconstrained);
         void                        chooseSpeciesForCoalescentEvent(double delta);
@@ -4086,32 +4085,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
             }
         }
         return count;
-    }
-
-    inline bool Forest::checkIfReadyToJoinSpecies(double species_tree_height, tuple<string, string, string> species_merge_info) {
-        int num_coalescent_attempts_needed = _num_lineages_at_beginning_of_species_generation - (int) _species_partition.size(); // TODO: check num_lineages_at_beginning
-//        cout << "num coal attempts needed: " << num_coalescent_attempts_needed << endl;
-
-//        if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation || getTreeHeight() >= species_tree_height - 0.000001) { // TODO: I'm not sure this always works
-        if (num_coalescent_attempts_needed <= _num_coalescent_attempts_within_species_generation || getTreeHeight() >= species_tree_height - 0.000001) { 
-//        if (num_coalescent_attempts_needed == _num_coalescent_attempts_within_species_generation) {
-            _species_join_number++;
-            
-            // need to now update the species partition
-            string species1 = get<0> (species_merge_info);
-            string species2 = get<1> (species_merge_info);
-            string new_nd = get<2> (species_merge_info);
-            
-            list<Node*> &nodes = _species_partition[new_nd];
-            copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
-            copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
-            _species_partition.erase(species1);
-            _species_partition.erase(species2);
-            return true;
-        }
-        else {
-            return false;
-        }
     }
 
     inline void Forest::extendGeneTreeLineages(double species_tree_height) {

@@ -68,7 +68,6 @@ class Particle {
         }
 
         static void                                     setNumSubsets(unsigned n);
-        vector<Forest> &                                getForests() {return _forests;}
         void                                            showSpeciesIncrement();
         void                                            showSpeciesJoined();
         void                                            showSpeciesTree();
@@ -85,9 +84,7 @@ class Particle {
         vector<double>                                  getGeneTreeLogLikelihoods();
         vector<double>                                  getTopologyPriors();
         void                                            hybridizationProposal();
-        void                                            priorPriorProposal();
         void                                            calcParticleWeight();
-        void                                            speciesJoinedProposal();
         vector<string>                                  getGeneTreeNames(int j);
         vector<string>                                  getGeneTreeNewicks();
         double                                          getNumSpecies(){return _forests[0]._lineages.size();}
@@ -115,35 +112,25 @@ class Particle {
         double                                  _log_likelihood;
         double                                  _log_coalescent_likelihood;
         int                                     _generation = 0;
-        map<int, vector<double>>                     _random_seeds;
         bool                                    _running_on_empty = false;
         bool                                    _no_species_joined = true;
         double                                  _species_tree_height;
         vector<pair<tuple<string, string, string>, double>> _t;
-        unsigned                                _gene_tree_proposal_attempts;
-        bool                                    _ready_to_join_species;
-        bool                                    firstProposal();
-        void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
-        bool                                    checkIfReadyToJoinSpecies();
         bool                                    _inf = false;
-        vector<double>                          _unnormalized_weights;
 };
 
     inline Particle::Particle() {
         //log weight and log likelihood are 0 for first generation
         _log_weight = 0.0;
         _log_likelihood = 0.0;
-        _gene_tree_proposal_attempts = 0;
         _log_coalescent_likelihood = 0.0;
-        _species_tree_height = 0.0;
         _species_tree_height = 0.0;
         _species_log_weight = 0.0;
     };
 
     inline Particle::~Particle() {
 //        cout << "destroying a particle" << endl;
-//	cout << "test" << endl;
     }
     inline void Particle::showParticle() {
 //        cout << "log coalescent likelihood: " << _log_coalescent_likelihood << endl;
@@ -231,8 +218,6 @@ class Particle {
         }
         else if (!gene_trees_only) {
             if (_generation == 0 || _generation == Forest::_ntaxa - 1) {
-//            if (_generation == 0) {
-//            if (_generation == Forest::_ntaxa - 1) {
                 for (int i=1; i<_forests.size(); i++) {
                     _forests[i].calcMinDepth();
                     _forests[i]._nincrements = 0;
@@ -685,15 +670,11 @@ class Particle {
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;
         _t = other._t;
-        _gene_tree_proposal_attempts = other._gene_tree_proposal_attempts;
-        _ready_to_join_species = other._ready_to_join_species;
         _running_on_empty = other._running_on_empty;
-        _random_seeds = other._random_seeds;
         _no_species_joined = other._no_species_joined;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _species_tree_height = other._species_tree_height;
         _inf = other._inf;
-        _unnormalized_weights = other._unnormalized_weights;
         _species_log_weight = other._species_log_weight;
     };
 }
