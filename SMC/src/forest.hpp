@@ -65,11 +65,8 @@ class Forest {
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
         tuple<string,string, string> speciesTreeProposal();
-        inline tuple<string,string, string> preDeterminedSpeciesTreeProposal(pair<unsigned, unsigned> t);
         void                        firstGeneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_merge_info);
-//        void                        geneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_merge_info);
         void                        geneTreeProposal(pair<double, string> species_info, vector<pair<tuple<string, string, string>, double>> _t);
-//        void                        evolveSpeciesFor(list <Node*> &nodes, vector<pair<tuple<string, string, string>, double>> species_merge_info);
         void                        evolveSpeciesFor(list <Node*> &nodes, double increment, string species);
         void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
@@ -86,7 +83,6 @@ class Forest {
         vector<string>              setUpExistingLineagesVector();
         vector<string>              updateExistingLineagesVector(vector<string> existing_lineages, tuple<string, string, string> species_joined);
         void                        addSpeciesIncrement();
-        void                        addPredeterminedSpeciesIncrement(double increment);
         string                      chooseEvent();
         void                        allowMigration(list<Node*> &nodes);
         void                        setGeneration(double g) {_generationf = g;}
@@ -96,9 +92,7 @@ class Forest {
         string                      chooseLineage(Node* taxon_to_migrate, string key_to_del);
         void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
         void                        deleteTaxon(string key_to_del, unsigned taxon_choice);
-//        void                        allowCoalescence(pair<Node*, Node*> nd_pair, double increment, double prev_lineage_log_likelihood, list<Node*> &nodes);
         void                        allowCoalescence(list<Node*> &nodes, double increment, string species);
-        void                        allowDummyCoalescence(list<Node*> &nodes, double increment);
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
         vector<string>              hybridizeSpecies();
         void                        moveGene(string new_nd, string parent, string hybrid);
@@ -110,24 +104,12 @@ class Forest {
         int                         chooseDirectionOfHybridization(vector<double> likelihood_vec);
         void                        hybridGeneTreeProposal(double species_tree_increment);
         unsigned                    countDescendants(Node* nd, unsigned count);
-        double                      findShallowestCoalescence();
-        void                        revertToShallowest(double smallest_branch);
         double                      getTreeHeight();
 //        double                      getLineageHeight(const Node* nd) const;
         double                      getLineageHeight(Node* nd);
-        void                        revertNewNode(list <Node*> &nodes, Node*new_nd, Node* subtree1, Node* subtree2);
-        void                        revertBranches(list <Node*> &nodes, Node* subtree1, Node* subtree2, double increment);
-        void                        chooseCoalescentEvent();
-        void                        mergeChosenPair(vector<pair<tuple<string, string, string>, double>> species_merge_info);
         void                        extendGeneTreeLineages(double species_tree_increment);
-        double                      extendSingleLineage(double gene_increment, Node* nd, string spp_right_child, string spp_left_child);
-        void                        finishGeneTree();
-        double                      updateSpeciesPartition(Node* subtree1, Node* subtree2, Node* new_nd, double increment, vector<pair<tuple<string, string, string>, double>> species_merge_info);
-        void                        updateSpeciesPartitionTwo(tuple<string, string, string> species_info);
-        void                        updateIncrements(double log_increment_prior);
-        vector<pair<Node*, Node*>>  getAllPossiblePairs(list<Node*> &nodes);
+        void                        updateSpeciesPartition(tuple<string, string, string> species_info);
         pair<double, string>                      chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info, bool unconstrained);
-        void                        chooseSpeciesForCoalescentEvent(double delta);
         pair<Node*, Node*>    chooseAllPairs(list<Node*> &nodes, double increment, string species);
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done);
         vector< pair<double, Node *>>      sortPreorder();
@@ -138,26 +120,19 @@ class Forest {
         vector<pair<double, pair<string, string>>>             getMinDepths();
         void                        trimDepthVector();
         void                        resetDepthVector(tuple<string, string, string> species_joined);
-        vector<pair<int, int>>      priorPostSpeciesOptions();
-        tuple<string,string, string> priorPostSpeciesProposal(pair<int, int> t);
-        void                        undoSpeciesJoin(tuple<string, string, string> species_names);
-        tuple<string,string,string> getSpeciesNames(pair<int, int>);
-        void                        buildFromNewick(const std::string newick, bool rooted, bool allow_polytomies);
-    vector<pair<tuple<string, string, string>, double>>                         buildFromNewickTopology(const std::string newick, bool rooted, bool allow_polytomies);
+        void                        buildFromNewick(const std::string newick);
+    vector<pair<tuple<string, string, string>, double>>                         buildFromNewickTopology(const std::string newick);
         void                        stripOutNexusComments(std::string & newick);
         unsigned                    countNewickLeaves(const std::string newick);
-        void                        extractNodeNumberFromName(Node * nd, std::set<unsigned> & used);
         void                        extractEdgeLen(Node * nd, std::string edge_length_string);
         bool                        canHaveSibling(Node * nd, bool rooted, bool allow_polytomies);
         void                        renumberInternals();
-//        void                        rerootAtNodeNumber(int node_number);
         void                        remakeGeneTree(map<string, string> &taxon_map);
         void                        resetIncrements();
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
         std::vector<Node*>          _new_nodes;
-//        vector< pair<double, Node *>> _heights_and_nodes;
 
         unsigned                    _nleaves;
         unsigned                    _ninternals;
@@ -186,17 +161,14 @@ class Forest {
         vector<pair<double, double>>         _increments;
         double                      _topology_prior;
         unsigned                    _num_coalescent_events_in_generation;
-    vector<pair<double, double>> _searchable_branch_lengths; // pair is lineage height, increment
         double                      _prev_log_likelihood;
         double                      _log_joining_prob;
-        vector<double>              _increment_choices;
         double                      _extended_increment;
         int                         _species_join_number;
         int                         _num_coalescent_attempts_within_species_generation;
         int                         _num_lineages_at_beginning_of_species_generation;
         double                      _prev_gene_tree_log_likelihood;
         vector<pair<string, string>>        _names_of_species_joined;
-        bool                        _rebuild_tree;
         bool                        _ready_to_join_species;
         vector<Node*>               _preorder;
         vector<pair<double, pair<string, string>>>              _depths;
@@ -209,10 +181,8 @@ class Forest {
         void                        hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment);
         void                        resetToMinor(vector<Node*> minor_nodes, vector<Node*> minor_left_children, vector<Node*> minor_right_children, vector<double> minor_left_edge_lengths, vector<double> minor_right_edge_lengths);
         vector<pair<double, double>>              _deep_coalescent_increments; // increment, prior
-        void                        calcDeepCoalescentPrior();
         void                        deconstructGeneTree();
         void                        refreshPreorder();
-//        vector<pair<double, string>>              _gene_tree_increments;
         int                         _nincrements = 0;
 
     public:
@@ -255,7 +225,6 @@ class Forest {
         _species_join_number = 0;
         _num_coalescent_attempts_within_species_generation = 0.0;
         _num_lineages_at_beginning_of_species_generation = _ntaxa;
-        _rebuild_tree = false;
         _ready_to_join_species = false;
         _preorder.clear();
         _gene_tree_log_likelihood = 0.0;
@@ -992,110 +961,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         return make_pair(subtree1, subtree2);
     }
 
-    inline void Forest::chooseCoalescentEvent() {
-        assert (_increment_choices.size() == _log_weight_vec.size());
-        _num_coalescent_attempts_within_species_generation++;
-        _gene_tree_log_weight = 0.0;
-        if (_log_weight_vec.size() > 0) {
-            double log_weight_choices_sum = getRunningSumChoices(_log_weight_vec);
-            _gene_tree_log_weight = log_weight_choices_sum;
-            for (int b=0; b < (int) _log_weight_vec.size(); b++) {
-                _log_weight_vec[b] -= log_weight_choices_sum;
-            }
-            
-            // randomly select a pair
-            _index_of_choice = selectPair(_log_weight_vec);
-            
-//            _gene_tree_log_likelihood = calcLogLikelihood();
-            _log_weight_vec.clear();
-        }
-    }
-
-    inline void Forest::mergeChosenPair(vector<pair<tuple<string, string, string>, double>> species_merge_info) {
-        if (_increment_choices.size() > 0) {
-            assert (_proposal != "prior-prior");
-            double log_increment_prior = 0.0;
-
-            double increment = _increment_choices[_index_of_choice];
-            for (auto &nd:_lineages) {
-                nd->_edge_length += increment;
-        }
-        
-        _log_likelihood_choices.clear();
-            // find nodes to join in node list
-            
-        Node *subtree1 = get<0>(_node_choices[_index_of_choice]);
-        Node *subtree2 = get<1>(_node_choices[_index_of_choice]);
-        
-        _node_choices.clear();
-
-        _log_likelihood_choices.clear();
-        _new_nodes.clear();
-        
-        // rejoin the chosen subtrees
-        Node nd;
-        _nodes.push_back(nd);
-        Node* new_nd = &_nodes.back();
-        new_nd->_parent=0;
-        new_nd->_number=_nleaves+_ninternals;
-        new_nd->_edge_length=0.0;
-        new_nd->_right_sib=0;
-        _ninternals++;
-
-        new_nd->_left_child=subtree1;
-        subtree1->_right_sib=subtree2;
-
-        subtree1->_parent=new_nd;
-        subtree2->_parent=new_nd;
-
-        _num_coalescent_events_in_generation++;
-
-        //always calculating partials now
-        assert (new_nd->_partial == nullptr);
-        new_nd->_partial=ps.getPartial(_npatterns*4);
-        assert(new_nd->_left_child->_right_sib);
-        calcPartialArray(new_nd);
-
-        //update species list
-        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-        
-        // update species partition and calculate prior
-        log_increment_prior = updateSpeciesPartition(subtree1, subtree2, new_nd, increment, species_merge_info);
-        
-        // save only the correct increment in the _increments vector
-        
-        updateIncrements(log_increment_prior);
-
-        _increment_choices.clear();
-        _node_choices.clear();
-        }
-    }
-
-    inline void Forest::updateIncrements(double log_increment_prior) {
-        pair <double, double> chosen_increment;
-        double deep_coalescent_increment = 0.0;
-        double deep_coalescent_prior = 0.0;
-        for (int i=0; i<_deep_coalescent_increments.size(); i++) {
-            if (_deep_coalescent_increments[i].second != 0.0) {
-                deep_coalescent_increment += _deep_coalescent_increments[i].first;
-                deep_coalescent_prior += _deep_coalescent_increments[i].second;
-            }
-        }
-
-        if (deep_coalescent_increment > 0.0) {
-            chosen_increment = make_pair(_increment_choices[_index_of_choice]+deep_coalescent_increment+_extended_increment, log_increment_prior+deep_coalescent_prior);
-        }
-        else {
-            chosen_increment = make_pair(_increment_choices[_index_of_choice]+_extended_increment, log_increment_prior);
-        }
-
-        // clear deep coalescent increment
-        _deep_coalescent_increments.clear();
-        // add increment and prior to increments list
-        _increments.push_back(chosen_increment);
-        _extended_increment = 0.0;
-    }
-
     inline void Forest::trimDepthVector() {
         _depths.erase(_depths.begin());
     }
@@ -1114,35 +979,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         sregex_iterator m1(newick.begin(), newick.end(), taxonexpr);
         sregex_iterator m2;
         return (unsigned)std::distance(m1, m2);
-    }
-
-    inline void Forest::extractNodeNumberFromName(Node * nd, set<unsigned> & used) {
-        assert(nd);
-        bool success = true;
-        unsigned x = 0;
-        try {
-            x = stoi(nd->_name);
-        }
-        catch(std::invalid_argument &) {
-            // node name could not be converted to an integer value
-            success = false;
-        }
-
-        if (success) {
-            // conversion succeeded
-            // attempt to insert x into the set of node numbers already used
-            std::pair<std::set<unsigned>::iterator, bool> insert_result = used.insert(x);
-            if (insert_result.second) {
-                // insertion was made, so x has NOT already been used
-                nd->_number = x - 1;
-            }
-            else {
-                // insertion was not made, so set already contained x
-                throw XProj(boost::str(boost::format("leaf number %d used more than once") % x));
-            }
-        }
-        else
-            throw XProj(boost::str(boost::format("node name (%s) not interpretable as a positive integer") % nd->_name));
     }
 
     inline void Forest::extractEdgeLen(Node * nd, std::string edge_length_string) {
@@ -1196,7 +1032,12 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         return nd_can_have_sibling;
     }
 
-    inline void Forest::buildFromNewick(const std::string newick, bool rooted, bool allow_polytomies) {
+    inline void Forest::buildFromNewick(const std::string newick) { // TODO: remove rooted and polytomies
+        // assume tree is rooted
+        // do not allow polytomies
+        bool rooted = true;
+        bool allow_polytomies = false;
+        
         set<unsigned> used; // used to ensure that no two leaf nodes have the same number
         unsigned curr_leaf = 0;
         unsigned num_edge_lengths = 0;
@@ -1210,16 +1051,11 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _nleaves = countNewickLeaves(commentless_newick);
         if (_nleaves < 4)
             throw XProj("Expecting newick tree description to have at least 4 leaves");
-        unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
-//        max_nodes--; // no root node
-//        unsigned curr_node_index = max_nodes-1; // walk in reverse through _nodes list
-        _nodes.resize(max_nodes);
-//        int b=0;
+            unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
+            _nodes.resize(max_nodes);
         for (auto & nd : _nodes ) {
             nd._name = "";
             nd._number = -1;
-//            nd._number = b;
-//            b++;
         }
 
         try {
@@ -1281,7 +1117,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                         inside_quoted_name = false;
                         node_name_position = 0;
                         if (!nd->_left_child) {
-//                            extractNodeNumberFromName(nd, used);
                             curr_leaf++;
                         }
                         previous = Prev_Tok_Name;
@@ -1305,7 +1140,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                             throw XProj(boost::str(boost::format("Unexpected node name (%s) at position %d in tree description") % nd->_name % node_name_position));
 
                         if (!nd->_left_child) {
-//                            extractNodeNumberFromName(nd, used);
                             curr_leaf++;
                         }
 
@@ -1458,11 +1292,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             if (rooted) {
                 refreshPreorder();
             }
-            else {
-//                // Root at leaf whose _number = 0
-//                // refreshPreorder() and refreshLevelorder() called after rerooting
-//                rerootAtNodeNumber(0);
-            }
             renumberInternals();
         }
         catch(XProj x) {
@@ -1502,7 +1331,12 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
 
-inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNewickTopology(const std::string newick, bool rooted, bool allow_polytomies) {
+inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNewickTopology(const std::string newick) {
+    // assume tree is rooted
+    // do not allow polytomies
+    bool rooted = true;
+    bool allow_polytomies = false;
+    
     vector<pair<tuple<string, string, string>, double>> species_joined;
     species_joined.push_back(make_pair(make_tuple("null", "null", "null"), 0.0));
     
@@ -1519,14 +1353,12 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
     _nleaves = countNewickLeaves(commentless_newick);
     if (_nleaves < 4)
         throw XProj("Expecting newick tree description to have at least 4 leaves");
-    unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
-//        max_nodes--; // no root node
-//        unsigned curr_node_index = max_nodes-1; // walk in reverse through _nodes list
-    _nodes.resize(max_nodes);
-    for (auto & nd : _nodes ) {
-        nd._name = "";
-        nd._number = -1;
-    }
+        unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
+        _nodes.resize(max_nodes);
+        for (auto & nd : _nodes ) {
+            nd._name = "";
+            nd._number = -1;
+        }
 
     try {
         // Root node is the last node in _nodes
@@ -1587,7 +1419,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
                     inside_quoted_name = false;
                     node_name_position = 0;
                     if (!nd->_left_child) {
-//                            extractNodeNumberFromName(nd, used);
                         curr_leaf++;
                     }
                     previous = Prev_Tok_Name;
@@ -1611,7 +1442,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
                         throw XProj(boost::str(boost::format("Unexpected node name (%s) at position %d in tree description") % nd->_name % node_name_position));
 
                     if (!nd->_left_child) {
-//                            extractNodeNumberFromName(nd, used);
                         curr_leaf++;
                     }
 
@@ -1763,11 +1593,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
 
         if (rooted) {
             refreshPreorder();
-        }
-        else {
-//                // Root at leaf whose _number = 0
-//                // refreshPreorder() and refreshLevelorder() called after rerooting
-//                rerootAtNodeNumber(0);
         }
         renumberInternals();
     }
@@ -1941,7 +1766,7 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
 //        return depths[0];
     }
 
-    inline void Forest::updateSpeciesPartitionTwo(tuple<string, string, string> species_info) {
+    inline void Forest::updateSpeciesPartition(tuple<string, string, string> species_info) {
         string spp1 = get<0>(species_info);
         string spp2 = get<1>(species_info);
         string new_spp = get<2>(species_info);
@@ -2053,117 +1878,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         return log_coalescent_likelihood;
     }
 
-    inline double Forest::updateSpeciesPartition(Node* subtree1, Node* subtree2, Node* new_nd, double increment, vector<pair<tuple<string, string, string>, double>> species_merge_info) {
-        // if the two taxa are from different species, must merge those species in the species partition before updating node lists
-            string species1 = "blank";
-            string species2 = "blank";
-            for (auto &s:_species_partition) {
-                for (auto &nd:s.second) {
-                    if (nd == subtree1) {
-                        species1 = s.first;
-                    }
-                    else if (nd == subtree2) {
-                        species2 = s.first;
-                    }
-                }
-            }
-        assert (species1 != "blank");
-        assert (species2 != "blank");
-        
-        bool species1_done = false;
-        bool species2_done = false;
-        
-        string species1_lineage = species1; // this is the lineage that contains species 1
-        string species2_lineage = species2; // this is the lineage that contains species 2
-        
-        if (species1 != species2) {
-            while (!species1_done || !species2_done) {
-                for (auto &st:species_merge_info) {
-                    string spp1_lineage = get<0>(st.first);
-                    string spp2_lineage = get<1>(st.first);
-                    string new_nd = get<2>(st.first);
-                    
-                    bool sp1_bool = false;
-                    bool sp2_bool = false;
-                    if (species1 == spp1_lineage || species1 == spp2_lineage) {
-                        sp1_bool = true;
-                    }
-                    if (species2 == spp1_lineage || species2 == spp2_lineage) {
-                        sp2_bool = true;
-                    }
-                    if (sp1_bool && sp2_bool) {
-                        species1_done = true;
-                        species2_done = true;
-                    }
-                    
-                    if (species1 == spp1_lineage || species1 == spp2_lineage) {
-                        species1 = new_nd;
-                    }
-                    
-                    if (species2 == spp1_lineage || species2 == spp2_lineage) {
-                        species2 = new_nd;
-                    }
-
-                    list<Node*> &nodes = _species_partition[new_nd];
-                    copy(_species_partition[spp1_lineage].begin(), _species_partition[spp1_lineage].end(), back_inserter(nodes));
-                    copy(_species_partition[spp2_lineage].begin(), _species_partition[spp2_lineage].end(), back_inserter(nodes));
-                    _species_partition.erase(spp1_lineage);
-                    _species_partition.erase(spp2_lineage);
-                    
-                    if (species1_done && species2_done) {
-                        break;
-                    }
-                }
-            }
-//            while (!species1_done || !species2_done) {
-//            for (auto &st:species_merge_info) {
-//                string spp1 = get<0>(st.first);
-//                string spp2 = get<1>(st.first);
-//                string new_spp = get<2>(st.first);
-//
-//                if (spp1 == species1_lineage || spp2 == species1_lineage) {
-//                    species1_lineage = spp1;
-//                }
-//                if (spp2 == species2_lineage || spp1 == species2_lineage) {
-//                    species2_lineage = spp2;
-//                }
-//
-//                if (spp1 == species1_lineage && spp2 == species2_lineage) {
-//                    species1_done = true;
-//                    species2_done = true;
-//                }
-//
-//                list<Node*> &nodes = _species_partition[new_spp];
-//                copy(_species_partition[spp1].begin(), _species_partition[spp1].end(), back_inserter(nodes));
-//                copy(_species_partition[spp2].begin(), _species_partition[spp2].end(), back_inserter(nodes));
-//                _species_partition.erase(spp1);
-//                _species_partition.erase(spp2);
-//
-//                if (species1_done && species2_done) {
-//                    break;
-//                }
-//                }
-//            }
-        }
-        
-        double coalescence_rate = 0.0;
-        double log_increment_prior = 0.0;
-        for (auto &s:_species_partition) {
-            for (auto &nd:s.second) {
-                coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
-                if (nd == subtree1 || nd == subtree2) {
-                    updateNodeList(s.second, subtree1, subtree2, new_nd);
-                    log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate);
-                    break;
-                }
-                else {
-                    log_increment_prior -= increment*coalescence_rate;
-                }
-            }
-        }
-        return log_increment_prior;
-    }
-
     inline int Forest::selectPair(vector<double> weight_vec) {
         // choose a random number [0,1]
         double u = rng.uniform();
@@ -2181,26 +1895,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         return index;
     }
 
-    inline vector<pair<Node*, Node*>> getAllPossiblePairs(list<Node*> &nodes) {
-        vector<pair<Node*, Node*>> node_choices;
-    //            make list of all possible node pairs
-            for (int i = 0; i < (int) nodes.size()-1; i++) {
-                for (int j = i+1; j < (int) nodes.size(); j++) {
-                    Node *node1 = nullptr;
-                    Node *node2 = nullptr;
-                    
-                    auto it1 = std::next(nodes.begin(), i);
-                    node1 = *it1;
-
-                    auto it2 = std::next(nodes.begin(), j);
-                    node2 = *it2;
-                    
-                    assert (i < nodes.size() && j < nodes.size());
-                    node_choices.push_back(make_pair(node1, node2));
-                }
-            }
-        return node_choices;
-    }
     inline vector<double> Forest::reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood) {
         vector<double> weight_vec;
 //        assert (likelihood_vec.size() == prev_log_likelihood_choices.size());
@@ -2401,9 +2095,7 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         _increments = other._increments;
         _topology_prior = other._topology_prior;
         _num_coalescent_events_in_generation = other._num_coalescent_events_in_generation;
-        _searchable_branch_lengths = other._searchable_branch_lengths;
         _log_joining_prob = other._log_joining_prob;
-        _increment_choices = other._increment_choices;
         _deep_coalescent_increments = other._deep_coalescent_increments;
         _extended_increment = other._extended_increment;
         _species_join_number = other._species_join_number;
@@ -2411,11 +2103,8 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         _num_lineages_at_beginning_of_species_generation = other._num_lineages_at_beginning_of_species_generation;
         _prev_gene_tree_log_likelihood = other._prev_gene_tree_log_likelihood;
         _names_of_species_joined = other._names_of_species_joined;
-        _rebuild_tree = other._rebuild_tree;
         _ready_to_join_species = other._ready_to_join_species;
-//        _heights_and_nodes = other._heights_and_nodes;
         _depths = other._depths;
-//        _gene_tree_increments = other._gene_tree_increments;
         _nincrements = other._nincrements;
         _gene_tree_log_coalescent_likelihood = other._gene_tree_log_coalescent_likelihood;
 
@@ -2659,118 +2348,7 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         for (auto &nd:_nodes) {
             nd._edge_length = 0.0;
         }
-    }
-
-    inline tuple<string,string, string> Forest::preDeterminedSpeciesTreeProposal(pair<unsigned, unsigned> t) {
-        // this function creates a new node and joins two species
-
-//        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
-        Node *subtree1=_lineages[t.first];
-        Node *subtree2=_lineages[t.second];
-        assert(!subtree1->_parent && !subtree2->_parent);
-
-        Node nd;
-        _nodes.push_back(nd);
-        Node* new_nd = &_nodes.back();
-        new_nd->_parent=0;
-        new_nd->_number=_nleaves+_ninternals;
-        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
-        new_nd->_edge_length=0.0;
-        _ninternals++;
-        new_nd->_right_sib=0;
-
-        new_nd->_left_child=subtree1;
-        subtree1->_right_sib=subtree2;
-
-        subtree1->_parent=new_nd;
-        subtree2->_parent=new_nd;
-
-        calcTopologyPrior((int) _lineages.size());
-
-        updateNodeVector (_lineages, subtree1, subtree2, new_nd);
-
-        _species_joined = make_pair(subtree1, subtree2);
-
-        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
-    }
-
-    inline vector<pair<int, int>> Forest::priorPostSpeciesOptions() {
-        // returns list of all possible species pairings
-        vector<pair<int, int>> species_choices;
-        
-    //    choose pair of nodes to try
-        for (int i = 0; i < (int) _lineages.size()-1; i++) {
-            for (int j = i+1; j < (int) _lineages.size(); j++) {
-                species_choices.push_back(make_pair(i, j));
-            }
-        }
-        return species_choices;
-    }
-
-    inline tuple<string,string,string> Forest::getSpeciesNames(pair<int, int> p) {
-        if (p.first > 0 && p.second > 0) {
-        string species1 = _lineages[p.first]->_name;
-        string species2 = _lineages[p.second]->_name;
-        int num = _nleaves + _ninternals;
-        string new_nd = boost::str(boost::format("node-%d")%num);
-        
-        return make_tuple(species1, species2, new_nd);
-        }
-        else {
-            return make_tuple("null", "null", "null");
-        }
-    }
-
-//    inline void Forest::undoSpeciesJoin(tuple<string, string, string> species_names) {
-//        Node* addnode1;
-//        Node* addnode2;
-//        Node* delnode1;
-//        for (auto &nd:_lineages) {
-//            if (nd->_name == get<0>(species_names)) {
-//                addnode1 = nd;
-//            }
-//            else if (nd->_name == get<1>(species_names)) {
-//                addnode2 = nd;
-//            }
-//            else if (nd->_name == get<2>(species_names)) {
-//                delnode1 = nd;
-//            }
-//        }
-//
-//        revertNodeList(_lineages, addnode1, addnode2, delnode1);
-//        list<Node *> & node_vector,
-//    }
-
-    inline tuple<string,string, string> Forest::priorPostSpeciesProposal(pair<int, int> t) {
-        // this function creates a new node and joins two species
-
-        Node *subtree1=_lineages[t.first];
-        Node *subtree2=_lineages[t.second];
-        assert(!subtree1->_parent && !subtree2->_parent);
-
-        Node nd;
-        _nodes.push_back(nd);
-        Node* new_nd = &_nodes.back();
-        new_nd->_parent=0;
-        new_nd->_number=_nleaves+_ninternals;
-        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
-        new_nd->_edge_length=0.0;
-        _ninternals++;
-        new_nd->_right_sib=0;
-
-        new_nd->_left_child=subtree1;
-        subtree1->_right_sib=subtree2;
-
-        subtree1->_parent=new_nd;
-        subtree2->_parent=new_nd;
-
-        calcTopologyPrior((int) _lineages.size());
-
-        updateNodeVector (_lineages, subtree1, subtree2, new_nd);
-
-        _species_joined = make_pair(subtree1, subtree2);
-
-        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
+        _increments.clear();
     }
 
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
@@ -2834,29 +2412,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         assert (_species_partition.size() > 0);
     }
 
-    inline void Forest::finishGeneTree() {
-        vector<double> lineage_heights;
-        for (auto &lineage:_lineages) {
-            lineage_heights.push_back(getLineageHeight(lineage));
-        }
-        double max_height = *max_element(lineage_heights.begin(), lineage_heights.end());
-
-        for (auto &l:_lineages) {
-            if (l->_left_child) {
-                if (getLineageHeight(l) < max_height) {
-                    _extended_increment += max_height - getLineageHeight(l);
-                    l->_edge_length += max_height - getLineageHeight(l);
-                }
-            }
-            else {
-                if (l->_edge_length < max_height) {
-                    _extended_increment += max_height - getLineageHeight(l);
-                    l->_edge_length += max_height - getLineageHeight(l);
-                }
-            }
-        }
-    }
-
     inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info, bool unconstrained) {
         // get species info
         double species_increment = species_info[_species_join_number].second;
@@ -2883,7 +2438,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
             _species_partition.erase(species2);
 
             _names_of_species_joined.push_back(make_pair(species1, species2));
-            _rebuild_tree = true;
 
             species_increment = species_info[_species_join_number].second;
         }
@@ -2916,9 +2470,7 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         int index = selectPair(population_coalescent_rates);
         
         string species_for_join = eligible_species[index];
-        
-//        _gene_tree_increments.push_back(make_pair(increment, species_for_join));
-        
+                
         double species_tree_height = 0.0;
         for (int a=0; a<_species_join_number+1; a++) {
             species_tree_height += species_info[a].second;
@@ -2952,7 +2504,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
                 _species_partition.erase(species2);
                 
                 _names_of_species_joined.push_back(make_pair(species1, species2));
-                _rebuild_tree = true;
                 
                 species_increment = species_info[_species_join_number].second;
                 cum_time += species_increment;
@@ -3098,7 +2649,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         //update species list
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-//        _gene_tree_increments.push_back(increment);
         
         // update increments and priors
         double log_increment_prior = 0.0;
@@ -3333,79 +2883,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
 
         // Add addnode to node_list
         node_list.push_back(addnode);
-    }
-
-    inline void Forest::revertBranches(list <Node*> &nodes, Node* subtree1, Node* subtree2, double increment) {
-        // save increment that was added to to subtrees
-        vector<double> increments;
-        increments.push_back(subtree1->_edge_length);
-        increments.push_back(subtree2->_edge_length);
-
-        // clear new node from _nodes
-        for (auto iter = _nodes.begin(); iter != _nodes.end(); iter++) {
-            if (iter->_name == "unused") {
-                iter = _nodes.erase(iter);
-                --iter;
-                _ninternals--;
-            }
-        }
-
-        // reset node numbers
-        int n = 0;
-        for (auto &nd:_nodes) {
-            nd._number = n;
-            n++;
-        }
-
-        // revert edge lengths back
-        for (auto &nd:nodes) {
-            nd->_edge_length -= increment;
-        }
-    }
-
-    inline void Forest::revertNewNode(list <Node*> &nodes, Node* new_nd, Node* subtree1, Node* subtree2) {
-        // revert the species partition
-//        for (auto &s:_species_partition) {
-//            for (auto &nd:s.second) {
-//                if (nd->_name == "unused") {
-//                    revertNodeList(s.second, nd->_left_child, nd->_left_child->_right_sib, nd);
-//                    break;
-//                }
-//            }
-//        }
-
-        // revert _lineages vector
-        revertNodeVector(_lineages, subtree1, subtree2, new_nd);
-
-        // reset siblings and parents of new node back to 0
-        new_nd->_left_child->_right_sib->resetNode(); // subtree 2
-        new_nd->_left_child->resetNode(); // subtree 1
-
-        // clear new node from _new_nodes
-//        _new_nodes.erase(remove(_new_nodes.begin(), _new_nodes.end(), new_nd));
-
-        // clear new node from _nodes
-        for (auto iter = _nodes.begin(); iter != _nodes.end(); iter++) {
-            if (iter->_name == "unused") {
-                iter = _nodes.erase(iter);
-                --iter;
-                _ninternals--;
-            }
-        }
-
-        // reset node numbers
-        int n = 0;
-        for (auto &nd:_nodes) {
-            nd._number = n;
-            n++;
-        }
-
-        // check the reversion worked
-        for (auto &s:_species_partition) {
-            for (auto &n:s.second) {
-                assert(_lineages[n->_position_in_lineages] == n);
-            }
-        }
     }
 
     inline void Forest::allowMigration(list<Node*> &nodes) {
@@ -3929,13 +3406,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         return hybridized_nodes;
     }
 
-    inline void Forest::addPredeterminedSpeciesIncrement(double increment) {
-        _last_edge_length = increment;
-        for (auto nd:_lineages) {
-            nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
-        }
-    }
-
     inline void Forest::addSpeciesIncrement() {
         double rate = (_speciation_rate)*_lineages.size();
 
@@ -3963,115 +3433,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
     inline double Forest::calcTopologyPrior(int nlineages) {
         _log_joining_prob += -log(0.5*nlineages*(nlineages-1));
         return _log_joining_prob;
-    }
-
-    inline double Forest::findShallowestCoalescence() {
-        pair<double, double> smallest_branch = *min_element(_searchable_branch_lengths.begin(), _searchable_branch_lengths.end());
-        return smallest_branch.first;
-    }
-
-    inline void Forest::revertToShallowest(double smallest_branch){
-        assert (_proposal != "prior-post-ish");
-        // revert joins that are not smallest join
-
-        // save nodes that must be reverted
-        vector<Node*> nodes_to_revert;
-        for (auto &lineage:_new_nodes) {
-            if (lineage->_left_child) {
-                if (getLineageHeight(lineage->_left_child) != smallest_branch) {
-                    nodes_to_revert.push_back(lineage);
-                    lineage->_name = "unused";
-                }
-                else {
-                    lineage->_edge_length = 0.0;
-                }
-            }
-        }
-
-        assert (nodes_to_revert.size() == _new_nodes.size()-1);
-        // TODO: this will only work if there is only one unused node per lineage
-        for (auto &s:_species_partition) {
-            list<Node*> my_list;
-            for (auto &nd:s.second) {
-                if (nd->_name == "unused") {
-                    my_list = s.second;
-                    revertNodeList(my_list, nd->_left_child, nd->_left_child->_right_sib, nd);
-                    s.second = my_list;
-                    break;
-                }
-            }
-        }
-
-        // revert nodes in reverse
-        for (auto &nd : boost::adaptors::reverse(nodes_to_revert)) {
-            assert (nd->_name == "unused");
-            revertNodeVector(_lineages, nd->_left_child, nd->_left_child->_right_sib, nd);
-
-            //reset siblings and parents of original nodes back to 0
-            nd->_left_child->_right_sib->resetNode(); //subtree2
-            nd->_left_child->resetNode(); //subtree1
-
-
-            // clear new node from _new_nodes
-            _new_nodes.erase(remove(_new_nodes.begin(), _new_nodes.end(), nd));
-        }
-
-        for (auto iter = _nodes.begin(); iter != _nodes.end(); iter++) {
-            if (iter->_name == "unused") {
-                iter = _nodes.erase(iter);
-                --iter;
-                _ninternals--;
-            }
-        }
-
-        // reset branches to smallest coalescence
-        for (auto &lineage:_lineages) {
-            if (lineage->_edge_length != 0.0) {
-                if (!lineage->_left_child) {
-                    lineage->_edge_length = smallest_branch;
-                }
-                else {
-                    lineage->_edge_length = smallest_branch - getLineageHeight(lineage->_left_child);
-                }
-            }
-        }
-
-        // delete extra increments from _branch_lengths and _branch_length_priors
-        vector<double> increments_to_remove;
-        for (auto &s:_searchable_branch_lengths) {
-            // s.first is lineage height
-            // s.second is increment
-            if (s.first != smallest_branch) {
-                increments_to_remove.push_back(s.second);
-            }
-        }
-
-        for (auto &i:_increments) {
-            for (int a = 0; a<increments_to_remove.size(); a++) {
-                if (i.first == increments_to_remove[a]) {
-                    _increments.erase(remove(_increments.begin(), _increments.end(), i), _increments.end());
-                }
-            }
-        }
-
-        // reset _searchable_branch_lengths
-        _searchable_branch_lengths.clear();
-
-        // reset node numbers
-        int n = 0;
-        for (auto &nd:_nodes) {
-            nd._number = n;
-            n++;
-        }
-
-        // clear new nodes to reset for next generation
-        _new_nodes.clear();
-
-        for (auto &s:_species_partition) {
-            for (auto &n:s.second) {
-                assert(_lineages[n->_position_in_lineages] == n);
-            }
-        }
     }
 
     inline unsigned Forest::countDescendants(Node* nd, unsigned count) {
@@ -4124,7 +3485,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
             _extended_increment += *min_element(extended_increment_options.begin(), extended_increment_options.end()); // extended increment is the smallest one added
             deep_coalescent_increment = *min_element(extended_increment_options.begin(), extended_increment_options.end());
         }
-//        _gene_tree_increments.push_back(make_pair(_extended_increment, "extend"));
         
         double deep_coalescent_prior = 0.0; // must account for a deep coalescence scenario
         
@@ -4134,7 +3494,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
             deep_coalescent_prior -= deep_coalescent_increment * rate;
         }
         
-//        _gene_tree_log_coalescent_likelihood += deep_coalescent_prior;
         _deep_coalescent_increments.push_back(make_pair(deep_coalescent_increment, deep_coalescent_prior));
     }
 
@@ -4154,7 +3513,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         _ninternals = 0;
         _log_likelihood_choices.clear();
         _num_coalescent_events_in_generation = 0;
-        _searchable_branch_lengths.clear();
         _new_nodes.clear();
         _species_join_number = 0;
         _gene_tree_log_weight = 0.0;
@@ -4204,7 +3562,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         _ninternals = 0;
         _log_likelihood_choices.clear();
         _num_coalescent_events_in_generation = 0;
-        _searchable_branch_lengths.clear();
         _new_nodes.clear();
         _species_join_number = 0;
         _gene_tree_log_weight = 0.0;

@@ -302,7 +302,7 @@ class Particle {
 
                 for (int i=1; i<_forests.size(); i++) {
                     
-                    _forests[i].updateSpeciesPartitionTwo(species_joined);
+                    _forests[i].updateSpeciesPartition(species_joined);
                     string species1 = get<0>(species_joined);
                     string species2 = get<1>(species_joined);
                         
@@ -362,7 +362,6 @@ class Particle {
     inline void Particle::resetVariables() {
         for (int i = 1; i<_forests.size(); i++) {
             _forests[i]._num_coalescent_events_in_generation = 0;
-            _forests[i]._searchable_branch_lengths.clear();
             _forests[i]._new_nodes.clear();
         }
     }
@@ -413,7 +412,7 @@ class Particle {
         
         if (newicks.size() > 0) {
             string newick = newicks[0];
-            _t = _forests[0].buildFromNewickTopology(newick, true, false);
+            _t = _forests[0].buildFromNewickTopology(newick);
             drawHeightsFromPrior();
         }
         
@@ -442,7 +441,7 @@ class Particle {
     inline void Particle::processGeneNewicks(vector<string> newicks) {
         assert (newicks.size() == _forests.size() - 1);
         for (int i=1; i<_forests.size(); i++) {
-            _forests[i].buildFromNewick(newicks[i-1], true, false);
+            _forests[i].buildFromNewick(newicks[i-1]);
             _forests[i].refreshPreorder();
         }
 }
