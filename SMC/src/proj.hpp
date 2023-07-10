@@ -868,16 +868,16 @@ namespace proj {
                 
                     for (auto & p:my_vec ) {
                         p->setData(_data, _taxon_map);
-//                        p->mapSpecies(_taxon_map, _species_names);
+                        p->mapSpecies(_taxon_map, _species_names);
                         p->setParticleGeneration(-1);
-                        if (newicks.size() > 0) {
+//                        if (newicks.size() > 0) {
                             if (_gene_newicks_names != "null") {
                                 p->processGeneNewicks(newicks);
                             }
-                            else if (_species_newicks_name != "null") {
-                                p->processSpeciesNewick(newicks);
+                            else {
+                                p->processSpeciesNewick(newicks); // if no newick specified, program will sample from species tree prior
                             }
-                        }
+//                        }
                         p->mapSpecies(_taxon_map, _species_names);
                         if (!_run_on_empty) {
                             p->setParticleGeneration(0);
@@ -917,7 +917,6 @@ namespace proj {
 //                            p->mapSpecies(_taxon_map, _species_names);
                             p->mapGeneTrees(_taxon_map, _species_names);
                             p->resetGeneIncrements();
-//                            p->showParticle();
                         }
                     }
                     // keep the species partition for the gene forests at this stage but clear the tree structure

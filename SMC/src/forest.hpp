@@ -82,6 +82,9 @@ class Forest {
         pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
         int                         selectPair(vector<double> weight_vec);
         void                        chooseSpeciesIncrement(double max_depth);
+        void                        chooseSpeciesIncrementFromNewick(int lineage_size, vector<string> existing_lineages);
+        vector<string>              setUpExistingLineagesVector();
+        vector<string>              updateExistingLineagesVector(vector<string> existing_lineages, tuple<string, string, string> species_joined);
         void                        addSpeciesIncrement();
         void                        addPredeterminedSpeciesIncrement(double increment);
         string                      chooseEvent();
@@ -141,7 +144,7 @@ class Forest {
         void                        undoSpeciesJoin(tuple<string, string, string> species_names);
         tuple<string,string,string> getSpeciesNames(pair<int, int>);
         void                        buildFromNewick(const std::string newick, bool rooted, bool allow_polytomies);
-        void                        buildFromNewickTopology(const std::string newick, bool rooted, bool allow_polytomies);
+    vector<pair<tuple<string, string, string>, double>>                         buildFromNewickTopology(const std::string newick, bool rooted, bool allow_polytomies);
         void                        stripOutNexusComments(std::string & newick);
         unsigned                    countNewickLeaves(const std::string newick);
         void                        extractNodeNumberFromName(Node * nd, std::set<unsigned> & used);
@@ -150,6 +153,7 @@ class Forest {
         void                        renumberInternals();
 //        void                        rerootAtNodeNumber(int node_number);
         void                        remakeGeneTree(map<string, string> &taxon_map);
+        void                        resetIncrements();
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -1499,8 +1503,9 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
 
-inline void Forest::buildFromNewickTopology(const std::string newick, bool rooted, bool allow_polytomies) {
-    // TODO: just need to get the order of species joined
+inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNewickTopology(const std::string newick, bool rooted, bool allow_polytomies) {
+    vector<pair<tuple<string, string, string>, double>> species_joined;
+    species_joined.push_back(make_pair(make_tuple("null", "null", "null"), 0.0));
     
     set<unsigned> used; // used to ensure that no two leaf nodes have the same number
     unsigned curr_leaf = 0;
@@ -1519,12 +1524,9 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
 //        max_nodes--; // no root node
 //        unsigned curr_node_index = max_nodes-1; // walk in reverse through _nodes list
     _nodes.resize(max_nodes);
-//        int b=0;
     for (auto & nd : _nodes ) {
         nd._name = "";
         nd._number = -1;
-//            nd._number = b;
-//            b++;
     }
 
     try {
@@ -1798,12 +1800,22 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
     _lineages.clear();
     _lineages.push_back(&_nodes.back());
     
-    // reset node names
+    // reset node numbers and names that are not tips
     int j = 0;
     for (auto &nd:_nodes) {
         nd._number = j;
+        if (nd._name == "") {
+            nd._name=boost::str(boost::format("node-%d")%nd._number);
+        }
         j++;
     }
+    
+    refreshPreorder();
+    vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
+    for (auto &entry:heights_and_nodes) {
+        species_joined.push_back(make_pair(make_tuple(entry.second->_left_child->_name, entry.second->_left_child->_right_sib->_name, entry.second->_name), 0.0));
+    }
+    return species_joined;
 }
 
 
@@ -2560,6 +2572,53 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
 //        return event;
 //    }
 
+    inline vector<string> Forest::setUpExistingLineagesVector() {
+        vector<string> existing_lineages;
+        
+        int b=0;
+        for (auto &nd:_nodes) {
+            if (b<Forest::_nspecies) {
+                existing_lineages.push_back(nd._name);
+                b++;
+            }
+        }
+        
+        return existing_lineages;
+    }
+
+    inline vector<string> Forest::updateExistingLineagesVector(vector<string> existing_lineages, tuple<string, string, string> species_joined) {
+        string species1 = get<0>(species_joined);
+        string species2 = get<1>(species_joined);
+        string new_spp = get<2>(species_joined);
+        
+        // remove species1 and species2
+        existing_lineages.erase(remove(existing_lineages.begin(), existing_lineages.end(), species1), existing_lineages.end());
+        existing_lineages.erase(remove(existing_lineages.begin(), existing_lineages.end(), species2), existing_lineages.end());
+        
+        // ad new species
+        existing_lineages.push_back(new_spp);
+        
+        return existing_lineages;
+    }
+
+    inline void Forest::chooseSpeciesIncrementFromNewick(int lineage_size, vector<string> existing_lineages) {
+            // hybridization prior
+            double rate = (_speciation_rate+_hybridization_rate)*lineage_size;
+
+            _last_edge_length = rng.gamma(1.0, 1.0/rate);
+
+            for (auto &nd:_nodes) {
+                // add increment to tip nodes not already involved in a join
+                if (count(existing_lineages.begin(), existing_lineages.end(), nd._name)) {
+                    // add increment to nodes in existing lineages
+                    nd._edge_length += _last_edge_length; //add most recently chosen branch length to each species node
+                }
+                
+                // add increment to tip nodes that have already joined
+            }
+            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+    }
+
     inline void Forest::chooseSpeciesIncrement(double max_depth) {
         assert (max_depth >= 0.0);
         if (max_depth > 0.0) {
@@ -2582,8 +2641,6 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
             double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
             
             _increments.push_back(make_pair(_last_edge_length, increment_prior));
-            
-//            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
         }
         else {
             // hybridization prior
@@ -2595,6 +2652,13 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
             }
             _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+        }
+    }
+
+    inline void Forest::resetIncrements() {
+        // clear all branch lengths from forest
+        for (auto &nd:_nodes) {
+            nd._edge_length = 0.0;
         }
     }
 

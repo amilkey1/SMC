@@ -105,8 +105,9 @@ class Particle {
         int                                             getNGenes(){return (int) _forests.size() - 1;}
         void                                            processSpeciesNewick(vector<string> newicks);
         void                                            processGeneNewicks(vector<string> newicks);
-        void                                            remakeGeneTrees(map<string, string> &taxon_map) ;
-
+        void                                            remakeGeneTrees(map<string, string> &taxon_map);
+        void                                            drawHeightsFromPrior();
+    
     private:
 
         static unsigned                         _nsubsets;
@@ -224,9 +225,9 @@ class Particle {
         }
 
         bool no_newick = true;
-        if (unconstrained && _generation == 0 && no_newick) {
-            firstGen();
-        }
+//        if (unconstrained && _generation == 0 && no_newick) {
+//            firstGen();
+//        }
         if (_generation == 0) {
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i]._nincrements = 0;
@@ -433,13 +434,37 @@ class Particle {
     }
 
     inline void Particle::processSpeciesNewick(vector<string> newicks) {
-        if (newicks.size() != 1) {
+        if (newicks.size() > 1) {
             throw XProj(boost::str(boost::format("only one species tree newick may be specified")));
         }
-//        assert(newicks.size() == 1);
-        string newick = newicks[0];
-//        _forests[0].buildFromNewickTopology(newick, true, false);
-        buildEntireSpeciesTree();
+        
+        if (newicks.size() > 0) {
+            string newick = newicks[0];
+            _t = _forests[0].buildFromNewickTopology(newick, true, false);
+            drawHeightsFromPrior();
+        }
+        
+        else {
+            buildEntireSpeciesTree();
+        }
+    }
+
+    inline void Particle::drawHeightsFromPrior() {
+        int nlineages = Forest::_nspecies;
+        _forests[0].resetIncrements();
+        
+       vector<string> existing_lineages = _forests[0].setUpExistingLineagesVector();
+        
+        for (int a=0; a<Forest::_nspecies-1; a++) {
+            existing_lineages = _forests[0].updateExistingLineagesVector(existing_lineages, _t[a].first);
+            _forests[0].chooseSpeciesIncrementFromNewick(nlineages, existing_lineages);
+            _t[a].second = _forests[0]._last_edge_length;
+            
+            nlineages--;
+        }
+        
+        assert (_t[Forest::_nspecies-1].second == 0); // last element of _t should not draw a branch length
+        _forests[0].showForest();
     }
 
     inline void Particle::processGeneNewicks(vector<string> newicks) {
@@ -631,140 +656,21 @@ class Particle {
     }
 
     inline void Particle::buildEntireSpeciesTree() {
+        _forests[0].showForest();
         double max_depth = 0.0;
         _forests[0].chooseSpeciesIncrement(max_depth);
-//        double first_edge = 0.0015;
-//        double first_edge = 3.0161e-12;
-//        _forests[0].addPredeterminedSpeciesIncrement(first_edge);
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-        double edge_len = _forests[0]._last_edge_length;
-        _t.push_back(make_pair(species_joined, edge_len));
-        double increment = 0.0;
+        _t.push_back(make_pair(species_joined, 0.0));
 
 //        cout << "new particle" << endl;
         for (int i=0; i < _forests[0]._nspecies-1; i++) {
             if (_forests[0]._lineages.size() > 1) {
                 species_joined = _forests[0].speciesTreeProposal();
-                pair<unsigned, unsigned> example;
-                // for sim.nex
-                bool sim = false;
-                if (sim) {
-                    if (i == 0) {
-                        example = make_pair(1, 4);
-                        increment = 0.00322;
-                    }
-                    else if (i == 1) {
-                        example = make_pair(1,2 );
-                        increment = 0.01051;
-                    }
-                    else if (i == 2) {
-                        example = make_pair(1, 2);
-                        increment = 0.00193;
-                    }
-                    else if (i == 3) {
-                        example = make_pair(0, 1);
-                        increment = 0.0;
-                    }
-                }
-                // for low_info.,nex
-                bool low_info = false;
-                    if (low_info) {
-                        if (i == 0) {
-                            example = make_pair(1,2);
-                        }
-                        else if (i==1) {
-                            example = make_pair(1,2);
-                        }
-                        else if (i == 2) {
-                            example = make_pair(1,2);
-                        }
-                        else if (i == 3) {
-                            example = make_pair(0,1);
-                        }
-                    }
-                // for gopher.nex
-                bool gopher = false;
-                    if (gopher) {
-                        if (i == 0) {
-                            example = make_pair(1,7);
-//                            increment = 3.0161e-12;
-                            increment = 0.0015;
-                        }
-                        else if (i == 1) {
-                            example = make_pair(5,6);
-//                            increment = 0.00237780 - 3.0161e-12;
-                            increment = 0.00237780 - 0.003;
-                        }
-                        else if (i == 2) {
-                            example = make_pair(1,2);
-                            increment = (0.00340594 - 0.00237780);
-                        }
-                        else if (i == 3) {
-                            example = make_pair(2,4);
-                            increment = 0.00554410 - (0.00340594);
-                        }
-                        else if (i == 4) {
-                            example = make_pair(1,3);
-                            increment = 0.01366147 - 0.00554410;
-                        }
-                        else if (i == 5) {
-                            example = make_pair(1,2);
-                            increment = 0.00728109;
-                        }
-                        else if (i == 6) {
-                            example = make_pair(0,1);
-                            increment = 0.0;
-                        }
-                    }
-                bool snake = false;
-                if (snake) {
-                    if (i == 0) {
-                        example = make_pair(2,3);
-                    }
-                    else if (i == 1) {
-                        example = make_pair(2,3);
-                    }
-                    else if (i == 2) {
-                        example = make_pair(1,3);
-                    }
-                    else if (i == 3) {
-                        example = make_pair(1,2);
-                    }
-                    else if (i == 4) {
-                        example = make_pair(1,2);
-                    }
-                    else if (i == 5) {
-                        example = make_pair(0,1);
-                    }
-                }
-                bool sim19 = false;
-                if (sim19) {
-                    if (i == 0) {
-                        example = make_pair(4,5);
-                    }
-                    else if (i == 1) {
-                        example = make_pair(1,2);
-                    }
-                    else if (i == 2) {
-                        example = make_pair(2,3);
-                    }
-                    else if (i == 3) {
-                        example = make_pair(0,2);
-                    }
-                    else if (i == 4) {
-                        example = make_pair(0,2);
-                    }
-                    else if (i == 5) {
-                        example = make_pair(0,1);
-                    }
-                }
-//                species_joined = _forests[0].preDeterminedSpeciesTreeProposal(example);
+                
                 // if the species tree is not finished, add another species increment
                 if (_forests[0]._lineages.size()>1) {
                     _forests[0].addSpeciesIncrement();
-//                    assert (increment > 0.0);
-//                    _forests[0].addPredeterminedSpeciesIncrement(increment);
                 }
                 
                 double edge_len = 0.0;
@@ -772,9 +678,10 @@ class Particle {
                     edge_len = _forests[0]._last_edge_length;
                 }
                 _t.push_back(make_pair(species_joined, edge_len));
-//                _t.push_back(make_pair(species_joined, edge_len));
             }
         }
+        _forests[0].showForest();
+        _forests[1].showForest();
     }
 
     inline void Particle::resetGeneTreePartials(Data::SharedPtr d, map<string, string> taxon_map) {
