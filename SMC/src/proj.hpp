@@ -878,7 +878,7 @@ namespace proj {
                                 p->processSpeciesNewick(newicks); // if no newick specified, program will sample from species tree prior
                             }
 //                        }
-                        p->mapSpecies(_taxon_map, _species_names);
+//                        p->mapSpecies(_taxon_map, _species_names);
                         if (!_run_on_empty) {
                             p->setParticleGeneration(0);
                             p->setLogLikelihood(0.0);

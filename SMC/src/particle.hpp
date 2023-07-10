@@ -464,7 +464,6 @@ class Particle {
         }
         
         assert (_t[Forest::_nspecies-1].second == 0); // last element of _t should not draw a branch length
-        _forests[0].showForest();
     }
 
     inline void Particle::processGeneNewicks(vector<string> newicks) {
@@ -656,7 +655,6 @@ class Particle {
     }
 
     inline void Particle::buildEntireSpeciesTree() {
-        _forests[0].showForest();
         double max_depth = 0.0;
         _forests[0].chooseSpeciesIncrement(max_depth);
         
@@ -680,8 +678,6 @@ class Particle {
                 _t.push_back(make_pair(species_joined, edge_len));
             }
         }
-        _forests[0].showForest();
-        _forests[1].showForest();
     }
 
     inline void Particle::resetGeneTreePartials(Data::SharedPtr d, map<string, string> taxon_map) {
