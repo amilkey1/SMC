@@ -418,7 +418,7 @@ class Forest {
     }
 
     inline string Forest::makeNewick(unsigned precision, bool use_names) {
-            string newick = "(";
+            string newick = "";
             const boost::format tip_node_name_format( boost::str(boost::format("%%s:%%.%df") % precision) );
             const boost::format tip_node_number_format( boost::str(boost::format("%%d:%%.%df") % precision) );
             const boost::format internal_node_format( boost::str(boost::format("):%%.%df") % precision) );
@@ -499,38 +499,40 @@ class Forest {
                         a++;
 //                        nd->_visited = true;
                         // leaf node
-                        if (use_names) {
-                            newick += boost::str(boost::format(tip_node_name_format)
-                                % nd->_name
-                                % nd->_edge_length);
-                        } else {
-                            newick += boost::str(boost::format(tip_node_number_format)
-                                % (nd->_number + 1)
-                                % nd->_edge_length);
-                        }
-                        if (nd->_right_sib)
-                            newick += ",";
-                        else {
-                            Node * popped = (node_stack.empty() ? 0 : node_stack.top());
-                            while (popped && !popped->_right_sib) {
-                                node_stack.pop();
-                                if (node_stack.empty()) {
-                                    //newick += ")";
-                                    newick += boost::str(boost::format(internal_node_format) % lineage->_edge_length);
-                                    popped = 0;
-                                }
-                                else {
-                                    newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
-                                    popped = node_stack.top();
-                                }
+                            if (use_names) {
+                                newick += boost::str(boost::format(tip_node_name_format)
+                                    % nd->_name
+                                    % nd->_edge_length);
+                                } else {
+                                newick += boost::str(boost::format(tip_node_number_format)
+                                    % (nd->_number + 1)
+                                    % nd->_edge_length);
                             }
-                            if (popped && popped->_right_sib) {
-                                node_stack.pop();
-                                newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                            if (nd->_right_sib)
                                 newick += ",";
-                            }
-                        }
-                    }   // leaf node
+                            else {
+                                Node * popped = (node_stack.empty() ? 0 : node_stack.top());
+                                while (popped && !popped->_right_sib) {
+                                    node_stack.pop();
+                                    if (node_stack.empty()) {
+                                        //newick += ")";
+                                        if (lineage->_edge_length != 0.0) {
+                                            newick += boost::str(boost::format(internal_node_format) % lineage->_edge_length);
+                                        }
+                                        popped = 0;
+                                    }
+                                    else {
+                                        newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                                        popped = node_stack.top();
+                                    }
+                                }
+                                if (popped && popped->_right_sib) {
+                                    node_stack.pop();
+                                    newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                                    newick += ",";
+                                }
+                        }   // leaf node
+                    }
                     if (a >= _ninternals + _nleaves - 1 && hybrid_nodes.size()>0) {
                         break;
                     }
