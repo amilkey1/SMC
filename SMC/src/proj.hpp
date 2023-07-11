@@ -52,8 +52,8 @@ namespace proj {
             string              acceptParameters();
             void                showFinal(vector<Particle::SharedPtr>);
             double              tune(bool accepted, double lambda);
-            void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained, string a, bool deconstruct);
-            void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained, string a, bool deconstruct);
+            void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct);
+            void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct);
             void                printSpeciationRates();
             void                printThetas();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
@@ -692,11 +692,11 @@ namespace proj {
         cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
     }
 
-    inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained, string a, bool deconstruct) {
+    inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct) {
         assert(_nthreads > 0);
         if (_nthreads == 1) {
           for (auto & p : particles) {
-              p->proposal(gene_trees_only, unconstrained, deconstruct);
+              p->proposal(gene_trees_only, deconstruct);
           }
         }
         else {
@@ -710,7 +710,7 @@ namespace proj {
 
             while (true) {
             // create a thread to handle particles first through last - 1
-              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles), gene_trees_only, unconstrained, a, deconstruct));
+              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles), gene_trees_only, a, deconstruct));
             // update first and last
             first = last;
             last += incr;
@@ -729,9 +729,9 @@ namespace proj {
         }
     }
 
-    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained, string a, bool deconstruct) {
+    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct) {
         for (unsigned i=first; i<last; i++){
-            particles[i]->proposal(gene_trees_only, unconstrained, deconstruct);
+            particles[i]->proposal(gene_trees_only, deconstruct);
         }
     }
 
@@ -839,7 +839,6 @@ namespace proj {
                 }
 
                 bool use_first = true;
-                int h = 0;
                 
                 vector<string> newicks;
                 if (_gene_newicks_names != "null" && _species_newicks_name != "null") {
@@ -850,7 +849,6 @@ namespace proj {
                 if (_gene_newicks_names != "null") {
                     ifstream infile(_species_newicks_name);
                     string newick;
-//                    vector<string> newicks;
                     while (getline(infile, newick)) {
                         newicks.push_back(newick);
                     }
@@ -858,49 +856,38 @@ namespace proj {
                 else if (_species_newicks_name != "null") {
                     ifstream infile(_species_newicks_name);
                     string newick;
-//                    vector<string> newicks;
                     while (getline(infile, newick)) {
                         newicks.push_back(newick);
                     }
                 }
                 
+                string start = "species"; // start variable defines if program should start with gene or species trees
+                
                     for (auto & p:my_vec ) {
                         p->setData(_data, _taxon_map);
                         p->mapSpecies(_taxon_map, _species_names);
-                        p->setParticleGeneration(-1);
-//                        if (newicks.size() > 0) {
-                            if (_gene_newicks_names != "null") {
-                                p->processGeneNewicks(newicks);
-                            }
-                            else {
-                                p->processSpeciesNewick(newicks); // if no newick specified, program will sample from species tree prior
-                            }
-//                        }
-//                        p->mapSpecies(_taxon_map, _species_names);
-                        if (!_run_on_empty) {
-                            p->setParticleGeneration(0);
-                            p->setLogLikelihood(0.0);
-                            p->setLogWeight(0.0, "g");
-                            p->setLogWeight(0.0, "s");
+                        p->setParticleGeneration(0);
+                        p->setLogLikelihood(0.0);
+                        p->setLogCoalescentLikelihood(0.0);
+                        p->setLogWeight(0.0, "g");
+                        p->setLogWeight(0.0, "s");
+                        
+                        if (_gene_newicks_names != "null") {
+                            p->processGeneNewicks(newicks);
+                            start = "gene";
                         }
                         else {
-                            p->setParticleGeneration(0);
-                            p->setLogLikelihood(0.0);
+                            p->processSpeciesNewick(newicks); // if no newick specified, program will sample from species tree prior
                         }
-                        h++;
                     }
                 
                 for (auto &p:my_vec) {
                     p->setRunOnEmpty(_run_on_empty);
                 }
                 
-//                normalizeWeights(my_vec, -1, true);
-                
                 //run through each generation of particles
                 int ntaxa = (int) _taxon_map.size();
-                bool skip = false;
-                bool deconstruct = true;
-//                p->setLogCoalescentLikelihood(0.0);
+                bool deconstruct = false;
                 for (int i=0; i<_niterations; i++) {
                     _log_marginal_likelihood = 0.0;
                     cout << "beginning iteration: " << i << endl;
@@ -908,16 +895,13 @@ namespace proj {
                         for (auto &p:my_vec) {
                             p->setParticleGeneration(0);
                             p->setLogLikelihood(0.0);
-//                            p->setLogCoalescentLikelihood(0.0);
                             p->setLogWeight(0.0, "g");
                             p->setLogWeight(0.0, "s");
-//                            p->mapSpecies(_taxon_map, _species_names);
                             p->mapGeneTrees(_taxon_map, _species_names);
                             p->resetGeneIncrements();
                         }
                     }
                     // keep the species partition for the gene forests at this stage but clear the tree structure
-                    if (!skip) {
                         bool no_newick = true;
                         if (!no_newick) {
                             if (i == 1) {
@@ -928,55 +912,61 @@ namespace proj {
                                 }
                             }
                         }
-                    for (unsigned g=0; g<ntaxa-1; g++){
-    //                    cout << "gen " << g << endl;
-                        //taxon joining and reweighting step
-                        
-                        bool gene_trees_only = true;
-                        bool unconstrained = true;
-                        if (i > 0) {
-                            unconstrained = false;
-                        }
-                        proposeParticles(my_vec, gene_trees_only, unconstrained, "g", deconstruct);
+                    if (i > 0) {
                         deconstruct = true;
-                        
-                        if (!_run_on_empty) {
-                            bool calc_marg_like = true;
-                            
-                            normalizeWeights(my_vec, "g", calc_marg_like);
-                            
-                            double ess_inverse = 0.0;
-                            
-                            for (auto & p:my_vec) {
-                                ess_inverse += exp(2.0*p->getLogWeight("g"));
-                            }
-
-                            double ess = 1.0/ess_inverse;
-                            cout << "   " << "ESS = " << ess << endl;
-                         
-                            resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1, "g");
-                            //if use_first is true, my_vec = my_vec_2
-                            //if use_first is false, my_vec = my_vec_1
-                            
-                            my_vec = use_first ? my_vec_2:my_vec_1;
-
-                            //change use_first from true to false or false to true
-                            use_first = !use_first;
-                            saveParticleWeights(my_vec);
-                        }
-                        resetWeights(my_vec, "g");
-                        _accepted_particle_vec = my_vec;
-                    } // g loop
                     }
-                    skip = false;
+                    
+                    if (start == "species") {
+                        for (unsigned g=0; g<ntaxa-1; g++){
+        //                    cout << "gen " << g << endl;
+                            //taxon joining and reweighting step
+                            
+                            bool gene_trees_only = true;
+//                            if (i > 0 && g == 0) {
+//                                deconstruct = true;
+//                            }
+                            
+                            proposeParticles(my_vec, gene_trees_only, "g", deconstruct);
+                            
+                            deconstruct = false;
+//                            deconstruct = true;
+                            
+                            if (!_run_on_empty) {
+                                bool calc_marg_like = true;
+                                
+                                normalizeWeights(my_vec, "g", calc_marg_like);
+                                
+                                double ess_inverse = 0.0;
+                                
+                                for (auto & p:my_vec) {
+                                    ess_inverse += exp(2.0*p->getLogWeight("g"));
+                                }
+
+                                double ess = 1.0/ess_inverse;
+                                cout << "   " << "ESS = " << ess << endl;
+                             
+                                resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1, "g");
+                                //if use_first is true, my_vec = my_vec_2
+                                //if use_first is false, my_vec = my_vec_1
+                                
+                                my_vec = use_first ? my_vec_2:my_vec_1;
+
+                                //change use_first from true to false or false to true
+                                use_first = !use_first;
+                                saveParticleWeights(my_vec);
+                            }
+                            resetWeights(my_vec, "g");
+                            _accepted_particle_vec = my_vec;
+                        } // g loop
+                    }
                     // filter species trees now
                 if (i < _niterations-1) {
                     _species_tree_log_marginal_likelihood = 0.0;
-                    for (auto &p:my_vec) {
-                        // reset forest species partitions
-                        p->mapSpecies(_taxon_map, _species_names);
-                        p->resetSpecies();
-                    }
+                        for (auto &p:my_vec) {
+                            // reset forest species partitions
+                            p->mapSpecies(_taxon_map, _species_names);
+                            p->resetSpecies();
+                        }
 //                    _gene_tree_log_marginal_likelihood = _log_marginal_likelihood;
 //                    _log_marginal_likelihood = 0.0;
                     
@@ -985,9 +975,8 @@ namespace proj {
                             //taxon joining and reweighting step
                             
                             bool gene_trees_only = false;
-                            bool unconstrained = false;
                             
-                            proposeParticles(my_vec, gene_trees_only, unconstrained, "s", deconstruct);
+                            proposeParticles(my_vec, gene_trees_only, "s", deconstruct);
                             
                             if (!_run_on_empty) {
                                 bool calc_marg_like = false;

@@ -78,7 +78,7 @@ class Forest {
         pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
         int                         selectPair(vector<double> weight_vec);
         void                        chooseSpeciesIncrement(double max_depth);
-        void                        chooseSpeciesIncrementFromNewick(int lineage_size, vector<string> existing_lineages);
+        void                        chooseSpeciesIncrementFromNewick(vector<string> existing_lineages);
         vector<string>              setUpExistingLineagesVector();
         vector<string>              updateExistingLineagesVector(vector<string> existing_lineages, tuple<string, string, string> species_joined);
         void                        addSpeciesIncrement();
@@ -108,9 +108,9 @@ class Forest {
         double                      getLineageHeight(Node* nd);
         void                        extendGeneTreeLineages(double species_tree_increment);
         void                        updateSpeciesPartition(tuple<string, string, string> species_info);
-        pair<double, string>                      chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info, bool unconstrained);
+        pair<double, string>                      chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info);
         pair<Node*, Node*>    chooseAllPairs(list<Node*> &nodes, double increment, string species);
-        double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done);
+        double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
         vector< pair<double, Node *>>      sortPreorder();
         void                        calcMinDepth();
         vector<pair<double, pair<string, string>>>             getMinDepths();
@@ -125,6 +125,8 @@ class Forest {
         void                        renumberInternals();
         void                        remakeGeneTree(map<string, string> &taxon_map);
         void                        resetIncrements();
+        double                      getLogLikelihood() {return _gene_tree_log_likelihood;}
+        double                      getLogCoalescentLikelihood() {return _gene_tree_log_coalescent_likelihood;}
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -145,7 +147,6 @@ class Forest {
         map<string, list<Node*> > _species_partition;
         double                    _gene_tree_log_likelihood;
         double                      _gene_tree_log_weight;
-        vector<double>              _log_weight_vec;
         vector<pair<Node*, Node*>>      _node_choices;
         vector<double>              _log_likelihood_choices;
         int                         _index_of_choice;
@@ -153,10 +154,8 @@ class Forest {
         tuple<Node*, Node*, Node*>  _hybrid_species_joined;
         double                      _generationf = 0;
         string                      _last_direction;
-        vector<double>              _rand_numbers;
         vector<pair<double, double>>         _increments;
         double                      _topology_prior;
-        unsigned                    _num_coalescent_events_in_generation;
         double                      _prev_log_likelihood;
         double                      _log_joining_prob;
         double                      _extended_increment;
@@ -214,8 +213,6 @@ class Forest {
         _nstates = 4;
         _last_edge_length = 0.0;
         _lineages.reserve(_nodes.size());
-        _rand_numbers.clear();
-        _num_coalescent_events_in_generation = 0;
         _log_joining_prob = 0.0;
         _extended_increment = 0.0;
         _species_join_number = 0;
@@ -573,13 +570,10 @@ class Forest {
         if (nsubtrees > 2) {
             t1 = ::rng.randint(0, nsubtrees-1);
             t2 = ::rng.randint(0, nsubtrees-1);
-            _rand_numbers.push_back(t1);
-            _rand_numbers.push_back(t2);
 
             //keep calling t2 until it doesn't equal t1
             while (t2 == t1) {
                 t2 = ::rng.randint(0, nsubtrees-1);
-                _rand_numbers.push_back(t2);
             }
         }
         mtx.unlock();
@@ -597,19 +591,14 @@ class Forest {
         t1 = ::rng.randint(0, nsubtrees-1);
         t2 = ::rng.randint(0, nsubtrees-1);
         t3 = ::rng.randint(0, nsubtrees-1);
-        _rand_numbers.push_back(t1);
-        _rand_numbers.push_back(t2);
-        _rand_numbers.push_back(t3);
 
         //keep calling t2 until it doesn't equal t1 or t3
         while (t2 == t1 || t2 == t3) {
             t2 = ::rng.randint(0, nsubtrees-1);
-            _rand_numbers.push_back(t2);
         }
         // keep calling t3 until it doesn't equal t1 or t2
         while (t3 == t1 || t3 == t2) {
             t3 = ::rng.randint(0, nsubtrees-1);
-            _rand_numbers.push_back(t3);
         }
         mtx.unlock();
         return make_tuple(t1, t2, t3);
@@ -771,10 +760,9 @@ class Forest {
         }
         
         // reweight each choice of pairs
-            vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood);
+            vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood + starting_gene_tree_log_coalescent_likelihood);
             
             // sum unnormalized weights before choosing the pair
-//            _gene_tree_log_weight = 0.0;
                 // choices are already weighted
 
             // sum unnormalized weights before choosing the pair
@@ -784,8 +772,6 @@ class Forest {
             for (int b=0; b < (int) log_weight_choices.size(); b++) {
                 log_weight_choices[b] -= log_weight_choices_sum;
             }
-            
-            _log_weight_vec.clear();
             
             // randomly select a pair
             _index_of_choice = selectPair(log_weight_choices);
@@ -1618,7 +1604,7 @@ class Forest {
         _species_partition.erase(spp2);
     }
 
-    inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done) {
+    inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {
         double neg_inf = -1*numeric_limits<double>::infinity();
         vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
         double log_coalescent_likelihood = 0.0;
@@ -1721,7 +1707,6 @@ class Forest {
     inline int Forest::selectPair(vector<double> weight_vec) {
         // choose a random number [0,1]
         double u = rng.uniform();
-        _rand_numbers.push_back(u);
         double cum_prob = 0.0;
         int index = 0.0;
         for (int i=0; i < (int) weight_vec.size(); i++) {
@@ -1880,7 +1865,6 @@ class Forest {
         clear();
         //create taxa
         double edge_length = rng.gamma(1.0, 1.0/_ntaxa);
-        _rand_numbers.push_back(edge_length);
         _lineages.reserve(_nodes.size());
 
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -1927,14 +1911,11 @@ class Forest {
         _last_direction = other._last_direction;
         _generationf = other._generationf;
         _gamma = other._gamma;
-        _rand_numbers = other._rand_numbers;
         _gene_tree_log_weight = other._gene_tree_log_weight;
         _prev_log_likelihood = other._prev_log_likelihood;
-        _log_weight_vec = other._log_weight_vec;
         _theta = other._theta;
         _increments = other._increments;
         _topology_prior = other._topology_prior;
-        _num_coalescent_events_in_generation = other._num_coalescent_events_in_generation;
         _log_joining_prob = other._log_joining_prob;
         _deep_coalescent_increments = other._deep_coalescent_increments;
         _extended_increment = other._extended_increment;
@@ -2075,7 +2056,6 @@ class Forest {
         double hybridization_prob = _hybridization_rate/(_hybridization_rate+_speciation_rate);
 
         double u = rng.uniform();
-        _rand_numbers.push_back(u);
         if (u<hybridization_prob && _lineages.size()>2) {
             event = "hybridization";
         }
@@ -2119,32 +2099,37 @@ class Forest {
         string species2 = get<1>(species_joined);
         string new_spp = get<2>(species_joined);
         
-        // remove species1 and species2
-        existing_lineages.erase(remove(existing_lineages.begin(), existing_lineages.end(), species1), existing_lineages.end());
-        existing_lineages.erase(remove(existing_lineages.begin(), existing_lineages.end(), species2), existing_lineages.end());
-        
-        // ad new species
-        existing_lineages.push_back(new_spp);
+        // do not need to update for first generation since nothing has been joined
+        if (species1 != "null" && species2 != "null") {
+            // remove species1 and species2
+            existing_lineages.erase(remove(existing_lineages.begin(), existing_lineages.end(), species1), existing_lineages.end());
+            existing_lineages.erase(remove(existing_lineages.begin(), existing_lineages.end(), species2), existing_lineages.end());
+            
+            // ad new species
+            existing_lineages.push_back(new_spp);
+        }
         
         return existing_lineages;
     }
 
-    inline void Forest::chooseSpeciesIncrementFromNewick(int lineage_size, vector<string> existing_lineages) {
-            // hybridization prior
-            double rate = (_speciation_rate+_hybridization_rate)*lineage_size;
+    inline void Forest::chooseSpeciesIncrementFromNewick(vector<string> existing_lineages) {
+        int nlineages = (int) existing_lineages.size();
+        
+        // hybridization prior
+        double rate = (_speciation_rate+_hybridization_rate)*nlineages;
 
-            _last_edge_length = rng.gamma(1.0, 1.0/rate);
+        _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
-            for (auto &nd:_nodes) {
-                // add increment to tip nodes not already involved in a join
-                if (count(existing_lineages.begin(), existing_lineages.end(), nd._name)) {
-                    // add increment to nodes in existing lineages
-                    nd._edge_length += _last_edge_length; //add most recently chosen branch length to each species node
-                }
-                
-                // add increment to tip nodes that have already joined
+        for (auto &nd:_nodes) {
+            // add increment to tip nodes not already involved in a join
+            if (count(existing_lineages.begin(), existing_lineages.end(), nd._name)) {
+                // add increment to nodes in existing lineages
+                nd._edge_length += _last_edge_length; //add most recently chosen branch length to each species node
             }
-            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+            
+            // add increment to tip nodes that have already joined
+        }
+        _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
     }
 
     inline void Forest::chooseSpeciesIncrement(double max_depth) {
@@ -2242,7 +2227,6 @@ class Forest {
     inline void Forest::setUpGeneForest(map<string, string> &taxon_map) {
         assert (_index >0);
         _species_partition.clear();
-//        for (auto nd:_lineages) {
         for (auto &nd:_nodes) {
             if (!nd._left_child) {
                 string species_name = taxon_map[nd._name];
@@ -2252,13 +2236,12 @@ class Forest {
         assert (_species_partition.size() > 0);
     }
 
-    inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info, bool unconstrained) {
+    inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info) {
         // get species info
         double species_increment = species_info[_species_join_number].second;
 
         // join species if necessary
         if (_ready_to_join_species) {
-//        if (_ready_to_join_species && unconstrained) {
             _ready_to_join_species = false;
             
             // update species partition
@@ -2305,7 +2288,7 @@ class Forest {
         // choose which species coalescent event occurred in
         
         for (auto &p:population_coalescent_rates) {
-            p = p/coalescence_rate;
+            p = log(p/coalescence_rate);
         }
         int index = selectPair(population_coalescent_rates);
         
@@ -2317,7 +2300,7 @@ class Forest {
         }
         
         bool done = false;
-        if (increment > species_increment && _species_partition.size() > 1 && species_increment > 0.0 && !unconstrained) {
+        if (increment > species_increment && _species_partition.size() > 1 && species_increment > 0.0) {
             // deep coalescence
             double cum_time = species_increment;
             while (!done) {
@@ -2405,19 +2388,17 @@ class Forest {
             }
         }
         
-        if (!unconstrained) {
-            bool extend = true;
-            for (auto &s:_species_partition) {
-                if (s.second.size() != 1) {
-                    extend = false;
-                    break;
-                }
+        bool extend = true;
+        for (auto &s:_species_partition) {
+            if (s.second.size() != 1) {
+                extend = false;
+                break;
             }
+        }
 
-            assert (!extend);
-            if (extend) {
-                extendGeneTreeLineages(species_tree_height);
-            }
+        assert (!extend);
+        if (extend) {
+            extendGeneTreeLineages(species_tree_height);
         }
         
         return make_pair(increment, species_for_join);
@@ -2490,6 +2471,8 @@ class Forest {
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         
+        _gene_tree_log_likelihood = calcLogLikelihood();
+        
         // update increments and priors
         double log_increment_prior = 0.0;
         for (auto &s:_species_partition) {
@@ -2503,14 +2486,12 @@ class Forest {
                     coalescence = false;
                 }
             }
-//            double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
             if (coalescence) {
                 // if there is coalescence, need to use number of lineages before the join
                 double coalescence_rate = (s.second.size()+1)*(s.second.size()) / _theta;
                 assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
                 double nChooseTwo = (s.second.size()+1)*(s.second.size());
                 double log_prob_join = log(2/nChooseTwo);
-//                double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
                 log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate) + log_prob_join;
             }
             else {
@@ -2741,7 +2722,6 @@ class Forest {
     inline double Forest::chooseTaxonToMigrate(double s) {
         mtx.lock();
         unsigned taxon_choice = ::rng.randint(0, s-1);
-        _rand_numbers.push_back(taxon_choice);
         mtx.unlock();
         return taxon_choice;
     }
@@ -2795,7 +2775,6 @@ class Forest {
         string key_to_add;
         mtx.lock();
         unsigned lineage_choice = ::rng.randint(0, (unsigned) _species_partition.size()-1);
-        _rand_numbers.push_back(lineage_choice);
         mtx.unlock();
 
         // find lineage to migrate to in species partition
@@ -2899,7 +2878,6 @@ class Forest {
         if (u < gamma) {
             double gamma = 0.85;
             double u = rng.uniform();
-            _rand_numbers.push_back(u);
             // move gene in direction of major parent
             _last_direction = "major";
             moveGene(new_nd, parent, hybrid);
@@ -3249,7 +3227,6 @@ class Forest {
         double rate = (_speciation_rate)*_lineages.size();
 
         double u = rng.uniform();
-        _rand_numbers.push_back(u);
         // choose edge length but don't add it yet
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
@@ -3349,7 +3326,6 @@ class Forest {
         }
         _ninternals = 0;
         _log_likelihood_choices.clear();
-        _num_coalescent_events_in_generation = 0;
         _new_nodes.clear();
         _species_join_number = 0;
         _gene_tree_log_weight = 0.0;
@@ -3357,8 +3333,6 @@ class Forest {
         _node_choices.clear();
         _generationf = 0;
         _extended_increment = 0.0;
-        _num_coalescent_events_in_generation = 0;
-        _num_coalescent_events_in_generation = 0;
         _prev_gene_tree_log_likelihood = 0.0;
         _ready_to_join_species = false;
         _deep_coalescent_increments.clear();
@@ -3398,7 +3372,6 @@ class Forest {
         }
         _ninternals = 0;
         _log_likelihood_choices.clear();
-        _num_coalescent_events_in_generation = 0;
         _new_nodes.clear();
         _species_join_number = 0;
         _gene_tree_log_weight = 0.0;
@@ -3406,8 +3379,6 @@ class Forest {
         _node_choices.clear();
         _generationf = 0;
         _extended_increment = 0.0;
-        _num_coalescent_events_in_generation = 0;
-        _num_coalescent_events_in_generation = 0;
         _prev_gene_tree_log_likelihood = 0.0;
         _ready_to_join_species = false;
         _deep_coalescent_increments.clear();

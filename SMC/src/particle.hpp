@@ -28,7 +28,7 @@ class Particle {
 
         void                                    debugParticle(std::string name);
         void                                    showParticle();
-        double                                  proposal(bool gene_trees_only, bool unconstrained, bool deconstruct);
+        double                                  proposal(bool gene_trees_only, bool deconstruct);
         void                                    setData(Data::SharedPtr d, map<string, string> &taxon_map) {
                                                     _nsubsets = d->getNumSubsets();
                                                     _data = d;
@@ -90,7 +90,7 @@ class Particle {
         double                                          getNumSpecies(){return _forests[0]._lineages.size();}
         vector<pair<string, string>>                    getSpeciesJoined(){return _forests[1]._names_of_species_joined;}
         double                                          getCoalescentLikelihood(){return _log_coalescent_likelihood;}
-        void                                            geneTreeProposal(bool unconstrained, bool deconstruct);
+        void                                            geneTreeProposal(bool deconstruct);
         void                                            speciesProposal();
         void                                            resetSpeciesInfo(){_t.clear();}
         void                                            resetSpeciesTreeHeight(){ _species_tree_height = 0.0;}
@@ -178,12 +178,14 @@ class Particle {
         double log_likelihood = 0.0;
         double gene_tree_log_likelihood = 0.0;
         for (unsigned i=1; i<_forests.size(); i++) {
-            gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
+            gene_tree_log_likelihood = _forests[i].getLogLikelihood() + _forests[i].getLogCoalescentLikelihood();
+            
+//            gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
             assert(!isnan (log_likelihood));
             assert(!isnan (gene_tree_log_likelihood));
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
-            log_likelihood += _forests[i]._gene_tree_log_coalescent_likelihood;
+//            log_likelihood += _forests[i]._gene_tree_log_coalescent_likelihood;
         }
 
         // set _generation for each forest
@@ -201,7 +203,7 @@ class Particle {
         }
     }
 
-    inline double Particle::proposal(bool gene_trees_only, bool unconstrained, bool deconstruct) {
+    inline double Particle::proposal(bool gene_trees_only, bool deconstruct) {
         string event;
         for (int i=1; i<_forests.size(); i++) {
             _forests[i]._theta = _forests[i]._starting_theta;
@@ -210,11 +212,10 @@ class Particle {
         if (_generation == 0) {
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i]._nincrements = 0;
-                _forests[i]._gene_tree_log_coalescent_likelihood = 0.0;
             }
         }
         if (gene_trees_only) {
-            geneTreeProposal(unconstrained, deconstruct);
+            geneTreeProposal(deconstruct);
         }
         else if (!gene_trees_only) {
             if (_generation == 0 || _generation == Forest::_ntaxa - 1) {
@@ -235,17 +236,17 @@ class Particle {
         return _log_weight;
     }
 
-    inline void Particle::geneTreeProposal(bool unconstrained, bool deconstruct) {
-        if (_generation == 0 && !unconstrained && deconstruct) {
+    inline void Particle::geneTreeProposal(bool deconstruct) {
+        if (deconstruct) {
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i].deconstructGeneTree();
             }
         }
         
         for (int i=1; i<_forests.size(); i++) {
-            _forests[i]._theta = _forests[i]._starting_theta;
+            _forests[i]._theta = _forests[i]._starting_theta; // TODO: redundant
             assert (_t.size() == _forests[0]._nspecies);
-            pair<double, string> species_info = _forests[i].chooseDelta(_t, false);
+            pair<double, string> species_info = _forests[i].chooseDelta(_t);
             _forests[i].geneTreeProposal(species_info, _t);
             if (_forests[i]._lineages.size() == 1) {
                 _forests[i].refreshPreorder();
@@ -287,7 +288,6 @@ class Particle {
 
     inline void Particle::speciesProposal() {
         assert (!_inf);
-        vector<double> species_tree_proposals;
         if (!_inf) {
             tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
             double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
@@ -321,7 +321,6 @@ class Particle {
                 if (_forests[0]._lineages.size() > 1) {
                     assert (max_depth > 0.0);
                     _forests[0].chooseSpeciesIncrement(max_depth);
-                    species_tree_proposals.push_back(_forests[0]._last_edge_length);
                     _species_tree_height += _forests[0]._last_edge_length;
                 }
                 if (_forests[0]._lineages.size() == 1) {
@@ -331,7 +330,7 @@ class Particle {
                 _t.push_back(make_pair(species_joined, _forests[0]._last_edge_length));
                 
                 for (int i = 1; i<_forests.size(); i++) {
-                    double coal_like_increment = _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height, true);
+                    double coal_like_increment = _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
                     _log_coalescent_likelihood += coal_like_increment;
                 }
             
@@ -361,7 +360,6 @@ class Particle {
 
     inline void Particle::resetVariables() {
         for (int i = 1; i<_forests.size(); i++) {
-            _forests[i]._num_coalescent_events_in_generation = 0;
             _forests[i]._new_nodes.clear();
         }
     }
@@ -422,17 +420,14 @@ class Particle {
     }
 
     inline void Particle::drawHeightsFromPrior() {
-        int nlineages = Forest::_nspecies;
         _forests[0].resetIncrements();
         
        vector<string> existing_lineages = _forests[0].setUpExistingLineagesVector();
         
         for (int a=0; a<Forest::_nspecies-1; a++) {
             existing_lineages = _forests[0].updateExistingLineagesVector(existing_lineages, _t[a].first);
-            _forests[0].chooseSpeciesIncrementFromNewick(nlineages, existing_lineages);
+            _forests[0].chooseSpeciesIncrementFromNewick(existing_lineages);
             _t[a].second = _forests[0]._last_edge_length;
-            
-            nlineages--;
         }
         
         assert (_t[Forest::_nspecies-1].second == 0); // last element of _t should not draw a branch length
