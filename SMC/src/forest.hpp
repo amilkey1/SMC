@@ -934,7 +934,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         }
         
         // reweight each choice of pairs
-            vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood);
+            vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood + starting_gene_tree_log_coalescent_likelihood);
             
             // sum unnormalized weights before choosing the pair
 //            _gene_tree_log_weight = 0.0;
@@ -2890,7 +2890,7 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
         // choose which species coalescent event occurred in
         
         for (auto &p:population_coalescent_rates) {
-            p = p/coalescence_rate;
+            p = log(p/coalescence_rate);
         }
         int index = selectPair(population_coalescent_rates);
         
@@ -2952,7 +2952,7 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
                 
 //                // choose which species coalescent event occurred in
                 for (auto &p:population_coalescent_rates) {
-                    p = p/coalescence_rate;
+                    p = log(p/coalescence_rate);
                 }
                 int index = selectPair(population_coalescent_rates);
                 species_for_join = eligible_species[index];
