@@ -847,7 +847,7 @@ namespace proj {
                 }
                 
                 if (_gene_newicks_names != "null") {
-                    ifstream infile(_species_newicks_name);
+                    ifstream infile(_gene_newicks_names);
                     string newick;
                     while (getline(infile, newick)) {
                         newicks.push_back(newick);
@@ -922,9 +922,6 @@ namespace proj {
                             //taxon joining and reweighting step
                             
                             bool gene_trees_only = true;
-//                            if (i > 0 && g == 0) {
-//                                deconstruct = true;
-//                            }
                             
                             proposeParticles(my_vec, gene_trees_only, "g", deconstruct);
                             
@@ -987,7 +984,6 @@ namespace proj {
                                 
                                 for (auto & p:my_vec) {
                                     ess_inverse += exp(2.0*p->getLogWeight("s"));
-//                                    p->showParticle();
                                 }
 
                                 double ess = 1.0/ess_inverse;
@@ -1008,8 +1004,6 @@ namespace proj {
                         } // s loop
                     }
                 }
-                    
-//                }
                 
 //                cout << "gene tree marg like: " << _gene_tree_log_marginal_likelihood << endl;
 //                cout << "species tree marg like: " << _log_marginal_likelihood << endl;
