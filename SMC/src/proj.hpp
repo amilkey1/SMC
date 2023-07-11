@@ -902,16 +902,14 @@ namespace proj {
                         }
                     }
                     // keep the species partition for the gene forests at this stage but clear the tree structure
-                        bool no_newick = true;
-                        if (!no_newick) {
-                            if (i == 1) {
-                                for (auto &p:my_vec) {
-                                    p->remakeGeneTrees(_taxon_map);
-                                    p->resetGeneTreePartials(_data, _taxon_map);
-                                    deconstruct = false;
-                                }
-                            }
+                    if (i == 1) {
+                        for (auto &p:my_vec) {
+                            p->remakeGeneTrees(_taxon_map);
+                            p->resetGeneTreePartials(_data, _taxon_map);
+                            deconstruct = false;
                         }
+                    }
+                    
                     if (i > 0) {
                         deconstruct = true;
                     }
@@ -926,7 +924,6 @@ namespace proj {
                             proposeParticles(my_vec, gene_trees_only, "g", deconstruct);
                             
                             deconstruct = false;
-//                            deconstruct = true;
                             
                             if (!_run_on_empty) {
                                 bool calc_marg_like = true;
@@ -959,11 +956,11 @@ namespace proj {
                     // filter species trees now
                 if (i < _niterations-1) {
                     _species_tree_log_marginal_likelihood = 0.0;
-                        for (auto &p:my_vec) {
-                            // reset forest species partitions
-                            p->mapSpecies(_taxon_map, _species_names);
-                            p->resetSpecies();
-                        }
+                    for (auto &p:my_vec) {
+                        // reset forest species partitions
+                        p->mapSpecies(_taxon_map, _species_names);
+                        p->resetSpecies();
+                    }
 //                    _gene_tree_log_marginal_likelihood = _log_marginal_likelihood;
 //                    _log_marginal_likelihood = 0.0;
                     
@@ -1001,6 +998,7 @@ namespace proj {
                             }
                             resetWeights(my_vec, "s");
                             _accepted_particle_vec = my_vec;
+                            start = "species";
                         } // s loop
                     }
                 }
