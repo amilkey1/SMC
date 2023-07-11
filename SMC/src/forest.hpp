@@ -2349,7 +2349,7 @@ class Forest {
                 
 //                // choose which species coalescent event occurred in
                 for (auto &p:population_coalescent_rates) {
-                    p = p/coalescence_rate;
+                    p = log(p/coalescence_rate);
                 }
                 int index = selectPair(population_coalescent_rates);
                 species_for_join = eligible_species[index];
