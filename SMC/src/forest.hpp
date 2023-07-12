@@ -144,7 +144,7 @@ class Forest {
         void                        undoSpeciesJoin(tuple<string, string, string> species_names);
         tuple<string,string,string> getSpeciesNames(pair<int, int>);
         void                        buildFromNewick(const std::string newick, bool rooted, bool allow_polytomies);
-        void                        buildFromNewickTopology(const std::string newick, bool rooted, bool allow_polytomies);
+    vector<pair<tuple<string, string, string>, double>>                         buildFromNewickTopology(const std::string newick);
         void                        stripOutNexusComments(std::string & newick);
         unsigned                    countNewickLeaves(const std::string newick);
         void                        extractNodeNumberFromName(Node * nd, std::set<unsigned> & used);
@@ -153,6 +153,10 @@ class Forest {
         void                        renumberInternals();
 //        void                        rerootAtNodeNumber(int node_number);
         void                        remakeGeneTree(map<string, string> &taxon_map);
+        void                        resetIncrements();
+        vector<string>              updateExistingLineagesVector(vector<string> existing_lineages, tuple<string, string, string> species_joined);
+        vector<string>              setUpExistingLineagesVector();
+        void                chooseSpeciesIncrementFromNewick(vector<string> existing_lineages);
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -558,7 +562,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
     inline string Forest::makeNewick(unsigned precision, bool use_names) {
-            string newick = "(";
+            string newick = "";
             const boost::format tip_node_name_format( boost::str(boost::format("%%s:%%.%df") % precision) );
             const boost::format tip_node_number_format( boost::str(boost::format("%%d:%%.%df") % precision) );
             const boost::format internal_node_format( boost::str(boost::format("):%%.%df") % precision) );
@@ -599,7 +603,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                             newick += boost::str(boost::format(tip_node_name_format)
                                 % nd->_hybrid_newick_name
                                 % nd->_edge_length);
-//                                nd->_minor_parent->_visited = true;
+    //                                nd->_minor_parent->_visited = true;
                             newick += ")";
                         }
 
@@ -610,7 +614,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                                 % nd->_major_parent->_name
                                 % nd->_major_parent->_edge_length);
                             newick += ",(";
-//                            newick += "#H_";
+    //                            newick += "#H_";
                             newick += boost::str(boost::format(tip_node_name_format)
                                 % nd->_name
                                 % nd->_edge_length);
@@ -618,7 +622,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                             newick += boost::str(boost::format(tip_node_name_format)
                                 % nd->_hybrid_newick_name
                                 % nd->_edge_length);
-//                                nd->_major_parent->_visited = true; // TODO: I think this only works if major and minor parents are tip nodes
+    //                                nd->_major_parent->_visited = true; // TODO: I think this only works if major and minor parents are tip nodes
                         }
 
                         else {
@@ -629,7 +633,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     //                    else if (nd->_left_child && !nd->_visited && !skip) {
                     if (nd->_left_child) {
                         a++;
-//                        nd->_visited = true;
+    //                        nd->_visited = true;
                         // internal node
                         newick += "(";
                         node_stack.push(nd);
@@ -637,44 +641,46 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     //                    else if (!nd->_left_child && !nd->_visited && !skip) {
                     else {
                         a++;
-//                        nd->_visited = true;
+    //                        nd->_visited = true;
                         // leaf node
-                        if (use_names) {
-                            newick += boost::str(boost::format(tip_node_name_format)
-                                % nd->_name
-                                % nd->_edge_length);
-                        } else {
-                            newick += boost::str(boost::format(tip_node_number_format)
-                                % (nd->_number + 1)
-                                % nd->_edge_length);
-                        }
-                        if (nd->_right_sib)
-                            newick += ",";
-                        else {
-                            Node * popped = (node_stack.empty() ? 0 : node_stack.top());
-                            while (popped && !popped->_right_sib) {
-                                node_stack.pop();
-                                if (node_stack.empty()) {
-                                    //newick += ")";
-                                    newick += boost::str(boost::format(internal_node_format) % lineage->_edge_length);
-                                    popped = 0;
-                                }
-                                else {
-                                    newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
-                                    popped = node_stack.top();
-                                }
+                            if (use_names) {
+                                newick += boost::str(boost::format(tip_node_name_format)
+                                    % nd->_name
+                                    % nd->_edge_length);
+                                } else {
+                                newick += boost::str(boost::format(tip_node_number_format)
+                                    % (nd->_number + 1)
+                                    % nd->_edge_length);
                             }
-                            if (popped && popped->_right_sib) {
-                                node_stack.pop();
-                                newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                            if (nd->_right_sib)
                                 newick += ",";
-                            }
-                        }
-                    }   // leaf node
+                            else {
+                                Node * popped = (node_stack.empty() ? 0 : node_stack.top());
+                                while (popped && !popped->_right_sib) {
+                                    node_stack.pop();
+                                    if (node_stack.empty()) {
+                                        //newick += ")";
+                                        if (lineage->_edge_length != 0.0) {
+                                            newick += boost::str(boost::format(internal_node_format) % lineage->_edge_length);
+                                        }
+                                        popped = 0;
+                                    }
+                                    else {
+                                        newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                                        popped = node_stack.top();
+                                    }
+                                }
+                                if (popped && popped->_right_sib) {
+                                    node_stack.pop();
+                                    newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                                    newick += ",";
+                                }
+                        }   // leaf node
+                    }
                     if (a >= _ninternals + _nleaves - 1 && hybrid_nodes.size()>0) {
                         break;
                     }
-//                    nd->_visited = true;
+    //                    nd->_visited = true;
                     nd = findNextPreorder(nd);
                 }   // while (subnd)...
 
@@ -1475,9 +1481,77 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         }
     }
 
+    inline void Forest::resetIncrements() {
+        // clear all branch lengths from forest
+        for (auto &nd:_nodes) {
+            nd._edge_length = 0.0;
+        }
+        _increments.clear();
+    }
 
-inline void Forest::buildFromNewickTopology(const std::string newick, bool rooted, bool allow_polytomies) {
-    // TODO: just need to get the order of species joined
+    inline vector<string> Forest::setUpExistingLineagesVector() {
+        vector<string> existing_lineages;
+        
+        int b=0;
+        for (auto &nd:_nodes) {
+            if (b<Forest::_nspecies) {
+                existing_lineages.push_back(nd._name);
+                b++;
+            }
+        }
+        
+        return existing_lineages;
+    }
+
+    inline void Forest::chooseSpeciesIncrementFromNewick(vector<string> existing_lineages) {
+        int nlineages = (int) existing_lineages.size();
+        
+        // hybridization prior
+        double rate = (_speciation_rate+_hybridization_rate)*nlineages;
+
+        _last_edge_length = rng.gamma(1.0, 1.0/rate);
+
+        for (auto &nd:_nodes) {
+            // add increment to tip nodes not already involved in a join
+            if (count(existing_lineages.begin(), existing_lineages.end(), nd._name)) {
+                // add increment to nodes in existing lineages
+                nd._edge_length += _last_edge_length; //add most recently chosen branch length to each species node
+            }
+            
+            // add increment to tip nodes that have already joined
+        }
+        _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+    }
+
+    inline vector<string> Forest::updateExistingLineagesVector(vector<string> existing_lineages, tuple<string, string, string> species_joined) {
+        string species1 = get<0>(species_joined);
+        string species2 = get<1>(species_joined);
+        string new_spp = get<2>(species_joined);
+        
+        // do not need to update for first generation since nothing has been joined
+        if (species1 != "null" && species2 != "null") {
+            // remove species1 and species2
+            existing_lineages.erase(remove(existing_lineages.begin(), existing_lineages.end(), species1), existing_lineages.end());
+            existing_lineages.erase(remove(existing_lineages.begin(), existing_lineages.end(), species2), existing_lineages.end());
+            
+            // ad new species
+            existing_lineages.push_back(new_spp);
+        }
+        
+        return existing_lineages;
+    }
+
+
+
+
+inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNewickTopology(const std::string newick) {
+    // assume tree is rooted
+    // do not allow polytomies
+    bool rooted = true;
+    bool allow_polytomies = false;
+    
+    vector<pair<tuple<string, string, string>, double>> species_joined;
+    species_joined.push_back(make_pair(make_tuple("null", "null", "null"), 0.0));
     
     set<unsigned> used; // used to ensure that no two leaf nodes have the same number
     unsigned curr_leaf = 0;
@@ -1492,17 +1566,12 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
     _nleaves = countNewickLeaves(commentless_newick);
     if (_nleaves < 4)
         throw XProj("Expecting newick tree description to have at least 4 leaves");
-    unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
-//        max_nodes--; // no root node
-//        unsigned curr_node_index = max_nodes-1; // walk in reverse through _nodes list
-    _nodes.resize(max_nodes);
-//        int b=0;
-    for (auto & nd : _nodes ) {
-        nd._name = "";
-        nd._number = -1;
-//            nd._number = b;
-//            b++;
-    }
+        unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
+        _nodes.resize(max_nodes);
+        for (auto & nd : _nodes ) {
+            nd._name = "";
+            nd._number = -1;
+        }
 
     try {
         // Root node is the last node in _nodes
@@ -1563,7 +1632,6 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
                     inside_quoted_name = false;
                     node_name_position = 0;
                     if (!nd->_left_child) {
-//                            extractNodeNumberFromName(nd, used);
                         curr_leaf++;
                     }
                     previous = Prev_Tok_Name;
@@ -1587,7 +1655,6 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
                         throw XProj(boost::str(boost::format("Unexpected node name (%s) at position %d in tree description") % nd->_name % node_name_position));
 
                     if (!nd->_left_child) {
-//                            extractNodeNumberFromName(nd, used);
                         curr_leaf++;
                     }
 
@@ -1740,11 +1807,6 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
         if (rooted) {
             refreshPreorder();
         }
-        else {
-//                // Root at leaf whose _number = 0
-//                // refreshPreorder() and refreshLevelorder() called after rerooting
-//                rerootAtNodeNumber(0);
-        }
         renumberInternals();
     }
     catch(XProj x) {
@@ -1775,13 +1837,24 @@ inline void Forest::buildFromNewickTopology(const std::string newick, bool roote
     _lineages.clear();
     _lineages.push_back(&_nodes.back());
     
-    // reset node names
+    // reset node numbers and names that are not tips
     int j = 0;
     for (auto &nd:_nodes) {
         nd._number = j;
+        if (nd._name == "") {
+            nd._name=boost::str(boost::format("node-%d")%nd._number);
+        }
         j++;
     }
+    
+    refreshPreorder();
+    vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
+    for (auto &entry:heights_and_nodes) {
+        species_joined.push_back(make_pair(make_tuple(entry.second->_left_child->_name, entry.second->_left_child->_right_sib->_name, entry.second->_name), 0.0));
+    }
+    return species_joined;
 }
+
 
 
 

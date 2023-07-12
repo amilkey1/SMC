@@ -90,7 +90,6 @@ class Particle {
         vector<string>                                  getGeneTreeNames(int j);
         vector<string>                                  getGeneTreeNewicks();
         double                                          getNumSpecies(){return _forest._lineages.size();}
-//        vector<pair<string, string>>                    getSpeciesJoined(){return _forest._names_of_species_joined;}
         vector<pair<tuple<string, string, string>, double>>                    getSpeciesJoined(){return _t;}
         void                                            buildFakeSpeciesTree();
         double                                          getCoalescentLikelihood(){return _log_coalescent_likelihood;}
@@ -114,6 +113,7 @@ class Particle {
         double                                          getSpeciesTreeHeight();
         double                                          getLastEdgeLen();
         void                                            calcSpeciesParticleWeight(double log_coalescent_likelihood);
+        void        drawHeightsFromPrior();
 
     private:
 
@@ -505,14 +505,44 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
         paupf.close();
     }
 
+//    inline void Particle::processSpeciesNewick(vector<string> newicks) {
+//        if (newicks.size() != 1) {
+//            throw XProj(boost::str(boost::format("only one species tree newick may be specified")));
+//        }
+////        assert(newicks.size() == 1);
+//        string newick = newicks[0];
+//        _forest.buildFromNewickTopology(newick, true, false);
+//        buildEntireSpeciesTree();
+//    }
+
     inline void Particle::processSpeciesNewick(vector<string> newicks) {
-        if (newicks.size() != 1) {
+        if (newicks.size() > 1) {
             throw XProj(boost::str(boost::format("only one species tree newick may be specified")));
         }
-//        assert(newicks.size() == 1);
-        string newick = newicks[0];
-//        _forests[0].buildFromNewickTopology(newick, true, false);
-        buildEntireSpeciesTree();
+        
+        if (newicks.size() > 0) {
+            string newick = newicks[0];
+            _t = _forest.buildFromNewickTopology(newick);
+            drawHeightsFromPrior();
+        }
+        
+        else {
+            buildEntireSpeciesTree();
+        }
+    }
+
+    inline void Particle::drawHeightsFromPrior() {
+        _forest.resetIncrements();
+        
+       vector<string> existing_lineages = _forest.setUpExistingLineagesVector();
+        
+        for (int a=0; a<Forest::_nspecies-1; a++) {
+            existing_lineages = _forest.updateExistingLineagesVector(existing_lineages, _t[a].first);
+            _forest.chooseSpeciesIncrementFromNewick(existing_lineages);
+            _t[a].second = _forest._last_edge_length;
+        }
+        
+        assert (_t[Forest::_nspecies-1].second == 0); // last element of _t should not draw a branch length
     }
 
     inline void Particle::processGeneNewicks(vector<string> newicks) {
