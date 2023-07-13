@@ -168,7 +168,7 @@ namespace proj {
     inline void Proj::saveParticleWeights(vector<Particle::SharedPtr> &v) const {
         // this function saves particle weights + species tree newick in order of weight
         //sort particles by weight
-        sort(v.begin(), v.end(), greater<Particle::SharedPtr>());
+//        sort(v.begin(), v.end(), greater<Particle::SharedPtr>());
         
         ofstream weightf("weights.txt");
         weightf << "begin trees;" << endl;
@@ -843,7 +843,7 @@ namespace proj {
         }
         
         //sort particles by weight
-        sort(my_vec.begin(), my_vec.end(), greater<Particle::SharedPtr>());
+//        sort(my_vec.beg  in(), my_vec.end(), greater<Particle::SharedPtr>());
         
         //print first particle
         cout << "\n" << "Heaviest particle: ";

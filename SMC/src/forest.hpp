@@ -1888,6 +1888,7 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
 
 
     inline void Forest::resetDepthVector(tuple<string, string, string> species_joined) {
+        showForest();
         // this function replaces species names with new species name after a join
         for (auto &d:_depths) {
             bool match1 = false;
