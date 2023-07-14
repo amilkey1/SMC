@@ -346,7 +346,7 @@ namespace proj {
             _species_tree_log_marginal_likelihood += log_particle_sum - log(_nparticles);
             cout << setprecision(12) << "   " << _species_tree_log_marginal_likelihood << endl;
         }
-//        sort(particles.begin(), particles.end(), greater<Particle::SharedPtr>()); // TODO: this is messing up resampling!!!
+//        sort(particles.begin(), particles.end(), greater<Particle::SharedPtr>());
     }
 
     inline double Proj::tune(bool accepted, double lambda) {
@@ -1142,7 +1142,7 @@ namespace proj {
                             
                             for (int p=0; p<nparticles; p++) {
                                 vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
-                                tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal(); // TODO: species tree is proposing same join twice
+                                tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
                                 for (int j=1; j<nsubsets+1; j++) {
                                     max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
                                 }
@@ -1171,7 +1171,7 @@ namespace proj {
                             if (!_run_on_empty) {
                                 bool calc_marg_like = false;
                                 
-                                normalizeWeights(my_vec[0], "s", calc_marg_like); // TODO: this is messing up the resampling - maybe you are sorting particles here?
+                                normalizeWeights(my_vec[0], "s", calc_marg_like);
                                 
                                 double ess_inverse = 0.0;
                                 
@@ -1181,14 +1181,12 @@ namespace proj {
 
                                 double ess = 1.0/ess_inverse;
                                 cout << "   " << "ESS = " << ess << endl;
-                             // TODO: something is not working with the resampling - double check species partitions and associated species trees very carefully
                                 vector<int> sel_indices = resampleSpeciesParticles(my_vec[0], use_first ? my_vec_2[0]:my_vec_1[0], "s");
                                 //if use_first is true, my_vec = my_vec_2
                                 //if use_first is false, my_vec = my_vec_1
                                 
                                 my_vec[0] = use_first ? my_vec_2[0]:my_vec_1[0];
                                 
-                                // TODO: I think this function is not copying correctly
                                 for (int s=1; s<nsubsets+1; s++) {
                                     resetGeneParticles(sel_indices, my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s]);
                                     my_vec[s] = use_first ? my_vec_2[s]:my_vec_1[s];

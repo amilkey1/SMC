@@ -1916,6 +1916,7 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
     }
 
     inline void Forest::calcMinDepth() {
+        // TODO: is the newick being set wrong? different from other version
         assert (_index != 0);
         _depths.clear();
         // walk through nodes
