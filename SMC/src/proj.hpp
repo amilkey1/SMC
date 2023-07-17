@@ -797,35 +797,35 @@ namespace proj {
                 particles[p]->proposal(gene_trees_only, deconstruct, species_joined);
           }
         }
-        // TODO: add species_joined for multithreading
-//        else {
-//          // divide up the particles as evenly as possible across threads
-//          unsigned first = 0;
-//          unsigned incr = _nparticles/_nthreads + (_nparticles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
-//          unsigned last = incr;
-//
-//          // need a vector of threads because we have to wait for each one to finish
-//          vector<thread> threads;
-//
-//            while (true) {
-//            // create a thread to handle particles first through last - 1
-//              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles), gene_trees_only, a, deconstruct, species_joined));
-//            // update first and last
-//            first = last;
-//            last += incr;
-//            if (last > _nparticles) {
-//              last = _nparticles;
-//              }
-//            if (first>=_nparticles) {
-//                break;
-//            }
-//          }
-//
-//          // the join function causes this loop to pause until the ith thread finishes
-//          for (unsigned i = 0; i < threads.size(); i++) {
-//            threads[i].join();
-//          }
-//        }
+
+        else {
+          // divide up the particles as evenly as possible across threads
+          unsigned first = 0;
+          unsigned incr = _nparticles/_nthreads + (_nparticles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
+          unsigned last = incr;
+
+          // need a vector of threads because we have to wait for each one to finish
+          vector<thread> threads;
+
+            while (true) {
+            // create a thread to handle particles first through last - 1
+              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles), gene_trees_only, a, deconstruct, species_joined));
+            // update first and last
+            first = last;
+            last += incr;
+            if (last > _nparticles) {
+              last = _nparticles;
+              }
+            if (first>=_nparticles) {
+                break;
+            }
+          }
+
+          // the join function causes this loop to pause until the ith thread finishes
+          for (unsigned i = 0; i < threads.size(); i++) {
+            threads[i].join();
+          }
+        }
     }
 
     inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
@@ -1107,7 +1107,7 @@ namespace proj {
                                     _accepted_particle_vec[s] = my_vec[s];
                                     saveParticleWeights(my_vec[0]);
                                 }
-                            deconstruct = false; 
+                            deconstruct = false;
     //                    } // p loop
                         } // g loop
                     }
