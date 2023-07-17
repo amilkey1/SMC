@@ -265,7 +265,8 @@ class Particle {
     }
 
     inline void Particle::geneTreeProposal(bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
-        if (_generation == 0 && deconstruct) {
+        
+        if (deconstruct) {
 //            for (int i=1; i<_forests.size(); i++) {
                 _forest.deconstructGeneTree();
 //            }

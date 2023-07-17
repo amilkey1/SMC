@@ -1069,7 +1069,7 @@ namespace proj {
                             
                             for (int s=1; s<nsubsets+1; s++) { // skip species tree particles
                                 proposeParticles(my_vec[s], gene_trees_only, "g", deconstruct, species_tree_particle);
-                                deconstruct = true;
+                                deconstruct = false;
                                 
                                 if (!_run_on_empty) {
                                     bool calc_marg_like = true;
