@@ -93,7 +93,6 @@ class Particle {
         vector<pair<tuple<string, string, string>, double>>                    getSpeciesJoined(){return _t;}
         void                                            buildFakeSpeciesTree();
         double                                          getCoalescentLikelihood(){return _log_coalescent_likelihood;}
-        void                                            firstGen();
         void                                            geneTreeProposal(bool unconstrained, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
         void                                            speciesProposal(vector<double> max_depths, tuple<string, string, string> species_joined);
         void                                            resetSpeciesInfo(){_t.clear();}
@@ -232,14 +231,9 @@ class Particle {
 
     inline double Particle::proposal(bool gene_trees_only, bool unconstrained, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
         string event;
-//        for (int i=1; i<_forests.size(); i++) {
+        
             _forest._theta = _forest._starting_theta;
-//        }
-
-//        bool no_newick = true;
-//        if (unconstrained && _generation == 0 && no_newick) {
-//            firstGen();
-//        }
+        
         if (_generation == 0) {
 //            for (int i=1; i<_forests.size(); i++) {
                 _forest._nincrements = 0;
@@ -268,13 +262,6 @@ class Particle {
         }
         resetVariables();
         return _log_weight;
-    }
-
-    inline void Particle::firstGen() {
-        assert (_generation == 0); // species tree should only be rebuilt in the first round of the first iteration of gene trees
-//        buildFakeSpeciesTree();
-        buildEntireSpeciesTree();
-//        panmicticSpeciesPartition();
     }
 
     inline void Particle::geneTreeProposal(bool unconstrained, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
