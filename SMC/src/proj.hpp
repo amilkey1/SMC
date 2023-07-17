@@ -1138,16 +1138,19 @@ namespace proj {
                             for (int p=0; p<nparticles; p++) {
                                 vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
                                 tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
-                                for (int j=1; j<nsubsets+1; j++) {
-                                    max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
+                                
+                                if (s < nspecies-1) {
+                                    for (int j=1; j<nsubsets+1; j++) {
+                                        max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
+                                    }
+                                    
+    //                                cout << "particle: " << p << endl;
+    //                                cout << get<0>(species_joined) << endl;
+    //                                cout << get<1>(species_joined) << endl;
+                                    
+                                    // now finish the species tree branch length proposal
+                                    my_vec[0][p]->speciesProposal(max_depths, species_joined);
                                 }
-                                
-//                                cout << "particle: " << p << endl;
-//                                cout << get<0>(species_joined) << endl;
-//                                cout << get<1>(species_joined) << endl;
-                                
-                                // now finish the species tree branch length proposal
-                                my_vec[0][p]->speciesProposal(max_depths, species_joined);
                                 
                                 double log_coalescent_likelihood = 0.0;
                                 

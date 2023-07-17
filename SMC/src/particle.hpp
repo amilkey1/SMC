@@ -222,7 +222,7 @@ class Particle {
     }
 
     inline void Particle::remakeGeneTrees(map<string, string> &taxon_map) {
-        // TODO: assert these are gene trees
+        assert (_name != "species");
 //        for (int i=1; i<_forests.size(); i++) {
             _forest.clear();
             _forest.remakeGeneTree(taxon_map);
@@ -361,27 +361,25 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
     inline void Particle::speciesProposal(vector<double> max_depth_vector, tuple<string, string, string> species_joined ) {
         assert (!_inf);
+        double max_depth = 0.0;
 
-        if (!_inf) {
-                double max_depth = 0.0;
-        
-                if (_forest._lineages.size() > 1) {
-                    max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
-                    max_depth -= _forest.getTreeHeight();
-                    // choose a species tree increment
-                }
-                
-                if (_forest._lineages.size() > 1) {
-                    assert (max_depth > 0.0);
-                    _forest.chooseSpeciesIncrement(max_depth);
-                    _species_tree_height += _forest._last_edge_length;
-                }
-                if (_forest._lineages.size() == 1) {
-                    _forest._last_edge_length = 0.0;
-                }
-            _t[_forest._species_join_number].second = _forest._last_edge_length;
-            _forest._species_join_number++;
+        if (_forest._lineages.size() > 1) {
+            max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
+            max_depth -= _forest.getTreeHeight();
+            // choose a species tree increment
         }
+        
+        if (_forest._lineages.size() > 1) {
+            assert (max_depth > 0.0);
+            _forest.chooseSpeciesIncrement(max_depth);
+            _species_tree_height += _forest._last_edge_length;
+        }
+        if (_forest._lineages.size() == 1) {
+            _forest._last_edge_length = 0.0;
+        }
+        _t[_forest._species_join_number].second = _forest._last_edge_length;
+        _forest._species_join_number++;
+        
         }
 
     inline void Particle::calcSpeciesParticleWeight(double log_coalescent_likelihood) {
