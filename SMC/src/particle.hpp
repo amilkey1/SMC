@@ -124,7 +124,6 @@ class Particle {
         bool                                    firstProposal();
         void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
-        bool                                    checkIfReadyToJoinSpecies();
         bool                                    _inf = false;
         vector<double>                          _unnormalized_weights;
         string                                  _name;
@@ -305,7 +304,7 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     inline double Particle::calcConstrainedProposal(tuple<string, string, string> species_joined) {
         assert (!_inf);
         
-        _forest.updateSpeciesPartitionTwo(species_joined);
+        _forest.updateSpeciesPartition(species_joined);
         
         string species1 = get<0>(species_joined);
         string species2 = get<1>(species_joined);
