@@ -1068,8 +1068,7 @@ namespace proj {
                             bool gene_trees_only = true;
                             
                             for (int s=1; s<nsubsets+1; s++) { // skip species tree particles
-                                proposeParticles(my_vec[s], gene_trees_only, "g", deconstruct, species_tree_particle);
-                                deconstruct = false; // TODO: only set this after going through all genes once
+                                proposeParticles(my_vec[s], gene_trees_only, "g", deconstruct, species_tree_particle);// TODO: only set this after going through all genes once
                                 
                                 if (!_run_on_empty) {
                                     bool calc_marg_like = true;
@@ -1108,6 +1107,7 @@ namespace proj {
                                     _accepted_particle_vec[s] = my_vec[s];
                                     saveParticleWeights(my_vec[0]);
                                 }
+                            deconstruct = false; 
     //                    } // p loop
                         } // g loop
                     }
