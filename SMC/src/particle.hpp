@@ -116,7 +116,6 @@ class Particle {
         double                                  _log_likelihood;
         double                                  _log_coalescent_likelihood;
         int                                     _generation = 0;
-        map<int, vector<double>>                     _random_seeds;
         bool                                    _running_on_empty = false;
         bool                                    _no_species_joined = true;
         double                                  _species_tree_height;
@@ -141,11 +140,9 @@ class Particle {
 
     inline Particle::~Particle() {
 //        cout << "destroying a particle" << endl;
-//	cout << "test" << endl;
     }
+
     inline void Particle::showParticle() {
-//        cout << "log coalescent likelihood: " << _log_coalescent_likelihood << endl;
-//        _forests[0].showForest();
         //print out weight of each particle
         cout << "\nParticle:\n";
         double log_weight = _log_weight;
@@ -158,9 +155,7 @@ class Particle {
         }
         cout << "  _forest: " << "\n";
         cout << "\n";
-//        for (auto &_forest:_forests) {
-            _forest.showForest();
-//        }
+        _forest.showForest();
     }
 
     inline void Particle::showSpeciesTree() {
@@ -191,6 +186,8 @@ class Particle {
 
     inline double Particle::calcLogLikelihood() {
         //calculate likelihood for each gene tree
+        assert (_name != "species");
+        
         double log_likelihood = 0.0;
         double gene_tree_log_likelihood = 0.0;
         
@@ -232,7 +229,7 @@ class Particle {
             _generation++;
             _log_weight = 0.0;
         }
-        resetVariables();
+        
         return _log_weight;
     }
 
@@ -387,11 +384,7 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
 
     inline void Particle::resetVariables() {
-//        for (int i = 1; i<_forests.size(); i++) {
-            _forest._num_coalescent_events_in_generation = 0;
-            _forest._searchable_branch_lengths.clear();
-            _forest._new_nodes.clear();
-//        }
+        _forest._new_nodes.clear();
     }
 
 
@@ -436,6 +429,8 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
     inline void Particle::processSpeciesNewick(vector<string> newicks) {
+        assert (_name == "species");
+        
         if (newicks.size() > 1) {
             throw XProj(boost::str(boost::format("only one species tree newick may be specified")));
         }
@@ -452,6 +447,8 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
     inline void Particle::drawHeightsFromPrior() {
+        assert (_name == "species");
+        
         _forest.resetIncrements();
         
        vector<string> existing_lineages = _forest.setUpExistingLineagesVector();
@@ -466,17 +463,12 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
     inline void Particle::processGeneNewicks(vector<string> newicks, int gene_number) {
+        assert (_name != "species");
+        
         _forest.buildFromNewick(newicks[gene_number], true, false);
         _forest.refreshPreorder();
         _forest._theta = _forest._starting_theta;
-        
-//        cout << "fix this later" << endl;
-//        assert (newicks.size() == _forests.size() - 1);
-//        for (int i=1; i<_forests.size(); i++) {
-//            _forests[i].buildFromNewick(newicks[i-1], true, false);
-//            _forests[i].refreshPreorder();
-//        }
-}
+    }
 
     inline double Particle::calcHeight() {
         assert (_name == "species");
@@ -529,6 +521,7 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
     inline void Particle::showSpeciesIncrement(){
+        assert (_name == "species");
         cout << "species tree increment: " << "     " << _forest._last_edge_length << endl;
     }
 
@@ -636,11 +629,8 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
     inline vector<string> Particle::getGeneTreeNewicks() {
         vector<string> newicks;
-//        for (int i=1; i<_forests.size(); i++) {
-//            string newick = "newick:\"" + _forests[i].makeNewick(9, true) + "\"";
-            string newick = _forest.makeNewick(9, true);
-            newicks.push_back(newick);
-//        }
+        string newick = _forest.makeNewick(9, true);
+        newicks.push_back(newick);
         return newicks;
     }
 
@@ -656,6 +646,7 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
     inline void Particle::resetGeneIncrements() {
+        assert (_name != "species");
         _forest._increments.clear();
     }
 
@@ -688,20 +679,20 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
 
     inline void Particle::resetGeneTreePartials(Data::SharedPtr d, map<string, string> taxon_map) {
+        assert (_name != "species");
         _nsubsets = d->getNumSubsets();
         _data = d;
         int i = 1;
-//        for (int i=1; i<_forests.size(); i++) {
-            _forest.setData(d, i, taxon_map);
-//        }
+        _forest.setData(d, i, taxon_map);
     }
 
     inline void Particle::calcGeneTreeMinDepth() {
-        assert (_name != "s");
+        assert (_name != "species");
         _forest.calcMinDepth();
     }
 
     inline void Particle::refreshGeneTreePreorder() {
+        assert (_name != "species");
         _forest.refreshPreorder();
     }
 
@@ -712,9 +703,8 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
         _data           = other._data;
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;
-        _t = other._t;
+        _t              = other._t;
         _running_on_empty = other._running_on_empty;
-        _random_seeds = other._random_seeds;
         _no_species_joined = other._no_species_joined;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _species_tree_height = other._species_tree_height;

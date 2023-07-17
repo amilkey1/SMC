@@ -157,8 +157,6 @@ class Forest {
         string                      _last_direction;
         vector<pair<double, double>>    _increments;
         double                      _topology_prior;
-        unsigned                    _num_coalescent_events_in_generation;
-    vector<pair<double, double>> _searchable_branch_lengths; // pair is lineage height, increment
         double                      _prev_log_likelihood;
         double                      _log_joining_prob;
         vector<double>              _increment_choices;
@@ -216,7 +214,6 @@ class Forest {
         _nstates = 4;
         _last_edge_length = 0.0;
         _lineages.reserve(_nodes.size());
-        _num_coalescent_events_in_generation = 0;
         _log_joining_prob = 0.0;
         _extended_increment = 0.0;
         _species_join_number = 0;
@@ -2089,8 +2086,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _theta = other._theta;
         _increments = other._increments;
         _topology_prior = other._topology_prior;
-        _num_coalescent_events_in_generation = other._num_coalescent_events_in_generation;
-        _searchable_branch_lengths = other._searchable_branch_lengths;
         _log_joining_prob = other._log_joining_prob;
         _increment_choices = other._increment_choices;
         _deep_coalescent_increments = other._deep_coalescent_increments;
@@ -3476,8 +3471,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         }
         _ninternals = 0;
         _log_likelihood_choices.clear();
-        _num_coalescent_events_in_generation = 0;
-        _searchable_branch_lengths.clear();
         _new_nodes.clear();
         _species_join_number = 0;
         _gene_tree_log_weight = 0.0;
@@ -3485,8 +3478,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _node_choices.clear();
         _generationf = 0;
         _extended_increment = 0.0;
-        _num_coalescent_events_in_generation = 0;
-        _num_coalescent_events_in_generation = 0;
         _prev_gene_tree_log_likelihood = 0.0;
         _ready_to_join_species = false;
         _deep_coalescent_increments.clear();
@@ -3526,8 +3517,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         }
         _ninternals = 0;
         _log_likelihood_choices.clear();
-        _num_coalescent_events_in_generation = 0;
-        _searchable_branch_lengths.clear();
         _new_nodes.clear();
         _species_join_number = 0;
         _gene_tree_log_weight = 0.0;
@@ -3535,8 +3524,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _node_choices.clear();
         _generationf = 0;
         _extended_increment = 0.0;
-        _num_coalescent_events_in_generation = 0;
-        _num_coalescent_events_in_generation = 0;
         _prev_gene_tree_log_likelihood = 0.0;
         _ready_to_join_species = false;
         _deep_coalescent_increments.clear();
