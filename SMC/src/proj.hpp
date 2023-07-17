@@ -1124,8 +1124,8 @@ namespace proj {
                     for (int s=1; s<nsubsets+1; s++) {
                         for (int p=0; p<nparticles; p++) {
                             my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
-//                            my_vec[s][p]->refreshGeneTreePreorder();
-//                            my_vec[s][p]->calcGeneTreeMinDepth(); // reset min depth vector for gene trees
+                            my_vec[s][p]->refreshGeneTreePreorder();
+                            my_vec[s][p]->calcGeneTreeMinDepth(); // reset min depth vector for gene trees
                         }
                     }
 //                    _gene_tree_log_marginal_likelihood = _log_marginal_likelihood;
