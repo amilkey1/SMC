@@ -38,7 +38,6 @@ class Particle {
         void                                    mapSpecies(map<string, string> &taxon_map, vector<string> &species_names, int n);
         void                                    mapGeneTrees(map<string, string> &taxon_map, vector<string> &species_names);
         void                                    saveForest(std::string treefilename);
-        void                                    saveMSCTrees(string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
         void                                    setLogLikelihood(double log_likelihood);
@@ -48,11 +47,8 @@ class Particle {
         void                                    buildEntireSpeciesTree();
         string                                  getSpeciesNewick() {return _forest.makeNewick(9, true);}
         double                                  getLogWeight(string a);
-        map<int, vector<double>>                     getRandomSeeds() {return _random_seeds;}
-//        void                                    setLogWeight(double w){_log_weight = w;}
         void                                    setLogWeight(double w, string a);
         void                                    operator=(const Particle & other);
-        const Forest &                  getForest() const {return _forest;}
         std::string                             saveForestNewick() {
             return _forest.makeNewick(8, true);
         }
@@ -65,7 +61,6 @@ class Particle {
         }
 
         static void                                     setNumSubsets(unsigned n);
-        Forest                                          getForests() {return _forest;}
         void                                            showSpeciesIncrement();
         void                                            showSpeciesJoined();
         void                                            showSpeciesTree();
@@ -77,7 +72,6 @@ class Particle {
         string                                          saveGamma();
         void                                            calculateGamma();
         void                                            setRunOnEmpty(bool a) {_running_on_empty = a;}
-        void                                            setBuildEntireSpeciesTree(bool a) {_species_first = a;}
         vector<double>                                  getBranchLengths();
         vector<double>                                  getBranchLengthPriors();
         vector<double>                                  getGeneTreeLogLikelihoods();
@@ -91,7 +85,6 @@ class Particle {
         vector<string>                                  getGeneTreeNewicks();
         double                                          getNumSpecies(){return _forest._lineages.size();}
         vector<pair<tuple<string, string, string>, double>>                    getSpeciesJoined(){return _t;}
-        void                                            buildFakeSpeciesTree();
         double                                          getCoalescentLikelihood(){return _log_coalescent_likelihood;}
         void                                            geneTreeProposal(bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
         void                                            speciesProposal(vector<double> max_depths, tuple<string, string, string> species_joined);
@@ -99,20 +92,19 @@ class Particle {
         void                                            resetSpeciesTreeHeight(){ _species_tree_height = 0.0;}
         void                                            resetSpecies();
         void                                            resetGeneIncrements();
-//        int                                             getNGenes(){return (int) _forests.size() - 1;}
         void                                            processSpeciesNewick(vector<string> newicks);
         void                                            processGeneNewicks(vector<string> newicks);
         void                                            remakeGeneTrees(map<string, string> &taxon_map) ;
-    vector<pair<double, pair<string, string>>>      getMinDepth(){return _forest.getMinDepths();}
+        vector<pair<double, pair<string, string>>>      getMinDepth(){return _forest.getMinDepths();}
         void                                            calcGeneTreeMinDepth();
         void                                            refreshGeneTreePreorder();
-        tuple<string, string, string>                                            speciesTopologyProposal();
-        double                                        calcConstrainedProposal(tuple<string, string, string> species_joined);
+        tuple<string, string, string>                   speciesTopologyProposal();
+        double                                          calcConstrainedProposal(tuple<string, string, string> species_joined);
         double                                          calcGeneCoalescentLikelihood(double last_edge_len, tuple<string, string, string> species_joined, double species_tree_height);
         double                                          getSpeciesTreeHeight();
         double                                          getLastEdgeLen();
         void                                            calcSpeciesParticleWeight(double log_coalescent_likelihood);
-        void        drawHeightsFromPrior();
+        void                                            drawHeightsFromPrior();
 
     private:
 
@@ -120,7 +112,6 @@ class Particle {
         Forest                                  _forest;
         double                                  _log_weight;
         double                                  _species_log_weight;
-//        vector<double>                          _log_weight_options;
         Data::SharedPtr                         _data;
         double                                  _log_likelihood;
         double                                  _log_coalescent_likelihood;
@@ -128,12 +119,8 @@ class Particle {
         map<int, vector<double>>                     _random_seeds;
         bool                                    _running_on_empty = false;
         bool                                    _no_species_joined = true;
-//        vector<double>                                  _species_tree_height;
         double                                  _species_tree_height;
         vector<pair<tuple<string, string, string>, double>> _t;
-        unsigned                                _gene_tree_proposal_attempts;
-        bool                                    _ready_to_join_species;
-        bool                                    _species_first;
         bool                                    firstProposal();
         void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
@@ -147,7 +134,6 @@ class Particle {
         //log weight and log likelihood are 0 for first generation
         _log_weight = 0.0;
         _log_likelihood = 0.0;
-        _gene_tree_proposal_attempts = 0;
         _log_coalescent_likelihood = 0.0;
         _species_tree_height = 0.0;
         _species_tree_height = 0.0;
@@ -179,11 +165,11 @@ class Particle {
     }
 
     inline void Particle::showSpeciesTree() {
-        // TODO: include assert that this is a species tree, same for other functions
+        assert (_name == "species");
         //print out weight of each particle
         cout << "\nParticle:\n";
-        cout << "  _log_weight: " << _log_weight << "\n" ;
-        cout << " _log_likelihood: " << _log_likelihood << "\n";
+        cout << "  _log_weight: " << _species_log_weight << "\n" ;
+        cout << " _log_coalescent_likelihood: " << _log_coalescent_likelihood << "\n";
         cout << "  _forest: " << "\n";
         cout << "\n";
         _forest.showForest();
@@ -194,50 +180,42 @@ class Particle {
         cout << "debugging particle" << endl;
         //print out weight of each particle
         cout << "\nParticle " << name << ":\n";
-//        for (auto &_forest:_forests) {
-            cout << "  _log_weight:               " << _log_weight                 << "\n" ;
-            cout << "  _log_likelihood:           " << _log_likelihood             << "\n";
-            cout << "  _forest._nleaves:          " << _forest._nleaves            << "\n";
-            cout << "  _forest._ninternals:       " << _forest._ninternals         << "\n";
-            cout << "  _forest._npatterns:        " << _forest._npatterns          << "\n";
-            cout << "  _forest._nstates:          " << _forest._nstates            << "\n";
-            cout << "  _forest._last_edge_length: " << _forest._last_edge_length   << "\n";
-            cout << "  newick description:        " << _forest.makeNewick(5,false) << "\n";
-//        }
+        cout << "  _log_weight:               " << _log_weight                 << "\n" ;
+        cout << "  _log_likelihood:           " << _log_likelihood             << "\n";
+        cout << "  _forest._nleaves:          " << _forest._nleaves            << "\n";
+        cout << "  _forest._ninternals:       " << _forest._ninternals         << "\n";
+        cout << "  _forest._npatterns:        " << _forest._npatterns          << "\n";
+        cout << "  _forest._nstates:          " << _forest._nstates            << "\n";
+        cout << "  _forest._last_edge_length: " << _forest._last_edge_length   << "\n";
+        cout << "  newick description:        " << _forest.makeNewick(5,false) << "\n";
     }
 
     inline double Particle::calcLogLikelihood() {
         //calculate likelihood for each gene tree
         double log_likelihood = 0.0;
         double gene_tree_log_likelihood = 0.0;
-//        for (unsigned i=1; i<_forests.size(); i++) {
-            gene_tree_log_likelihood = _forest.calcLogLikelihood();
-            assert(!isnan (log_likelihood));
-            assert(!isnan (gene_tree_log_likelihood));
-            //total log likelihood is sum of gene tree log likelihoods
-            log_likelihood += gene_tree_log_likelihood;
-            log_likelihood += _forest._gene_tree_log_coalescent_likelihood;
-//        }
+        
+        gene_tree_log_likelihood = _forest.calcLogLikelihood();
+        assert(!isnan (log_likelihood));
+        assert(!isnan (gene_tree_log_likelihood));
+        //total log likelihood is sum of gene tree log likelihoods
+        log_likelihood += gene_tree_log_likelihood;
+        log_likelihood += _forest._gene_tree_log_coalescent_likelihood;
 
         // set _generation for each forest
-//        for (int i=0; i < (int) _forests.size(); i++ ){
-            _forest.setGeneration(_generation);
-//        }
+        _forest.setGeneration(_generation);
         _generation++;
         return log_likelihood;
     }
 
     inline void Particle::remakeGeneTrees(map<string, string> &taxon_map) {
         assert (_name != "species");
-//        for (int i=1; i<_forests.size(); i++) {
-            _forest.clear();
-            _forest.remakeGeneTree(taxon_map);
-//        }
+        _forest.clear();
+        _forest.remakeGeneTree(taxon_map);
     }
 
     inline double Particle::proposal(bool gene_trees_only, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
-        
-        // this function is to make gene trees, not species trees
+        // this function proposes gene trees, not species trees
         
         string event;
         
@@ -250,19 +228,6 @@ class Particle {
         if (gene_trees_only) {
             geneTreeProposal(deconstruct, species_joined);
         }
-        
-//        else if (!gene_trees_only) {
-//            if (_generation == 0 || _generation == Forest::_ntaxa - 1) {
-////            if (_generation == 0) {
-////            if (_generation == Forest::_ntaxa - 1) {
-////                for (int i=1; i<_forests.size(); i++) {
-//                    _forest.calcMinDepth();
-//                    _forest._nincrements = 0;
-////                }
-//            }
-////            speciesProposal();
-//            _generation++;
-//        }
         
         if (_running_on_empty) {
             _generation++;
@@ -280,7 +245,6 @@ class Particle {
             _forest.deconstructGeneTree();
         }
         
-        _forest._theta = _forest._starting_theta; // TODO: redundant?
         pair<double, string> species_info = _forest.chooseDelta(species_joined);
         _forest.geneTreeProposal(species_info, species_joined);
         if (_forest._lineages.size() == 1) {
@@ -431,29 +395,6 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 //        }
     }
 
-//    inline void Particle::buildFakeSpeciesTree() {
-//        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-//        _forests[0]._last_edge_length = 0.0;
-//
-//        double edge_len = _forests[0]._last_edge_length;
-//        _t.resize(1);
-//
-////        _t.push_back(make_pair(species_joined, edge_len));
-//
-//        for (int i=0; i < _forests[0]._nspecies-1; i++) {
-//            if (_forests[0]._lineages.size() > 1) {
-////                tuple<string, string, string> species_joined = _forests[0].speciesTreeProposal();
-//                tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-//
-//                double edge_len = 0.0;
-//                if (_forests[0]._lineages.size() > 1) {
-//                    edge_len = _forests[0]._last_edge_length;
-//                }
-//                _t.push_back(make_pair(species_joined, edge_len));
-//            }
-//        }
-//    }
-
 
     inline Particle::Particle(const Particle & other) {
         *this = other;
@@ -481,16 +422,6 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
         treef.close();
     }
 
-    inline void Particle::saveMSCTrees(string treefilename) {
-        // this function writes the species tree all particles to the same file
-        ofstream treef(treefilename);
-        treef << "#nexus\n\n";
-        treef << "begin trees;\n";
-        treef << "  tree test = [&R] " << _forest.makeNewick(8, true)  << ";\n";
-        treef << "end;\n";
-        treef.close();
-    }
-
     inline void Particle::savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const {
         ofstream paupf(paupfilename);
         paupf << "#nexus\n\n";
@@ -504,16 +435,6 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
         paupf << "end;\n";
         paupf.close();
     }
-
-//    inline void Particle::processSpeciesNewick(vector<string> newicks) {
-//        if (newicks.size() != 1) {
-//            throw XProj(boost::str(boost::format("only one species tree newick may be specified")));
-//        }
-////        assert(newicks.size() == 1);
-//        string newick = newicks[0];
-//        _forest.buildFromNewickTopology(newick, true, false);
-//        buildEntireSpeciesTree();
-//    }
 
     inline void Particle::processSpeciesNewick(vector<string> newicks) {
         if (newicks.size() > 1) {
@@ -555,7 +476,7 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 }
 
     inline double Particle::calcHeight() {
-        // TODO: assert species tree
+        assert (_name == "species");
         //species tree
         double sum_height = 0.0;
 
@@ -600,9 +521,8 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
     inline void Particle::mapGeneTrees(map<string, string> &taxon_map, vector<string> &species_names) {
         //gene trees
-//        for (unsigned i=1; i<_forests.size(); i++) {
-            _forest.setUpGeneForest(taxon_map);
-//        }
+        assert (_name != "species");
+        _forest.setUpGeneForest(taxon_map);
     }
 
     inline void Particle::showSpeciesIncrement(){
@@ -673,51 +593,41 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
     inline vector<double> Particle::getBranchLengths() {
         vector<double> divergence_times;
-//        for (auto &f:_forests) {
-            for (auto &b:_forest._increments) {
-                divergence_times.push_back(b.first);
-            }
-//        }
+        for (auto &b:_forest._increments) {
+            divergence_times.push_back(b.first);
+        }
         return divergence_times;
     }
 
     inline vector<double> Particle::getBranchLengthPriors() {
         vector<double> priors;
-//        for (auto &f:_forests) {
-            for (auto &b:_forest._increments) {
-                priors.push_back(b.second);
-            }
-//        }
+        for (auto &b:_forest._increments) {
+            priors.push_back(b.second);
+        }
         return priors;
     }
 
 
     inline vector<double> Particle::getGeneTreeLogLikelihoods() {
         vector<double> gene_tree_log_likelihoods;
-//        for (int i=1; i<_forests.size(); i++) {
-            gene_tree_log_likelihoods.push_back(_forest._gene_tree_log_likelihood);
-//        }
+        gene_tree_log_likelihoods.push_back(_forest._gene_tree_log_likelihood);
         return gene_tree_log_likelihoods;
     }
 
     inline vector<double> Particle::getTopologyPriors() {
         // calculate species tree topology probability
         vector<double> topology_priors;
-//        for (auto &f:_forests) {
-            topology_priors.push_back(_forest._log_joining_prob);
-//        }
+        topology_priors.push_back(_forest._log_joining_prob);
         return topology_priors;
     }
 
     inline vector<string> Particle::getGeneTreeNames(int j) {
         vector<string> names;
         string particle_number = to_string(j);
-//        for (int i=1; i<_forest.size(); i++) {
         int i = 1;
-            string forest_number = to_string(i-1);
-            string name = "\"gene-" + forest_number + "-" + particle_number + "\"";
-            names.push_back(name);
-//        }
+        string forest_number = to_string(i-1);
+        string name = "\"gene-" + forest_number + "-" + particle_number + "\"";
+        names.push_back(name);
         return names;
     }
 
@@ -743,146 +653,25 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
     inline void Particle::resetGeneIncrements() {
-//        for (int i=1; i<_forests.size(); i++) {
-            _forest._increments.clear();
-//        }
+        _forest._increments.clear();
     }
 
     inline void Particle::buildEntireSpeciesTree() {
+        assert (_name == "species");
+        
         double max_depth = 0.0;
         _forest.chooseSpeciesIncrement(max_depth);
-//        double first_edge = 0.0015;
-//        double first_edge = 3.0161e-12;
-//        _forests[0].addPredeterminedSpeciesIncrement(first_edge);
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-        double edge_len = _forest._last_edge_length;
-        _t.push_back(make_pair(species_joined, edge_len));
-        double increment = 0.0;
+        _t.push_back(make_pair(species_joined, 0.0));
 
-//        cout << "new particle" << endl;
         for (int i=0; i < _forest._nspecies-1; i++) {
             if (_forest._lineages.size() > 1) {
                 species_joined = _forest.speciesTreeProposal();
-                pair<unsigned, unsigned> example;
-                // for sim.nex
-                bool sim = false;
-                if (sim) {
-                    if (i == 0) {
-                        example = make_pair(1, 4);
-                        increment = 0.00322;
-                    }
-                    else if (i == 1) {
-                        example = make_pair(1,2 );
-                        increment = 0.01051;
-                    }
-                    else if (i == 2) {
-                        example = make_pair(1, 2);
-                        increment = 0.00193;
-                    }
-                    else if (i == 3) {
-                        example = make_pair(0, 1);
-                        increment = 0.0;
-                    }
-                }
-                // for low_info.,nex
-                bool low_info = false;
-                    if (low_info) {
-                        if (i == 0) {
-                            example = make_pair(1,2);
-                        }
-                        else if (i==1) {
-                            example = make_pair(1,2);
-                        }
-                        else if (i == 2) {
-                            example = make_pair(1,2);
-                        }
-                        else if (i == 3) {
-                            example = make_pair(0,1);
-                        }
-                    }
-                // for gopher.nex
-                bool gopher = false;
-                    if (gopher) {
-                        if (i == 0) {
-                            example = make_pair(1,7);
-//                            increment = 3.0161e-12;
-                            increment = 0.0015;
-                        }
-                        else if (i == 1) {
-                            example = make_pair(5,6);
-//                            increment = 0.00237780 - 3.0161e-12;
-                            increment = 0.00237780 - 0.003;
-                        }
-                        else if (i == 2) {
-                            example = make_pair(1,2);
-                            increment = (0.00340594 - 0.00237780);
-                        }
-                        else if (i == 3) {
-                            example = make_pair(2,4);
-                            increment = 0.00554410 - (0.00340594);
-                        }
-                        else if (i == 4) {
-                            example = make_pair(1,3);
-                            increment = 0.01366147 - 0.00554410;
-                        }
-                        else if (i == 5) {
-                            example = make_pair(1,2);
-                            increment = 0.00728109;
-                        }
-                        else if (i == 6) {
-                            example = make_pair(0,1);
-                            increment = 0.0;
-                        }
-                    }
-                bool snake = false;
-                if (snake) {
-                    if (i == 0) {
-                        example = make_pair(2,3);
-                    }
-                    else if (i == 1) {
-                        example = make_pair(2,3);
-                    }
-                    else if (i == 2) {
-                        example = make_pair(1,3);
-                    }
-                    else if (i == 3) {
-                        example = make_pair(1,2);
-                    }
-                    else if (i == 4) {
-                        example = make_pair(1,2);
-                    }
-                    else if (i == 5) {
-                        example = make_pair(0,1);
-                    }
-                }
-                bool sim19 = false;
-                if (sim19) {
-                    if (i == 0) {
-                        example = make_pair(4,5);
-                    }
-                    else if (i == 1) {
-                        example = make_pair(1,2);
-                    }
-                    else if (i == 2) {
-                        example = make_pair(2,3);
-                    }
-                    else if (i == 3) {
-                        example = make_pair(0,2);
-                    }
-                    else if (i == 4) {
-                        example = make_pair(0,2);
-                    }
-                    else if (i == 5) {
-                        example = make_pair(0,1);
-                    }
-                }
-//                species_joined = _forest.preDeterminedSpeciesTreeProposal(example);
+                
                 // if the species tree is not finished, add another species increment
                 if (_forest._lineages.size()>1) {
                     _forest.addSpeciesIncrement();
-//                    assert (increment > 0.0);
-//                    _forests[0].addPredeterminedSpeciesIncrement(increment);
                 }
                 
                 double edge_len = 0.0;
@@ -890,10 +679,10 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
                     edge_len = _forest._last_edge_length;
                 }
                 _t.push_back(make_pair(species_joined, edge_len));
-//                _t.push_back(make_pair(species_joined, edge_len));
             }
         }
     }
+
 
     inline void Particle::resetGeneTreePartials(Data::SharedPtr d, map<string, string> taxon_map) {
         _nsubsets = d->getNumSubsets();
@@ -916,17 +705,13 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_likelihood = other._log_likelihood;
-//        _forests         = other._forests;
         _forest         = other._forest;
         _data           = other._data;
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;
         _t = other._t;
-        _gene_tree_proposal_attempts = other._gene_tree_proposal_attempts;
-        _ready_to_join_species = other._ready_to_join_species;
         _running_on_empty = other._running_on_empty;
         _random_seeds = other._random_seeds;
-        _species_first = other._species_first;
         _no_species_joined = other._no_species_joined;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _species_tree_height = other._species_tree_height;

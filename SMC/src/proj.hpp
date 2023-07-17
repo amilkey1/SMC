@@ -1253,7 +1253,6 @@ namespace proj {
                     log_coalescent_likelihood = p->getCoalescentLikelihood();
                     
                     assert(branch_length_vec.size() == prior_vec.size());
-//                    int ngenes = p->getNGenes();
                     int ngenes = nsubsets;
                     
                     if (col_count == 0) {
