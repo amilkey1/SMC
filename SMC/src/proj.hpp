@@ -953,6 +953,9 @@ namespace proj {
                 }
                 
                 if (_gene_newicks_names != "null") {
+                    if (_niterations == 1) {
+                        throw XProj(boost::str(boost::format("must specify more than 1 iteration if beginning from gene trees")));
+                    }
                     ifstream infile(_gene_newicks_names);
                     string newick;
                     while (getline(infile, newick)) {
@@ -993,18 +996,6 @@ namespace proj {
                         }
                     }
                 }
-                    
-//                    if (s == 0) {
-//                        if (_gene_newicks_names != "null") {
-//                            my_vec[0][p]->processGeneNewicks(newicks, s);
-//                            start = "gene";
-//                        }
-//                        else {
-//                            my_vec[0][p]->processSpeciesNewick(newicks); // if no newick specified, program will sample from species tree prior
-//                            }
-//                        }
-//                    }
-//                }
                 
                 for (int s=0; s<nsubsets+1; s++) {
                     for (auto &p:my_vec[s]) {
@@ -1023,9 +1014,6 @@ namespace proj {
                         for (int s=0; s<nsubsets+1; s++) {
                             for (int p=0; p<nparticles; p++) {
                                 my_vec[s][p]->setParticleGeneration(0);
-//                                my_vec[s][p]->setLogLikelihood(0.0);
-//                                my_vec[s][p]->setLogWeight(0.0, "g");
-//                                my_vec[s][p]->setLogWeight(0.0, "s");
                                 if (s > 0) {
                                     my_vec[s][p]->mapGeneTrees(_taxon_map, _species_names);
                                     my_vec[s][p]->resetGeneIncrements();
