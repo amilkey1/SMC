@@ -247,9 +247,9 @@ class Particle {
 
         if (!_running_on_empty) {
             double prev_log_likelihood = _log_likelihood;
+            
             if (Forest::_proposal == "prior-prior") {
                 _log_likelihood = calcLogLikelihood();
-
                 _log_weight = _log_likelihood - prev_log_likelihood;
             }
             else {

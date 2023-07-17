@@ -106,12 +106,9 @@ class Forest {
         void                        updateSpeciesPartition(tuple<string, string, string> species_info);
         void                        updateIncrements(double log_increment_prior);
         pair<double, string>        chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info);
-        void                        combineSpeciesPartition();
         pair<Node*, Node*>          chooseAllPairs(list<Node*> &nodes, double increment, string species);
-        double                      calcMaxDepth();
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done);
         vector< pair<double, Node *>>      sortPreorder();
-        void                        updateLineages(pair<tuple<string, string, string>, double> chosen_species);
         void                        calcMinDepth();
         vector<pair<double, pair<string, string>>>             getMinDepths();
         void                        resetDepthVector(tuple<string, string, string> species_joined);
@@ -312,7 +309,6 @@ class Forest {
         return sum_height;
     }
 
-//    inline double Forest::getLineageHeight(const Node* nd) const {
     inline double Forest::getLineageHeight(Node* nd) {
         if (nd != nullptr) {
             double sum_height = 0.0;
@@ -330,43 +326,6 @@ class Forest {
         }
     }
 
-    inline void Forest::updateLineages(pair<tuple<string, string, string>, double> species_joined) {
-        Node* delnode1;
-        Node* delnode2;
-        Node* addnode;
-        if (get<0>(species_joined.first) != "null") {
-            for (auto &nd:_lineages) {
-                if (nd->_name == get<0>(species_joined.first)) {
-                    delnode1 = nd;
-                }
-                else if (nd->_name == get<1>(species_joined.first)) {
-                    delnode2 = nd;
-                }
-            }
-            // make new node
-            Node nd;
-            _nodes.push_back(nd);
-            Node* new_nd = &_nodes.back();
-            new_nd->_parent=0;
-            new_nd->_number=_nleaves+_ninternals;
-            new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
-            new_nd->_edge_length=0.0;
-            _ninternals++;
-            new_nd->_right_sib=0;
-
-            new_nd->_left_child=delnode1;
-            delnode1->_right_sib=delnode2;
-
-            delnode1->_parent=new_nd;
-            delnode2->_parent=new_nd;
-            
-            updateNodeVector(_lineages, delnode1, delnode2, new_nd);
-        }
-        for (auto &nd:_lineages) {
-            nd->_edge_length += species_joined.second;
-        }
-    }
-
     inline vector< pair<double, Node *>> Forest::sortPreorder() {
             vector< pair<double, Node *>> heights_and_nodes;
             for (auto it = _preorder.rbegin(); it != _preorder.rend(); it++) {
@@ -375,12 +334,6 @@ class Forest {
                     // if internal node, store cumulative height in _height
                     double height = getLineageHeight(nd->_left_child); //
                     heights_and_nodes.push_back(make_pair(height, nd));
-    //                nd->_height = nd->_left_child->_height + nd->_left_child->_edge_length;
-    //                heights_and_nodes.push_back(make_pair(nd->_height, nd));
-                }
-                else {
-                    // if leaf node, initialize _height to zero
-    //                nd->_height = 0.0;
                 }
             }
              
@@ -2316,63 +2269,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             }
         }
         assert (_species_partition.size() > 0);
-    }
-
-    inline void Forest::combineSpeciesPartition() {
-        string new_name = "new_species";
-        vector<string> species;
-        
-//        list<Node*> &nodes = _species_partition[new_name];
-        
-        for (auto &s:_species_partition) {
-            species.push_back(s.first);
-        }
-        
-        for (int i=0; i<species.size(); i++) {
-            list<Node*> &nodes = _species_partition[new_name];
-            copy(_species_partition[species[i]].begin(), _species_partition[species[i]].end(), back_inserter(nodes));
-            _species_partition.erase(species[i]);
-        }
-    }
-
-    inline double Forest::calcMaxDepth() {
-        // TODO: this function needs to know which species have just been joined
-        // walk through _lineages vector backwards, finding the earliest place in the tree nodes from different species share a parent
-        // build list of nodes joined
-        vector<pair<Node, Node>> nodes_joined_from_different_species;
-        for (auto &nd:_nodes) {
-            if (nd._right_sib != NULL) {
-                string species1 = nd._name;
-                Node nd2 = nd;
-                while (species1 == "") {
-                    nd2 = *nd2._left_child;
-                    species1 = nd2._name;
-                }
-                string species2 = nd._right_sib->_name;
-                Node nd3 = *nd._right_sib;
-                while (species2 == "") {
-                    nd3 = *nd3._left_child;
-                    species2 = nd3._name;
-                }
-                species1 = species1.substr(species1.find("^") + 1);
-                species2 = species2.substr(species2.find("^") + 1); 
-                if (species1 != species2) {
-                    nodes_joined_from_different_species.push_back(make_pair(nd, *nd._right_sib));
-                }
-            }
-        }
-        
-        vector<double> depths;
-        for (auto &nds:nodes_joined_from_different_species) {
-            // calculate distance between nodes
-            double depth = getLineageHeight(&nds.first);
-            depths.push_back(depth);
-        }
-        
-        double max_depth = *max_element(depths.begin(), depths.end());
-
-
-        return max_depth;
     }
 
     inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info) {
