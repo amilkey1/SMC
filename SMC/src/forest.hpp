@@ -562,11 +562,11 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
     inline string Forest::makeNewick(unsigned precision, bool use_names) {
-            string newick = "";
-            const boost::format tip_node_name_format( boost::str(boost::format("%%s:%%.%df") % precision) );
-            const boost::format tip_node_number_format( boost::str(boost::format("%%d:%%.%df") % precision) );
-            const boost::format internal_node_format( boost::str(boost::format("):%%.%df") % precision) );
-            stack<Node *> node_stack; // TODO: this function doesn't work with >1 cycles
+        string newick = "";
+        const boost::format tip_node_name_format( boost::str(boost::format("%%s:%%.%df") % precision) );
+        const boost::format tip_node_number_format( boost::str(boost::format("%%d:%%.%df") % precision) );
+        const boost::format internal_node_format( boost::str(boost::format("):%%.%df") % precision) );
+        stack<Node *> node_stack; // TODO: this function doesn't work with >1 cycles
 
         // find hybrid nodes, don't visit minor or major parent until hybrid node is visited
         vector<Node*> hybrid_nodes;

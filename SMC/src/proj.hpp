@@ -1072,6 +1072,8 @@ namespace proj {
                             }
                         }
                         
+                        _accepted_particle_vec = my_vec;
+                        
                         for (unsigned g=0; g<ntaxa-1; g++){
                             // filter particles within each gene
         //                    cout << "gen " << g << endl;
@@ -1160,10 +1162,6 @@ namespace proj {
                                 for (int j=1; j<nsubsets+1; j++) {
                                     max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
                                 }
-                                
-//                                cout << "particle: " << p << endl;
-//                                cout << get<0>(species_joined) << endl;
-//                                cout << get<1>(species_joined) << endl;
                                 
                                 // now finish the species tree branch length proposal
                                 my_vec[0][p]->speciesProposal(max_depths, species_joined);
