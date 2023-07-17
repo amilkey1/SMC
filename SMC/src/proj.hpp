@@ -54,8 +54,8 @@ namespace proj {
             string              acceptParameters();
             void                showFinal(vector<vector<Particle::SharedPtr>>);
             double              tune(bool accepted, double lambda);
-            void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained, string a, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
-            void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained, string a, bool deconstruct, Particle::SharedPtr species_tree_particle);
+            void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
+            void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, Particle::SharedPtr species_tree_particle);
             void                printSpeciationRates();
             void                printThetas();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
@@ -787,14 +787,14 @@ namespace proj {
         cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
     }
 
-    inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained, string a, bool deconstruct, Particle::SharedPtr species_tree_particle) {
+    inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, Particle::SharedPtr species_tree_particle) {
         assert(_nthreads > 0);
         vector<pair<tuple<string, string, string>, double>> species_joined = species_tree_particle->getSpeciesJoined();
         assert (species_joined.size() > 0);
         
         if (_nthreads == 1) {
             for (int p=0; p<particles.size(); p++) {
-                particles[p]->proposal(gene_trees_only, unconstrained, deconstruct, species_joined);
+                particles[p]->proposal(gene_trees_only, deconstruct, species_joined);
           }
         }
         // TODO: add species_joined for multithreading
@@ -809,7 +809,7 @@ namespace proj {
 //
 //            while (true) {
 //            // create a thread to handle particles first through last - 1
-//              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles), gene_trees_only, unconstrained, a, deconstruct, species_joined));
+//              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles), gene_trees_only, a, deconstruct, species_joined));
 //            // update first and last
 //            first = last;
 //            last += incr;
@@ -828,9 +828,9 @@ namespace proj {
 //        }
     }
 
-    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, bool unconstrained, string a, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
+    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
         for (unsigned i=first; i<last; i++){
-            particles[i]->proposal(gene_trees_only, unconstrained, deconstruct, species_joined);
+            particles[i]->proposal(gene_trees_only, deconstruct, species_joined);
         }
     }
 
@@ -1066,14 +1066,9 @@ namespace proj {
                             //taxon joining and reweighting step
                             
                             bool gene_trees_only = true;
-                            bool unconstrained = true;
-                            if (i > 0) {
-                                unconstrained = false;
-                            }
                             
                             for (int s=1; s<nsubsets+1; s++) { // skip species tree particles
-                                proposeParticles(my_vec[s], gene_trees_only, unconstrained, "g", deconstruct, species_tree_particle);
-//                                proposeParticles(my_vec[s], gene_trees_only, unconstrained, "g", deconstruct, my_vec[0]);
+                                proposeParticles(my_vec[s], gene_trees_only, "g", deconstruct, species_tree_particle);
                                 deconstruct = true;
                                 
                                 if (!_run_on_empty) {

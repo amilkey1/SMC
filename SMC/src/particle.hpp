@@ -28,7 +28,7 @@ class Particle {
 
         void                                    debugParticle(std::string name);
         void                                    showParticle();
-        double                                  proposal(bool gene_trees_only, bool unconstrained, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
+        double                                  proposal(bool gene_trees_only, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
         void                                    setData(Data::SharedPtr d, map<string, string> &taxon_map, int index) {
                                                     _nsubsets = d->getNumSubsets();
                                                     _data = d;
@@ -93,7 +93,7 @@ class Particle {
         vector<pair<tuple<string, string, string>, double>>                    getSpeciesJoined(){return _t;}
         void                                            buildFakeSpeciesTree();
         double                                          getCoalescentLikelihood(){return _log_coalescent_likelihood;}
-        void                                            geneTreeProposal(bool unconstrained, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
+        void                                            geneTreeProposal(bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
         void                                            speciesProposal(vector<double> max_depths, tuple<string, string, string> species_joined);
         void                                            resetSpeciesInfo(){_t.clear();}
         void                                            resetSpeciesTreeHeight(){ _species_tree_height = 0.0;}
@@ -229,7 +229,7 @@ class Particle {
 //        }
     }
 
-    inline double Particle::proposal(bool gene_trees_only, bool unconstrained, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
+    inline double Particle::proposal(bool gene_trees_only, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
         string event;
         
             _forest._theta = _forest._starting_theta;
@@ -241,7 +241,7 @@ class Particle {
 //            }
         }
         if (gene_trees_only) {
-            geneTreeProposal(unconstrained, deconstruct, species_joined);
+            geneTreeProposal(deconstruct, species_joined);
         }
         else if (!gene_trees_only) {
             if (_generation == 0 || _generation == Forest::_ntaxa - 1) {
@@ -264,8 +264,8 @@ class Particle {
         return _log_weight;
     }
 
-    inline void Particle::geneTreeProposal(bool unconstrained, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
-        if (_generation == 0 && !unconstrained && deconstruct) {
+    inline void Particle::geneTreeProposal(bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
+        if (_generation == 0 && deconstruct) {
 //            for (int i=1; i<_forests.size(); i++) {
                 _forest.deconstructGeneTree();
 //            }
@@ -273,7 +273,7 @@ class Particle {
 //        for (int i=1; i<_forests.size(); i++) {
             _forest._theta = _forest._starting_theta;
 //            assert (_t.size() == _forests[0]._nspecies); // TODO: get num species
-            pair<double, string> species_info = _forest.chooseDelta(species_joined, false);
+            pair<double, string> species_info = _forest.chooseDelta(species_joined);
             _forest.geneTreeProposal(species_info, species_joined);
             if (_forest._lineages.size() == 1) {
                 _forest.refreshPreorder();
