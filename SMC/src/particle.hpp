@@ -93,7 +93,7 @@ class Particle {
         void                                            resetSpecies();
         void                                            resetGeneIncrements();
         void                                            processSpeciesNewick(vector<string> newicks);
-        void                                            processGeneNewicks(vector<string> newicks);
+        void                                            processGeneNewicks(vector<string> newicks, int gene_number);
         void                                            remakeGeneTrees(map<string, string> &taxon_map) ;
         vector<pair<double, pair<string, string>>>      getMinDepth(){return _forest.getMinDepths();}
         void                                            calcGeneTreeMinDepth();
@@ -327,7 +327,7 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
     inline double Particle::calcGeneCoalescentLikelihood(double last_edge_len, tuple<string, string, string> species_joined, double species_tree_height) {
-            double coal_like_increment = _forest.calcCoalescentLikelihood(last_edge_len, species_joined, species_tree_height, true);
+        double coal_like_increment = _forest.calcCoalescentLikelihood(last_edge_len, species_joined, species_tree_height, true);
             _log_coalescent_likelihood += coal_like_increment;
         return _log_coalescent_likelihood;
     }
@@ -466,8 +466,12 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
         assert (_t[Forest::_nspecies-1].second == 0); // last element of _t should not draw a branch length
     }
 
-    inline void Particle::processGeneNewicks(vector<string> newicks) {
-        cout << "fix this later" << endl;
+    inline void Particle::processGeneNewicks(vector<string> newicks, int gene_number) {
+        _forest.buildFromNewick(newicks[gene_number], true, false);
+        _forest.refreshPreorder();
+        _forest._theta = _forest._starting_theta;
+        
+//        cout << "fix this later" << endl;
 //        assert (newicks.size() == _forests.size() - 1);
 //        for (int i=1; i<_forests.size(); i++) {
 //            _forests[i].buildFromNewick(newicks[i-1], true, false);

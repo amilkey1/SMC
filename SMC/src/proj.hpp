@@ -978,18 +978,33 @@ namespace proj {
                         my_vec[s][p]->setLogCoalescentLikelihood(0.0);
                         my_vec[s][p]->setLogWeight(0.0, "g");
                         my_vec[s][p]->setLogWeight(0.0, "s");
-                    
-                    if (s== 0) {
-                        if (_gene_newicks_names != "null") {
-                            my_vec[0][p]->processGeneNewicks(newicks);
-                            start = "gene";
-                        }
-                        else {
+                        
+                        if (s == 0 && _gene_newicks_names == "null") {
                             my_vec[0][p]->processSpeciesNewick(newicks); // if no newick specified, program will sample from species tree prior
-                        }
                         }
                     }
                 }
+                if (_gene_newicks_names != "null") {
+                    assert (newicks.size() == nsubsets);
+                    for (int s=1; s<nsubsets+1; s++) {
+                        for (int p=0; p<nparticles; p++) {
+                            my_vec[s][p]->processGeneNewicks(newicks, s-1);
+                            start = "gene";
+                        }
+                    }
+                }
+                    
+//                    if (s == 0) {
+//                        if (_gene_newicks_names != "null") {
+//                            my_vec[0][p]->processGeneNewicks(newicks, s);
+//                            start = "gene";
+//                        }
+//                        else {
+//                            my_vec[0][p]->processSpeciesNewick(newicks); // if no newick specified, program will sample from species tree prior
+//                            }
+//                        }
+//                    }
+//                }
                 
                 for (int s=0; s<nsubsets+1; s++) {
                     for (auto &p:my_vec[s]) {
