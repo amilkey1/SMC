@@ -117,14 +117,12 @@ class Particle {
         double                                  _log_coalescent_likelihood;
         int                                     _generation = 0;
         bool                                    _running_on_empty = false;
-        bool                                    _no_species_joined = true;
         double                                  _species_tree_height;
         vector<pair<tuple<string, string, string>, double>> _t;
         bool                                    firstProposal();
         void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
         void                                    resetVariables();
         bool                                    _inf = false;
-        vector<double>                          _unnormalized_weights;
         string                                  _name;
 };
 
@@ -249,12 +247,14 @@ class Particle {
 
         if (!_running_on_empty) {
             double prev_log_likelihood = _log_likelihood;
-            _log_likelihood = calcLogLikelihood();
             if (Forest::_proposal == "prior-prior") {
+                _log_likelihood = calcLogLikelihood();
+
                 _log_weight = _log_likelihood - prev_log_likelihood;
             }
             else {
                 calcParticleWeight();
+                _generation++;
             }
         }
     }
@@ -372,14 +372,8 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
     inline void Particle::calcParticleWeight() {
         // use the gene tree weights to calculate the particle weight
-//        double prev_log_weight = _log_weight;
         _log_weight = 0.0;
-//        for (int i = 1; i<_forests.size(); i++) {
-            _log_weight += _forest._gene_tree_log_weight;
-//            _log_weight += _forests[i]._gene_tree_log_likelihood;
-//        }
-//        _log_weight = prev_log_weight - _log_weight;
-//        _generation++;
+        _log_weight += _forest._gene_tree_log_weight;
     }
 
 
@@ -393,16 +387,12 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
     inline void Particle::calculateGamma() {
-        cout << "fix later" << endl;
-//        double major = 0.0;
-//        double total = _forests.size()-1;
-//        for (int i=1; i < (int) _forests.size(); i++) {
-//            if (_forests[i]._last_direction == "major") {
-//                major++;
-//            }
-//        }
-//        double gamma = major / total;
-//        _forests[0]._gamma.push_back(gamma);
+        double major = 0.0;
+        if (_forest._last_direction == "major") {
+            major++;
+        }
+        double gamma = major;
+        _forest._gamma.push_back(gamma);
     }
 
     inline void Particle::saveForest(std::string treefilename)  {
@@ -485,15 +475,12 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
     inline void Particle::hybridizationProposal() {
-        cout << "fix this later" << endl;
-//        vector<string> hybridized_nodes = _forests[0].hybridizeSpecies();
-//        if (_forests[0]._lineages.size()>1) {
-//            _forests[0].addSpeciesIncrement();
-//        }
-//        for (unsigned i=1; i<_forests.size(); i++) {
-//            _forests[i].hybridizeGene(hybridized_nodes, _forests[0]._last_edge_length);
-//        }
-//        calculateGamma();
+        vector<string> hybridized_nodes = _forest.hybridizeSpecies();
+        if (_forest._lineages.size()>1) {
+            _forest.addSpeciesIncrement();
+        }
+        _forest.hybridizeGene(hybridized_nodes, _forest._last_edge_length);
+        calculateGamma();
     }
 
     inline void Particle::setNumSubsets(unsigned n) {
@@ -530,30 +517,26 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
     inline void Particle::showHybridNodes() {
-        cout << "fix this" << endl;
-//        cout << "particle" << endl;
-//        showGamma();
-//        for (auto &nd:_forests[0]._nodes) {
-//            if (nd._major_parent) {
-//                cout << "       " << "hybridized node is: " << nd._name << " with minor parent " << nd._minor_parent->_name << " and major parent " << nd._major_parent->_name << endl;
-//            }
-//        }
+        cout << "particle" << endl;
+        showGamma();
+        for (auto &nd:_forest._nodes) {
+            if (nd._major_parent) {
+                cout << "       " << "hybridized node is: " << nd._name << " with minor parent " << nd._minor_parent->_name << " and major parent " << nd._major_parent->_name << endl;
+            }
+        }
     }
 
     inline string Particle::saveHybridNodes() {
-        cout << "fix this" << endl;
-//        string nodes = "";
-//        int i = 0;
-//        for (auto &nd:_forests[0]._nodes) {
-//            if (nd._major_parent) {
-//                string gammastr = to_string(_forests[0]._gamma[i]);
-//                nodes +=  "hybridized node is: " + nd._name + " with minor parent " + nd._minor_parent->_name + " and major parent " + nd._major_parent->_name + "\n" + "gamma is: " + gammastr + "\n";
-//                i++;
-//            }
-//        }
-//        return nodes;
-        string test = "";
-        return test;
+        string nodes = "";
+        int i = 0;
+        for (auto &nd:_forest._nodes) {
+            if (nd._major_parent) {
+                string gammastr = to_string(_forest._gamma[i]);
+                nodes +=  "hybridized node is: " + nd._name + " with minor parent " + nd._minor_parent->_name + " and major parent " + nd._major_parent->_name + "\n" + "gamma is: " + gammastr + "\n";
+                i++;
+            }
+        }
+        return nodes;
     }
 
     inline double Particle::saveParticleWeights() {
@@ -565,14 +548,13 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
     inline void Particle::showGamma() {
-        cout << "fix this" << endl;
-//        if (_forests[0]._gamma.size() > 0) {
-//            cout << "   " << "gamma is: " << endl;
-//            for (auto &g:_forests[0]._gamma) {
-//                cout << g << "   ";
-//            }
-//            cout << "\n";
-//        }
+        if (_forest._gamma.size() > 0) {
+            cout << "   " << "gamma is: " << endl;
+            for (auto &g:_forest._gamma) {
+                cout << g << "   ";
+            }
+            cout << "\n";
+        }
     }
 
     inline void Particle::setLogLikelihood(double log_likelihood) {
@@ -705,11 +687,9 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
         _generation     = other._generation;
         _t              = other._t;
         _running_on_empty = other._running_on_empty;
-        _no_species_joined = other._no_species_joined;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _species_tree_height = other._species_tree_height;
         _inf = other._inf;
-        _unnormalized_weights = other._unnormalized_weights;
         _species_log_weight = other._species_log_weight;
         _name = other._name;
     };
