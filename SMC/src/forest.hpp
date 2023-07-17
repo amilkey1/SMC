@@ -92,7 +92,6 @@ class Forest {
         vector<string>              hybridizeSpecies();
         void                        moveGene(string new_nd, string parent, string hybrid);
         void                        rebuildSpeciesPartition(vector<string> names, vector<list<Node*>> nodes);
-        void                        resetSpeciesTree(vector<pair<tuple<string, string, string>, double>> _t, int smallest_num_species);
         void                        switchParents(string parent, string parent2);
         void                        resetLineages(vector<double> branch_lengths);
         vector<double>              saveBranchLengths();
@@ -3113,37 +3112,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         for (auto &name:names) {
             _species_partition[name] = nodes[i];
             i++;
-        }
-    }
-
-    inline void Forest::resetSpeciesTree(vector<pair<tuple<string, string, string>, double>> t, int smallest_num_species) {
-        // walk through species partition up to smallest_num_species - 1, separating species again
-        int a = 0;
-        int edge_len_pos = (int) t.size() - 1;
-//        int edge_len_pos = smallest_num_species-1;
-//        if (smallest_num_species == _t.size()) {
-//            edge_len_pos -= 1;
-//        }
-//        int edge_len_pos = smallest_num_species-1;
-        for (int i=0; i<smallest_num_species-1; i++) {
-            if (edge_len_pos > 0) { // never undo the first species tree increment because no species have been joined and gene trees are always constrained by that increment
-//                _lineages[a]->_left_child->_edge_length -= t[edge_len_pos].second;
-//                _lineages[a]->_left_child->_right_sib->_edge_length -= t[edge_len_pos].second;
-                for (auto &nd:_lineages) {
-                    if (nd->_edge_length > 0.0) {
-                        nd->_edge_length -= t[edge_len_pos].second;
-                    }
-                }
-            }
-            revertNodeVector(_lineages, _lineages[a]->_left_child, _lineages[a]->_left_child->_right_sib, _lineages[a]);
-            _nodes.back()._left_child->_right_sib->_parent = 0;
-            _nodes.back()._left_child->_right_sib = 0;
-            _nodes.back()._left_child->_parent = 0;
-            _nodes.back()._left_child->_right_sib = 0;
-            _nodes.pop_back();
-            a++;
-            edge_len_pos--;
-            _ninternals--;
         }
     }
 
