@@ -324,6 +324,10 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
         }
         
         _t.push_back(make_pair(species_joined, -1.0));
+    
+        if (_t.size() == Forest::_nspecies) {
+            _t[Forest::_nspecies-1].second = 0.0; // last element of _t should not draw a branch length
+        }
         
         return species_joined;
     }
@@ -361,6 +365,8 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
     inline void Particle::speciesProposal(vector<double> max_depth_vector, tuple<string, string, string> species_joined ) {
         assert (!_inf);
+        assert (_forest._lineages.size() > 1);
+        
         double max_depth = 0.0;
 
         if (_forest._lineages.size() > 1) {
@@ -374,9 +380,11 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
             _forest.chooseSpeciesIncrement(max_depth);
             _species_tree_height += _forest._last_edge_length;
         }
+        
         if (_forest._lineages.size() == 1) {
             _forest._last_edge_length = 0.0;
         }
+        
         _t[_forest._species_join_number].second = _forest._last_edge_length;
         _forest._species_join_number++;
         

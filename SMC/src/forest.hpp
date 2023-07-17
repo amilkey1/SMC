@@ -3221,6 +3221,7 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
     inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info) {
          // get species info
          double species_increment = species_info[_species_join_number].second;
+        assert (species_increment >= 0.0);
 
          // join species if necessary
          if (_ready_to_join_species) {
@@ -3296,6 +3297,12 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
                      _species_join_number = (int) species_info.size()-1;
                  }
                  
+                 if (_species_join_number == 4) {
+                     cout << "stop";
+                 }
+                 
+                 showForest();
+                 
                  species_tree_height += species_info[_species_join_number].second;
                  
                  string species1 = get<0> (species_info[_species_join_number].first);
@@ -3311,6 +3318,8 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
                  _names_of_species_joined.push_back(make_pair(species1, species2));
                  
                  species_increment = species_info[_species_join_number].second;
+                 assert (species_increment >= 0.0);
+                 
                  cum_time += species_increment;
                  
                  // choose a new species
