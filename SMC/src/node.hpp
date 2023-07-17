@@ -32,10 +32,8 @@ namespace proj {
                     void                setEdgeLength(double v);
         
                     unsigned            countChildren() const;
-//                    unsigned            countDescendants() const;
-
                     void                clearPointers()             {_left_child = _right_sib = _parent = 0;}
-            void                resetNode();
+            void                        resetNode();
                                         
             static const double _smallest_edge_length;
 

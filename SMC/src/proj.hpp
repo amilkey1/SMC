@@ -36,12 +36,10 @@ namespace proj {
             void                saveParticleLikelihoods(vector<Particle::SharedPtr> &v) const;
 
             void                normalizeWeights(vector<Particle::SharedPtr> & particles, string a, bool calc_marg_like);
-            unsigned            chooseRandomParticle(vector<Particle::SharedPtr> & particles, vector<double> & cum_prob, string a);
             void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles, string a);
-            vector<int>                resampleSpeciesParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles, string a);
+            vector<int>         resampleSpeciesParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles, string a);
             void                resetGeneParticles(vector<int> sel_indices, vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                resetWeights(vector<Particle::SharedPtr> & particles, string a);
-            double              getWeightAverage(vector<double> log_weight_vec);
             void                createSpeciesMap(Data::SharedPtr);
             void                showParticlesByWeight(vector<Particle::SharedPtr> my_vec, string a);
             void                proposeTheta();
@@ -59,7 +57,6 @@ namespace proj {
             void                printSpeciationRates();
             void                printThetas();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
-        vector< pair<double,unsigned> >                throwDarts(vector< pair<double,unsigned> > & cum_probs, vector<Particle::SharedPtr> &particles, string a);
             void                writeGeneTreeFile();
             Particle::SharedPtr                chooseSpeciesTree(vector<Particle::SharedPtr> species_trees);
         
@@ -73,7 +70,6 @@ namespace proj {
             bool                        _ambig_missing;
             unsigned                    _nparticles;
             unsigned                    _random_seed;
-//            double                      _avg_marg_like;
             double                      _log_marginal_likelihood;
             double                      _gene_tree_log_marginal_likelihood;
             double                      _species_tree_log_marginal_likelihood;
@@ -528,55 +524,6 @@ namespace proj {
     inline double Proj::logHybridizationRatePrior(double hybridization_rate) {
         double exponential_rate = -log(0.05);
         return (log(exponential_rate) - hybridization_rate*exponential_rate);
-    }
-
-    inline unsigned Proj::chooseRandomParticle(vector<Particle::SharedPtr> & particles, vector<double> & cum_probs, string a) {
-        int chosen_index = -1;
-        unsigned nparticles = (unsigned)particles.size();
-        double u = rng.uniform();
-        double cum_prob = 0.0;
-        
-        for(unsigned j = 0; j < nparticles; j++) {
-            if (cum_probs[j]<0.0){
-                cum_prob += exp(particles[j]->getLogWeight(a));
-                cum_probs[j] = cum_prob;
-            }
-            else
-                cum_prob = cum_probs[j];
-            
-            if (u < cum_prob) {
-                chosen_index = j;
-                break;
-            }
-        }
-        assert(chosen_index > -1);
-        return chosen_index;
-    }
-
-    inline vector< pair<double,unsigned> > Proj::throwDarts(vector< pair<double,unsigned> > & cum_probs, vector<Particle::SharedPtr> &particles, string a) {
-        // Create vector of pairs p, with p.first = log weight and p.second = particle index
-        cum_probs.resize(_nparticles);
-        unsigned i = 0;
-        for(auto & p : particles) {
-            cum_probs[i].first = p->getLogWeight(a);
-            cum_probs[i].second = i;
-            ++i;
-        }
-        
-        // Sort cum_probs vector so that largest log weights come first
-          sort(cum_probs.begin(), cum_probs.end(), greater< pair<double,unsigned> >());
-
-          // Convert vector from storing log weights to storing cumulative weights
-          double cumpr = 0.0;
-          for (auto & w : cum_probs) {
-              cumpr += exp(w.first);
-              w.first = cumpr;
-          }
-          
-          // Last element in cum_probs should hold 1.0 if weights were indeed normalized coming in
-          assert( fabs( 1.0 - cum_probs[_nparticles-1].first ) < Proj::_small_enough);
-        
-        return cum_probs;
     }
 
     inline void Proj::writeGeneTreeFile() {
