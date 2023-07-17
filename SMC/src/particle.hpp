@@ -163,8 +163,14 @@ class Particle {
 //        _forests[0].showForest();
         //print out weight of each particle
         cout << "\nParticle:\n";
-        cout << "  _log_weight: " << _log_weight << "\n" ;
-        cout << " _log_likelihood: " << _log_likelihood << "\n";
+        double log_weight = _log_weight;
+        if (_name == "species") {
+            log_weight = _species_log_weight;
+        }
+        cout << "  _log_weight: " << log_weight << "\n" ;
+        if (_name != "species") {
+            cout << " _log_likelihood: " << _log_likelihood << "\n";
+        }
         cout << "  _forest: " << "\n";
         cout << "\n";
 //        for (auto &_forest:_forests) {

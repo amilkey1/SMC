@@ -1044,6 +1044,7 @@ namespace proj {
                     if (start == "species") {
                         // pick a species tree to use for all the gene trees for this step
                         // TODO: make sure weights are normalized going on and on the log scale
+                        // TODO: don't need to build them all and choose for the first step
                         
                         Particle::SharedPtr species_tree_particle = chooseSpeciesTree(my_vec[0]); // pass in all the species trees
                         resetWeights(my_vec[0], "s");
