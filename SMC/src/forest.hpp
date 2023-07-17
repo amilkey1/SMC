@@ -909,68 +909,65 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     }
 
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment, string species) {
-        _node_choices.clear();
-        _log_likelihood_choices.clear();
-        _gene_tree_log_weight = 0.0;
-        
-        double starting_gene_tree_log_coalescent_likelihood = _gene_tree_log_coalescent_likelihood;
-        
-        // choose pair of nodes to try
-        for (int i = 0; i < (int) node_list.size()-1; i++) {
-            for (int j = i+1; j < (int) node_list.size(); j++) {
-                // createNewSubtree returns subtree1, subtree2, new_nd
-                tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment, species);
-                
-                _log_likelihood_choices.push_back(calcLogLikelihood()+_gene_tree_log_coalescent_likelihood);
-                
-                // reset log coal likelihood
-                _gene_tree_log_coalescent_likelihood = starting_gene_tree_log_coalescent_likelihood;
+         _node_choices.clear();
+         _log_likelihood_choices.clear();
+         _gene_tree_log_weight = 0.0;
+         
+         double starting_gene_tree_log_coalescent_likelihood = _gene_tree_log_coalescent_likelihood;
+         
+         // choose pair of nodes to try
+         for (int i = 0; i < (int) node_list.size()-1; i++) {
+             for (int j = i+1; j < (int) node_list.size(); j++) {
+                 // createNewSubtree returns subtree1, subtree2, new_nd
+                 tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment, species);
+                 
+                 _log_likelihood_choices.push_back(calcLogLikelihood()+_gene_tree_log_coalescent_likelihood);
+                 
+                 // reset log coal likelihood
+                 _gene_tree_log_coalescent_likelihood = starting_gene_tree_log_coalescent_likelihood;
 
-                // revert _lineages
-                revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
+                 // revert _lineages
+                 revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
 
-                //reset siblings and parents of original nodes back to 0
-                get<0>(t)->resetNode(); //subtree1
-                get<1>(t)->resetNode(); //subtree2
+                 //reset siblings and parents of original nodes back to 0
+                 get<0>(t)->resetNode(); //subtree1
+                 get<1>(t)->resetNode(); //subtree2
 
-                // clear new node from _nodes
-                //clear new node that was just created
-                get<2>(t)->clear(); //new_nd
-            }
-        }
-        
-        // reweight each choice of pairs
-            vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood + starting_gene_tree_log_coalescent_likelihood);
-            
-            // sum unnormalized weights before choosing the pair
-//            _gene_tree_log_weight = 0.0;
-                // choices are already weighted
+                 // clear new node from _nodes
+                 //clear new node that was just created
+                 get<2>(t)->clear(); //new_nd
+             }
+         }
+         
+         // reweight each choice of pairs
+             vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood + starting_gene_tree_log_coalescent_likelihood);
+             
+             // sum unnormalized weights before choosing the pair
+                 // choices are already weighted
 
-            // sum unnormalized weights before choosing the pair
-            // must include the likelihoods of all pairs in the final particle weight
-            double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-            _gene_tree_log_weight += log_weight_choices_sum;
-            for (int b=0; b < (int) log_weight_choices.size(); b++) {
-                log_weight_choices[b] -= log_weight_choices_sum;
-            }
-            
-            _log_weight_vec.clear();
-            
-            // randomly select a pair
-            _index_of_choice = selectPair(log_weight_choices);
+             // sum unnormalized weights before choosing the pair
+             // must include the likelihoods of all pairs in the final particle weight
+             double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
+             _gene_tree_log_weight += log_weight_choices_sum;
+             for (int b=0; b < (int) log_weight_choices.size(); b++) {
+                 log_weight_choices[b] -= log_weight_choices_sum;
+             }
+             
+             // randomly select a pair
+             _index_of_choice = selectPair(log_weight_choices);
 
-            // find nodes to join in node_list
-            Node *subtree1 = _node_choices[_index_of_choice].first;
-            Node *subtree2 = _node_choices[_index_of_choice].second;
-        
-        _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
-            
-            // erase extra nodes created from node list
-            for (int i = 0; i < _node_choices.size(); i++) {
-                _nodes.pop_back();
-            }
-        return make_pair(subtree1, subtree2);
-    }
+             // find nodes to join in node_list
+             Node *subtree1 = _node_choices[_index_of_choice].first;
+             Node *subtree2 = _node_choices[_index_of_choice].second;
+         
+         _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
+             
+             // erase extra nodes created from node list
+             for (int i = 0; i < _node_choices.size(); i++) {
+                 _nodes.pop_back();
+             }
+         return make_pair(subtree1, subtree2);
+     }
 
     inline void Forest::chooseCoalescentEvent() {
         assert (_increment_choices.size() == _log_weight_vec.size());
@@ -3391,7 +3388,6 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
      }
 
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double increment, string species) {
-        // try prior-prior for now
         allowCoalescence(nodes, increment, species);
         _gene_tree_log_likelihood = calcLogLikelihood();
     }
@@ -3412,9 +3408,9 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
             assert (t.first < nodes.size() && t.second < nodes.size());
         }
         else {
-//            _prev_gene_tree_log_likelihood = 0.0; // prev log likelihood is 0 for the first gen
+    //            _prev_gene_tree_log_likelihood = 0.0; // prev log likelihood is 0 for the first gen
             if (_lineages.size() != _ntaxa) {
-//                _prev_gene_tree_log_likelihood = calcLogLikelihood();
+    //                _prev_gene_tree_log_likelihood = calcLogLikelihood();
                 _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
             }
             else {
@@ -3456,7 +3452,8 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         //update species list
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-//        _gene_tree_increments.push_back(increment);
+        
+        _gene_tree_log_likelihood = calcLogLikelihood();
         
         // update increments and priors
         double log_increment_prior = 0.0;
@@ -3471,14 +3468,12 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
                     coalescence = false;
                 }
             }
-//            double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
             if (coalescence) {
                 // if there is coalescence, need to use number of lineages before the join
                 double coalescence_rate = (s.second.size()+1)*(s.second.size()) / _theta;
                 assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
                 double nChooseTwo = (s.second.size()+1)*(s.second.size());
                 double log_prob_join = log(2/nChooseTwo);
-//                double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
                 log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate) + log_prob_join;
             }
             else {
@@ -3498,10 +3493,8 @@ inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNew
         _deep_coalescent_increments.clear();
         
     }
-
     inline void Forest::geneTreeProposal(pair<double, string> species_info, vector<pair<tuple<string, string, string>, double>> _t) {
         string species_name = species_info.second;
-        double species_increment = _t[_species_join_number].second;
         bool joined = false;
         double increment = species_info.first;
         for (auto &s:_species_partition) {

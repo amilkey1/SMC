@@ -230,31 +230,33 @@ class Particle {
     }
 
     inline double Particle::proposal(bool gene_trees_only, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
+        
+        // this function is to make gene trees, not species trees
+        
         string event;
         
-            _forest._theta = _forest._starting_theta;
+        _forest._theta = _forest._starting_theta;
         
-        if (_generation == 0) {
-//            for (int i=1; i<_forests.size(); i++) {
-                _forest._nincrements = 0;
-                _forest._gene_tree_log_coalescent_likelihood = 0.0;
-//            }
+        if (_generation == 0 || _generation == Forest::_ntaxa - 1) {
+            _forest._nincrements = 0;
+            _forest._gene_tree_log_coalescent_likelihood = 0.0;
         }
         if (gene_trees_only) {
             geneTreeProposal(deconstruct, species_joined);
         }
-        else if (!gene_trees_only) {
-            if (_generation == 0 || _generation == Forest::_ntaxa - 1) {
-//            if (_generation == 0) {
-//            if (_generation == Forest::_ntaxa - 1) {
-//                for (int i=1; i<_forests.size(); i++) {
-                    _forest.calcMinDepth();
-                    _forest._nincrements = 0;
-//                }
-            }
-//            speciesProposal();
-            _generation++;
-        }
+        
+//        else if (!gene_trees_only) {
+//            if (_generation == 0 || _generation == Forest::_ntaxa - 1) {
+////            if (_generation == 0) {
+////            if (_generation == Forest::_ntaxa - 1) {
+////                for (int i=1; i<_forests.size(); i++) {
+//                    _forest.calcMinDepth();
+//                    _forest._nincrements = 0;
+////                }
+//            }
+////            speciesProposal();
+//            _generation++;
+//        }
         
         if (_running_on_empty) {
             _generation++;
@@ -266,20 +268,18 @@ class Particle {
 
     inline void Particle::geneTreeProposal(bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
         
+        assert(_name != "species");
+        
         if (deconstruct) {
-//            for (int i=1; i<_forests.size(); i++) {
-                _forest.deconstructGeneTree();
-//            }
+            _forest.deconstructGeneTree();
         }
-//        for (int i=1; i<_forests.size(); i++) {
-            _forest._theta = _forest._starting_theta;
-//            assert (_t.size() == _forests[0]._nspecies); // TODO: get num species
-            pair<double, string> species_info = _forest.chooseDelta(species_joined);
-            _forest.geneTreeProposal(species_info, species_joined);
-            if (_forest._lineages.size() == 1) {
-                _forest.refreshPreorder();
-            }
-//        }
+        
+        _forest._theta = _forest._starting_theta; // TODO: redundant?
+        pair<double, string> species_info = _forest.chooseDelta(species_joined);
+        _forest.geneTreeProposal(species_info, species_joined);
+        if (_forest._lineages.size() == 1) {
+            _forest.refreshPreorder();
+        }
 
         if (!_running_on_empty) {
             double prev_log_likelihood = _log_likelihood;
@@ -720,11 +720,13 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
     inline void Particle::resetSpecies() {
-//        setLogLikelihood(0.0);
+        setLogLikelihood(0.0);
         setLogWeight(0.0, "s");
         resetSpeciesInfo();
         resetSpeciesTreeHeight();
-        _forest._increments.clear();
+        if (_name == "species") {
+            _forest._increments.clear();
+        }
         _log_coalescent_likelihood = 0.0;
     }
 
