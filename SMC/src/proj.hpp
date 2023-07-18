@@ -59,6 +59,7 @@ namespace proj {
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
             void                writeGeneTreeFile();
             Particle::SharedPtr                chooseSpeciesTree(vector<Particle::SharedPtr> species_trees);
+            void                writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa);
         
         private:
 
@@ -706,26 +707,18 @@ namespace proj {
     }
     
     inline void Proj::showFinal(vector<vector<Particle::SharedPtr>> my_vec) {
-//        for (int s=0; s<my_vec.size(); s++) {
+        // this function displays the final species trees
         for (int p=0; p<_nparticles; p++) {
-//            for (auto &p:my_vec[s]){
                 my_vec[0][p]->showParticle();
             }
-//        }
         
         double sum_h = 0.0;
         for (auto & p:my_vec[0]) {
             double h = p->calcHeight();
             sum_h += h;
         }
-        sum_h/=my_vec.size();
-//        cout << "mean height equals " << sum_h << endl;
-////        cout << "log marginal likelihood = " << setprecision(12) << _log_marginal_likelihood << endl;
-//        cout << "gene tree marg like: " << _gene_tree_log_marginal_likelihood << endl;
+        sum_h/=my_vec[0].size();
         cout << "species tree marg like: " << _species_tree_log_marginal_likelihood << endl;
-//        cout << "starting theta = " << Forest::_starting_theta << endl;
-//        cout << "speciation rate = " << Forest::_speciation_rate << endl;
-//        cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
         
         cout << "mean height equals " << sum_h << endl;
         cout << "log marginal likelihood = " << setprecision(12) << _log_marginal_likelihood << endl;
@@ -865,9 +858,6 @@ namespace proj {
             if (_estimate_theta) {_theta_lambda = 0.1;}
             if (_estimate_speciation_rate) {_speciation_rate_lambda = 5.0;}
             if (_estimate_hybridization_rate) {_hybrid_rate_lambda = 0.003;}
-            
-            // open log file
-            ofstream logf("params.log");
             
         // loop for number of samples (either theta or speciation rate)
             for (_sample=0; _sample<_nsamples; _sample++) {
@@ -1152,17 +1142,6 @@ namespace proj {
                     } // s loop
                     }
                 }
-                    
-//                }
-                
-//                cout << "gene tree marg like: " << _gene_tree_log_marginal_likelihood << endl;
-//                cout << "species tree marg like: " << _log_marginal_likelihood << endl;
-//                _log_marginal_likelihood = gene_tree_marg_like - _log_marginal_likelihood;
-//                for (int s=0; s<nsubsets+1; s++) {
-//                    for (auto &p:my_vec[s]) {
-//                            p->getTopologyPriors();
-//                        }
-//                }
                 
                 cout << "\t" << "proposed marg like: " << _log_marginal_likelihood;
                 cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood << endl;
@@ -1173,92 +1152,10 @@ namespace proj {
                     }
                 }
                 
-                double a = 0;
-                unsigned col_count = 0;
+                writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
                 
-                for (int p=0; p<nparticles; p++) {
-                    
-                    vector<double> branch_length_vec;
-                    for (int s=0; s<nsubsets+1; s++) {
-                        for (auto &b:my_vec[s][p]->getBranchLengths()) {
-                            branch_length_vec.push_back(b);
-                        }
-                    }
-                    
-                    vector<double> prior_vec;
-                    for (int s=0; s<nsubsets+1; s++) {
-                        for (auto &b:my_vec[s][p]->getBranchLengthPriors()) {
-                            prior_vec.push_back(b);
-                        }
-                    }
-                    
-                    vector<double> gene_tree_log_like;
-                    for (int s=1; s<nsubsets+1; s++) {
-                        for (auto &g:my_vec[s][p]->getGeneTreeLogLikelihoods()) {
-                            gene_tree_log_like.push_back(g);
-                        }
-                    }
-                    
-                    vector<double> log_topology_priors;
-                    for (int s=0; s<nsubsets+1; s++) {
-                        for (auto &t:my_vec[s][p]->getTopologyPriors()) {
-                            log_topology_priors.push_back(t);
-                        }
-                    }
-                    
-                    assert(branch_length_vec.size() == prior_vec.size());
-                    
-                    double log_coalescent_likelihood = my_vec[0][p]->getCoalescentLikelihood();
-                    
-                    int ngenes = nsubsets;
-                    
-                    if (col_count == 0) {
-                        logf << "iter" << "\t" << "theta";
-                        for (int g=0; g<ngenes; g++) {
-                            logf << "\t" << "gene_tree_log_like";
-                        }
-                        for (int i=0; i<nspecies-1; i++) {
-//                        for (int i = 0; i < branch_length_vec.size(); i++) {
-                            logf << "\t" << "species_tree_increment" << "\t" << "increment_prior";
-                        }
-                        for (int g=0; g<ngenes; g++) {
-                            for (int j=nspecies; j<nspecies+ntaxa-1; j++) {
-                                logf << "\t" << "gene_tree_increment" << "\t" << "increment_prior";
-                            }
-                        }
-                        logf << "\t" << "species_tree_topology_prior";
-                        for (int g=0; g<ngenes; g++) {
-                            logf << "\t" << "gene_tree_topology_prior";
-                        }
-                        logf << "\t" << "log_coal_like" << endl;
-                    }
-                    
-                    logf << a << "\t" << Forest::_starting_theta;
-                    
-                    for (int g=0; g<gene_tree_log_like.size(); g++) {
-                        logf << "\t" << setprecision(12) << gene_tree_log_like[g];
-                    }
-
-                    
-                    for (int i=0; i<prior_vec.size(); i++) {
-                        logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
-                    }
-                    
-                    for (int j=0; j<log_topology_priors.size(); j++) {
-                        logf << "\t" << setprecision(12) << log_topology_priors[j];
-                    }
-                    
-                    logf << "\t" << setprecision(12) << log_coalescent_likelihood;
-                    
-                    logf << endl;
-                    a++;
-                    col_count++;
-                }
-                
-                if (_sample == _nsamples) {
-                    logf.close();
-                }
                 } // _nsamples loop - number of samples
+            
             writeGeneTreeFile();
 //            saveParticleWeights(_accepted_particle_vec);
 //            saveParticleLikelihoods(_accepted_particle_vec);
@@ -1285,4 +1182,95 @@ namespace proj {
 
         std::cout << "\nFinished!" << std::endl;
     }
+
+    inline void Proj::writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa) {
+        // open log file
+        ofstream logf("params.log");
+        
+        double a = 0;
+        unsigned col_count = 0;
+        
+        for (int p=0; p<nparticles; p++) {
+            
+            vector<double> branch_length_vec;
+            for (int s=0; s<nsubsets+1; s++) {
+                for (auto &b:my_vec[s][p]->getBranchLengths()) {
+                    branch_length_vec.push_back(b);
+                }
+            }
+            
+            vector<double> prior_vec;
+            for (int s=0; s<nsubsets+1; s++) {
+                for (auto &b:my_vec[s][p]->getBranchLengthPriors()) {
+                    prior_vec.push_back(b);
+                }
+            }
+            
+            vector<double> gene_tree_log_like;
+            for (int s=1; s<nsubsets+1; s++) {
+                for (auto &g:my_vec[s][p]->getGeneTreeLogLikelihoods()) {
+                    gene_tree_log_like.push_back(g);
+                }
+            }
+            
+            vector<double> log_topology_priors;
+            for (int s=0; s<nsubsets+1; s++) {
+                for (auto &t:my_vec[s][p]->getTopologyPriors()) {
+                    log_topology_priors.push_back(t);
+                }
+            }
+            
+            assert(branch_length_vec.size() == prior_vec.size());
+            
+            double log_coalescent_likelihood = my_vec[0][p]->getCoalescentLikelihood();
+            
+            int ngenes = nsubsets;
+            
+            if (col_count == 0) {
+                logf << "iter" << "\t" << "theta";
+                for (int g=0; g<ngenes; g++) {
+                    logf << "\t" << "gene_tree_log_like";
+                }
+                for (int i=0; i<nspecies-1; i++) {
+                    logf << "\t" << "species_tree_increment" << "\t" << "increment_prior";
+                }
+                for (int g=0; g<ngenes; g++) {
+                    for (int j=nspecies; j<nspecies+ntaxa-1; j++) {
+                        logf << "\t" << "gene_tree_increment" << "\t" << "increment_prior";
+                    }
+                }
+                logf << "\t" << "species_tree_topology_prior";
+                for (int g=0; g<ngenes; g++) {
+                    logf << "\t" << "gene_tree_topology_prior";
+                }
+                logf << "\t" << "log_coal_like" << endl;
+            }
+            
+            logf << a << "\t" << Forest::_starting_theta;
+            
+            for (int g=0; g<gene_tree_log_like.size(); g++) {
+                logf << "\t" << setprecision(12) << gene_tree_log_like[g];
+            }
+
+            
+            for (int i=0; i<prior_vec.size(); i++) {
+                logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
+            }
+            
+            for (int j=0; j<log_topology_priors.size(); j++) {
+                logf << "\t" << setprecision(12) << log_topology_priors[j];
+            }
+            
+            logf << "\t" << setprecision(12) << log_coalescent_likelihood;
+            
+            logf << endl;
+            a++;
+            col_count++;
+        }
+        
+        if (_sample == _nsamples) {
+            logf.close();
+        }
+    }
+
 }

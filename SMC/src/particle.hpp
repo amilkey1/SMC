@@ -588,14 +588,15 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
     inline vector<double> Particle::getGeneTreeLogLikelihoods() {
         vector<double> gene_tree_log_likelihoods;
-        gene_tree_log_likelihoods.push_back(_forest._gene_tree_log_likelihood);
+        gene_tree_log_likelihoods.push_back(_forest._gene_tree_log_likelihood+_forest._gene_tree_log_coalescent_likelihood); // TODO: include coalescent likelihood?
+//        gene_tree_log_likelihoods.push_back(_forest._gene_tree_log_likelihood);
         return gene_tree_log_likelihoods;
     }
 
     inline vector<double> Particle::getTopologyPriors() {
         // calculate species tree topology probability
         vector<double> topology_priors;
-        topology_priors.push_back(_forest._log_joining_prob);
+        topology_priors.push_back(_forest._log_joining_prob); // TODO: I don't think this is correct for multiple genes
         return topology_priors;
     }
 
