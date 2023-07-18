@@ -929,7 +929,8 @@ namespace proj {
                         my_vec[s][p]->setLogWeight(0.0, "g");
                         my_vec[s][p]->setLogWeight(0.0, "s");
                         
-                        if (s == 0 && _gene_newicks_names == "null") {
+                        // only sample 1 species tree, and use this tree for all the gene filtering
+                        if (s == 0 && _gene_newicks_names == "null" && p == 0) {
                             my_vec[0][p]->processSpeciesNewick(newicks); // if no newick specified, program will sample from species tree prior
                         }
                     }
@@ -996,8 +997,18 @@ namespace proj {
                         // TODO: make sure weights are normalized going on and on the log scale
                         // TODO: don't need to build them all and choose for the first step
                         
-                        Particle::SharedPtr species_tree_particle = chooseSpeciesTree(my_vec[0]); // pass in all the species trees
-                        resetWeights(my_vec[0], "s");
+                        Particle::SharedPtr species_tree_particle;
+                        
+                        if (i > 0) {
+                            species_tree_particle = chooseSpeciesTree(my_vec[0]); // pass in all the species trees
+                            resetWeights(my_vec[0], "s");
+                        }
+                        else {
+                            species_tree_particle = my_vec[0][0];
+                            for (int p=0; p<nparticles; p++) {
+                                _accepted_particle_vec[0][p] = species_tree_particle;
+                            }
+                        }
                         
                         for (int s=1; s<nsubsets+1; s++) {
                             for (int p=0; p<nparticles; p++) {
@@ -1007,7 +1018,7 @@ namespace proj {
                             }
                         }
                         
-                        _accepted_particle_vec = my_vec;
+//                        _accepted_particle_vec = my_vec;
                         
                         for (unsigned g=0; g<ntaxa-1; g++){
                             // filter particles within each gene
@@ -1017,7 +1028,7 @@ namespace proj {
                             bool gene_trees_only = true;
                             
                             for (int s=1; s<nsubsets+1; s++) { // skip species tree particles
-                                proposeParticles(my_vec[s], gene_trees_only, "g", deconstruct, species_tree_particle);// TODO: only set this after going through all genes once
+                                proposeParticles(my_vec[s], gene_trees_only, "g", deconstruct, species_tree_particle);
                                 
                                 if (!_run_on_empty) {
                                     bool calc_marg_like = true;
