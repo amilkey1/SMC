@@ -60,6 +60,7 @@ namespace proj {
             void                writeGeneTreeFile();
             Particle::SharedPtr                chooseSpeciesTree(vector<Particle::SharedPtr> species_trees);
             void                writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa);
+            void                setStartingVariables();
         
         private:
 
@@ -816,6 +817,21 @@ namespace proj {
         }
     }
 
+    inline void Proj::setStartingVariables() {
+        // sampling both theta and speciation rate
+        // set starting window size
+        _prev_theta = Forest::_starting_theta;
+        _prev_speciation_rate = Forest::_speciation_rate;
+        _prev_hybridization_rate = Forest::_hybridization_rate;
+        _theta_prior = logThetaPrior(_prev_theta);
+        _speciation_rate_prior = logSpeciationRatePrior(_prev_speciation_rate);
+        _hybridization_rate_prior = logHybridizationRatePrior(_prev_hybridization_rate);
+        
+        if (_estimate_theta) {_theta_lambda = 0.1;}
+        if (_estimate_speciation_rate) {_speciation_rate_lambda = 5.0;}
+        if (_estimate_hybridization_rate) {_hybrid_rate_lambda = 0.003;}
+    }
+
     inline void Proj::run() {
         cout << "Starting..." << endl;
         cout << "Current working directory: " << boost::filesystem::current_path() << endl;
@@ -840,26 +856,15 @@ namespace proj {
             Forest::setNumSpecies(nspecies);
             rng.setSeed(_random_seed);
             
-//          create vector of particles
+            // create vector of particles
             unsigned nsubsets = _data->getNumSubsets();
             unsigned nparticles = _nparticles;
             
             Particle::setNumSubsets(nsubsets);
                 
-            // sampling both theta and speciation rate
-            // set starting window size
-            _prev_theta = Forest::_starting_theta;
-            _prev_speciation_rate = Forest::_speciation_rate;
-            _prev_hybridization_rate = Forest::_hybridization_rate;
-            _theta_prior = logThetaPrior(_prev_theta);
-            _speciation_rate_prior = logSpeciationRatePrior(_prev_speciation_rate);
-            _hybridization_rate_prior = logHybridizationRatePrior(_prev_hybridization_rate);
+            setStartingVariables();
             
-            if (_estimate_theta) {_theta_lambda = 0.1;}
-            if (_estimate_speciation_rate) {_speciation_rate_lambda = 5.0;}
-            if (_estimate_hybridization_rate) {_hybrid_rate_lambda = 0.003;}
-            
-        // loop for number of samples (either theta or speciation rate)
+            // loop for number of samples (either theta or speciation rate)
             for (_sample=0; _sample<_nsamples; _sample++) {
                 cout << "sample: " << _sample << endl;
                 // my_vec contains a vector of vector of particles corresponding to species particles and gene particles
@@ -959,10 +964,10 @@ namespace proj {
                                 }
                             }
                         }
-                }
+                    }
                     
                     // keep the species partition for the gene forests at this stage but clear the tree structure
-                     if (i == 1) {
+                     if (i == 1) { // TODO: double check why this is necessary
                          for (int s=1; s<nsubsets+1; s++) {
                              // start at s=1 to only modify the gene trees
                              for (int p=0; p<nparticles; p++) {
@@ -1009,8 +1014,6 @@ namespace proj {
                         
                         for (unsigned g=0; g<ntaxa-1; g++){
                             // filter particles within each gene
-        //                    cout << "gen " << g << endl;
-                            //taxon joining and reweighting step
                             
                             bool gene_trees_only = true;
                             
@@ -1039,11 +1042,9 @@ namespace proj {
                                     // do not need to resample species trees; species tree will remain the same throughout all gene tree filtering
                                     
                                     assert(my_vec[s].size() == nparticles);
-//                                    assert(my_vec[0].size() == nparticles);
                                 }
                                 //change use_first from true to false or false to true
                                 use_first = !use_first;
-        //                            }
                                     resetWeights(my_vec[s], "g");
                                     assert (_accepted_particle_vec.size() == nsubsets+1);
                                     _accepted_particle_vec[s] = my_vec[s];
@@ -1137,7 +1138,6 @@ namespace proj {
                             use_first = !use_first;
                         }
                         _accepted_particle_vec[0] = my_vec[0];
-//                            saveParticleWeights(my_vec[0]);
                         start = "species";
                     } // s loop
                     }
@@ -1157,8 +1157,8 @@ namespace proj {
                 } // _nsamples loop - number of samples
             
             writeGeneTreeFile();
-//            saveParticleWeights(_accepted_particle_vec);
-//            saveParticleLikelihoods(_accepted_particle_vec);
+            // saveParticleWeights(_accepted_particle_vec);
+            // saveParticleLikelihoods(_accepted_particle_vec);
             
             if (_estimate_theta) {
                 cout << "number of accepted theta proposals: " << _theta_accepted_number << endl;
