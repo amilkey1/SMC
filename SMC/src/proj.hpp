@@ -61,6 +61,7 @@ namespace proj {
             Particle::SharedPtr                chooseSpeciesTree(vector<Particle::SharedPtr> species_trees);
             void                writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa);
             void                setStartingVariables();
+            void                setUpInitialData();
         
         private:
 
@@ -832,6 +833,18 @@ namespace proj {
         if (_estimate_hybridization_rate) {_hybrid_rate_lambda = 0.003;}
     }
 
+    inline void Proj::setUpInitialData() {
+        _data = Data::SharedPtr(new Data());
+        _data->setPartition(_partition);
+        _data->getDataFromFile(_data_file_name);
+
+        summarizeData(_data);
+        createSpeciesMap(_data);
+
+        //set number of species to number in data file
+        setNumberTaxa(_data);
+    }
+
     inline void Proj::run() {
         cout << "Starting..." << endl;
         cout << "Current working directory: " << boost::filesystem::current_path() << endl;
@@ -843,15 +856,9 @@ namespace proj {
             
             std::cout << "\n*** Reading and storing the data in the file " << _data_file_name << std::endl;
             std::cout << "data file name is " << _data_file_name << std::endl;
-            _data = Data::SharedPtr(new Data());
-            _data->setPartition(_partition);
-            _data->getDataFromFile(_data_file_name);
-
-            summarizeData(_data);
-            createSpeciesMap(_data);
-
-            //set number of species to number in data file
-            setNumberTaxa(_data);
+            
+            setUpInitialData();
+            
             unsigned nspecies = (unsigned) _species_names.size();
             Forest::setNumSpecies(nspecies);
             rng.setSeed(_random_seed);
@@ -1049,9 +1056,8 @@ namespace proj {
                                     assert (_accepted_particle_vec.size() == nsubsets+1);
                                     _accepted_particle_vec[s] = my_vec[s];
                                     saveParticleWeights(my_vec[0]);
-                                }
+                                } // s loop
                             deconstruct = false;
-    //                    } // p loop
                         } // g loop
                     }
                     
@@ -1106,7 +1112,7 @@ namespace proj {
                             }
                             
                             my_vec[0][p]->calcSpeciesParticleWeight(log_coalescent_likelihood);
-                        }
+                        } // p loop
 
                         // filter - make sure all gene trees go along with correct species tree
                         
