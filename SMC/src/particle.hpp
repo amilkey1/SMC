@@ -75,6 +75,7 @@ class Particle {
         vector<double>                                  getBranchLengths();
         vector<double>                                  getBranchLengthPriors();
         vector<double>                                  getGeneTreeLogLikelihoods();
+        vector<double>                                  getGeneTreeLogCoalescentLikelihood();
         vector<double>                                  getTopologyPriors();
         void                                            hybridizationProposal();
         bool                                            checkForDeepCoalescence();
@@ -588,9 +589,15 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
     inline vector<double> Particle::getGeneTreeLogLikelihoods() {
         vector<double> gene_tree_log_likelihoods;
-        gene_tree_log_likelihoods.push_back(_forest._gene_tree_log_likelihood+_forest._gene_tree_log_coalescent_likelihood); // TODO: include coalescent likelihood?
+        gene_tree_log_likelihoods.push_back(_forest._gene_tree_log_likelihood);
 //        gene_tree_log_likelihoods.push_back(_forest._gene_tree_log_likelihood);
         return gene_tree_log_likelihoods;
+    }
+
+    inline vector<double> Particle::getGeneTreeLogCoalescentLikelihood() {
+        vector<double> gene_tree_log_coalescent_likelihoods;
+        gene_tree_log_coalescent_likelihoods.push_back(_forest._gene_tree_log_coalescent_likelihood);
+        return gene_tree_log_coalescent_likelihoods;
     }
 
     inline vector<double> Particle::getTopologyPriors() {

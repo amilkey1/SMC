@@ -1219,6 +1219,13 @@ namespace proj {
                 }
             }
             
+            vector<double> gene_tree_log_coalescent_like;
+            for (int s=1; s<nsubsets+1; s++) {
+                for (auto &g:my_vec[s][p]->getGeneTreeLogCoalescentLikelihood()) {
+                    gene_tree_log_coalescent_like.push_back(g);
+                }
+            }
+            
             vector<double> log_topology_priors;
             for (int s=0; s<nsubsets+1; s++) {
                 for (auto &t:my_vec[s][p]->getTopologyPriors()) {
@@ -1236,6 +1243,9 @@ namespace proj {
                 logf << "iter" << "\t" << "theta";
                 for (int g=0; g<ngenes; g++) {
                     logf << "\t" << "gene_tree_log_like";
+                }
+                for (int g=0; g<ngenes; g++) {
+                    logf << "\t" << "gene_tree_log_coalescent_like";
                 }
                 for (int i=0; i<nspecies-1; i++) {
                     logf << "\t" << "species_tree_increment" << "\t" << "increment_prior";
@@ -1256,6 +1266,10 @@ namespace proj {
             
             for (int g=0; g<gene_tree_log_like.size(); g++) {
                 logf << "\t" << setprecision(12) << gene_tree_log_like[g];
+            }
+            
+            for (int g=0; g<gene_tree_log_coalescent_like.size(); g++) {
+                logf << "\t" << setprecision(12) << gene_tree_log_coalescent_like[g];
             }
 
             
