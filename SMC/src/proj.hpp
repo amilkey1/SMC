@@ -1052,7 +1052,7 @@ namespace proj {
                                 }
                                 //change use_first from true to false or false to true
                                 use_first = !use_first;
-                                    resetWeights(my_vec[s], "g");
+//                                    resetWeights(my_vec[s], "g"); // TODO: do this after choosing 1 gene tree
                                     assert (_accepted_particle_vec.size() == nsubsets+1);
                                     _accepted_particle_vec[s] = my_vec[s];
                                     saveParticleWeights(my_vec[0]);
@@ -1062,6 +1062,21 @@ namespace proj {
                     }
                     
                     // filter species trees now
+                    
+                // choose one set of gene trees to use
+                vector<vector<Particle>> gene_tree_particles(nsubsets, vector<Particle>(nparticles)); // gene_tree_particles[0] contains first gene
+                
+                for (int s=1; s<nsubsets+1; s++) {
+                    Particle gene_x = *chooseSpeciesTree(my_vec[s]);
+                    for (int p=0; p<nparticles; p++) {
+//                        gene_tree_particles[s-1][p] = gene_x; // TODO: instead of making a new vector, replace everything in my_vec[s] with these gene trees (be careful of pointers)
+                        *my_vec[s][p] = gene_x;
+                    }
+                    resetWeights(my_vec[s], "g");
+//                    _accepted_particle_vec[s] = *gene_tree_particles[s-1];
+                }
+                    
+                    
                 if (i < _niterations-1) {
                     _species_tree_log_marginal_likelihood = 0.0;
                     
@@ -1070,6 +1085,14 @@ namespace proj {
                         my_vec[0][p]->resetSpecies();
                     }
 
+//                    for (int s=1; s<nsubsets+1; s++) { // TODO: can copy over instead of repeating for every particle?
+//                        for (int p=0; p<nparticles; p++) {
+//                            gene_tree_particles[s-1][p].mapSpecies(_taxon_map, _species_names, s);
+//                            gene_tree_particles[s-1][p].refreshGeneTreePreorder();
+//                            gene_tree_particles[s-1][p].calcGeneTreeMinDepth(); // reset min depth vector for gene trees
+//                        }
+//                    }
+                    
                     for (int s=1; s<nsubsets+1; s++) {
                         for (int p=0; p<nparticles; p++) {
                             my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
@@ -1096,6 +1119,8 @@ namespace proj {
                             if (s < nspecies-1) {
                                 for (int j=1; j<nsubsets+1; j++) {
                                     max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
+//                                    max_depths.push_back(gene_tree_particles[j-1][p].calcConstrainedProposal(species_joined));
+
                                 }
                                 
                                 // now finish the species tree branch length proposal
@@ -1109,6 +1134,7 @@ namespace proj {
                                 double last_edge_len = my_vec[0][p]->getLastEdgeLen();
                                 double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
                                 log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
+//                                log_coalescent_likelihood += gene_tree_particles[j-1][p].calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
                             }
                             
                             my_vec[0][p]->calcSpeciesParticleWeight(log_coalescent_likelihood);
@@ -1135,7 +1161,7 @@ namespace proj {
                             
                             my_vec[0] = use_first ? my_vec_2[0]:my_vec_1[0];
                             
-                            for (int s=1; s<nsubsets+1; s++) {
+                            for (int s=1; s<nsubsets+1; s++) { // TODO: need to resample the gene_particles vector along with the species tree so everything copies correctly
                                 resetGeneParticles(sel_indices, my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s]);
                                 my_vec[s] = use_first ? my_vec_2[s]:my_vec_1[s];
                             }
