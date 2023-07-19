@@ -1006,9 +1006,9 @@ namespace proj {
                         }
                         else {
                             species_tree_particle = my_vec[0][0];
-                            for (int p=0; p<nparticles; p++) {
-                                _accepted_particle_vec[0][p] = species_tree_particle;
-                            }
+//                            for (int p=0; p<nparticles; p++) {
+//                                _accepted_particle_vec[0][p] = species_tree_particle;
+//                            }
                         }
                         
                         for (int s=1; s<nsubsets+1; s++) {
@@ -1041,9 +1041,6 @@ namespace proj {
                                     double ess = 1.0/ess_inverse;
                                     cout << "   " << "ESS = " << ess << endl;
                                  
-                                    if (g == ntaxa-2) {
-                                        cout << "stop";
-                                    }
                                     resampleParticles(my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s], "g");
                                     //if use_first is true, my_vec = my_vec_2
                                     //if use_first is false, my_vec = my_vec_1
@@ -1068,15 +1065,30 @@ namespace proj {
                     
                     // filter species trees now
                     
+                    // save gene tree variation for use in lorad file
+                    vector<vector<Particle>> variable_gene_trees(nsubsets, vector<Particle> (nparticles));
+
+                    for (int s=1; s<nsubsets+1; s++) {
+                        for (int p=0; p<nparticles; p++) {
+                            variable_gene_trees[s-1][p] = *my_vec[s][p];
+                        }
+                    }
+                    
                 // choose one set of gene trees to use
                 for (int s=1; s<nsubsets+1; s++) {
                     Particle gene_x = *chooseSpeciesTree(my_vec[s], "g");
                     for (int p=0; p<nparticles; p++) {
-                        *my_vec[s][p] = gene_x;
+                        *my_vec[s][p] = gene_x; // TODO: why does this change accepted particle vec?
                     }
                     resetWeights(my_vec[s], "g");
-                    _accepted_particle_vec[s] = my_vec[s];
+//                    _accepted_particle_vec[s] = my_vec[s];
                 }
+                    
+                    for (int s=1; s<nsubsets+1; s++) {
+                        for (int p=0; p<nparticles; p++) {
+                            *_accepted_particle_vec[s][p] = variable_gene_trees[s-1][p];
+                        }
+                    }
                     
                     
                 if (i < _niterations-1) {
