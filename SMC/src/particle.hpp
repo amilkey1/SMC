@@ -106,6 +106,7 @@ class Particle {
         double                                          getLastEdgeLen();
         void                                            calcSpeciesParticleWeight(double log_coalescent_likelihood);
         void                                            drawHeightsFromPrior();
+        void                                            resetLogTopologyPrior(){_forest._log_joining_prob = 0.0;}
 
     private:
 
@@ -633,6 +634,7 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
         if (_name == "species") {
             _forest._increments.clear();
         }
+        _forest._log_joining_prob = 0.0;
         _log_coalescent_likelihood = 0.0;
     }
 

@@ -1109,6 +1109,7 @@ namespace proj {
                             my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
                             my_vec[s][p]->refreshGeneTreePreorder();
                             my_vec[s][p]->calcGeneTreeMinDepth(); // reset min depth vector for gene trees
+                            my_vec[s][p]->resetLogTopologyPrior();
                         }
                     }
                     
