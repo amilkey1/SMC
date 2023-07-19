@@ -999,8 +999,12 @@ namespace proj {
                         // pick a species tree to use for all the gene trees for this step
                         
                         Particle::SharedPtr species_tree_particle;
+//                        for (auto &p:my_vec[0]) {
+//                            p->showParticle();
+//                        }
                         
                         if (i > 0) {
+                            normalizeWeights(my_vec[0], "s", false);
                             species_tree_particle = chooseSpeciesTree(my_vec[0], "s"); // pass in all the species trees
                             resetWeights(my_vec[0], "s");
                         }
@@ -1019,7 +1023,7 @@ namespace proj {
                             }
                         }
                         
-                        for (unsigned g=0; g<ntaxa-1; g++){
+                        for (unsigned g=0; g<ntaxa-1; g++) {
                             // filter particles within each gene
                             
                             bool gene_trees_only = true;
@@ -1076,9 +1080,10 @@ namespace proj {
                     
                 // choose one set of gene trees to use
                 for (int s=1; s<nsubsets+1; s++) {
+                    normalizeWeights(my_vec[s], "g", false);
                     Particle gene_x = *chooseSpeciesTree(my_vec[s], "g");
                     for (int p=0; p<nparticles; p++) {
-                        *my_vec[s][p] = gene_x; // TODO: why does this change accepted particle vec?
+                        *my_vec[s][p] = gene_x;
                     }
                     resetWeights(my_vec[s], "g");
 //                    _accepted_particle_vec[s] = my_vec[s];
@@ -1117,6 +1122,15 @@ namespace proj {
                     for (unsigned s=0; s<nspecies; s++){
                         cout << "beginning species tree proposals" << endl;
                         //taxon joining and reweighting step
+                        
+                        if (s == 0) {
+                            for (int j=1; j<nsubsets+1; j++) {
+                                // reset gene tree log coalescent likelihoods to 0
+                                for (int p=0; p<nparticles; p++) {
+                                    my_vec[j][p]->setLogCoalescentLikelihood(0.0);
+                                }
+                            }
+                        }
                         
                         for (int p=0; p<nparticles; p++) {
                             vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
