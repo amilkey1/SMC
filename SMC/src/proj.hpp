@@ -58,7 +58,7 @@ namespace proj {
             void                printThetas();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
             void                writeGeneTreeFile();
-            Particle::SharedPtr                chooseSpeciesTree(vector<Particle::SharedPtr> species_trees);
+            Particle::SharedPtr                chooseSpeciesTree(vector<Particle::SharedPtr> species_trees, string gene_or_species);
             void                writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa);
             void                setStartingVariables();
             void                setUpInitialData();
@@ -562,11 +562,11 @@ namespace proj {
         }
     }
 
-    inline Particle::SharedPtr Proj::chooseSpeciesTree(vector<Particle::SharedPtr> species_trees) {
+    inline Particle::SharedPtr Proj::chooseSpeciesTree(vector<Particle::SharedPtr> species_trees, string gene_or_species) {
         // get species tree weights
         vector<double> log_weights;
         for (auto &p:species_trees) {
-            log_weights.push_back(p->getLogWeight("s"));
+            log_weights.push_back(p->getLogWeight(gene_or_species));
         }
         
 //        // choose a random number [0,1]
@@ -1001,7 +1001,7 @@ namespace proj {
                         Particle::SharedPtr species_tree_particle;
                         
                         if (i > 0) {
-                            species_tree_particle = chooseSpeciesTree(my_vec[0]); // pass in all the species trees
+                            species_tree_particle = chooseSpeciesTree(my_vec[0], "s"); // pass in all the species trees
                             resetWeights(my_vec[0], "s");
                         }
                         else {
@@ -1015,7 +1015,7 @@ namespace proj {
                             for (int p=0; p<nparticles; p++) {
                                 my_vec[s][p]->setLogLikelihood(0.0);
                                 my_vec[s][p]->setLogWeight(0.0, "g");
-                                my_vec[s][p]->setLogWeight(0.0, "s");
+//                                my_vec[s][p]->setLogWeight(0.0, "s");
                             }
                         }
                         
@@ -1041,6 +1041,9 @@ namespace proj {
                                     double ess = 1.0/ess_inverse;
                                     cout << "   " << "ESS = " << ess << endl;
                                  
+                                    if (g == ntaxa-2) {
+                                        cout << "stop";
+                                    }
                                     resampleParticles(my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s], "g");
                                     //if use_first is true, my_vec = my_vec_2
                                     //if use_first is false, my_vec = my_vec_1
@@ -1052,7 +1055,9 @@ namespace proj {
                                 }
                                 //change use_first from true to false or false to true
                                 use_first = !use_first;
-//                                    resetWeights(my_vec[s], "g"); // TODO: do this after choosing 1 gene tree
+                                if (g < ntaxa-2) {
+                                    resetWeights(my_vec[s], "g"); // TODO: do this after choosing 1 gene tree
+                                }
                                     assert (_accepted_particle_vec.size() == nsubsets+1);
                                     _accepted_particle_vec[s] = my_vec[s];
                                     saveParticleWeights(my_vec[0]);
@@ -1064,16 +1069,13 @@ namespace proj {
                     // filter species trees now
                     
                 // choose one set of gene trees to use
-                vector<vector<Particle>> gene_tree_particles(nsubsets, vector<Particle>(nparticles)); // gene_tree_particles[0] contains first gene
-                
                 for (int s=1; s<nsubsets+1; s++) {
-                    Particle gene_x = *chooseSpeciesTree(my_vec[s]);
+                    Particle gene_x = *chooseSpeciesTree(my_vec[s], "g");
                     for (int p=0; p<nparticles; p++) {
-//                        gene_tree_particles[s-1][p] = gene_x; // TODO: instead of making a new vector, replace everything in my_vec[s] with these gene trees (be careful of pointers)
                         *my_vec[s][p] = gene_x;
                     }
                     resetWeights(my_vec[s], "g");
-//                    _accepted_particle_vec[s] = *gene_tree_particles[s-1];
+                    _accepted_particle_vec[s] = my_vec[s];
                 }
                     
                     
@@ -1084,14 +1086,6 @@ namespace proj {
                         my_vec[0][p]->mapSpecies(_taxon_map, _species_names, 0);
                         my_vec[0][p]->resetSpecies();
                     }
-
-//                    for (int s=1; s<nsubsets+1; s++) { // TODO: can copy over instead of repeating for every particle?
-//                        for (int p=0; p<nparticles; p++) {
-//                            gene_tree_particles[s-1][p].mapSpecies(_taxon_map, _species_names, s);
-//                            gene_tree_particles[s-1][p].refreshGeneTreePreorder();
-//                            gene_tree_particles[s-1][p].calcGeneTreeMinDepth(); // reset min depth vector for gene trees
-//                        }
-//                    }
                     
                     for (int s=1; s<nsubsets+1; s++) {
                         for (int p=0; p<nparticles; p++) {

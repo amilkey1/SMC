@@ -373,6 +373,7 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
     inline void Particle::calcParticleWeight() {
         // use the gene tree weights to calculate the particle weight
+        _log_likelihood = _forest._gene_tree_log_likelihood;
         _log_weight = 0.0;
         _log_weight += _forest._gene_tree_log_weight;
     }
