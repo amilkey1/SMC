@@ -533,16 +533,20 @@ namespace proj {
         // open log file
         ofstream genef("genetrees.txt");
         genef << "let gene_forests = [\n";
-        for (int s=0; s<_accepted_particle_vec.size(); s++) {
-            for (int j=0; j<_accepted_particle_vec[s].size(); j++) {
-                vector<string> names = _accepted_particle_vec[s][j]->getGeneTreeNames(j);
-                vector<string> newicks = _accepted_particle_vec[s][j]->getGeneTreeNewicks();
+        for (int p=0; p<_accepted_particle_vec[0].size(); p++) {
+            genef << "particle " << endl;
+            for (int s=1; s<_accepted_particle_vec.size(); s++) {
+                genef << "gene " << s << endl;
+//                vector<string> names = _accepted_particle_vec[s][p]->getGeneTreeNames(s);
+                vector<string> newicks = _accepted_particle_vec[s][p]->getGeneTreeNewicks();
+                string newick = newicks[0];
+                genef << newick << endl;
                 // name and newick include quotes
-                for (int i=0; i<names.size(); i++) {
-                    string name = names[i];
-                    string newick = newicks[i];
-                    genef << "{name:" << name << ", relrate:1.0, w:1.0, cumw:1.0, " << newick << "},\n";
-                }
+//                for (int i=0; i<names.size(); i++) {
+//                    string name = names[i];
+//                    string newick = newicks[i];
+//                    genef << "{name:" << name << ", relrate:1.0, w:1.0, cumw:1.0, " << newick << "},\n";
+//                }
             }
         }
         genef << "];";
@@ -974,16 +978,16 @@ namespace proj {
                     }
                     
                     // keep the species partition for the gene forests at this stage but clear the tree structure
-                     if (i == 1) { // TODO: double check why this is necessary
-                         for (int s=1; s<nsubsets+1; s++) {
-                             // start at s=1 to only modify the gene trees
-                             for (int p=0; p<nparticles; p++) {
-                             my_vec[s][p]->remakeGeneTrees(_taxon_map);
-                             my_vec[s][p]->resetGeneTreePartials(_data, _taxon_map);
-                             deconstruct = false;
-                             }
-                         }
-                     }
+//                     if (i == 1) { // TODO: double check why this is necessary
+//                         for (int s=1; s<nsubsets+1; s++) {
+//                             // start at s=1 to only modify the gene trees
+//                             for (int p=0; p<nparticles; p++) {
+//                             my_vec[s][p]->remakeGeneTrees(_taxon_map);
+//                             my_vec[s][p]->resetGeneTreePartials(_data, _taxon_map);
+//                             deconstruct = false;
+//                             }
+//                         }
+//                     }
                 
                     if (i > 0) {
                         deconstruct = true;
@@ -999,9 +1003,6 @@ namespace proj {
                         // pick a species tree to use for all the gene trees for this step
                         
                         Particle::SharedPtr species_tree_particle;
-//                        for (auto &p:my_vec[0]) {
-//                            p->showParticle();
-//                        }
                         
                         if (i > 0) {
                             normalizeWeights(my_vec[0], "s", false);
@@ -1057,7 +1058,7 @@ namespace proj {
                                 //change use_first from true to false or false to true
                                 use_first = !use_first;
                                 if (g < ntaxa-2) {
-                                    resetWeights(my_vec[s], "g"); // TODO: do this after choosing 1 gene tree
+                                    resetWeights(my_vec[s], "g");
                                 }
                                     assert (_accepted_particle_vec.size() == nsubsets+1);
                                     _accepted_particle_vec[s] = my_vec[s];
@@ -1066,6 +1067,8 @@ namespace proj {
                             deconstruct = false;
                         } // g loop
                     }
+                    
+                    writeGeneTreeFile();
                     
                     // filter species trees now
                     
@@ -1077,6 +1080,7 @@ namespace proj {
                             variable_gene_trees[s-1][p] = *my_vec[s][p];
                         }
                     }
+                    
                     
                 // choose one set of gene trees to use
                 for (int s=1; s<nsubsets+1; s++) {
