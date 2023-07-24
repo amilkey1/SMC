@@ -1323,39 +1323,7 @@ namespace proj {
                             }
                         }
                         
-                        // TODO: make this a separate function
-                        // TODO: then parallelize it
                         proposeSpeciesParticles(my_vec, s, nspecies, nsubsets);
-                        
-//                        for (int p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
-//                            tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
-//
-//                            if (_nthreads == 1) {
-//                                vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
-//
-//                                if (s < nspecies-1) {
-//                                    for (int j=1; j<nsubsets+1; j++) {
-//
-//                                        max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
-//                                    }
-//
-//                                    // now finish the species tree branch length proposal
-//                                    my_vec[0][p]->speciesProposal(max_depths, species_joined);
-//                                }
-//
-//                                double log_coalescent_likelihood = 0.0;
-//
-//                                // calculate coalescent likelihood for each gene on each particle
-//                                    for (int j=1; j<nsubsets+1; j++) {
-//                                        double last_edge_len = my_vec[0][p]->getLastEdgeLen();
-//                                        double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
-//                                        log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
-//                                    }
-//
-//                                my_vec[0][p]->calcSpeciesParticleWeight(log_coalescent_likelihood);
-//                            }
-//
-//                        } // p loop
 
                         // filter - make sure all gene trees go along with correct species tree
                         
@@ -1378,7 +1346,7 @@ namespace proj {
                             
                             my_vec[0] = use_first ? my_vec_2[0]:my_vec_1[0];
                             
-                            for (int s=1; s<nsubsets+1; s++) { // TODO: need to resample the gene_particles vector along with the species tree so everything copies correctly
+                            for (int s=1; s<nsubsets+1; s++) {
                                 resetGeneParticles(sel_indices, my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s]);
                                 my_vec[s] = use_first ? my_vec_2[s]:my_vec_1[s];
                             }
