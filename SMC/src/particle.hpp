@@ -648,9 +648,10 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
         
         double max_depth = 0.0;
         _forest.chooseSpeciesIncrement(max_depth);
+        double edge_len = _forest._last_edge_length;
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-        _t.push_back(make_pair(species_joined, 0.0));
+        _t.push_back(make_pair(species_joined, edge_len));
 
         for (int i=0; i < _forest._nspecies-1; i++) {
             if (_forest._lineages.size() > 1) {

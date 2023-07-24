@@ -2274,6 +2274,10 @@ inline Node * Forest::findNextPreorder(Node * nd) {
          // get species info
          double species_increment = species_info[_species_join_number].second;
         assert (species_increment >= 0.0);
+        
+        if (_species_join_number == 0) {
+            assert (species_increment > 0.0);
+        }
 
          // join species if necessary
          if (_ready_to_join_species) {
