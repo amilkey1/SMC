@@ -34,7 +34,7 @@ class Particle {
                                                     _data = d;
                                                     _forest.setData(d, index, taxon_map);
                                                 }
-        void                                    resetGeneTreePartials(Data::SharedPtr d, map<string, string> taxon_map);
+        void                                    resetGeneTreePartials(Data::SharedPtr d, map<string, string> taxon_map, int i);
         void                                    mapSpecies(map<string, string> &taxon_map, vector<string> &species_names, int n);
         void                                    mapGeneTrees(map<string, string> &taxon_map, vector<string> &species_names);
         void                                    saveForest(std::string treefilename);
@@ -671,11 +671,11 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
 
-    inline void Particle::resetGeneTreePartials(Data::SharedPtr d, map<string, string> taxon_map) {
+    inline void Particle::resetGeneTreePartials(Data::SharedPtr d, map<string, string> taxon_map, int i) {
         assert (_name != "species");
         _nsubsets = d->getNumSubsets();
         _data = d;
-        int i = 1;
+//        int i = 1;
         _forest.setData(d, i, taxon_map);
     }
 

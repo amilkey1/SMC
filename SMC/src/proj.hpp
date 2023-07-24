@@ -1115,12 +1115,15 @@ namespace proj {
                         }
                     }
                 }
+                bool gene_first = false;
                 if (_gene_newicks_names != "null") {
                     assert (newicks.size() == nsubsets);
                     for (int s=1; s<nsubsets+1; s++) {
                         for (int p=0; p<nparticles; p++) {
-                            my_vec[s][p]->processGeneNewicks(newicks, s-1);
+                            my_vec[s][p]->processGeneNewicks(newicks, s-1); // TODO: need to also set the speceis partition
+                            my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
                             start = "gene";
+                            gene_first = true;
                         }
                     }
                     _accepted_particle_vec = my_vec;
@@ -1159,16 +1162,16 @@ namespace proj {
                     }
                     
                     // keep the species partition for the gene forests at this stage but clear the tree structure
-//                     if (i == 1) { // TODO: double check why this is necessary
-//                         for (int s=1; s<nsubsets+1; s++) {
-//                             // start at s=1 to only modify the gene trees
-//                             for (int p=0; p<nparticles; p++) {
-//                             my_vec[s][p]->remakeGeneTrees(_taxon_map);
-//                             my_vec[s][p]->resetGeneTreePartials(_data, _taxon_map);
-//                             deconstruct = false;
-//                             }
-//                         }
-//                     }
+                     if (i == 1 && gene_first == true) { // TODO: double check why this is necessary
+                         for (int s=1; s<nsubsets+1; s++) {
+                             // start at s=1 to only modify the gene trees
+                             for (int p=0; p<nparticles; p++) {
+                             my_vec[s][p]->remakeGeneTrees(_taxon_map);
+                             my_vec[s][p]->resetGeneTreePartials(_data, _taxon_map, s);
+                             deconstruct = false;
+                             }
+                         }
+                     }
                 
                     if (i > 0) {
                         deconstruct = true;
