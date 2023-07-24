@@ -2451,7 +2451,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double increment, string species) {
         calcTopologyPrior((int) _lineages.size());
         allowCoalescence(nodes, increment, species);
-        _gene_tree_log_likelihood = calcLogLikelihood();
+//        _gene_tree_log_likelihood = calcLogLikelihood();
     }
 
     inline void Forest::allowCoalescence(list<Node*> &nodes, double increment, string species) {
