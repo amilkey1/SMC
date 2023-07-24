@@ -806,7 +806,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
              Node *subtree1 = _node_choices[_index_of_choice].first;
              Node *subtree2 = _node_choices[_index_of_choice].second;
          
-         _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
+//         _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice]; // don't do this because this will include the coalescent likelihood
              
              // erase extra nodes created from node list
              for (int i = 0; i < _node_choices.size(); i++) {
@@ -2322,7 +2322,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
          
          // use combined rate to draw an increment (delta)
          double increment = rng.gamma(1.0, 1.0/(coalescence_rate));
-    //        cout << "proposed increment is: " << increment << endl;
+//            cout << "proposed increment is: " << increment << endl;
          
          // choose which species coalescent event occurred in
          
@@ -2412,6 +2412,9 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                  
                  for (auto &nd:_lineages) {
                      nd->_edge_length += deep_coalescence_increment;
+                     for (int i=0; i<1; i++) {
+//                         cout << "total increment is : " << nd->_edge_length << endl;
+                     }
                  }
                  
                  increment = deep_coalescence_increment;

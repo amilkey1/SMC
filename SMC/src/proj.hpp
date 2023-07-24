@@ -1139,6 +1139,8 @@ namespace proj {
                 int ntaxa = (int) _taxon_map.size();
                 bool deconstruct = false;
                 
+                my_vec[0][0]->showParticle();
+                
                 for (int i=0; i<_niterations; i++) {
                     _log_marginal_likelihood = 0.0;
                     cout << "beginning iteration: " << i << endl;

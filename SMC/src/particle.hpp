@@ -251,7 +251,8 @@ class Particle {
             double prev_log_likelihood = _log_likelihood;
             
             if (Forest::_proposal == "prior-prior") {
-                _log_likelihood = calcLogLikelihood();
+//                _log_likelihood = calcLogLikelihood();
+                _log_likelihood = _forest._gene_tree_log_likelihood + _forest._gene_tree_log_coalescent_likelihood;
                 _log_weight = _log_likelihood - prev_log_likelihood;
             }
             else {
