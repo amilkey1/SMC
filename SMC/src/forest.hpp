@@ -2272,6 +2272,10 @@ inline Node * Forest::findNextPreorder(Node * nd) {
 
     inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info) {
          // get species info
+        if (_species_join_number == species_info.size() - 1) {
+            showForest();
+            cout << "x";
+        }
          double species_increment = species_info[_species_join_number].second;
         assert (species_increment >= 0.0);
         
@@ -2280,7 +2284,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         }
 
          // join species if necessary
-         if (_ready_to_join_species) {
+         if (_ready_to_join_species && _species_partition.size() > 1) {
              _ready_to_join_species = false;
              
              // update species partition
