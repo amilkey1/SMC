@@ -342,10 +342,6 @@ namespace proj {
         for (int p=0; p<nparticles; p++ ) {
             log_weight_vec[i++] = particles[p]->getLogWeight(a);
         }
-        
-//        for (auto &p:particles) {
-//            p->showParticle();
-//        }
 
         double log_particle_sum = getRunningSum(log_weight_vec);
 
@@ -811,38 +807,76 @@ namespace proj {
     }
 
     inline void Proj::proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets) {
-        for (unsigned p=first; p<last; p++) {
-//                for (int p=0; p<_nparticles*_species_particles_per_gene_particle; p++) {
-                    tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
+                for (unsigned p=first; p<last; p++) {
+        for (int p=0; p<_nparticles*_species_particles_per_gene_particle; p++) {
+            tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
+            
+            vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
+            
+            if (s < nspecies-1) {
+                for (int j=1; j<nsubsets+1; j++) {
                     
-                    vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
-                    
-                    if (s < nspecies-1) {
-                        for (int j=1; j<nsubsets+1; j++) {
-                            
-                            max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
-                        }
-                        
-                        // now finish the species tree branch length proposal
-                        my_vec[0][p]->speciesProposal(max_depths, species_joined);
-                    }
+                    max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
+                }
+                
+                // now finish the species tree branch length proposal
+                my_vec[0][p]->speciesProposal(max_depths, species_joined); // branch length proposal
+            }
+            else {
+                for (int j=1; j<nsubsets+1; j++) {
+                    my_vec[j][p]->calcConstrainedProposal(species_joined); // update the gene tree species partitions
+                    max_depths.push_back(0.0);
+                }
+                my_vec[0][p]->speciesProposal(max_depths, species_joined); // set last edge length of species tree to 0.0
+            }
 
-                    double log_coalescent_likelihood = 0.0;
-                    
-                    // calculate coalescent likelihood for each gene on each particle
-                        for (int j=1; j<nsubsets+1; j++) {
-                            double last_edge_len = my_vec[0][p]->getLastEdgeLen();
-                            double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
-                            log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
-                        }
-                    
-                    my_vec[0][p]->calcSpeciesParticleWeight(log_coalescent_likelihood);
-                } // p loop
+            double log_coalescent_likelihood = 0.0;
+            
+            // calculate coalescent likelihood for each gene on each particle
+                for (int j=1; j<nsubsets+1; j++) {
+                    double last_edge_len = my_vec[0][p]->getLastEdgeLen();
+                    double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
+                    log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
+                }
+            
+            my_vec[0][p]->calcSpeciesParticleWeight(log_coalescent_likelihood);
+        } // p loop
+    }
+        
+        //        for (unsigned p=first; p<last; p++) {
+////                for (int p=0; p<_nparticles*_species_particles_per_gene_particle; p++) {
+//                    tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
+//
+//                    vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
+//
+//                    if (s < nspecies-1) {
+//                        for (int j=1; j<nsubsets+1; j++) {
+//
+//                            max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
+//                        }
+//
+//                        // now finish the species tree branch length proposal
+//                        my_vec[0][p]->speciesProposal(max_depths, species_joined);
+//                    }
+//
+//                    double log_coalescent_likelihood = 0.0;
+//
+//                    // calculate coalescent likelihood for each gene on each particle
+//                        for (int j=1; j<nsubsets+1; j++) {
+//                            double last_edge_len = my_vec[0][p]->getLastEdgeLen();
+//                            double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
+//                            log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
+//                        }
+//
+//                    my_vec[0][p]->calcSpeciesParticleWeight(log_coalescent_likelihood);
+//                } // p loop
         }
 //    }
 
     inline void Proj::proposeSpeciesParticles( vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets) {
-        if (_nthreads == 1) {
+        bool no_threading = true;
+//        if (_nthreads == 1) {
+//        if (no_threading) {
             for (int p=0; p<_nparticles*_species_particles_per_gene_particle; p++) {
                 tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
                 
@@ -855,7 +889,14 @@ namespace proj {
                     }
                     
                     // now finish the species tree branch length proposal
-                    my_vec[0][p]->speciesProposal(max_depths, species_joined);
+                    my_vec[0][p]->speciesProposal(max_depths, species_joined); // branch length proposal
+                }
+                else {
+                    for (int j=1; j<nsubsets+1; j++) {
+                        my_vec[j][p]->calcConstrainedProposal(species_joined); // update the gene tree species partitions
+                        max_depths.push_back(0.0);
+                    }
+                    my_vec[0][p]->speciesProposal(max_depths, species_joined); // set last edge length of species tree to 0.0
                 }
 
                 double log_coalescent_likelihood = 0.0;
@@ -869,38 +910,38 @@ namespace proj {
                 
                 my_vec[0][p]->calcSpeciesParticleWeight(log_coalescent_likelihood);
             } // p loop
-        }
+//        }
             
-        else { // multithreading
-            // divide up the particles as evenly as possible across threads
-            unsigned first = 0;
-            int nspecies_particles = _nparticles*_species_particles_per_gene_particle;
-            unsigned incr = nspecies_particles/_nthreads + (nspecies_particles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
-            unsigned last = incr;
-            
-            
-            // need a vector of threads because we have to wait for each one to finish
-            vector<thread> threads;
-            
-            while (true) {
-//                // create a thread to handle particles first through last - 1
-                  threads.push_back(thread(&Proj::proposeSpeciesParticleRange, this, first, last, std::ref(my_vec), s, nspecies, nsubsets));
-//                // update first and last
-                first = last;
-                last += incr;
-                if (last > nspecies_particles) {
-                  last = nspecies_particles;
-                  }
-                if (first>=nspecies_particles) {
-                    break;
-                }
-          }
-
-          // the join function causes this loop to pause until the ith thread finishes
-              for (unsigned i = 0; i < threads.size(); i++) {
-                threads[i].join();
-              }
-        }
+//        else { // multithreading
+//            // divide up the particles as evenly as possible across threads
+//            unsigned first = 0;
+//            int nspecies_particles = _nparticles*_species_particles_per_gene_particle;
+//            unsigned incr = nspecies_particles/_nthreads + (nspecies_particles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
+//            unsigned last = incr;
+//
+//
+//            // need a vector of threads because we have to wait for each one to finish
+//            vector<thread> threads;
+//
+//            while (true) {
+////                // create a thread to handle particles first through last - 1
+//                  threads.push_back(thread(&Proj::proposeSpeciesParticleRange, this, first, last, std::ref(my_vec), s, nspecies, nsubsets));
+////                // update first and last
+//                first = last;
+//                last += incr;
+//                if (last > nspecies_particles) {
+//                  last = nspecies_particles;
+//                  }
+//                if (first>=nspecies_particles) {
+//                    break;
+//                }
+//          }
+//
+//          // the join function causes this loop to pause until the ith thread finishes
+//              for (unsigned i = 0; i < threads.size(); i++) {
+//                threads[i].join();
+//              }
+//        }
             
 
 //            }
@@ -1037,6 +1078,16 @@ namespace proj {
                 
             setStartingVariables();
             
+            ofstream testf("exponential.log");
+            testf << "sample_number" << endl;
+            for (int i=0; i<10000; i++) {
+                double test1 = rng.gamma(1.0, 1.0/(2));
+                testf << test1 << endl;;
+//                cout << "proposed increment is: " << test1 << endl;
+            }
+            testf.close();
+
+            
             // loop for number of samples (either theta or speciation rate)
             for (_sample=0; _sample<_nsamples; _sample++) {
                 cout << "sample: " << _sample << endl;
@@ -1139,8 +1190,6 @@ namespace proj {
                 int ntaxa = (int) _taxon_map.size();
                 bool deconstruct = false;
                 
-                my_vec[0][0]->showParticle();
-                
                 for (int i=0; i<_niterations; i++) {
                     _log_marginal_likelihood = 0.0;
                     cout << "beginning iteration: " << i << endl;
@@ -1164,7 +1213,7 @@ namespace proj {
                     }
                     
                     // keep the species partition for the gene forests at this stage but clear the tree structure
-                     if (i == 1 && gene_first == true) { // TODO: double check why this is necessary
+                     if (i == 1 && gene_first == true) {
                          for (int s=1; s<nsubsets+1; s++) {
                              // start at s=1 to only modify the gene trees
                              for (int p=0; p<nparticles; p++) {
@@ -1269,7 +1318,7 @@ namespace proj {
                     }
                     
                     
-                // choose one set of gene trees to use
+                // choose one set of gene trees to use // TODO: double check this as well as species tree sampling
                 for (int s=1; s<nsubsets+1; s++) {
                     normalizeWeights(my_vec[s], "g", false);
                     Particle gene_x = *chooseSpeciesTree(my_vec[s], "g");

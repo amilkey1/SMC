@@ -309,8 +309,12 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
         string species1 = get<0>(species_joined);
         string species2 = get<1>(species_joined);
         
-        _forest.resetDepthVector(species_joined);
-        double max_depth = _forest.getMinDepths()[0].first;
+        double max_depth = 0.0;
+        if (_forest._species_partition.size() > 1) {
+            _forest.resetDepthVector(species_joined);
+            max_depth = _forest.getMinDepths()[0].first;
+            assert (max_depth > 0.0);
+        }
         
         return max_depth;
     }
@@ -334,7 +338,7 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
     inline void Particle::speciesProposal(vector<double> max_depth_vector, tuple<string, string, string> species_joined ) {
         assert (!_inf);
-        assert (_forest._lineages.size() > 1);
+//        assert (_forest._lineages.size() > 1);
         
         double max_depth = 0.0;
 
