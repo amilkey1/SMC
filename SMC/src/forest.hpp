@@ -1816,7 +1816,9 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 cum_time += increment;
                 panmictic_nlineages--;
             }
-            // TODO: for every step except the last, need to include coalescent likelihood for rest of gene tree
+            assert (panmictic_nlineages == 1);
+            
+            // TODO: double check this calculation - I think the coalescent likelihood should not be accumluated anymore
         }
         else {
             // final step; no deep coalescence; one species
