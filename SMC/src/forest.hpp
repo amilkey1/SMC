@@ -106,7 +106,7 @@ class Forest {
         void                        updateIncrements(double log_increment_prior);
         pair<double, string>        chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info);
         pair<Node*, Node*>          chooseAllPairs(list<Node*> &nodes, double increment, string species);
-        double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done);
+        double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
         vector< pair<double, Node *>>      sortPreorder();
         void                        calcMinDepth();
         vector<pair<double, pair<string, string>>>             getMinDepths();
@@ -1725,7 +1725,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         }
     }
 
-    inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height, bool mark_as_done) {
+    inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {
         double neg_inf = -1*numeric_limits<double>::infinity();
         vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
         double log_coalescent_likelihood = 0.0;
@@ -1734,7 +1734,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
 
         if (species_increment > 0) {
             for (int i=_nincrements; i<heights_and_nodes.size(); i++) {
-                Node* node;
+                Node* node = nullptr;
                 if (heights_and_nodes[i].first < species_tree_height) {
                     // calc coalescent prob and update species partition
                     double increment = heights_and_nodes[i].first - (species_tree_height - species_increment) - cum_time;
@@ -1789,6 +1789,34 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 log_coalescent_likelihood -= remaining_chunk_of_branch * coalescence_rate;
             }
             _nincrements += a;
+        }
+        
+        // calculate coalescent likelihood for the rest of the panmictic tree
+        if (species_increment > 0.0) {
+            double cum_time = 0.0;
+            // calculate height of each join in the gene tree, minus the species tree height
+            // get number of lineages at beginning of that step and then decrement with each join
+            // don't increment _nincrements?
+            
+            // start at _nincrements and go through heights and nodes list
+            int panmictic_nlineages = 0;
+            for (auto &s:_species_partition) {
+                panmictic_nlineages += s.second.size();
+            }
+            
+            for (int i=_nincrements; i < heights_and_nodes.size(); i++) {
+                // calculate increment (should be heights_and_nodes[i].first - species_tree_height - cum_time (no need to worry about species increment now)
+                // calculate prob of coalescence, ln(rate) - rate*increment
+                double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
+                double coalescence_rate = panmictic_nlineages*(panmictic_nlineages-1) / _theta;
+                double nChooseTwo = panmictic_nlineages*(panmictic_nlineages-1);
+                double log_prob_join = log(2/nChooseTwo);
+                log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
+                
+                cum_time += increment;
+                panmictic_nlineages--;
+            }
+            // TODO: for every step except the last, need to include coalescent likelihood for rest of gene tree
         }
         else {
             // final step; no deep coalescence; one species

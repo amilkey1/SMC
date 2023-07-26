@@ -330,6 +330,9 @@ namespace proj {
     }
 
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles, string a, bool calc_marg_like) {
+//        for (int p=0; p<_nparticles; p++) {
+//            particles[p]->showParticle();
+//        }
         int nparticles = _nparticles;
         if (a == "s") {
             nparticles *= _species_particles_per_gene_particle;
@@ -545,7 +548,7 @@ namespace proj {
         // open log file
         ofstream genef("genetrees.txt");
         genef << "let gene_forests = [\n";
-        for (int p=0; p<_accepted_particle_vec[0].size(); p++) {
+        for (int p=0; p<_nparticles; p++) {
             genef << "particle " << endl;
             for (int s=1; s<_accepted_particle_vec.size(); s++) {
                 genef << "gene " << s << endl;
@@ -808,7 +811,6 @@ namespace proj {
 
     inline void Proj::proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets) {
             for (unsigned p=first; p<last; p++) {
-//                for (int p=0; p<_nparticles*_species_particles_per_gene_particle; p++) {
                     tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
 
                     vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
@@ -841,7 +843,6 @@ namespace proj {
 
                     my_vec[0][p]->calcSpeciesParticleWeight(log_coalescent_likelihood);
                 } // p loop
-//        }
     }
 
     inline void Proj::proposeSpeciesParticles( vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets) {
@@ -1044,16 +1045,6 @@ namespace proj {
                 
             setStartingVariables();
             
-            ofstream testf("exponential.log");
-            testf << "sample_number" << endl;
-            for (int i=0; i<10000; i++) {
-                double test1 = rng.gamma(1.0, 1.0/(2));
-                testf << test1 << endl;;
-//                cout << "proposed increment is: " << test1 << endl;
-            }
-            testf.close();
-
-            
             // loop for number of samples (either theta or speciation rate)
             for (_sample=0; _sample<_nsamples; _sample++) {
                 cout << "sample: " << _sample << endl;
@@ -1070,12 +1061,7 @@ namespace proj {
                 _log_marginal_likelihood = 0.0;
                 
                 for (unsigned s=0; s<nsubsets+1; s++) {
-//                    if (s == 0) {
-                        int nparticles = _nparticles*_species_particles_per_gene_particle;
-//                    }
-//                    else {
-//                        nparticles = _nparticles;
-//                    }
+                    int nparticles = _nparticles*_species_particles_per_gene_particle;
                     for (unsigned i=0; i<nparticles; i++) {
                         my_vec_1[s][i] = Particle::SharedPtr(new Particle);
                         my_vec_2[s][i] = Particle::SharedPtr(new Particle);
@@ -1208,7 +1194,7 @@ namespace proj {
                         if (i > 0) {
                             normalizeWeights(my_vec[0], "s", false);
                             species_tree_particle = chooseSpeciesTree(my_vec[0], "s"); // pass in all the species trees
-                            resetWeights(my_vec[0], "s");
+//                            resetWeights(my_vec[0], "s"); // TODO: not necessary?
                         }
                         else {
                             species_tree_particle = my_vec[0][0];
@@ -1224,6 +1210,8 @@ namespace proj {
 //                                my_vec[s][p]->setLogWeight(0.0, "s");
                             }
                         }
+                        
+//                        my_vec[0][0]->showParticle();
                         
                         for (unsigned g=0; g<ntaxa-1; g++) {
                             // filter particles within each gene
@@ -1270,6 +1258,7 @@ namespace proj {
                         } // g loop
                     }
                     
+//                    my_vec[0][0]->showParticle();
                     writeGeneTreeFile();
                     
                     // filter species trees now
@@ -1284,14 +1273,14 @@ namespace proj {
                     }
                     
                     
-                // choose one set of gene trees to use // TODO: double check this as well as species tree sampling
+                // choose one set of gene trees to use
                 for (int s=1; s<nsubsets+1; s++) {
                     normalizeWeights(my_vec[s], "g", false);
                     Particle gene_x = *chooseSpeciesTree(my_vec[s], "g");
                     for (int p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
                         *my_vec[s][p] = gene_x;
                     }
-                    resetWeights(my_vec[s], "g");
+//                    resetWeights(my_vec[s], "g"); // TODO: not necessary?
 //                    _accepted_particle_vec[s] = my_vec[s];
                 }
                     
