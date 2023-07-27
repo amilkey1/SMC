@@ -236,6 +236,7 @@ namespace proj {
         ("gene_newicks", boost::program_options::value(&_gene_newicks_names)->default_value("null"), "name of file containing gene newick descriptions")
         ("species_newick", boost::program_options::value(&_species_newicks_name)->default_value("null"), "name of file containing species newick descriptions")
         ("species_particles_per_gene_particle", boost::program_options::value(&_species_particles_per_gene_particle)->default_value(1), "increase number of particles for species trees by this amount")
+        ("outgroup", boost::program_options::value(&Forest::_outgroup)->default_value("null"), "specify outgroup in species tree")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -354,7 +355,7 @@ namespace proj {
         
         if (calc_marg_like) {
             _log_marginal_likelihood += log_particle_sum - log(_nparticles);
-            cout << setprecision(12) << "   " << _log_marginal_likelihood << endl;
+//            cout << setprecision(12) << "   " << _log_marginal_likelihood << endl;
         }
 //        else {
 //            _species_tree_log_marginal_likelihood += log_particle_sum - log(_nparticles);
@@ -1214,6 +1215,7 @@ namespace proj {
 //                        my_vec[0][0]->showParticle();
                         
                         for (unsigned g=0; g<ntaxa-1; g++) {
+                            cout << "generation " << g << endl;
                             // filter particles within each gene
                             
                             bool gene_trees_only = true;
@@ -1234,7 +1236,7 @@ namespace proj {
                                     }
 
                                     double ess = 1.0/ess_inverse;
-                                    cout << "   " << "ESS = " << ess << endl;
+//                                    cout << "   " << "ESS = " << ess << endl;
                                  
                                     resampleParticles(my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s], "g");
                                     //if use_first is true, my_vec = my_vec_2

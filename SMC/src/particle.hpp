@@ -331,7 +331,6 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
     inline double Particle::calcGeneCoalescentLikelihood(double last_edge_len, tuple<string, string, string> species_joined, double species_tree_height) {
         double coal_like_increment = _forest.calcCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
-//            _log_coalescent_likelihood += coal_like_increment;
         _log_coalescent_likelihood = coal_like_increment;
         return _log_coalescent_likelihood;
     }

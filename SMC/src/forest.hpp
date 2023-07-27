@@ -190,6 +190,7 @@ class Forest {
         static string               _string_base_frequencies;
         static double               _migration_rate;
         static double               _hybridization_rate;
+        static string               _outgroup;
 };
 
 
@@ -2242,11 +2243,28 @@ inline Node * Forest::findNextPreorder(Node * nd) {
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
         // this function creates a new node and joins two species
 
-        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
-        Node *subtree1=_lineages[t.first];
-        Node *subtree2=_lineages[t.second];
-        assert(!subtree1->_parent && !subtree2->_parent);
+        Node* subtree1;
+        Node* subtree2;
+        
+        bool done = false;
+        while (!done) {
+            pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
+            subtree1=_lineages[t.first];
+            subtree2=_lineages[t.second];
+            assert(!subtree1->_parent && !subtree2->_parent);
+            
+            if (_lineages.size() == 2) {
+                done = true;
+            }
+            else if (subtree1->_name != _outgroup && subtree2->_name != _outgroup) {
+                done = true;
+            }
+        }
 
+        if (_lineages.size() > 2) {
+            assert (subtree1->_name != _outgroup);
+            assert (subtree2->_name != _outgroup);
+        }
         Node nd;
         _nodes.push_back(nd);
         Node* new_nd = &_nodes.back();
