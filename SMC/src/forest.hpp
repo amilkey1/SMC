@@ -103,7 +103,6 @@ class Forest {
         void                        extendGeneTreeLineages(double species_tree_increment, bool deep_coalescence);
         double                      extendSingleLineage(double gene_increment, Node* nd, string spp_right_child, string spp_left_child);
         void                        updateSpeciesPartition(tuple<string, string, string> species_info);
-        void                        updateIncrements(double log_increment_prior);
         pair<double, string>        chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info);
         pair<Node*, Node*>          chooseAllPairs(list<Node*> &nodes, double increment, string species);
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
@@ -818,31 +817,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         
          return make_pair(subtree1, subtree2);
      }
-
-    inline void Forest::updateIncrements(double log_increment_prior) {
-        pair <double, double> chosen_increment;
-        double deep_coalescent_increment = 0.0;
-        double deep_coalescent_prior = 0.0;
-        for (int i=0; i<_deep_coalescent_increments.size(); i++) {
-            if (_deep_coalescent_increments[i].second != 0.0) {
-                deep_coalescent_increment += _deep_coalescent_increments[i].first;
-                deep_coalescent_prior += _deep_coalescent_increments[i].second;
-            }
-        }
-
-        if (deep_coalescent_increment > 0.0) {
-            chosen_increment = make_pair(_increment_choices[_index_of_choice]+deep_coalescent_increment+_extended_increment, log_increment_prior+deep_coalescent_prior);
-        }
-        else {
-            chosen_increment = make_pair(_increment_choices[_index_of_choice]+_extended_increment, log_increment_prior);
-        }
-
-        // clear deep coalescent increment
-        _deep_coalescent_increments.clear();
-        // add increment and prior to increments list
-        _increments.push_back(chosen_increment);
-        _extended_increment = 0.0;
-    }
 
     inline vector<pair<double, pair<string, string>>> Forest::getMinDepths() {
         return _depths;
