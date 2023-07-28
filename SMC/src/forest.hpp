@@ -1590,7 +1590,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         // find children of node and determine if children are in the same species
         // if children are in different species, calculate the node height
         vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
-    //        vector<double> depths;
     // post order traversal is the reverse of pre order, now sorted by node heights
         string spp_left_child;
         string spp_right_child;
@@ -1600,7 +1599,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             Node* nd = heights_and_nodes[i].second;
             done = false;
                 // figure out if descendants of internal node are in the same species
-    //                if (nd->_left_child && !nd->_visited) {
             if (nd->_left_child) {
                 while (!done) {
                     Node* left_child = nd->_left_child;
@@ -1618,8 +1616,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                         }
                         if (spp_left_child == "") {
                             if (left_child->_left_child) {
-                                left_child = left_child->_left_child; // TODO: not sure about these; will the parent get accounted for later?
-                                // this is saying if the species of the node is not found, the parent will be dealt with later & ignore the node for now
+                                left_child = left_child->_left_child;
+                                // if the species of the node is not found, the parent will be dealt with later; ignore the node for now
                                 done = true;
                             }
                         }
@@ -1630,7 +1628,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                             }
                         }
                     }
-    //                    nd->_visited = true;
                     if (spp_left_child != "" && spp_right_child != "") {
                         left_child->_parent->_visited = true;
                         done = true;
@@ -1638,7 +1635,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                     if (spp_left_child != spp_right_child) {
                         double height = getLineageHeight(nd->_left_child);
                         _depths.push_back(make_pair(height, make_pair(spp_left_child, spp_right_child)));
-    //                        _depths.push_back(height);
                     }
                     spp_left_child = "";
                     spp_right_child = "";
@@ -1646,7 +1642,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             }
         }
         assert (_depths.size() > 0);
-    //        return depths[0];
     }
 
     inline void Forest::updateSpeciesPartition(tuple<string, string, string> species_info) {
@@ -1759,9 +1754,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 panmictic_nlineages--;
             }
             assert (panmictic_nlineages == 1);
-            
-            // TODO: double check this calculation - I think the coalescent likelihood should not be accumluated anymore
         }
+        
         else {
             // final step; no deep coalescence; one species
             assert (species_increment == 0.0);
@@ -1790,7 +1784,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                         a++;
                         cum_time += increment;
                     }
-                        // no deep coalescence
+                        // no deep coalescence to deal with
                     }
                 }
         }
@@ -2463,16 +2457,12 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             assert (t.first < nodes.size() && t.second < nodes.size());
         }
         else {
-    //            _prev_gene_tree_log_likelihood = 0.0; // prev log likelihood is 0 for the first gen
             if (_lineages.size() != _ntaxa) {
     //                _prev_gene_tree_log_likelihood = calcLogLikelihood();
                 _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
             }
             else {
                 _prev_gene_tree_log_likelihood = 0.0;
-            }
-            if (_species_partition.size() < 8) {
-                cout << "stop";
             }
             pair<Node*, Node*> t = chooseAllPairs(nodes, increment, species);
             

@@ -252,8 +252,6 @@ class Particle {
             _log_likelihood = _forest._gene_tree_log_likelihood + _forest._gene_tree_log_coalescent_likelihood;
 
             if (Forest::_proposal == "prior-prior") {
-//                _log_likelihood = calcLogLikelihood();
-//                _log_likelihood = _forest._gene_tree_log_likelihood + _forest._gene_tree_log_coalescent_likelihood;
                 _log_weight = _log_likelihood - prev_log_likelihood;
             }
             else {
@@ -293,11 +291,11 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
             species_joined = _forest.speciesTreeProposal();
         }
         
-        _t.push_back(make_pair(species_joined, -1.0));
+        _t.push_back(make_pair(species_joined, 0.0));
     
-        if (_t.size() == Forest::_nspecies) {
-            _t[Forest::_nspecies-1].second = 0.0; // last element of _t should not draw a branch length
-        }
+//        if (_t.size() == Forest::_nspecies) {
+//            _t[Forest::_nspecies-1].second = 0.0; // last element of _t should not draw a branch length
+//        }
         
         return species_joined;
     }
@@ -339,7 +337,6 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
     inline void Particle::speciesProposal(vector<double> max_depth_vector, tuple<string, string, string> species_joined ) {
         assert (!_inf);
-//        assert (_forest._lineages.size() > 1);
         
         double max_depth = 0.0;
 
@@ -374,6 +371,7 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
             if (test == -0) {
                 _inf = true;
             }
+            assert (!_inf);
         }
     }
 
