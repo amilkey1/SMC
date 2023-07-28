@@ -768,7 +768,6 @@ namespace proj {
         assert (species_joined.size() > 0);
         
         if (_nthreads == 1) {
-//            for (int p=0; p<particles.size(); p++) {
             for (int p=0; p<_nparticles; p++) {
                 particles[p]->proposal(gene_trees_only, deconstruct, species_joined);
           }
@@ -1196,13 +1195,9 @@ namespace proj {
                         if (i > 0) {
                             normalizeWeights(my_vec[0], "s", false);
                             species_tree_particle = chooseSpeciesTree(my_vec[0], "s"); // pass in all the species trees
-//                            resetWeights(my_vec[0], "s"); // TODO: not necessary?
                         }
                         else {
                             species_tree_particle = my_vec[0][0];
-//                            for (int p=0; p<nparticles; p++) {
-//                                _accepted_particle_vec[0][p] = species_tree_particle;
-//                            }
                         }
                         
                         if (i > 0) {
@@ -1216,7 +1211,7 @@ namespace proj {
                             }
                         }
                         
-//                        my_vec[0][0]->showParticle();
+                        my_vec[0][0]->showParticle();
                         
                         for (unsigned g=0; g<ntaxa-1; g++) {
                             cout << "generation " << g << endl;
@@ -1225,6 +1220,7 @@ namespace proj {
                             bool gene_trees_only = true;
                             
                             for (int s=1; s<nsubsets+1; s++) { // skip species tree particles
+                                
                                 proposeParticles(my_vec[s], gene_trees_only, "g", deconstruct, species_tree_particle);
                                 
                                 if (!_run_on_empty) {

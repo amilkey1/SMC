@@ -59,7 +59,7 @@ class Forest {
         Node *                      findNextPreorder(Node * nd);
         std::string                 makeNewick(unsigned precision, bool use_names);
         pair<unsigned, unsigned>    chooseTaxaToJoin(double s);
-        tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> p, list<Node*> node_list, double increment, string species);
+        tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> p, list<Node*> node_list, double increment, string species, bool first);
         void                        calcPartialArray(Node* new_nd);
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
@@ -761,17 +761,18 @@ inline Node * Forest::findNextPreorder(Node * nd) {
          _gene_tree_log_weight = 0.0;
          
          double starting_gene_tree_log_coalescent_likelihood = _gene_tree_log_coalescent_likelihood;
-         
+        bool first = true;
+        
          // choose pair of nodes to try
          for (int i = 0; i < (int) node_list.size()-1; i++) {
              for (int j = i+1; j < (int) node_list.size(); j++) {
                  // createNewSubtree returns subtree1, subtree2, new_nd
-                 tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment, species);
+                 
+                 tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment, species, first);
+                 first = false;
                  
                  _log_likelihood_choices.push_back(calcLogLikelihood()+_gene_tree_log_coalescent_likelihood);
-                 
-                 // reset log coal likelihood
-                 _gene_tree_log_coalescent_likelihood = starting_gene_tree_log_coalescent_likelihood;
+                 // gene tree log coalescent likelihood is the same for every possible join
 
                  // revert _lineages
                  revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
@@ -1930,7 +1931,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         return s;
     }
 
-    inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, double increment, string species) {
+    inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, double increment, string species, bool first) {
         pair<Node*, Node*> p = getSubtreeAt(t, node_list);
 
         Node* subtree1 = p.first;
@@ -1957,37 +1958,39 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         assert(new_nd->_left_child->_right_sib);
         calcPartialArray(new_nd);
 
-        //update species list
-//        updateNodeList(node_list, subtree1, subtree2, new_nd); // TODO: this doesn't update species partition
+        // don't update the species list
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         
+        // calculate the coalescent likelihood for the first join since it's the same for all joins
         
-        // update increments and priors
-        double log_increment_prior = 0.0;
-        bool coalescence = false;
-        for (auto &s:_species_partition) {
-            if (s.first == species) {
-                coalescence = true;
+        if (first) {
+            // update increments and priors
+            double log_increment_prior = 0.0;
+            bool coalescence = false;
+            for (auto &s:_species_partition) {
+                if (s.first == species) {
+                    coalescence = true;
+                }
+                else {
+                    coalescence = false;
+                }
+                
+                if (coalescence) {
+                    // if there is coalescence, need to use number of lineages before the join
+                    double coalescence_rate = (s.second.size())*(s.second.size()-1) / _theta;
+                    assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
+                    double nChooseTwo = (s.second.size())*(s.second.size()-1);
+                    double log_prob_join = log(2/nChooseTwo);
+    //                double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
+                    log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate) + log_prob_join;
+                }
+                else {
+                    double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
+                    log_increment_prior -= increment*coalescence_rate;
+                }
             }
-            else {
-                coalescence = false;
-            }
-//            double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
-            if (coalescence) {
-                // if there is coalescence, need to use number of lineages before the join
-                double coalescence_rate = (s.second.size())*(s.second.size()-1) / _theta;
-                assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
-                double nChooseTwo = (s.second.size())*(s.second.size()-1);
-                double log_prob_join = log(2/nChooseTwo);
-//                double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
-                log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate) + log_prob_join;
-            }
-            else {
-                double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
-                log_increment_prior -= increment*coalescence_rate;
-            }
+            _gene_tree_log_coalescent_likelihood += log_increment_prior;
         }
-        _gene_tree_log_coalescent_likelihood += log_increment_prior;
         return make_tuple(subtree1, subtree2, new_nd);
     }
 
@@ -2320,12 +2323,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
 
     inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info) {
          // get species info
-//        showForest();
-//        if (_species_join_number == species_info.size() - 1) {
-//            showForest();
-//            cout << "x";
-//        }
-         double species_increment = species_info[_species_join_number].second;
+        double species_increment = species_info[_species_join_number].second;
         assert (species_increment >= 0.0);
         
         if (_species_join_number == 0) {
