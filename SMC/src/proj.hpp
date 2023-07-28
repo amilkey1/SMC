@@ -1050,7 +1050,7 @@ namespace proj {
             for (_sample=0; _sample<_nsamples; _sample++) {
                 cout << "sample: " << _sample << endl;
                 // my_vec contains a vector of vector of particles corresponding to species particles and gene particles
-                vector<vector<Particle::SharedPtr>> my_vec_1(nsubsets+1, vector<Particle::SharedPtr> (nparticles*_species_particles_per_gene_particle)); // leave 90% of vector empty for gene particles
+                vector<vector<Particle::SharedPtr>> my_vec_1(nsubsets+1, vector<Particle::SharedPtr> (nparticles*_species_particles_per_gene_particle)); // leave x% of vector empty for gene particles
                 vector<vector<Particle::SharedPtr>> my_vec_2(nsubsets+1, vector<Particle::SharedPtr> (nparticles*_species_particles_per_gene_particle));
                 vector<vector<Particle::SharedPtr>> &my_vec = my_vec_1;
                 
@@ -1064,7 +1064,7 @@ namespace proj {
                 for (unsigned s=0; s<nsubsets+1; s++) {
                     int nparticles = _nparticles*_species_particles_per_gene_particle;
                     for (unsigned i=0; i<nparticles; i++) {
-                        my_vec_1[s][i] = Particle::SharedPtr(new Particle);
+                        my_vec_1[s][i] = Particle::SharedPtr(new Particle); // TODO: wasteful that this makes species trees with extra lineages
                         my_vec_2[s][i] = Particle::SharedPtr(new Particle);
                     }
                 }
@@ -1133,10 +1133,11 @@ namespace proj {
                     _accepted_particle_vec = my_vec;
                 }
                 
-                for (int s=0; s<nsubsets+1; s++) {
-//                    for (auto &p:my_vec[s]) {
-                    for (int p=0; p<nparticles; p++) {
-                        my_vec[s][p]->setRunOnEmpty(_run_on_empty);
+                if (_run_on_empty) {
+                    for (int s=0; s<nsubsets+1; s++) {
+                        for (int p=0; p<nparticles; p++) {
+                            my_vec[s][p]->setRunOnEmpty(_run_on_empty);
+                        }
                     }
                 }
                 
