@@ -100,7 +100,7 @@ class Forest {
         unsigned                    countDescendants(Node* nd, unsigned count);
         double                      getTreeHeight();
         double                      getLineageHeight(Node* nd); // getLineageHeight(const Node* nd) const;
-        void                        extendGeneTreeLineages(double species_tree_increment);
+        void                        extendGeneTreeLineages(double species_tree_increment, bool deep_coalescence);
         double                      extendSingleLineage(double gene_increment, Node* nd, string spp_right_child, string spp_left_child);
         void                        updateSpeciesPartition(tuple<string, string, string> species_info);
         void                        updateIncrements(double log_increment_prior);
@@ -751,7 +751,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             _gene_tree_log_likelihood += log_like;
 //            debugLogLikelihood(nd, log_like);
         }
-//        _gene_tree_log_likelihood += _gene_tree_log_coalescent_likelihood;
         return _gene_tree_log_likelihood;
     }
 
@@ -795,7 +794,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
          // sum unnormalized weights before choosing the pair
          // must include the likelihoods of all pairs in the final particle weight
          double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-         _gene_tree_log_weight += log_weight_choices_sum;
+         _gene_tree_log_weight = log_weight_choices_sum;
          for (int b=0; b < (int) log_weight_choices.size(); b++) {
              log_weight_choices[b] -= log_weight_choices_sum;
          }
@@ -2397,7 +2396,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
              double cum_time = species_increment;
              while (!done) {
                  // extend existing lineages to species barrier
-                 extendGeneTreeLineages(species_tree_height);
+                 extendGeneTreeLineages(species_tree_height, true);
                  
                  // update species partition - two species must merge now to accommodate deep coalescence
                  _species_join_number++;
@@ -2491,11 +2490,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                  extend = false;
                  break;
              }
-         }
-
-         assert (!extend);
-         if (extend) {
-             extendGeneTreeLineages(species_tree_height);
          }
          
          return make_pair(increment, species_for_join);
@@ -2609,8 +2603,8 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _increments.push_back(make_pair(increment, log_increment_prior));
         _extended_increment = 0.0;
         _deep_coalescent_increments.clear();
-        
     }
+
     inline void Forest::geneTreeProposal(pair<double, string> species_info, vector<pair<tuple<string, string, string>, double>> _t) {
         string species_name = species_info.second;
         bool joined = false;
@@ -2640,7 +2634,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         }
         
         if (extend && _species_partition.size() > 1) {
-            extendGeneTreeLineages(species_tree_height);
+            extendGeneTreeLineages(species_tree_height, false);
         }
     }
 
@@ -3334,55 +3328,48 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         return count;
     }
 
-    inline void Forest::extendGeneTreeLineages(double species_tree_height) {
-        vector<double> extended_increment_options;
-        double deep_coalescent_increment = 0.0;
-//        _extended_increment = 0.0;
+    inline void Forest::extendGeneTreeLineages(double species_tree_height, bool deep_coalescence) {
+        // pick one node and figure out increment to add from there
+//        vector<double> extended_increment_options;
+//        double deep_coalescent_increment = 0.0;
+        double extended_increment = 0.0;
         
         if (_lineages.size() > 1) {
+            extended_increment = species_tree_height - getLineageHeight(_lineages[0]);
+            
             for (auto &l:_lineages) {
                 if (l->_left_child) {
                     if (getLineageHeight(l) < species_tree_height) {
-//                        _extended_increment += species_tree_height - getLineageHeight(l);
-                        double extended_increment = species_tree_height - getLineageHeight(l);
-                        extended_increment_options.push_back(extended_increment);
-                        l->_edge_length += species_tree_height - getLineageHeight(l);
+                        l->_edge_length += extended_increment;
                     }
                 }
                 else {
                     if (l->_edge_length < species_tree_height) {
-//                        _extended_increment += species_tree_height - getLineageHeight(l);
-                        double extended_increment = species_tree_height - getLineageHeight(l);
-                        extended_increment_options.push_back(extended_increment);
-                        l->_edge_length += species_tree_height - getLineageHeight(l);
+                        l->_edge_length += extended_increment;
                     }
                 }
             }
         }
         else {
-//            _extended_increment += species_tree_height - getLineageHeight(_lineages[0]->_left_child);
-            double extended_increment = species_tree_height - getLineageHeight(_lineages[0]->_left_child);
-            extended_increment_options.push_back(extended_increment);
+            extended_increment = species_tree_height - getLineageHeight(_lineages[0]->_left_child);
             _lineages[0]->_left_child->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child);
             _lineages[0]->_left_child->_right_sib->_edge_length = species_tree_height - getLineageHeight(_lineages[0]->_left_child->_right_sib);
         }
+        
         _ready_to_join_species = true;
-        if (extended_increment_options.size() > 0) {
-            _extended_increment += *min_element(extended_increment_options.begin(), extended_increment_options.end()); // extended increment is the smallest one added
-            deep_coalescent_increment = *min_element(extended_increment_options.begin(), extended_increment_options.end());
+        
+        if (deep_coalescence) {
+            
+            double deep_coalescent_prior = 0.0; // must account for a deep coalescence scenario
+            
+            for (auto &s:_species_partition) {
+                int nlineages = (int) s.second.size();
+                double rate = (nlineages * (nlineages-1) / _theta);
+                deep_coalescent_prior -= extended_increment * rate;
+            }
+            
+            _deep_coalescent_increments.push_back(make_pair(extended_increment, deep_coalescent_prior));
         }
-//        _gene_tree_increments.push_back(make_pair(_extended_increment, "extend"));
-        
-        double deep_coalescent_prior = 0.0; // must account for a deep coalescence scenario
-        
-        for (auto &s:_species_partition) {
-            int nlineages = (int) s.second.size();
-            double rate = (nlineages * (nlineages-1) / _theta);
-            deep_coalescent_prior -= deep_coalescent_increment * rate;
-        }
-        
-//        _gene_tree_log_coalescent_likelihood += deep_coalescent_prior;
-        _deep_coalescent_increments.push_back(make_pair(deep_coalescent_increment, deep_coalescent_prior));
     }
 
     inline void Forest::remakeGeneTree(map<string, string> &taxon_map) {
