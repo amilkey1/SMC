@@ -1205,11 +1205,14 @@ namespace proj {
 //                            }
                         }
                         
-                        for (int s=1; s<nsubsets+1; s++) {
-                            for (int p=0; p<nparticles; p++) {
-                                my_vec[s][p]->setLogLikelihood(0.0);
-                                my_vec[s][p]->setLogWeight(0.0, "g");
-//                                my_vec[s][p]->setLogWeight(0.0, "s");
+                        if (i > 0) {
+                            // don't need to reset these variables for the first ieration
+                            for (int s=1; s<nsubsets+1; s++) {
+                                for (int p=0; p<nparticles; p++) {
+                                    my_vec[s][p]->setLogLikelihood(0.0);
+                                    my_vec[s][p]->setLogWeight(0.0, "g");
+    //                                my_vec[s][p]->setLogWeight(0.0, "s");
+                                }
                             }
                         }
                         
