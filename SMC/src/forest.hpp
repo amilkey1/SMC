@@ -760,7 +760,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
          _log_likelihood_choices.clear();
          _gene_tree_log_weight = 0.0;
          
-         double starting_gene_tree_log_coalescent_likelihood = _gene_tree_log_coalescent_likelihood;
+        double starting_gene_tree_log_coalescent_likelihood = _gene_tree_log_coalescent_likelihood;
         bool first = true;
         
          // choose pair of nodes to try
@@ -788,32 +788,35 @@ inline Node * Forest::findNextPreorder(Node * nd) {
          }
          
          // reweight each choice of pairs
-             vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, _prev_gene_tree_log_likelihood + starting_gene_tree_log_coalescent_likelihood);
-             
-             // sum unnormalized weights before choosing the pair
-                 // choices are already weighted
+        double prev_log_likelihood = _prev_gene_tree_log_likelihood + starting_gene_tree_log_coalescent_likelihood;
+        vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, prev_log_likelihood);
 
-             // sum unnormalized weights before choosing the pair
-             // must include the likelihoods of all pairs in the final particle weight
-             double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-             _gene_tree_log_weight += log_weight_choices_sum;
-             for (int b=0; b < (int) log_weight_choices.size(); b++) {
-                 log_weight_choices[b] -= log_weight_choices_sum;
-             }
-             
-             // randomly select a pair
-             _index_of_choice = selectPair(log_weight_choices);
 
-             // find nodes to join in node_list
-             Node *subtree1 = _node_choices[_index_of_choice].first;
-             Node *subtree2 = _node_choices[_index_of_choice].second;
+         // sum unnormalized weights before choosing the pair
+         // must include the likelihoods of all pairs in the final particle weight
+         double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
+         _gene_tree_log_weight += log_weight_choices_sum;
+         for (int b=0; b < (int) log_weight_choices.size(); b++) {
+             log_weight_choices[b] -= log_weight_choices_sum;
+         }
          
-//         _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice]; // don't do this because this will include the coalescent likelihood
-             
-             // erase extra nodes created from node list
-             for (int i = 0; i < _node_choices.size(); i++) {
-                 _nodes.pop_back();
-             }
+         // randomly select a pair
+         _index_of_choice = selectPair(log_weight_choices);
+
+         // find nodes to join in node_list
+         Node *subtree1 = _node_choices[_index_of_choice].first;
+         Node *subtree2 = _node_choices[_index_of_choice].second;
+     
+         _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice] - _gene_tree_log_coalescent_likelihood; // remove the coalescent likelihood to get the ordinary gene tree log likelihood
+         
+         // erase extra nodes created from node list
+         for (int i = 0; i < _node_choices.size(); i++) {
+             _nodes.pop_back();
+         }
+        
+        // reset gene tree log coalescent likelihood
+        _gene_tree_log_coalescent_likelihood = starting_gene_tree_log_coalescent_likelihood;
+        
          return make_pair(subtree1, subtree2);
      }
 
@@ -1875,7 +1878,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
 
     inline vector<double> Forest::reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood) {
         vector<double> weight_vec;
-//        assert (likelihood_vec.size() == prev_log_likelihood_choices.size());
         for (int a = 0; a < (int) likelihood_vec.size(); a++) {
             weight_vec.push_back(likelihood_vec[a]-prev_log_likelihood);
         }
@@ -2566,7 +2568,10 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         
-        _gene_tree_log_likelihood = calcLogLikelihood();
+        if (_proposal == "prior-prior") {
+            _gene_tree_log_likelihood = calcLogLikelihood();
+            // don't need to recalculate this for prior-post
+        }
         
         // update increments and priors
         double log_increment_prior = 0.0;
@@ -2594,7 +2599,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 log_increment_prior -= increment*coalescence_rate;
             }
         }
-        if (_deep_coalescent_increments.size() > 0) {
+        if (_deep_coalescent_increments.size() > 0) { // TODO: do I need to include this in the chooseallpairs calculation?
             for (auto &d:_deep_coalescent_increments) {
                 increment += d.first;
                 log_increment_prior += d.second;
