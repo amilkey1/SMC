@@ -358,42 +358,6 @@ class Forest {
        }   // end while loop
    }
 
-//    inline Node * Forest::findNextPreorder(Node * nd) {
-//        assert(nd);
-//        Node * next = 0;
-//        if (nd->_major_parent) { // TODO: not sure
-//            next = nd->_parent->_right_sib;
-//        }
-//        else if (!nd->_left_child && !nd->_right_sib) {
-//            // nd has no children and no siblings, so next preorder is the right sibling of
-//            // the first ancestral node that has a right sibling.
-//            Node * anc = nd->_parent;
-//            while (anc && !anc->_right_sib)
-//                anc = anc->_parent;
-//            if (anc) {
-//                // We found an ancestor with a right sibling
-//                next = anc->_right_sib;
-//            }
-//            else {
-//                // nd is last preorder node in the tree
-//                next = 0;
-//            }
-//        }
-//        else if (nd->_right_sib && !nd->_left_child) {
-//            // nd has no children (it is a tip), but does have a sibling on its right
-//            next = nd->_right_sib;
-//        }
-//        else if (nd->_left_child && !nd->_right_sib) {
-//            // nd has children (it is an internal node) but no siblings on its right
-//            next = nd->_left_child;
-//        }
-//        else {
-//            // nd has both children and siblings on its right
-//            next = nd->_left_child;
-//        }
-//        return next;
-//    }
-
 inline Node * Forest::findNextPreorder(Node * nd) {
     assert(nd);
     Node * next = 0;
@@ -806,7 +770,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
          Node *subtree2 = _node_choices[_index_of_choice].second;
      
          _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice] - _gene_tree_log_coalescent_likelihood; // remove the coalescent likelihood to get the ordinary gene tree log likelihood
-         
+        
          // erase extra nodes created from node list
          for (int i = 0; i < _node_choices.size(); i++) {
              _nodes.pop_back();
@@ -2507,6 +2471,9 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             else {
                 _prev_gene_tree_log_likelihood = 0.0;
             }
+            if (_species_partition.size() < 8) {
+                cout << "stop";
+            }
             pair<Node*, Node*> t = chooseAllPairs(nodes, increment, species);
             
             subtree1 = t.first;
@@ -2575,7 +2542,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 log_increment_prior -= increment*coalescence_rate;
             }
         }
-        if (_deep_coalescent_increments.size() > 0) { // TODO: do I need to include this in the chooseallpairs calculation?
+        if (_deep_coalescent_increments.size() > 0) {
             for (auto &d:_deep_coalescent_increments) {
                 increment += d.first;
                 log_increment_prior += d.second;
