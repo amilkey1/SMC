@@ -1990,6 +1990,14 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                     log_increment_prior -= increment*coalescence_rate;
                 }
             }
+            
+            if (_deep_coalescent_increments.size() > 0) { // include any deep coalescence in the coalescent likelihood but do not clear yet
+                for (auto &d:_deep_coalescent_increments) {
+                    increment += d.first;
+                    log_increment_prior += d.second;
+                }
+            }
+            
             _gene_tree_log_coalescent_likelihood += log_increment_prior;
         }
         return make_tuple(subtree1, subtree2, new_nd);
@@ -3367,6 +3375,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 double rate = (nlineages * (nlineages-1) / _theta);
                 deep_coalescent_prior -= extended_increment * rate;
             }
+            assert (deep_coalescent_prior != 0.0);
             
             _deep_coalescent_increments.push_back(make_pair(extended_increment, deep_coalescent_prior));
         }
