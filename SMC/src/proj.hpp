@@ -1047,17 +1047,9 @@ namespace proj {
                 cout << "sample: " << _sample << endl;
                 // set size of vectors (number of genes + 1 species tree)
                 // my_vec contains a vector of vector of particles corresponding to species particles and gene particles
-//                bool test = true;
-//                if (!test) {
-//                    vector<vector<Particle::SharedPtr>> my_vec_1(nsubsets+1, vector<Particle::SharedPtr> (nparticles*_species_particles_per_gene_particle)); // leave x% of vector empty for gene particles
-//                    vector<vector<Particle::SharedPtr>> my_vec_2(nsubsets+1, vector<Particle::SharedPtr> (nparticles*_species_particles_per_gene_particle));
-//                    vector<vector<Particle::SharedPtr>> &my_vec = my_vec_1;
-//                }
-//                else if (test) {
-                    vector<vector<Particle::SharedPtr>> my_vec_1(nsubsets+1, vector<Particle::SharedPtr> (nparticles)); // leave x% of vector empty for gene particles
-                    vector<vector<Particle::SharedPtr>> my_vec_2(nsubsets+1, vector<Particle::SharedPtr> (nparticles));
-                    vector<vector<Particle::SharedPtr>> &my_vec = my_vec_1;
-//                }
+                vector<vector<Particle::SharedPtr>> my_vec_1(nsubsets+1, vector<Particle::SharedPtr> (nparticles)); // leave x% of vector empty for gene particles
+                vector<vector<Particle::SharedPtr>> my_vec_2(nsubsets+1, vector<Particle::SharedPtr> (nparticles));
+                vector<vector<Particle::SharedPtr>> &my_vec = my_vec_1;
                 
                 for (int s=0; s<nsubsets+1; s++) {
                     _accepted_particle_vec.push_back(vector<Particle::SharedPtr>(nparticles));
@@ -1089,12 +1081,6 @@ namespace proj {
                     }
                 }
 
-//                bool test3 = true;
-//
-//                if (test3) {
-//                    _species_particles_per_gene_particle = _nparticles;
-//                }
-                
                 bool use_first = true;
                 
                 vector<string> newicks;
@@ -1156,7 +1142,7 @@ namespace proj {
                     assert (newicks.size() == nsubsets);
                     for (int s=1; s<nsubsets+1; s++) {
                         for (int p=0; p<nparticles; p++) {
-                            my_vec[s][p]->processGeneNewicks(newicks, s-1); // TODO: need to also set the speceis partition
+                            my_vec[s][p]->processGeneNewicks(newicks, s-1);
                             my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
                             start = "gene";
                             gene_first = true;
@@ -1182,13 +1168,6 @@ namespace proj {
                     
                     if (i > 0) {
                         for (int s=0; s<nsubsets+1; s++) {
-//                            if (s == 0) {
-//                                bool test = true;
-//                                nparticles *= _species_particles_per_gene_particle;
-//                            }
-//                            else {
-//                                nparticles = _nparticles;
-//                            }
                             for (int p=0; p<nparticles; p++) {
                                 my_vec[s][p]->setParticleGeneration(0);
                                 if (s > 0) {
@@ -1230,8 +1209,7 @@ namespace proj {
                             normalizeWeights(my_vec[0], "s", false);
                             species_tree_particle = chooseSpeciesTree(my_vec[0], "s"); // pass in all the species trees
                             
-                            
-                            // TODO: now delete extra particles
+                            // delete extra particles
                             int nparticles_to_remove = (nparticles*_species_particles_per_gene_particle) - nparticles;
                             for (int s=0; s<nsubsets+1; s++) {
                                 my_vec[s].erase(my_vec[s].end() - nparticles_to_remove, my_vec[s].end());
@@ -1244,18 +1222,17 @@ namespace proj {
                         }
                         
                         if (i > 0) {
-                            // don't need to reset these variables for the first ieration
+                            // don't need to reset these variables for the first ietration
                             for (int s=1; s<nsubsets+1; s++) {
                                 for (int p=0; p<nparticles; p++) {
                                     my_vec[s][p]->setLogLikelihood(0.0);
                                     my_vec[s][p]->setLogWeight(0.0, "g");
-    //                                my_vec[s][p]->setLogWeight(0.0, "s");
                                 }
                             }
                         }
                         
-                        my_vec[0][0]->showParticle();
-                        
+                        species_tree_particle->showParticle();
+                                                
                         for (unsigned g=0; g<ntaxa-1; g++) {
                             cout << "generation " << g << endl;
                             // filter particles within each gene
@@ -1298,7 +1275,7 @@ namespace proj {
                                 }
                                     assert (_accepted_particle_vec.size() == nsubsets+1);
                                     _accepted_particle_vec[s] = my_vec[s];
-                                    saveParticleWeights(my_vec[0]);
+//                                    saveParticleWeights(my_vec[0]);
                                 } // s loop
                             deconstruct = false;
                         } // g loop
@@ -1323,15 +1300,13 @@ namespace proj {
                     normalizeWeights(my_vec[s], "g", false);
                     Particle gene_x = *chooseSpeciesTree(my_vec[s], "g");
                     for (int p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
-                        bool test5 = true;
                         if (p<nparticles) {
-                            *my_vec[s][p] = gene_x; // TODO: can add in null particles here?
+                            *my_vec[s][p] = gene_x;
                         }
                         else {
                             // add in null particles here
                             my_vec[s].push_back(Particle::SharedPtr(new Particle));
                             *my_vec[s][p] = gene_x;
-//                            my_vec_1[s].push_back(Particle::SharedPtr(new Particle));
                             my_vec_2[s].push_back(Particle::SharedPtr(new Particle));
                         }
                     }
@@ -1339,7 +1314,6 @@ namespace proj {
                     
                 // increase size of species vector
                     for (int p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
-//                    for (int p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
                         my_vec[0].push_back(Particle::SharedPtr(new Particle));
                         my_vec_2[0].push_back(Particle::SharedPtr(new Particle));
                     }
@@ -1355,7 +1329,6 @@ namespace proj {
                     _species_tree_log_marginal_likelihood = 0.0;
                     
                 for (int p=0; p<my_vec[0].size(); p++) {
-//                    for (int p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
                         my_vec[0][p]->mapSpecies(_taxon_map, _species_names, 0);
                         my_vec[0][p]->resetSpecies();
                     }
@@ -1385,7 +1358,7 @@ namespace proj {
                             for (int j=1; j<nsubsets+1; j++) {
                                 // reset gene tree log coalescent likelihoods to 0
                                 for (int p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
-                                    my_vec[j][p]->setLogCoalescentLikelihood(0.0); // TODO: not necessary?
+                                    my_vec[j][p]->setLogCoalescentLikelihood(0.0);
                                 }
                             }
                         }
@@ -1422,6 +1395,7 @@ namespace proj {
                             use_first = !use_first;
                         }
                         _accepted_particle_vec[0] = my_vec[0];
+                        saveParticleWeights(my_vec[0]);
                         start = "species";
                     } // s loop
                 }

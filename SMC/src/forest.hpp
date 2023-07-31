@@ -1642,6 +1642,7 @@ inline Node * Forest::findNextPreorder(Node * nd) {
             }
         }
         assert (_depths.size() > 0);
+
     }
 
     inline void Forest::updateSpeciesPartition(tuple<string, string, string> species_info) {
