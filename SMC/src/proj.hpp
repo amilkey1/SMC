@@ -61,7 +61,7 @@ namespace proj {
             void                writeGeneTreeFile();
             Particle::SharedPtr chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species);
             void                writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa);
-            void                writeLambdaFile(vector<Particle::SharedPtr> species_particles);
+//            void                writeLambdaFile(vector<Particle::SharedPtr> species_particles);
             void                setStartingVariables();
             void                setUpInitialData();
         
@@ -861,6 +861,8 @@ namespace proj {
                         double last_edge_len = my_vec[0][p]->getLastEdgeLen();
                         double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
                         log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
+                        
+                        cout << log_coalescent_likelihood << endl;
                     }
                 
                 my_vec[0][p]->calcSpeciesParticleWeight(log_coalescent_likelihood);
@@ -935,8 +937,8 @@ namespace proj {
         _speciation_rate_prior = logSpeciationRatePrior(_prev_speciation_rate);
         _hybridization_rate_prior = logHybridizationRatePrior(_prev_hybridization_rate);
         
-        if (_estimate_theta) {_theta_lambda = 0.1;}
-        if (_estimate_speciation_rate) {_speciation_rate_lambda = 5.0;}
+        if (_estimate_theta) {_theta_lambda = 0.05;}
+        if (_estimate_speciation_rate) {_speciation_rate_lambda = 100.0;}
         if (_estimate_hybridization_rate) {_hybrid_rate_lambda = 0.003;}
     }
 
@@ -1120,7 +1122,7 @@ namespace proj {
                     // my_vec[2] is gene 2 particles
                     // etc
                     
-                    double lambda = Forest::_speciation_rate;
+//                    double lambda = Forest::_speciation_rate;
                     
                     // filter gene trees
                     if (start == "species") {
@@ -1155,7 +1157,7 @@ namespace proj {
                         }
                         
                         species_tree_particle->showParticle();
-                        lambda = species_tree_particle->getLambda();
+//                        lambda = species_tree_particle->getLambda();
                                                 
                         for (unsigned g=0; g<ntaxa-1; g++) {
                             cout << "generation " << g << endl;
@@ -1251,14 +1253,14 @@ namespace proj {
                 }
                     
             // reset lambda
-            if (lambda > 0.0) {
-                for (auto &p:my_vec[0]) {
-                    p->setLambda(lambda); // set starting lambda from previous generation
-                }
-            }
-            for (auto &p:my_vec[0]) {
-                p->chooseLambda(); // set starting lambda from previous generation
-            }
+//            if (lambda > 0.0) {
+//                for (auto &p:my_vec[0]) {
+//                    p->setLambda(lambda); // set starting lambda from previous generation
+//                }
+//            }
+//            for (auto &p:my_vec[0]) {
+//                p->chooseLambda(); // set starting lambda from previous generation
+//            }
                     
                 if (i < _niterations-1) {
                     _species_tree_log_marginal_likelihood = 0.0;
@@ -1346,7 +1348,7 @@ namespace proj {
                 }
                 
                 writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
-                writeLambdaFile(my_vec[0]);
+//                writeLambdaFile(my_vec[0]);
                 
 //                } // _nsamples loop - number of samples
             
@@ -1377,14 +1379,14 @@ namespace proj {
         std::cout << "\nFinished!" << std::endl;
     }
 
-    inline void Proj::writeLambdaFile(vector<Particle::SharedPtr> species_particles) {
-        ofstream lambdaf("lambda.txt");
-        for (auto &p:species_particles) {
-            double lambda = p->getLambda();
-            lambdaf << lambda << endl;
-        }
-        lambdaf.close();
-    }
+//    inline void Proj::writeLambdaFile(vector<Particle::SharedPtr> species_particles) {
+//        ofstream lambdaf("lambda.txt");
+//        for (auto &p:species_particles) {
+//            double lambda = p->getLambda();
+//            lambdaf << lambda << endl;
+//        }
+//        lambdaf.close();
+//    }
 
     inline void Proj::writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa) {
         // open log file
@@ -1430,6 +1432,8 @@ namespace proj {
                 }
             }
             
+            double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
+            
             assert(branch_length_vec.size() == prior_vec.size());
             
             double log_coalescent_likelihood = my_vec[0][p]->getCoalescentLikelihood();
@@ -1456,7 +1460,9 @@ namespace proj {
                 for (int g=0; g<ngenes; g++) {
                     logf << "\t" << "gene_tree_topology_prior";
                 }
-                logf << "\t" << "log_coal_like" << endl;
+                logf << "\t" << "log_coal_like";
+                
+                logf << "\t" << "species_tree_height" << endl;
             }
             
             logf << a << "\t" << Forest::_starting_theta;
@@ -1479,6 +1485,8 @@ namespace proj {
             }
             
             logf << "\t" << setprecision(12) << log_coalescent_likelihood;
+            
+            logf << "\t" << setprecision(12) << species_tree_height;
             
             logf << endl;
             a++;

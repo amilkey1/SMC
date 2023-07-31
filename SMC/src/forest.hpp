@@ -163,7 +163,8 @@ class Forest {
         vector<Node*>               _preorder;
         vector<pair<double, pair<string, string>>>              _depths;
         double                      _gene_tree_log_coalescent_likelihood;
-        double                      _forest_lambda;
+//        double                      _forest_lambda;
+        double                      _panmictic_coalescent_likelihood;
 
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -219,6 +220,7 @@ class Forest {
         _gene_tree_log_weight = 0.0;
         _gene_tree_log_coalescent_likelihood = 0.0;
         _theta = 0.0;
+        _panmictic_coalescent_likelihood = 0.0;
         
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -1178,8 +1180,8 @@ class Forest {
         int nlineages = (int) existing_lineages.size();
         
         // hybridization prior
-//        double rate = (_speciation_rate+_hybridization_rate)*nlineages;
-        double rate = (_forest_lambda+_hybridization_rate)*nlineages;
+        double rate = (_speciation_rate+_hybridization_rate)*nlineages;
+//        double rate = (_forest_lambda+_hybridization_rate)*nlineages;
 
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
@@ -1654,7 +1656,7 @@ class Forest {
         int a = 0;
 
         if (species_increment > 0) {
-            for (int i=_nincrements; i<heights_and_nodes.size(); i++) {
+            for (int i=_nincrements; i<heights_and_nodes.size(); i++) { // TODO: need to add in increment from previous step b/c it's not getting recalculated... or start at 0
                 Node* node = nullptr;
                 if (heights_and_nodes[i].first < species_tree_height) {
                     // calc coalescent prob and update species partition
@@ -1732,7 +1734,8 @@ class Forest {
                 double coalescence_rate = panmictic_nlineages*(panmictic_nlineages-1) / _theta;
                 double nChooseTwo = panmictic_nlineages*(panmictic_nlineages-1);
                 double log_prob_join = log(2/nChooseTwo);
-                log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
+//                log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
+                _panmictic_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
                 
                 cum_time += increment;
                 panmictic_nlineages--;
@@ -2008,7 +2011,8 @@ class Forest {
         _depths = other._depths;
         _nincrements = other._nincrements;
         _gene_tree_log_coalescent_likelihood = other._gene_tree_log_coalescent_likelihood;
-        _forest_lambda = other._forest_lambda;
+//        _forest_lambda = other._forest_lambda;
+        _panmictic_coalescent_likelihood = other._panmictic_coalescent_likelihood;
 
         // copy tree itself
 
@@ -2132,8 +2136,8 @@ class Forest {
         assert (max_depth >= 0.0);
         if (max_depth > 0.0) {
             // hybridization prior
-//            double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
-            double rate = (_forest_lambda+_hybridization_rate)*_lineages.size();
+            double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
+//            double rate = (_forest_lambda+_hybridization_rate)*_lineages.size();
             
             double u = rng.uniform();
             double inner_term = 1-exp(-rate*max_depth);
@@ -2156,8 +2160,8 @@ class Forest {
         }
         else {
             // hybridization prior
-//            double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
-            double rate = (_forest_lambda+_hybridization_rate)*_lineages.size();
+            double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
+//            double rate = (_forest_lambda+_hybridization_rate)*_lineages.size();
 
             _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
@@ -3209,8 +3213,8 @@ class Forest {
     }
 
     inline void Forest::addSpeciesIncrement() {
-//        double rate = (_speciation_rate)*_lineages.size();
-        double rate = (_forest_lambda)*_lineages.size();
+        double rate = (_speciation_rate)*_lineages.size();
+//        double rate = (_forest_lambda)*_lineages.size();
 
         // choose edge length but don't add it yet
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
