@@ -78,7 +78,6 @@ class Particle {
         vector<double>                                  getGeneTreeLogCoalescentLikelihood();
         vector<double>                                  getTopologyPriors();
         void                                            hybridizationProposal();
-        bool                                            checkForDeepCoalescence();
         void                                            priorPriorProposal();
         void                                            calcParticleWeight();
         void                                            speciesJoinedProposal();

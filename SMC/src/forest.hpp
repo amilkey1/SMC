@@ -358,38 +358,38 @@ class Forest {
        }   // end while loop
    }
 
-inline Node * Forest::findNextPreorder(Node * nd) {
-    assert(nd);
-    Node * next = 0;
-    if (!nd->_left_child && !nd->_right_sib) {
-        // nd has no children and no siblings, so next preorder is the right sibling of
-        // the first ancestral node that has a right sibling.
-        Node * anc = nd->_parent;
-        while (anc && !anc->_right_sib)
-            anc = anc->_parent;
-        if (anc) {
-            // We found an ancestor with a right sibling
-            next = anc->_right_sib;
+    inline Node * Forest::findNextPreorder(Node * nd) {
+        assert(nd);
+        Node * next = 0;
+        if (!nd->_left_child && !nd->_right_sib) {
+            // nd has no children and no siblings, so next preorder is the right sibling of
+            // the first ancestral node that has a right sibling.
+            Node * anc = nd->_parent;
+            while (anc && !anc->_right_sib)
+                anc = anc->_parent;
+            if (anc) {
+                // We found an ancestor with a right sibling
+                next = anc->_right_sib;
+            }
+            else {
+                // nd is last preorder node in the tree
+                next = 0;
+            }
+        }
+        else if (nd->_right_sib && !nd->_left_child) {
+            // nd has no children (it is a tip), but does have a sibling on its right
+            next = nd->_right_sib;
+        }
+        else if (nd->_left_child && !nd->_right_sib) {
+            // nd has children (it is an internal node) but no siblings on its right
+            next = nd->_left_child;
         }
         else {
-            // nd is last preorder node in the tree
-            next = 0;
+            // nd has both children and siblings on its right
+            next = nd->_left_child;
         }
+        return next;
     }
-    else if (nd->_right_sib && !nd->_left_child) {
-        // nd has no children (it is a tip), but does have a sibling on its right
-        next = nd->_right_sib;
-    }
-    else if (nd->_left_child && !nd->_right_sib) {
-        // nd has children (it is an internal node) but no siblings on its right
-        next = nd->_left_child;
-    }
-    else {
-        // nd has both children and siblings on its right
-        next = nd->_left_child;
-    }
-    return next;
-}
 
     inline void Forest::showForest() {
         if (_index > 0) {
@@ -1216,7 +1216,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
 
 
     inline vector<pair<tuple<string, string, string>, double>>  Forest::buildFromNewickTopology(const std::string newick) {
-    //{
         // assume tree is rooted
         // do not allow polytomies
         bool rooted = true;
@@ -1489,22 +1488,10 @@ inline Node * Forest::findNextPreorder(Node * nd) {
         _nodes.pop_front(); // remove node at beginning of list because it's an extra root
         // remove parent from new last node
         _nodes.front()._parent = NULL;
-        // TODO: be careful - should change this so this is not an issue
-        
-        // order _nodes by height
-    //        vector<pair<Node, double>> node_heights;
-    //        for (auto &nd:_nodes) {
-    //            node_heights.push_back(make_pair(nd, getLineageHeight(&nd)));
-    //        }
         
         _nodes.sort(
              [this](Node& lhs, Node& rhs) {
-                 // TODO: first n should be the tips, then do this to sort the internal nodes
-                 return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } ); // TODO: sort by children instead?
-        
-    //        list::sort(_nodes.begin(), _nodes.end(),
-    //             [this](const Node& lhs, const Node& rhs) {
-    //                     return getLineageHeight(&lhs) < getLineageHeight(&rhs); } );
+                 return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
         
         _lineages.clear();
         _lineages.push_back(&_nodes.back());
@@ -1538,11 +1525,6 @@ inline Node * Forest::findNextPreorder(Node * nd) {
                 nd->_number = curr_internal++;
             }
         }
-
-        // Root node is not included in _tree->_preorder, so if the root node
-        // is an internal node we need to number it here
-//        if (_tree->_is_rooted)
-//            _tree->_root->_number = curr_internal++;
 
         _ninternals = curr_internal - _nleaves;
 
