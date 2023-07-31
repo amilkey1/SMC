@@ -41,7 +41,6 @@ namespace proj {
             void                resetGeneParticles(vector<int> sel_indices, vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                resetWeights(vector<Particle::SharedPtr> & particles, string a);
             void                createSpeciesMap(Data::SharedPtr);
-            void                showParticlesByWeight(vector<Particle::SharedPtr> my_vec, string a);
             void                proposeTheta();
             void                proposeSpeciationRate();
             void                proposeHybridizationRate();
@@ -62,6 +61,7 @@ namespace proj {
             void                writeGeneTreeFile();
             Particle::SharedPtr chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species);
             void                writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa);
+            void                writeLambdaFile(vector<Particle::SharedPtr> species_particles);
             void                setStartingVariables();
             void                setUpInitialData();
         
@@ -899,22 +899,6 @@ namespace proj {
         }
     }
 
-    inline void Proj::showParticlesByWeight(vector<Particle::SharedPtr> my_vec, string a) {
-        vector <double> weights;
-        
-        //create weight vector
-        for (auto & p:my_vec) {
-            weights.push_back(p->getLogWeight(a));
-        }
-        
-        //sort particles by weight
-//        sort(my_vec.beg  in(), my_vec.end(), greater<Particle::SharedPtr>());
-        
-        //print first particle
-        cout << "\n" << "Heaviest particle: ";
-        my_vec[0]->showParticle();
-    }
-
     inline void Proj::debugSpeciesTree(vector<Particle::SharedPtr> &particles) {
         cout << "debugging species tree" << endl;
         for (auto &p:particles) {
@@ -1135,7 +1119,9 @@ namespace proj {
                     // my_vec[1] is gene 1 particles
                     // my_vec[2] is gene 2 particles
                     // etc
-                
+                    
+                    double lambda = Forest::_speciation_rate;
+                    
                     // filter gene trees
                     if (start == "species") {
                         // pick a species tree to use for all the gene trees for this step
@@ -1145,7 +1131,7 @@ namespace proj {
                         if (i > 0) {
                             normalizeWeights(my_vec[0], "s", false);
                             species_tree_particle = chooseTree(my_vec[0], "s"); // pass in all the species trees
-                            
+                
                             // delete extra particles
                             int nparticles_to_remove = (nparticles*_species_particles_per_gene_particle) - nparticles;
                             for (int s=0; s<nsubsets+1; s++) {
@@ -1169,6 +1155,7 @@ namespace proj {
                         }
                         
                         species_tree_particle->showParticle();
+                        lambda = species_tree_particle->getLambda();
                                                 
                         for (unsigned g=0; g<ntaxa-1; g++) {
                             cout << "generation " << g << endl;
@@ -1231,6 +1218,8 @@ namespace proj {
                         }
                     }
                     
+                    // save starting lambda
+//                    double lambda = my_vec[0][0]->getLambda();
                     
                 // choose one set of gene trees to use
                 for (int s=1; s<nsubsets+1; s++) {
@@ -1250,17 +1239,26 @@ namespace proj {
                 }
                     
                 // increase size of species vector
-                    for (int p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
-                        my_vec[0].push_back(Particle::SharedPtr(new Particle));
-                        my_vec_2[0].push_back(Particle::SharedPtr(new Particle));
+                for (int p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
+                    my_vec[0].push_back(Particle::SharedPtr(new Particle));
+                    my_vec_2[0].push_back(Particle::SharedPtr(new Particle));
+                }
+                
+                for (int s=1; s<nsubsets+1; s++) {
+                    for (int p=0; p<nparticles; p++) {
+                        *_accepted_particle_vec[s][p] = variable_gene_trees[s-1][p]; // preserve gene tree variation for output
                     }
+                }
                     
-                    for (int s=1; s<nsubsets+1; s++) {
-                        for (int p=0; p<nparticles; p++) {
-                            *_accepted_particle_vec[s][p] = variable_gene_trees[s-1][p]; // preserve gene tree variation for output
-                        }
-                    }
-                    
+            // reset lambda
+            if (lambda > 0.0) {
+                for (auto &p:my_vec[0]) {
+                    p->setLambda(lambda); // set starting lambda from previous generation
+                }
+            }
+            for (auto &p:my_vec[0]) {
+                p->chooseLambda(); // set starting lambda from previous generation
+            }
                     
                 if (i < _niterations-1) {
                     _species_tree_log_marginal_likelihood = 0.0;
@@ -1348,6 +1346,7 @@ namespace proj {
                 }
                 
                 writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
+                writeLambdaFile(my_vec[0]);
                 
 //                } // _nsamples loop - number of samples
             
@@ -1376,6 +1375,15 @@ namespace proj {
         }
 
         std::cout << "\nFinished!" << std::endl;
+    }
+
+    inline void Proj::writeLambdaFile(vector<Particle::SharedPtr> species_particles) {
+        ofstream lambdaf("lambda.txt");
+        for (auto &p:species_particles) {
+            double lambda = p->getLambda();
+            lambdaf << lambda << endl;
+        }
+        lambdaf.close();
     }
 
     inline void Proj::writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa) {
