@@ -274,24 +274,20 @@ class Particle {
         
     }
 
-inline tuple<string, string, string> Particle::speciesTopologyProposal() {
-        assert (_name == "species");
-        
-        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-        
-        if (_forest._last_edge_length > 0.0) {
-        // choose species to join if past the first species generation for each forest vector
-            species_joined = _forest.speciesTreeProposal();
+    inline tuple<string, string, string> Particle::speciesTopologyProposal() {
+            assert (_name == "species");
+            
+            tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+            
+            if (_forest._last_edge_length > 0.0) {
+            // choose species to join if past the first species generation for each forest vector
+                species_joined = _forest.speciesTreeProposal();
+            }
+            
+            _t.push_back(make_pair(species_joined, 0.0));
+            
+            return species_joined;
         }
-        
-        _t.push_back(make_pair(species_joined, 0.0));
-    
-//        if (_t.size() == Forest::_nspecies) {
-//            _t[Forest::_nspecies-1].second = 0.0; // last element of _t should not draw a branch length
-//        }
-        
-        return species_joined;
-    }
 
     inline double Particle::calcConstrainedProposal(tuple<string, string, string> species_joined) {
         assert (!_inf);
@@ -370,9 +366,7 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
 
 
     inline void Particle::calcParticleWeight() {
-        // use the gene tree weights to calculate the particle weight
-//        _log_likelihood = _forest._gene_tree_log_likelihood;
-//        _log_weight = 0.0;
+        // particle weight is the forest weight
         _log_weight = _forest._gene_tree_log_weight;
     }
 

@@ -54,14 +54,13 @@ namespace proj {
             double              tune(bool accepted, double lambda);
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
             void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets);
-            void                parallelCoalescentLikelihood(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &particles, tuple<string, string, string> species_joined, int s, int nspecies);
             void                proposeSpeciesParticles( vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets);
             void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, Particle::SharedPtr species_tree_particle);
             void                printSpeciationRates();
             void                printThetas();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
             void                writeGeneTreeFile();
-            Particle::SharedPtr                chooseSpeciesTree(vector<Particle::SharedPtr> species_trees, string gene_or_species);
+            Particle::SharedPtr                chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species);
             void                writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa);
             void                setStartingVariables();
             void                setUpInitialData();
@@ -570,7 +569,7 @@ namespace proj {
         }
     }
 
-    inline Particle::SharedPtr Proj::chooseSpeciesTree(vector<Particle::SharedPtr> species_trees, string gene_or_species) {
+    inline Particle::SharedPtr Proj::chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species) {
         // get species tree weights
         vector<double> log_weights;
         int nparticles = _nparticles;
@@ -904,42 +903,6 @@ namespace proj {
         }
     }
 
-    inline void Proj::parallelCoalescentLikelihood(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &particles, tuple<string, string, string> species_joined, int s, int nspecies) {
-        // species tree topology and branch length proposals are not parallelized
-        
-        for (unsigned g=first; g<last; g++) {
-            if (s < nspecies - 1) {
-                
-            }
-        }
-        
-//        if (s < nspecies-1) {
-//            for (int j=1; j<nsubsets+1; j++) {
-//                
-//                max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
-//            }
-//
-//            // now finish the species tree branch length proposal
-//            my_vec[0][p]->speciesProposal(max_depths, species_joined);
-//        }
-//
-//        double log_coalescent_likelihood = 0.0;
-//
-//        // calculate coalescent likelihood for each gene on each particle
-//            for (int j=1; j<nsubsets+1; j++) {
-//                double last_edge_len = my_vec[0][p]->getLastEdgeLen();
-//                double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
-//                log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
-//            }
-//
-//        my_vec[0][p]->calcSpeciesParticleWeight(log_coalescent_likelihood);
-        
-        
-//        for (unsigned i=first; i<last; i++){
-//            particles[i]->proposal(gene_trees_only, deconstruct, species_joined);
-//        }
-    }
-
     inline void Proj::showParticlesByWeight(vector<Particle::SharedPtr> my_vec, string a) {
         vector <double> weights;
         
@@ -1200,7 +1163,7 @@ namespace proj {
                         
                         if (i > 0) {
                             normalizeWeights(my_vec[0], "s", false);
-                            species_tree_particle = chooseSpeciesTree(my_vec[0], "s"); // pass in all the species trees
+                            species_tree_particle = chooseTree(my_vec[0], "s"); // pass in all the species trees
                             
                             // delete extra particles
                             int nparticles_to_remove = (nparticles*_species_particles_per_gene_particle) - nparticles;
@@ -1291,7 +1254,7 @@ namespace proj {
                 // choose one set of gene trees to use
                 for (int s=1; s<nsubsets+1; s++) {
                     normalizeWeights(my_vec[s], "g", false);
-                    Particle gene_x = *chooseSpeciesTree(my_vec[s], "g");
+                    Particle gene_x = *chooseTree(my_vec[s], "g");
                     for (int p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
                         if (p<nparticles) {
                             *my_vec[s][p] = gene_x;
