@@ -548,16 +548,9 @@ namespace proj {
             genef << "particle " << endl;
             for (int s=1; s<_accepted_particle_vec.size(); s++) {
                 genef << "gene " << s << endl;
-//                vector<string> names = _accepted_particle_vec[s][p]->getGeneTreeNames(s);
                 vector<string> newicks = _accepted_particle_vec[s][p]->getGeneTreeNewicks();
                 string newick = newicks[0];
                 genef << newick << endl;
-                // name and newick include quotes
-//                for (int i=0; i<names.size(); i++) {
-//                    string name = names[i];
-//                    string newick = newicks[i];
-//                    genef << "{name:" << name << ", relrate:1.0, w:1.0, cumw:1.0, " << newick << "},\n";
-//                }
             }
         }
         genef << "];";

@@ -78,12 +78,9 @@ class Particle {
         vector<double>                                  getGeneTreeLogCoalescentLikelihood();
         vector<double>                                  getTopologyPriors();
         void                                            hybridizationProposal();
-        void                                            priorPriorProposal();
         void                                            calcParticleWeight();
         void                                            speciesJoinedProposal();
-        vector<string>                                  getGeneTreeNames(int j);
         vector<string>                                  getGeneTreeNewicks();
-        double                                          getNumSpecies(){return _forest._lineages.size();}
         vector<pair<tuple<string, string, string>, double>>                    getSpeciesJoined(){return _t;}
         double                                          getCoalescentLikelihood(){return _log_coalescent_likelihood;}
         void                                            geneTreeProposal(bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
@@ -120,9 +117,6 @@ class Particle {
         bool                                    _running_on_empty = false;
         double                                  _species_tree_height;
         vector<pair<tuple<string, string, string>, double>> _t;
-        bool                                    firstProposal();
-        void                                    priorPostIshChoice(int i, vector<pair<tuple<string, string, string>, double>> _t);
-        void                                    resetVariables();
         bool                                    _inf = false;
         string                                  _name;
 };
@@ -383,11 +377,6 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
     }
 
 
-    inline void Particle::resetVariables() {
-        _forest._new_nodes.clear();
-    }
-
-
     inline Particle::Particle(const Particle & other) {
         *this = other;
     }
@@ -610,16 +599,6 @@ inline tuple<string, string, string> Particle::speciesTopologyProposal() {
         vector<double> topology_priors;
         topology_priors.push_back(_forest._log_joining_prob); // TODO: I don't think this is correct for multiple genes
         return topology_priors;
-    }
-
-    inline vector<string> Particle::getGeneTreeNames(int j) {
-        vector<string> names;
-        string particle_number = to_string(j);
-        int i = 1;
-        string forest_number = to_string(i-1);
-        string name = "\"gene-" + forest_number + "-" + particle_number + "\"";
-        names.push_back(name);
-        return names;
     }
 
     inline vector<string> Particle::getGeneTreeNewicks() {
