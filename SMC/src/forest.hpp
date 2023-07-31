@@ -171,7 +171,6 @@ class Forest {
         void                        hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment);
         void                        resetToMinor(vector<Node*> minor_nodes, vector<Node*> minor_left_children, vector<Node*> minor_right_children, vector<double> minor_left_edge_lengths, vector<double> minor_right_edge_lengths);
         vector<pair<double, double>>              _deep_coalescent_increments; // increment, prior
-        void                        calcDeepCoalescentPrior();
         void                        deconstructGeneTree();
         void                        refreshPreorder();
         int                         _nincrements = 0;

@@ -60,7 +60,7 @@ namespace proj {
             void                printThetas();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
             void                writeGeneTreeFile();
-            Particle::SharedPtr                chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species);
+            Particle::SharedPtr chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species);
             void                writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa);
             void                setStartingVariables();
             void                setUpInitialData();
@@ -168,16 +168,12 @@ namespace proj {
     }
 
     inline void Proj::saveParticleWeights(vector<Particle::SharedPtr> &v) const {
-        // this function saves particle weights + species tree newick in order of weight
-        //sort particles by weight
-//        sort(v.begin(), v.end(), greater<Particle::SharedPtr>());
+        // this function saves particle weights + species tree newick
         
         ofstream weightf("weights.txt");
         weightf << "begin trees;" << endl;
 //        for (auto &p:v) {
         for (int i=0; i<v.size(); i++) {
-//            weightf << "particle\n";
-//            weightf << p->getCoalescentLikelihood() << "\t" << p->saveParticleWeights() << "\t" << p->getSpeciesNewick() << "\n";
             weightf << "tree " << i << " = " << v[i]->getSpeciesNewick() << "; " << "\n";
         }
         weightf << "end trees;" << endl;
@@ -999,8 +995,8 @@ namespace proj {
             setStartingVariables();
             
             // loop for number of samples (either theta or speciation rate)
-            for (_sample=0; _sample<_nsamples; _sample++) {
-                cout << "sample: " << _sample << endl;
+//            for (_sample=0; _sample<_nsamples; _sample++) {
+//                cout << "sample: " << _sample << endl;
                 // set size of vectors (number of genes + 1 species tree)
                 // my_vec contains a vector of vector of particles corresponding to species particles and gene particles
                 vector<vector<Particle::SharedPtr>> my_vec_1(nsubsets+1, vector<Particle::SharedPtr> (nparticles)); // leave x% of vector empty for gene particles
@@ -1013,27 +1009,12 @@ namespace proj {
                 
                 _prev_log_marginal_likelihood = _log_marginal_likelihood;
                 _log_marginal_likelihood = 0.0;
-                
-                bool test2 = true;
-                
-                // set number of particles
-                if (!test2) {
-                    for (unsigned s=0; s<nsubsets+1; s++) {
-                        int nparticles = _nparticles*_species_particles_per_gene_particle;
-                        for (unsigned i=0; i<nparticles; i++) {
-                            my_vec_1[s][i] = Particle::SharedPtr(new Particle); // TODO: wasteful that this makes species trees with extra lineages
-                            my_vec_2[s][i] = Particle::SharedPtr(new Particle);
-                        }
-                    }
-                }
-                
-                else if (test2) {
-                    for (unsigned s=0; s<nsubsets+1; s++) {
-                        int nparticles = _nparticles;
-                        for (unsigned i=0; i<nparticles; i++) {
-                            my_vec_1[s][i] = Particle::SharedPtr(new Particle); // TODO: wasteful that this makes species trees with extra lineages
-                            my_vec_2[s][i] = Particle::SharedPtr(new Particle);
-                        }
+            
+                for (unsigned s=0; s<nsubsets+1; s++) {
+                    int nparticles = _nparticles;
+                    for (unsigned i=0; i<nparticles; i++) {
+                        my_vec_1[s][i] = Particle::SharedPtr(new Particle); // TODO: wasteful that this makes species trees with extra lineages
+                        my_vec_2[s][i] = Particle::SharedPtr(new Particle);
                     }
                 }
 
@@ -1351,9 +1332,9 @@ namespace proj {
                             use_first = !use_first;
                         }
                         _accepted_particle_vec[0] = my_vec[0];
-                        saveParticleWeights(my_vec[0]);
                         start = "species";
                     } // s loop
+                    saveParticleWeights(my_vec[0]);
                 }
                 }
                 
@@ -1368,7 +1349,7 @@ namespace proj {
                 
                 writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
                 
-                } // _nsamples loop - number of samples
+//                } // _nsamples loop - number of samples
             
             writeGeneTreeFile();
             // saveParticleWeights(_accepted_particle_vec);
