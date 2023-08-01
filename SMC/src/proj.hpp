@@ -42,12 +42,10 @@ namespace proj {
             void                resetWeights(vector<Particle::SharedPtr> & particles, string a);
             void                createSpeciesMap(Data::SharedPtr);
             void                showFinal(vector<vector<Particle::SharedPtr>>);
-            double              tune(bool accepted, double lambda);
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
             void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets);
             void                proposeSpeciesParticles( vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets);
             void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, Particle::SharedPtr species_tree_particle);
-            void                printSpeciationRates();
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
             void                writeGeneTreeFile();
             Particle::SharedPtr chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species);
