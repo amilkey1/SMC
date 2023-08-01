@@ -72,6 +72,7 @@ namespace proj {
             double                      _species_tree_log_marginal_likelihood;
             bool                        _run_on_empty;
             bool                        _estimate_theta;
+            int                         _ntries_theta;
 
             static std::string          _program_name;
             static unsigned             _major_version;
@@ -231,6 +232,7 @@ namespace proj {
         ("species_particles_per_gene_particle", boost::program_options::value(&_species_particles_per_gene_particle)->default_value(1), "increase number of particles for species trees by this amount")
         ("outgroup", boost::program_options::value(&Forest::_outgroup)->default_value("null"), "specify outgroup in species tree")
         ("estimate_theta", boost::program_options::value(&_estimate_theta)->default_value(false), "estimate theta parameter")
+        ("ntries_theta", boost::program_options::value(&_ntries_theta)->default_value(50), "specify number of values of theta to try")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -1025,14 +1027,14 @@ namespace proj {
                         
                         if (_estimate_theta) {
                             // try multiple theta values
-                            int ntries = 50;
+//                            int ntries = 50;
                             double delta = 0.01;
                             vector<Particle> gene_particles;
                             for (int s=1; s<nsubsets+1; s++) {
                                 gene_particles.push_back(*my_vec[s][0]); // all gene trees are the same at this point, preserved from previous round of filtering
                             }
                             
-                            updateTheta(*species_tree_particle, ntries, delta, gene_particles);
+                            updateTheta(*species_tree_particle, _ntries_theta, delta, gene_particles);
                         }
             
                         // delete extra particles
