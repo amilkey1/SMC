@@ -812,12 +812,8 @@ namespace proj {
             string start = "species"; // start variable defines if program should start with gene or species trees
             
             for (int s=0; s<nsubsets+1; s++) {
-                if (s == 0) {
-                    nparticles = _nparticles;
-                }
-                else {
-                    nparticles = _nparticles;
-                }
+                nparticles = _nparticles;
+                
                 for (int p=0; p<nparticles; p++) {
                     my_vec[s][p]->setData(_data, _taxon_map, s);
                     my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
