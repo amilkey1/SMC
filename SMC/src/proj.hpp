@@ -813,13 +813,7 @@ namespace proj {
             
             for (int s=0; s<nsubsets+1; s++) {
                 if (s == 0) {
-                    bool test = true;
-                    if (!test) {
-                        nparticles *= _species_particles_per_gene_particle;
-                    }
-                    else {
-                        nparticles = _nparticles;
-                    }
+                    nparticles = _nparticles;
                 }
                 else {
                     nparticles = _nparticles;
@@ -1100,7 +1094,7 @@ namespace proj {
                 }
             }
                                 
-                writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
+            writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
             
             writeGeneTreeFile();
             // saveParticleWeights(_accepted_particle_vec);
