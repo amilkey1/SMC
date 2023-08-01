@@ -53,6 +53,9 @@ namespace proj {
             void                setStartingVariables();
             void                setUpInitialData();
             void                saveGeneAndSpeciesTrees(Particle::SharedPtr species_particle, Particle::SharedPtr gene1, Particle::SharedPtr gene2, Particle::SharedPtr gene3);
+            void                updateTheta(Particle & p, unsigned ntries, double delta, vector<Particle> & gene_particles);
+            double              calcLogSum(vector<double> vec);
+        unsigned                multinomialDraw (const vector<double> & probs);
         
         private:
 
@@ -380,6 +383,123 @@ namespace proj {
         }
     }
 
+    inline double Proj::calcLogSum(vector<double> vec) {
+        double running_sum = 0.0;
+        double sum = 0.0;
+        double log_max_weight = *max_element(vec.begin(), vec.end());
+        for (auto & i:vec) {
+            running_sum += exp(i - log_max_weight);
+        }
+        sum = log(running_sum) + log_max_weight;
+        return sum;
+    }
+
+    inline void Proj::updateTheta(Particle & species_particle, unsigned ntries, double delta, vector<Particle> & gene_particles) {
+        // Use multiple-try Metropolis to update theta conditional on the gene forests
+        // and species forest defined in p. Uses the algorithm presented in
+        // https://en.wikipedia.org/wiki/Multiple-try_Metropolis
+        // assuming a symmetric proposal (so that w(x,y) = pi(x)).
+
+        // theta0 is the current global theta value
+        double theta0 = species_particle.getTheta();
+
+        // Sample ntries new values of theta from symmetric proposal distribution
+        // (window of width 2*delta centered on theta0). Compute weights (coalescent
+        // likelihood) for each proposed_theta value.
+        vector<double> proposed_thetas(ntries, 0.0);
+        vector<double> logwstar(ntries, 0.0);
+        
+        vector<pair<tuple<string, string, string>, double>> species_info = species_particle.getSpeciesJoined();
+//
+        for (unsigned i = 0; i < ntries; ++i) {
+            
+            double q = theta0 - delta + 2.0*delta*rng.uniform();
+            if (q < 0.0)
+                q = -q;
+            proposed_thetas[i] = q;
+            double log_coalescent_likelihood = 0.0;
+            for (int s=0; s<gene_particles.size(); s++) {
+                    gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
+                    gene_particles[s].refreshGeneTreePreorder();
+                    log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info);
+
+                }
+            logwstar[i] = log_coalescent_likelihood;
+        }
+
+        // Compute log of the sum of the weights (this sum will form the
+        // numerator of the acceptance ratio)
+        double log_sum_numer_weights = calcLogSum(logwstar);
+
+        // Normalize weights to create a discrete probability distribution
+        vector<double> probs(ntries, 0.0);
+        transform(logwstar.begin(), logwstar.end(), probs.begin(), [log_sum_numer_weights](double logw){
+            return exp(logw - log_sum_numer_weights);
+        });
+
+        // Choose one theta value from the probability distribution
+        unsigned which = multinomialDraw(probs);
+        double theta_star = proposed_thetas[which];
+
+        // Sample ntries-1 new values of theta from symmetric proposal distribution
+        // (window of width 2*delta centered on theta_star)
+        double log_coalescent_likelihood = 0.0;
+        for (int s=0; s<gene_particles.size(); s++) {
+                gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
+                gene_particles[s].refreshGeneTreePreorder();
+                log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(theta0, species_info);
+
+            }
+        logwstar[0] = log_coalescent_likelihood;
+        
+        for (unsigned i = 1; i < ntries; ++i) {
+            double q = theta_star - delta + 2.0*delta*rng.uniform();
+            if (q < 0.0)
+                q = -q;
+            
+            double log_coalescent_likelihood = 0.0;
+            for (int s=0; s<gene_particles.size(); s++) {
+                    gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
+                    gene_particles[s].refreshGeneTreePreorder();
+                    log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info);
+
+                }
+            logwstar[i] = log_coalescent_likelihood;
+        }
+
+//         Compute log of the sum of the weights (this sum will form
+        // the denominator of the acceptance ratio)
+        double log_sum_denom_weights = calcLogSum(logwstar);
+
+        // Compute acceptance ratio
+        double logr = log_sum_numer_weights - log_sum_denom_weights;
+        bool accept = true;
+        if (logr < 0.0) {
+            double logu = log(rng.uniform());
+            accept = logu < logr;
+        }
+        if (accept) {
+            Forest::_starting_theta = theta_star;
+            cout << str(format("\n*** new theta: %.5f\n") % theta_star);
+        }
+    }
+
+    inline unsigned Proj::multinomialDraw(const vector<double> & probs) {
+        // choose a random number [0,1]
+        double u = rng.uniform();
+        double cum_prob = 0.0;
+        int index = 0.0;
+        for (int i=0; i < (int) probs.size(); i++) {
+            cum_prob += exp(probs[i]);
+            if (u <= cum_prob) {
+                index = i;
+                break;
+            }
+        }
+        // return index of choice
+        return index;
+    }
+
     inline Particle::SharedPtr Proj::chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species) {
         // get species tree weights
         vector<double> log_weights;
@@ -557,7 +677,7 @@ namespace proj {
         
         cout << "mean height equals " << sum_h << endl;
         cout << "log marginal likelihood = " << setprecision(12) << _log_marginal_likelihood << endl;
-        cout << "starting theta = " << Forest::_starting_theta << endl;
+        cout << "theta = " << Forest::_starting_theta << endl;
         cout << "speciation rate = " << Forest::_speciation_rate << endl;
         cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
     }
@@ -900,12 +1020,25 @@ namespace proj {
                     if (i > 0) {
                         normalizeWeights(my_vec[0], "s", false);
                         species_tree_particle = chooseTree(my_vec[0], "s"); // pass in all the species trees
+                        
+                        // try multiple theta values and
+                        int ntries = 50;
+                        double delta = 0.01;
+                        vector<Particle> gene_particles;
+                        for (int s=1; s<nsubsets+1; s++) {
+                            gene_particles.push_back(*my_vec[s][0]); // all gene trees are the same at this point, preserved from previous round of filtering
+                        }
+                        
+                        updateTheta(*species_tree_particle, ntries, delta, gene_particles);
             
                         // delete extra particles
                         int nparticles_to_remove = (nparticles*_species_particles_per_gene_particle) - nparticles;
-                        for (int s=0; s<nsubsets+1; s++) {
-                            my_vec[s].erase(my_vec[s].end() - nparticles_to_remove, my_vec[s].end());
-                            my_vec_2[s].erase(my_vec_2[s].end() - nparticles_to_remove, my_vec_2[s].end());
+                        
+                        if (nparticles_to_remove > 0) {
+                            for (int s=0; s<nsubsets+1; s++) {
+                                my_vec[s].erase(my_vec[s].end() - nparticles_to_remove, my_vec[s].end());
+                                my_vec_2[s].erase(my_vec_2[s].end() - nparticles_to_remove, my_vec_2[s].end());
+                            }
                         }
                         
                     }
@@ -1093,6 +1226,9 @@ namespace proj {
             writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
             
             writeGeneTreeFile();
+            
+//            saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]);
+            
             // saveParticleWeights(_accepted_particle_vec);
             // saveParticleLikelihoods(_accepted_particle_vec);
 

@@ -50,7 +50,7 @@ class Particle {
         void                                    setLogWeight(double w, string a);
         void                                    operator=(const Particle & other);
         std::string                             saveForestNewick() {
-            return _forest.makeNewick(8, true);
+            return _forest.makeNewick(12, true);
         }
         bool operator<(const Particle::SharedPtr & other) const {
             return _log_weight<other->_log_weight;
@@ -103,6 +103,8 @@ class Particle {
         void                                            calcSpeciesParticleWeight(double log_coalescent_likelihood);
         void                                            drawHeightsFromPrior();
         void                                            resetLogTopologyPrior(){_forest._log_joining_prob = 0.0;}
+        double                                          getTheta(){return _forest._theta;}
+        double                                          calcCoalLikeForNewTheta(double proposed_theta, vector<pair<tuple<string, string, string>, double>> species_info);
 
     private:
 
@@ -620,6 +622,10 @@ class Particle {
     inline void Particle::resetGeneIncrements() {
         assert (_name != "species");
         _forest._increments.clear();
+    }
+
+    inline double Particle::calcCoalLikeForNewTheta(double proposed_theta,  vector<pair<tuple<string, string, string>, double>> species_info) {
+        return _forest.calcLogCoalLikeGivenTheta(proposed_theta, species_info);
     }
 
     inline void Particle::buildEntireSpeciesTree() {

@@ -27,12 +27,12 @@ unsigned Particle::_nsubsets = 1;
 const double Node::_smallest_edge_length=1.0e-12;
 string Forest::_proposal;
 string Forest::_model;
-string Forest::_outgroup;
 double Forest::_kappa = 1.0;
 vector<double> Forest::_base_frequencies;
 string Forest::_string_base_frequencies;
 double Forest::_migration_rate;
 double Forest::_hybridization_rate;
+string Forest::_outgroup;
 //bool Proj::_run_on_empty;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
