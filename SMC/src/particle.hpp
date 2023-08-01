@@ -103,9 +103,6 @@ class Particle {
         void                                            calcSpeciesParticleWeight(double log_coalescent_likelihood);
         void                                            drawHeightsFromPrior();
         void                                            resetLogTopologyPrior(){_forest._log_joining_prob = 0.0;}
-//        void                                            chooseLambda();
-//        double                                          getLambda() {return _forest._forest_lambda;}
-//        void                                            setLambda(double lambda){_forest._forest_lambda = lambda;}
 
     private:
 
@@ -205,23 +202,6 @@ class Particle {
         _forest.clear();
         _forest.remakeGeneTree(taxon_map);
     }
-
-//    inline void Particle::chooseLambda() {
-//        // TODO: choose lambda
-//
-//        double u = rng.uniform();
-//        // speciation_rate_lambda = 5.0 for now
-//        double speciation_rate_lambda = 100.0;
-//        double proposed_speciation_rate = speciation_rate_lambda*u+(_forest._forest_lambda - speciation_rate_lambda/2.0);
-//
-//        // make sure proposed speciation rate is positive
-//        if (proposed_speciation_rate < 0.0) {
-//            proposed_speciation_rate*=-1;
-//        }
-//
-////        _prev_speciation_rate = Forest::_speciation_rate;
-//       _forest._forest_lambda = proposed_speciation_rate;
-//    }
 
     inline double Particle::proposal(bool gene_trees_only, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
         // this function proposes gene trees, not species trees
@@ -430,9 +410,7 @@ class Particle {
         paupf.close();
     }
 
-    inline void Particle::processSpeciesNewick(vector<string> newicks) {
-//        _forest._forest_lambda = Forest::_speciation_rate; // set starting lambda
-        
+    inline void Particle::processSpeciesNewick(vector<string> newicks) {        
         assert (_name == "species");
         
         if (newicks.size() > 1) {

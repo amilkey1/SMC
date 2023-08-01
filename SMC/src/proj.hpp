@@ -61,9 +61,9 @@ namespace proj {
             void                writeGeneTreeFile();
             Particle::SharedPtr chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species);
             void                writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa);
-//            void                writeLambdaFile(vector<Particle::SharedPtr> species_particles);
             void                setStartingVariables();
             void                setUpInitialData();
+            void                saveGeneAndSpeciesTrees(Particle::SharedPtr species_particle, Particle::SharedPtr gene1, Particle::SharedPtr gene2, Particle::SharedPtr gene3);
         
         private:
 
@@ -165,6 +165,27 @@ namespace proj {
             nodef << p->saveHybridNodes()  << "\n";
         }
         nodef.close();
+    }
+
+    inline void Proj::saveGeneAndSpeciesTrees(Particle::SharedPtr species_particle, Particle::SharedPtr gene1, Particle::SharedPtr gene2, Particle::SharedPtr gene3) {
+        // TODO: only works for one data set
+        ofstream testf("coalescent-likelihood.txt");
+        testf << "params : " << endl;
+        testf << "\t" << "theta = 0.05" << endl;
+        testf << "\t" << "lambda = 6.4" << endl;
+        
+        testf << "coalescent likelihood = " << species_particle->getCoalescentLikelihood() << endl;
+        
+        testf << "species tree: " << species_particle->saveForestNewick() << endl;
+        testf << endl;
+        testf << "gene1: " << gene1->saveForestNewick() << endl;
+        testf << endl;
+        testf << "gene2: " << gene2->saveForestNewick() << endl;
+        testf << endl;
+        testf << "gene3: " << gene3->saveForestNewick() << endl;
+        
+        testf.close();
+        
     }
 
     inline void Proj::saveParticleWeights(vector<Particle::SharedPtr> &v) const {
@@ -1122,8 +1143,6 @@ namespace proj {
                     // my_vec[2] is gene 2 particles
                     // etc
                     
-//                    double lambda = Forest::_speciation_rate;
-                    
                     // filter gene trees
                     if (start == "species") {
                         // pick a species tree to use for all the gene trees for this step
@@ -1157,7 +1176,6 @@ namespace proj {
                         }
                         
                         species_tree_particle->showParticle();
-//                        lambda = species_tree_particle->getLambda();
                                                 
                         for (unsigned g=0; g<ntaxa-1; g++) {
                             cout << "generation " << g << endl;
@@ -1181,7 +1199,7 @@ namespace proj {
                                         ess_inverse += exp(2.0*my_vec[s][p]->getLogWeight("g"));
                                     }
 
-                                    double ess = 1.0/ess_inverse;
+//                                    double ess = 1.0/ess_inverse;
 //                                    cout << "   " << "ESS = " << ess << endl;
                                  
                                     resampleParticles(my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s], "g");
@@ -1220,9 +1238,6 @@ namespace proj {
                         }
                     }
                     
-                    // save starting lambda
-//                    double lambda = my_vec[0][0]->getLambda();
-                    
                 // choose one set of gene trees to use
                 for (int s=1; s<nsubsets+1; s++) {
                     normalizeWeights(my_vec[s], "g", false);
@@ -1251,16 +1266,6 @@ namespace proj {
                         *_accepted_particle_vec[s][p] = variable_gene_trees[s-1][p]; // preserve gene tree variation for output
                     }
                 }
-                    
-            // reset lambda
-//            if (lambda > 0.0) {
-//                for (auto &p:my_vec[0]) {
-//                    p->setLambda(lambda); // set starting lambda from previous generation
-//                }
-//            }
-//            for (auto &p:my_vec[0]) {
-//                p->chooseLambda(); // set starting lambda from previous generation
-//            }
                     
                 if (i < _niterations-1) {
                     _species_tree_log_marginal_likelihood = 0.0;
@@ -1338,6 +1343,8 @@ namespace proj {
                 }
                 }
                 
+            saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]);
+            
                 cout << "\t" << "proposed marg like: " << _log_marginal_likelihood;
                 cout << "\t" << "prev marg like: " << _prev_log_marginal_likelihood << endl;
                 
@@ -1348,7 +1355,6 @@ namespace proj {
                 }
                 
                 writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
-//                writeLambdaFile(my_vec[0]);
                 
 //                } // _nsamples loop - number of samples
             
@@ -1378,15 +1384,6 @@ namespace proj {
 
         std::cout << "\nFinished!" << std::endl;
     }
-
-//    inline void Proj::writeLambdaFile(vector<Particle::SharedPtr> species_particles) {
-//        ofstream lambdaf("lambda.txt");
-//        for (auto &p:species_particles) {
-//            double lambda = p->getLambda();
-//            lambdaf << lambda << endl;
-//        }
-//        lambdaf.close();
-//    }
 
     inline void Proj::writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa) {
         // open log file
