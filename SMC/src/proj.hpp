@@ -50,6 +50,7 @@ namespace proj {
             void                writeGeneTreeFile();
             Particle::SharedPtr chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species);
             void                writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa);
+            void                writeSpeciesTreeLoradFile(vector<Particle::SharedPtr> species_particles, int nspecies);
             void                setStartingVariables();
             void                setUpInitialData();
             void                saveGeneAndSpeciesTrees(Particle::SharedPtr species_particle, Particle::SharedPtr gene1, Particle::SharedPtr gene2, Particle::SharedPtr gene3);
@@ -982,11 +983,6 @@ namespace proj {
                 }
             }
             
-            // set starting theta
-//            for (auto &p:my_vec[0]) {
-//                p->setTheta();
-//            }
-            
             int ntaxa = (int) _taxon_map.size();
             bool deconstruct = false;
             
@@ -1013,10 +1009,8 @@ namespace proj {
                     
                     double log_coalescent_likelihood = 0.0;
                     for (int s=1; s<nsubsets+1; s++) {
-//                            my_vec[s][0]->mapSpecies(_taxon_map, _species_names, s+1);
                             my_vec[s][0]->refreshGeneTreePreorder();
                             log_coalescent_likelihood += my_vec[s][0]->calcCoalLikeForNewTheta(Forest::_theta, species_info, both);
-                        // TODO: why doesn't this work?
                         }
                     cout << "log coalescent likelihood: " << log_coalescent_likelihood << endl;
                     exit(0);
@@ -1255,6 +1249,9 @@ namespace proj {
 
                         saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]); // save species tree and associated gene trees
                     } // s loop
+                    if (i == _niterations - 2) {
+                        writeSpeciesTreeLoradFile(my_vec[0], nspecies);
+                    }
                     saveParticleWeights(my_vec[0]);
                 }
             }
@@ -1367,6 +1364,72 @@ namespace proj {
                 logf << "\t" << setprecision(12) << gene_tree_log_coalescent_like[g];
             }
 
+            
+            for (int i=0; i<prior_vec.size(); i++) {
+                logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
+            }
+            
+            for (int j=0; j<log_topology_priors.size(); j++) {
+                logf << "\t" << setprecision(12) << log_topology_priors[j];
+            }
+            
+            logf << "\t" << setprecision(12) << log_coalescent_likelihood;
+            
+            logf << "\t" << setprecision(12) << species_tree_height;
+            
+            logf << endl;
+            a++;
+            col_count++;
+        }
+        
+        logf.close();
+    }
+
+    inline void Proj::writeSpeciesTreeLoradFile(vector<Particle::SharedPtr> species_particles, int nspecies) {
+        // open log file
+        ofstream logf("species_params.log");
+        
+        double a = 0;
+        unsigned col_count = 0;
+        
+        for (int p=0; p<species_particles.size(); p++) {
+            
+            vector<double> branch_length_vec;
+            for (auto &b:species_particles[p]->getBranchLengths()) {
+                branch_length_vec.push_back(b);
+            }
+            
+            vector<double> prior_vec;
+            for (auto &b:species_particles[p]->getBranchLengthPriors()) {
+                prior_vec.push_back(b);
+            }
+            
+            vector<double> log_topology_priors;
+            for (auto &t:species_particles[p]->getTopologyPriors()) {
+                log_topology_priors.push_back(t);
+            }
+            
+            double species_tree_height = species_particles[p]->getSpeciesTreeHeight();
+            
+            assert(branch_length_vec.size() == prior_vec.size());
+            
+            double log_coalescent_likelihood = species_particles[p]->getCoalescentLikelihood();
+            
+            if (col_count == 0) {
+                logf << "iter" << "\t" << "theta";
+                
+                for (int i=0; i<nspecies-1; i++) {
+                    logf << "\t" << "species_tree_increment" << "\t" << "increment_prior";
+                }
+                
+                logf << "\t" << "species_tree_topology_prior";
+                
+                logf << "\t" << "log_coal_like";
+                
+                logf << "\t" << "species_tree_height" << endl;
+            }
+            
+            logf << a << "\t" << Forest::_theta;
             
             for (int i=0; i<prior_vec.size(); i++) {
                 logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
