@@ -1254,6 +1254,7 @@ namespace proj {
                         _accepted_particle_vec[0] = my_vec[0];
                         start = "species";
                         my_vec[0][0]->showParticle();
+                        saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]); // save species tree and associated gene trees
                     } // s loop
                     saveParticleWeights(my_vec[0]);
                 }
@@ -1263,7 +1264,7 @@ namespace proj {
             
             writeGeneTreeFile();
             
-            saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]);
+//            saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]);
             
             // saveParticleWeights(_accepted_particle_vec);
             // saveParticleLikelihoods(_accepted_particle_vec);

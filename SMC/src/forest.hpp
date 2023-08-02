@@ -1654,6 +1654,7 @@ class Forest {
     }
 
     inline double Forest::calcLogCoalLikeGivenTheta(double proposed_theta, vector<pair<tuple<string, string, string>, double>> species_info, bool both) {
+        showForest();
         // walk through species increments and calculate coalescent likelihood
         int nincrements = 0.0;
         double log_coalescent_likelihood = 0.0;
@@ -1673,7 +1674,7 @@ class Forest {
                 }
             }
             
-            tuple<string, string, string> species_joined = species_info[species_join_number].first; // TODO: check this is not messed up for case of multiple try MCMC
+            tuple<string, string, string> species_joined = species_info[species_join_number].first;
             
             // update species partition with species_joined
             updateSpeciesPartition(species_joined);
@@ -1685,8 +1686,8 @@ class Forest {
             
             if (!both) {
                 species_tree_height = 0.0;
-                for (int i=0; i<species_join_number; i++) {
-                    species_tree_height += species_info[species_join_number].second;
+                for (int i=0; i<species_join_number+1; i++) {
+                    species_tree_height += species_info[i].second;
                 }
             }
             assert (species_tree_height > 0.0);
@@ -1713,13 +1714,17 @@ class Forest {
                             if (s.first == species) {
                                 // coalescence
                                 int nlineages = (int) s.second.size();
+                                if (nlineages == 1) {
+                                    log_coalescent_likelihood = neg_inf;
+                                }
+//                                assert (nlineages > 1);
                                 
                                 double coalescence_rate = nlineages*(nlineages-1) / proposed_theta;
                                 double nChooseTwo = nlineages*(nlineages-1);
                                 double log_prob_join = log(2/nChooseTwo);
                                 log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
                                 
-                                cout << "pr coalescence = " << log_prob_join + log(coalescence_rate) - (increment * coalescence_rate) << endl;
+//                                cout << "pr coalescence = " << log_prob_join + log(coalescence_rate) - (increment * coalescence_rate) << endl;
                                 
                                 bool found = (find(s.second.begin(), s.second.end(), node->_right_sib) != s.second.end());
 
@@ -1739,7 +1744,7 @@ class Forest {
                                 double coalescence_rate = nlineages*(nlineages-1) / proposed_theta;
                                 log_coalescent_likelihood -= increment * coalescence_rate;
                                 
-                                cout << "pr no coalescence = " << -1 * increment * coalescence_rate << endl;
+//                                cout << "pr no coalescence = " << -1 * increment * coalescence_rate << endl;
                             }
                         }
                         
@@ -1751,7 +1756,7 @@ class Forest {
                     int nlineages = (int) s.second.size();
                     double coalescence_rate = nlineages*(nlineages-1) / proposed_theta;
                     log_coalescent_likelihood -= remaining_chunk_of_branch * coalescence_rate;
-                    cout << "pr no coalescence = " << -1 * remaining_chunk_of_branch * coalescence_rate << endl;
+//                    cout << "pr no coalescence = " << -1 * remaining_chunk_of_branch * coalescence_rate << endl;
                 }
                 nincrements += a;
             }
@@ -1783,7 +1788,7 @@ class Forest {
                             double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
                             log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
                             
-                            cout << "pr coalescence = " << log_prob_join + log(coalescence_rate) - (increment * coalescence_rate) << endl;
+//                            cout << "pr coalescence = " << log_prob_join + log(coalescence_rate) - (increment * coalescence_rate) << endl;
 
                             updateNodeList(s.second, node, node->_right_sib, node->_parent); // update the species lineage
                             a++;
@@ -1831,12 +1836,16 @@ class Forest {
                             // coalescence
                             int nlineages = (int) s.second.size();
                             
+                            if (nlineages == 1) {
+                                log_coalescent_likelihood = neg_inf; // if there is only 1 lineage left, there cannot be coalescence
+                            }
+                            
                             double coalescence_rate = nlineages*(nlineages-1) / _theta;
                             double nChooseTwo = nlineages*(nlineages-1);
                             double log_prob_join = log(2/nChooseTwo);
                             log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
                             
-                            cout << "pr coalescence = " << log_prob_join + log(coalescence_rate) - (increment * coalescence_rate) << endl;
+//                            cout << "pr coalescence = " << log_prob_join + log(coalescence_rate) - (increment * coalescence_rate) << endl;
                             
                             bool found = (find(s.second.begin(), s.second.end(), node->_right_sib) != s.second.end());
 
@@ -1855,7 +1864,7 @@ class Forest {
                             double coalescence_rate = nlineages*(nlineages-1) / _theta;
                             log_coalescent_likelihood -= increment * coalescence_rate;
                             
-                            cout << "pr no coalescence = " << -1 * increment * coalescence_rate << endl;
+//                            cout << "pr no coalescence = " << -1 * increment * coalescence_rate << endl;
                         }
                     }
                     
@@ -1868,7 +1877,7 @@ class Forest {
                 double coalescence_rate = nlineages*(nlineages-1) / _theta;
                 log_coalescent_likelihood -= remaining_chunk_of_branch * coalescence_rate;
                 
-                cout << "pr no coalescence = " << -1 * remaining_chunk_of_branch * coalescence_rate << endl;
+//                cout << "pr no coalescence = " << -1 * remaining_chunk_of_branch * coalescence_rate << endl;
             }
             _nincrements += a;
         }
@@ -1926,7 +1935,7 @@ class Forest {
                         double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
                         log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
                         
-                        cout << "pr coalescence = " << log_prob_join + log(coalescence_rate) - (increment * coalescence_rate) << endl;
+//                        cout << "pr coalescence = " << log_prob_join + log(coalescence_rate) - (increment * coalescence_rate) << endl;
 
                         updateNodeList(s.second, node, node->_right_sib, node->_parent); // update the species lineage
                         a++;
