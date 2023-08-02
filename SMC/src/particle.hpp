@@ -339,7 +339,7 @@ class Particle {
         
         if (_forest._lineages.size() > 1) {
             assert (max_depth > 0.0);
-            _forest.chooseSpeciesIncrement(max_depth);
+            _forest.chooseSpeciesIncrement(max_depth, false);
             _species_tree_height += _forest._last_edge_length;
         }
         
@@ -631,7 +631,7 @@ class Particle {
         assert (_name == "species");
         
         double max_depth = 0.0;
-        _forest.chooseSpeciesIncrement(max_depth);
+        _forest.chooseSpeciesIncrement(max_depth, true);
         double edge_len = _forest._last_edge_length;
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
