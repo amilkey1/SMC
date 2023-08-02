@@ -216,7 +216,7 @@ namespace proj {
         ("ambigmissing",  boost::program_options::value(&_ambig_missing)->default_value(true), "treat all ambiguities as missing data")
         ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000), "number of particles")
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
-        ("theta, t", boost::program_options::value(&Forest::_starting_theta)->default_value(0.05), "theta")
+        ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.05), "theta")
         ("speciation_rate", boost::program_options::value(&Forest::_speciation_rate)->default_value(1), "speciation rate")
         ("proposal",  boost::program_options::value(&Forest::_proposal)->default_value("prior-post"), "a string defining a proposal (prior-prior or prior-post or prior-post-ish)")
         ("model", boost::program_options::value(&Forest::_model)->default_value("JC"), "a string defining a substitution model")
@@ -406,6 +406,7 @@ namespace proj {
 
         // theta0 is the current global theta value
         double theta0 = species_particle.getTheta();
+        assert (theta0 > 0.0);
 
         // Sample ntries new values of theta from symmetric proposal distribution
         // (window of width 2*delta centered on theta0). Compute weights (coalescent
@@ -414,7 +415,6 @@ namespace proj {
         vector<double> logwstar(ntries, 0.0);
         
         vector<pair<tuple<string, string, string>, double>> species_info = species_particle.getSpeciesJoined();
-        species_particle.showParticle();
         
         for (unsigned i = 0; i < ntries; ++i) {
             
@@ -484,7 +484,7 @@ namespace proj {
             accept = logu < logr;
         }
         if (accept) {
-            Forest::_starting_theta = theta_star;
+            Forest::_theta = theta_star;
             cout << str(format("\n*** new theta: %.5f\n") % theta_star);
         }
     }
@@ -668,9 +668,9 @@ namespace proj {
     
     inline void Proj::showFinal(vector<vector<Particle::SharedPtr>> my_vec) {
         // this function displays the final species trees
-        for (int p=0; p<_nparticles; p++) {
-                my_vec[0][p]->showParticle();
-            }
+//        for (int p=0; p<_nparticles; p++) {
+//                my_vec[0][p]->showParticle();
+//            }
         
         double sum_h = 0.0;
         for (auto & p:my_vec[0]) {
@@ -682,7 +682,7 @@ namespace proj {
         
         cout << "mean height equals " << sum_h << endl;
         cout << "log marginal likelihood = " << setprecision(12) << _log_marginal_likelihood << endl;
-        cout << "theta = " << Forest::_starting_theta << endl;
+        cout << "theta = " << Forest::_theta << endl;
         cout << "speciation rate = " << Forest::_speciation_rate << endl;
         cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
     }
@@ -794,9 +794,6 @@ namespace proj {
                     my_vec[0][p]->speciesProposal(max_depths, species_joined); // set last edge length of species tree to 0.0
                 }
 
-//                my_vec[1][0]->showParticle();
-//                my_vec[2][0]->showParticle();
-//                my_vec[3][0]->showParticle();
                 double log_coalescent_likelihood = 0.0;
                 
                 // calculate coalescent likelihood for each gene on each particle
@@ -868,7 +865,7 @@ namespace proj {
         cout << "Starting..." << endl;
         cout << "Current working directory: " << boost::filesystem::current_path() << endl;
         cout << "Random seed: " << _random_seed << endl;
-        cout << "Starting Theta: " << Forest::_starting_theta << endl;
+        cout << "Theta: " << Forest::_theta << endl;
         cout << "Number of threads: " << _nthreads << endl;
 
         try {
@@ -913,9 +910,6 @@ namespace proj {
             bool both = false;
             
             vector<string> newicks;
-//            if (_gene_newicks_names != "null" && _species_newicks_name != "null") {
-//                throw XProj(boost::str(boost::format("cannot specify gene newicks and species newicks; choose one")));
-//            }
             
             if (_species_newicks_name != "null") {
                 ifstream infile(_species_newicks_name);
@@ -988,6 +982,11 @@ namespace proj {
                 }
             }
             
+            // set starting theta
+//            for (auto &p:my_vec[0]) {
+//                p->setTheta();
+//            }
+            
             int ntaxa = (int) _taxon_map.size();
             bool deconstruct = false;
             
@@ -1016,7 +1015,7 @@ namespace proj {
                     for (int s=1; s<nsubsets+1; s++) {
 //                            my_vec[s][0]->mapSpecies(_taxon_map, _species_names, s+1);
                             my_vec[s][0]->refreshGeneTreePreorder();
-                            log_coalescent_likelihood += my_vec[s][0]->calcCoalLikeForNewTheta(Forest::_starting_theta, species_info, both);
+                            log_coalescent_likelihood += my_vec[s][0]->calcCoalLikeForNewTheta(Forest::_theta, species_info, both);
                         // TODO: why doesn't this work?
                         }
                     cout << "log coalescent likelihood: " << log_coalescent_likelihood << endl;
@@ -1204,6 +1203,7 @@ namespace proj {
                         my_vec[0][p]->setLogLikelihood(0.0);
                         my_vec[0][p]->setLogWeight(0.0, "g");
                         my_vec[0][p]->setLogWeight(0.0, "s");
+//                        my_vec[0][p]->setTheta();
                     }
                     
                     for (unsigned s=0; s<nspecies; s++) {
@@ -1253,7 +1253,7 @@ namespace proj {
                         }
                         _accepted_particle_vec[0] = my_vec[0];
                         start = "species";
-                        my_vec[0][0]->showParticle();
+
                         saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]); // save species tree and associated gene trees
                     } // s loop
                     saveParticleWeights(my_vec[0]);
@@ -1358,7 +1358,7 @@ namespace proj {
                 logf << "\t" << "species_tree_height" << endl;
             }
             
-            logf << a << "\t" << Forest::_starting_theta;
+            logf << a << "\t" << Forest::_theta;
             
             for (int g=0; g<gene_tree_log_like.size(); g++) {
                 logf << "\t" << setprecision(12) << gene_tree_log_like[g];

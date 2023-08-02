@@ -181,8 +181,9 @@ class Forest {
     public:
 
         typedef std::shared_ptr<Forest> SharedPtr;
-        double                      _theta;
-        static double               _starting_theta;
+//        double                      _theta;
+//        static double               _starting_theta;
+        static double               _theta;
         static double               _speciation_rate;
         static string               _proposal;
         static string               _model;
@@ -220,7 +221,7 @@ class Forest {
         _gene_tree_log_likelihood = 0.0;
         _gene_tree_log_weight = 0.0;
         _gene_tree_log_coalescent_likelihood = 0.0;
-        _theta = 0.0;
+//        _theta = 0.0;
         _panmictic_coalescent_likelihood = 0.0;
         
         //create taxa
@@ -1654,7 +1655,6 @@ class Forest {
     }
 
     inline double Forest::calcLogCoalLikeGivenTheta(double proposed_theta, vector<pair<tuple<string, string, string>, double>> species_info, bool both) {
-        showForest();
         // walk through species increments and calculate coalescent likelihood
         int nincrements = 0.0;
         double log_coalescent_likelihood = 0.0;
@@ -1840,7 +1840,7 @@ class Forest {
                                 log_coalescent_likelihood = neg_inf; // if there is only 1 lineage left, there cannot be coalescence
                             }
                             
-                            double coalescence_rate = nlineages*(nlineages-1) / _theta;
+                            double coalescence_rate = nlineages*(nlineages-1) / Forest::_theta;
                             double nChooseTwo = nlineages*(nlineages-1);
                             double log_prob_join = log(2/nChooseTwo);
                             log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
