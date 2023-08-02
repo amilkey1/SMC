@@ -414,7 +414,8 @@ namespace proj {
         vector<double> logwstar(ntries, 0.0);
         
         vector<pair<tuple<string, string, string>, double>> species_info = species_particle.getSpeciesJoined();
-//
+        species_particle.showParticle();
+        
         for (unsigned i = 0; i < ntries; ++i) {
             
             double q = theta0 - delta + 2.0*delta*rng.uniform();
@@ -425,7 +426,7 @@ namespace proj {
             for (int s=0; s<gene_particles.size(); s++) {
                     gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
                     gene_particles[s].refreshGeneTreePreorder();
-                    log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info);
+                    log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info, false);
 
                 }
             logwstar[i] = log_coalescent_likelihood;
@@ -451,7 +452,7 @@ namespace proj {
         for (int s=0; s<gene_particles.size(); s++) {
                 gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
                 gene_particles[s].refreshGeneTreePreorder();
-                log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(theta0, species_info);
+                log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(theta0, species_info, false);
 
             }
         logwstar[0] = log_coalescent_likelihood;
@@ -465,7 +466,7 @@ namespace proj {
             for (int s=0; s<gene_particles.size(); s++) {
                     gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
                     gene_particles[s].refreshGeneTreePreorder();
-                    log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info);
+                    log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info, false);
 
                 }
             logwstar[i] = log_coalescent_likelihood;
@@ -793,6 +794,9 @@ namespace proj {
                     my_vec[0][p]->speciesProposal(max_depths, species_joined); // set last edge length of species tree to 0.0
                 }
 
+//                my_vec[1][0]->showParticle();
+//                my_vec[2][0]->showParticle();
+//                my_vec[3][0]->showParticle();
                 double log_coalescent_likelihood = 0.0;
                 
                 // calculate coalescent likelihood for each gene on each particle
@@ -800,8 +804,6 @@ namespace proj {
                         double last_edge_len = my_vec[0][p]->getLastEdgeLen();
                         double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
                         log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
-                        
-                        cout << log_coalescent_likelihood << endl;
                     }
                 
                 my_vec[0][p]->calcSpeciesParticleWeight(log_coalescent_likelihood);
@@ -908,11 +910,19 @@ namespace proj {
             }
 
             bool use_first = true;
+            bool both = false;
             
             vector<string> newicks;
-            if (_gene_newicks_names != "null" && _species_newicks_name != "null") {
-                throw XProj(boost::str(boost::format("cannot specify gene newicks and species newicks; choose one")));
-
+//            if (_gene_newicks_names != "null" && _species_newicks_name != "null") {
+//                throw XProj(boost::str(boost::format("cannot specify gene newicks and species newicks; choose one")));
+//            }
+            
+            if (_species_newicks_name != "null") {
+                ifstream infile(_species_newicks_name);
+                string newick;
+                while (getline(infile, newick)) {
+                    newicks.push_back(newick);
+                }
             }
             
             if (_gene_newicks_names != "null") {
@@ -920,13 +930,6 @@ namespace proj {
                     throw XProj(boost::str(boost::format("must specify more than 1 iteration if beginning from gene trees")));
                 }
                 ifstream infile(_gene_newicks_names);
-                string newick;
-                while (getline(infile, newick)) {
-                    newicks.push_back(newick);
-                }
-            }
-            else if (_species_newicks_name != "null") {
-                ifstream infile(_species_newicks_name);
                 string newick;
                 while (getline(infile, newick)) {
                     newicks.push_back(newick);
@@ -949,12 +952,22 @@ namespace proj {
                     
                     // only sample 1 species tree, and use this tree for all the gene filtering
                     if (s == 0 && _gene_newicks_names == "null" && p == 0) {
-                        my_vec[0][p]->processSpeciesNewick(newicks); // if no newick specified, program will sample from species tree prior
+                        my_vec[0][p]->processSpeciesNewick(newicks, true); // if no newick specified, program will sample from species tree prior
+                    }
+                    
+                    if (s == 0 && _species_newicks_name != "null" && newicks.size() > 1) {
+                        vector<string> species_newick;
+                        species_newick.push_back(newicks[0]);
+                        my_vec[0][p]->processSpeciesNewick(species_newick, false); // read in species newick
+                        both = true;
                     }
                 }
             }
             bool gene_first = false;
             if (_gene_newicks_names != "null") {
+                if (both) {
+                    newicks.erase(newicks.begin()); // if specifying gene trees and species trees, erase the species newick because it's already been processed
+                }
                 assert (newicks.size() == nsubsets);
                 for (int s=1; s<nsubsets+1; s++) {
                     for (int p=0; p<nparticles; p++) {
@@ -992,6 +1005,22 @@ namespace proj {
                             }
                         }
                     }
+                }
+                
+                // if both specified, calculate the coalescent likelihood and return it, ending the program
+                if (both) {
+                    cout << "...... calculating coalescent likelihood for specified trees ......" << endl;
+                    vector<pair<tuple<string, string, string>, double>> species_info = my_vec[0][0]->getSpeciesJoined();
+                    
+                    double log_coalescent_likelihood = 0.0;
+                    for (int s=1; s<nsubsets+1; s++) {
+//                            my_vec[s][0]->mapSpecies(_taxon_map, _species_names, s+1);
+                            my_vec[s][0]->refreshGeneTreePreorder();
+                            log_coalescent_likelihood += my_vec[s][0]->calcCoalLikeForNewTheta(Forest::_starting_theta, species_info, both);
+                        // TODO: why doesn't this work?
+                        }
+                    cout << "log coalescent likelihood: " << log_coalescent_likelihood << endl;
+                    exit(0);
                 }
                 
                 // keep the species partition for the gene forests at this stage but clear the tree structure
@@ -1111,7 +1140,7 @@ namespace proj {
                     } // g loop
                 }
                 
-                    writeGeneTreeFile();
+//                    writeGeneTreeFile();
                     
                     // filter species trees now
                     
@@ -1224,6 +1253,7 @@ namespace proj {
                         }
                         _accepted_particle_vec[0] = my_vec[0];
                         start = "species";
+                        my_vec[0][0]->showParticle();
                     } // s loop
                     saveParticleWeights(my_vec[0]);
                 }
@@ -1233,7 +1263,7 @@ namespace proj {
             
             writeGeneTreeFile();
             
-//            saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]);
+            saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]);
             
             // saveParticleWeights(_accepted_particle_vec);
             // saveParticleLikelihoods(_accepted_particle_vec);
