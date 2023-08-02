@@ -405,7 +405,7 @@ namespace proj {
         // assuming a symmetric proposal (so that w(x,y) = pi(x)).
 
         // theta0 is the current global theta value
-        double theta0 = species_particle.getTheta();
+        double theta0 = Forest::_theta;
         assert (theta0 > 0.0);
 
         // Sample ntries new values of theta from symmetric proposal distribution
@@ -1203,7 +1203,6 @@ namespace proj {
                         my_vec[0][p]->setLogLikelihood(0.0);
                         my_vec[0][p]->setLogWeight(0.0, "g");
                         my_vec[0][p]->setLogWeight(0.0, "s");
-//                        my_vec[0][p]->setTheta();
                     }
                     
                     for (unsigned s=0; s<nspecies; s++) {

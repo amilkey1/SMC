@@ -103,7 +103,6 @@ class Particle {
         void                                            calcSpeciesParticleWeight(double log_coalescent_likelihood);
         void                                            drawHeightsFromPrior();
         void                                            resetLogTopologyPrior(){_forest._log_joining_prob = 0.0;}
-        double                                          getTheta(){return _forest._theta;}
         double                                          calcCoalLikeForNewTheta(double proposed_theta, vector<pair<tuple<string, string, string>, double>> species_info, bool both);
 
     private:
