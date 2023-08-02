@@ -181,8 +181,6 @@ class Forest {
     public:
 
         typedef std::shared_ptr<Forest> SharedPtr;
-//        double                      _theta;
-//        static double               _starting_theta;
         static double               _theta;
         static double               _speciation_rate;
         static string               _proposal;

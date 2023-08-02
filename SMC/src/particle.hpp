@@ -105,7 +105,6 @@ class Particle {
         void                                            resetLogTopologyPrior(){_forest._log_joining_prob = 0.0;}
         double                                          getTheta(){return _forest._theta;}
         double                                          calcCoalLikeForNewTheta(double proposed_theta, vector<pair<tuple<string, string, string>, double>> species_info, bool both);
-//        void                                            setTheta(){_forest._theta = Forest::_starting_theta;}
 
     private:
 
@@ -210,8 +209,6 @@ class Particle {
         // this function proposes gene trees, not species trees
         
         string event;
-        
-//        _forest._theta = _forest._starting_theta;
         
         if (_generation == 0 || _generation == Forest::_ntaxa - 1) {
             _forest._nincrements = 0;
@@ -455,7 +452,6 @@ class Particle {
         
         _forest.buildFromNewick(newicks[gene_number], true, false);
         _forest.refreshPreorder();
-//        _forest._theta = _forest._starting_theta;
     }
 
     inline double Particle::calcHeight() {
