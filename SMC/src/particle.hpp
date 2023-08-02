@@ -470,7 +470,7 @@ class Particle {
     inline void Particle::hybridizationProposal() {
         vector<string> hybridized_nodes = _forest.hybridizeSpecies();
         if (_forest._lineages.size()>1) {
-            _forest.addSpeciesIncrement();
+            _forest.addSpeciesIncrement(false);
         }
         _forest.hybridizeGene(hybridized_nodes, _forest._last_edge_length);
         calculateGamma();
@@ -643,7 +643,7 @@ class Particle {
                 
                 // if the species tree is not finished, add another species increment
                 if (_forest._lineages.size()>1) {
-                    _forest.addSpeciesIncrement();
+                    _forest.addSpeciesIncrement(true);
                 }
                 
                 double edge_len = 0.0;

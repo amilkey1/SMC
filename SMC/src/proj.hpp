@@ -1133,7 +1133,7 @@ namespace proj {
                     } // g loop
                 }
                 
-//                    writeGeneTreeFile();
+                    writeGeneTreeFile();
                     
                     // filter species trees now
                     

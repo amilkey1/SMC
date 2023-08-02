@@ -77,7 +77,7 @@ class Forest {
         pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
         int                         selectPair(vector<double> weight_vec);
         void                        chooseSpeciesIncrement(double max_depth);
-        void                        addSpeciesIncrement();
+        void                        addSpeciesIncrement(bool short_tree);
         string                      chooseEvent();
         void                        allowMigration(list<Node*> &nodes);
         void                        setGeneration(double g) {_generationf = g;}
@@ -3377,9 +3377,13 @@ class Forest {
         return hybridized_nodes;
     }
 
-    inline void Forest::addSpeciesIncrement() {
-
+    inline void Forest::addSpeciesIncrement(bool short_tree) {
         double rate = (_speciation_rate)*_lineages.size();
+        if (short_tree) {
+            // artificially inflate lambda for first gen if sampling from prior
+            rate = (_speciation_rate*100)*_lineages.size();
+            
+        }
 
         // choose edge length but don't add it yet
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
@@ -3390,8 +3394,6 @@ class Forest {
             double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
             
             _increments.push_back(make_pair(_last_edge_length, increment_prior));
-            
-//            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
         }
 
         // add the previously chosen edge length
