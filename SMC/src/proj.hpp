@@ -1247,7 +1247,7 @@ namespace proj {
                         _accepted_particle_vec[0] = my_vec[0];
                         start = "species";
 
-                        saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]); // save species tree and associated gene trees
+//                        saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]); // save species tree and associated gene trees
                     } // s loop
                     if (i == _niterations - 2) {
                         writeSpeciesTreeLoradFile(my_vec[0], nspecies);

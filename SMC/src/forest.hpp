@@ -1712,8 +1712,10 @@ class Forest {
                             if (s.first == species) {
                                 // coalescence
                                 int nlineages = (int) s.second.size();
+                                
                                 if (nlineages == 1) {
                                     log_coalescent_likelihood = neg_inf;
+                                    return log_coalescent_likelihood;
                                 }
 //                                assert (nlineages > 1);
                                 
@@ -1836,6 +1838,7 @@ class Forest {
                             
                             if (nlineages == 1) {
                                 log_coalescent_likelihood = neg_inf; // if there is only 1 lineage left, there cannot be coalescence
+                                return log_coalescent_likelihood;
                             }
                             
                             double coalescence_rate = nlineages*(nlineages-1) / Forest::_theta;
