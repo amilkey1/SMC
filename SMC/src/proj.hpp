@@ -55,6 +55,8 @@ namespace proj {
             void                setUpInitialData();
             void                saveGeneAndSpeciesTrees(Particle::SharedPtr species_particle, Particle::SharedPtr gene1, Particle::SharedPtr gene2, Particle::SharedPtr gene3);
             void                updateTheta(Particle & p, unsigned ntries, double delta, vector<Particle> & gene_particles);
+            double              updateLambda();
+            void                acceptLambda(double proposed_speciation_rate);
             double              calcLogSum(vector<double> vec);
         unsigned                multinomialDraw (const vector<double> & probs);
         
@@ -73,6 +75,7 @@ namespace proj {
             double                      _species_tree_log_marginal_likelihood;
             bool                        _run_on_empty;
             bool                        _estimate_theta;
+            bool                        _estimate_speciation_rate;
             int                         _ntries_theta;
 
             static std::string          _program_name;
@@ -83,7 +86,6 @@ namespace proj {
             double                      getRunningSum(const vector<double> &) const;
             vector<string>              _species_names;
             map<string, string>         _taxon_map;
-            double                      _prev_theta = 0.0;
             double                      _prev_speciation_rate = 0.0;
             double                      _prev_hybridization_rate = 0.0;
             vector<vector<Particle::SharedPtr>>            _accepted_particle_vec;
@@ -109,6 +111,8 @@ namespace proj {
             string                      _species_newicks_name;
             string                      _gene_newicks_names;
             int                         _species_particles_per_gene_particle;
+            double                      _prev_speciation_rate_prior;
+            double                      _prev_species_tree_log_marginal_likelihood;
     };
 
     inline Proj::Proj() {
@@ -233,6 +237,7 @@ namespace proj {
         ("species_particles_per_gene_particle", boost::program_options::value(&_species_particles_per_gene_particle)->default_value(1), "increase number of particles for species trees by this amount")
         ("outgroup", boost::program_options::value(&Forest::_outgroup)->default_value("null"), "specify outgroup in species tree")
         ("estimate_theta", boost::program_options::value(&_estimate_theta)->default_value(false), "estimate theta parameter")
+        ("estimate_speciation_rate", boost::program_options::value(&_estimate_speciation_rate)->default_value(false), "estimate speciation rate parameter")
         ("ntries_theta", boost::program_options::value(&_ntries_theta)->default_value(50), "specify number of values of theta to try")
         ;
 
@@ -349,10 +354,10 @@ namespace proj {
             _log_marginal_likelihood += log_particle_sum - log(_nparticles);
 //            cout << setprecision(12) << "   " << _log_marginal_likelihood << endl;
         }
-//        else {
-//            _species_tree_log_marginal_likelihood += log_particle_sum - log(_nparticles);
+        else {
+            _species_tree_log_marginal_likelihood += log_particle_sum - log(_nparticles);
 //            cout << setprecision(12) << "   " << _species_tree_log_marginal_likelihood << endl;
-//        }
+        }
 //        sort(particles.begin(), particles.end(), greater<Particle::SharedPtr>());
     }
 
@@ -397,6 +402,39 @@ namespace proj {
         }
         sum = log(running_sum) + log_max_weight;
         return sum;
+    }
+
+    inline void Proj::acceptLambda(double proposed_speciation_rate) {
+        assert (_estimate_speciation_rate);
+        
+        double u = rng.uniform();
+        
+        double exponential_rate = -log(0.05)/100.0;
+        double speciation_rate_prior = (log(exponential_rate) - Forest::_speciation_rate*exponential_rate);
+        
+        double log_acceptance_ratio = (_species_tree_log_marginal_likelihood+speciation_rate_prior)-(_prev_species_tree_log_marginal_likelihood+_prev_speciation_rate_prior);
+        
+        _prev_speciation_rate_prior = speciation_rate_prior;
+
+        if (log(u) < log_acceptance_ratio) {
+            // accept proposed theta
+            Forest::_speciation_rate = proposed_speciation_rate;
+            cout << str(format("\n*** new speciation rate: %.5f\n") % proposed_speciation_rate);
+        }
+    }
+
+    inline double Proj::updateLambda() {
+        double u = rng.uniform();
+        double speciation_rate_delta = 25.0;
+        double proposed_speciation_rate = speciation_rate_delta*u+(Forest::_speciation_rate-speciation_rate_delta / 2.0);
+        
+        // make sure proposed speciation rate is positive
+        if (proposed_speciation_rate < 0.0) {
+            proposed_speciation_rate*=-1;
+        }
+        
+        _prev_speciation_rate = Forest::_speciation_rate;
+        return proposed_speciation_rate;
     }
 
     inline void Proj::updateTheta(Particle & species_particle, unsigned ntries, double delta, vector<Particle> & gene_particles) {
@@ -987,6 +1025,8 @@ namespace proj {
             bool deconstruct = false;
             
             for (int i=0; i<_niterations; i++) {
+                _prev_species_tree_log_marginal_likelihood = _species_tree_log_marginal_likelihood;
+                _species_tree_log_marginal_likelihood = 0.0;
                 _log_marginal_likelihood = 0.0;
                 cout << "beginning iteration: " << i << endl;
                 
@@ -1049,7 +1089,6 @@ namespace proj {
                         
                         if (_estimate_theta) {
                             // try multiple theta values
-//                            int ntries = 50;
                             double delta = 0.01;
                             vector<Particle> gene_particles;
                             for (int s=1; s<nsubsets+1; s++) {
@@ -1200,6 +1239,7 @@ namespace proj {
                     }
                     
                     for (unsigned s=0; s<nspecies; s++) {
+                        // TODO: propose a new lambda
                         
                         cout << "beginning species tree proposals" << endl;
                         //taxon joining and reweighting step
@@ -1249,6 +1289,12 @@ namespace proj {
 
 //                        saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]); // save species tree and associated gene trees
                     } // s loop
+                    // TODO: decide to accept or reject new lambda?
+                    if (_estimate_speciation_rate) {
+                        double proposed_speciation_rate = updateLambda();
+                        acceptLambda(proposed_speciation_rate);
+                    }
+                    
                     if (i == _niterations - 2) {
                         writeSpeciesTreeLoradFile(my_vec[0], nspecies);
                     }

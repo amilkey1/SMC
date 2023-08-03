@@ -2331,7 +2331,7 @@ class Forest {
             // hybridization prior
             double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
             if (short_tree) {
-                rate = (_speciation_rate*100+_hybridization_rate)*_lineages.size();
+                rate = (_speciation_rate*10+_hybridization_rate)*_lineages.size();
             }
 
             _last_edge_length = rng.gamma(1.0, 1.0/rate);
@@ -3387,7 +3387,7 @@ class Forest {
         double rate = (_speciation_rate)*_lineages.size();
         if (short_tree) {
             // artificially inflate lambda for first gen if sampling from prior
-            rate = (_speciation_rate*100)*_lineages.size();
+            rate = (_speciation_rate*10)*_lineages.size();
             
         }
 

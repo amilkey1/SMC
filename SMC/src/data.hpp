@@ -432,7 +432,7 @@ namespace proj {
         if (numTaxaBlocks == 0)
             throw XProj("No taxa blocks were found in the data file");
             
-        unsigned cum_nchar = 0; ///begin_mainloop
+        unsigned cum_nchar = 0; // begin_mainloop
         for (int i = 0; i < numTaxaBlocks; ++i) {
             NxsTaxaBlock * taxaBlock = nexusReader.GetTaxaBlock(i);
             unsigned ntax = storeTaxonNames(taxaBlock, i);
