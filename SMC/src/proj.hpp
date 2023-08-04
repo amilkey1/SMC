@@ -1037,8 +1037,6 @@ namespace proj {
             
             string start = "species"; // start variable defines if program should start with gene or species trees
             
-            bool sample_gene_tree_prior = true;
-            
             for (int s=0; s<nsubsets+1; s++) {
                 nparticles = _nparticles;
                 
@@ -1072,9 +1070,7 @@ namespace proj {
                     if (both) {
                         newicks.erase(newicks.begin()); // if specifying gene trees and species trees, erase the species newick because it's already been processed
                     }
-                    if (!sample_gene_tree_prior) {
-                        assert (newicks.size() == nsubsets);
-                    }
+                    assert (newicks.size() == nsubsets);
                     
                     for (int s=1; s<nsubsets+1; s++) {
                         for (int p=0; p<nparticles; p++) {
@@ -1148,8 +1144,7 @@ namespace proj {
                     deconstruct = true;
                 }
                 
-                if (sample_gene_tree_prior) {
-                    sample_gene_tree_prior = false;
+                if (_sample_from_gene_tree_prior) {
                     start = "gene";
                     for (int s=1; s<nsubsets+1; s++) {
                         for (auto &p:my_vec[s]) {
@@ -1196,10 +1191,11 @@ namespace proj {
                             }
                                 assert (_accepted_particle_vec.size() == nsubsets+1);
                                 _accepted_particle_vec[s] = my_vec[s];
-//                                    saveParticleWeights(my_vec[0]);
                             } // s loop
                     } // g loop
+                    writeGeneTreeFile();
                 }
+                
                 
                 // my_vec[0] is the species tree particles
                 // my_vec[1] is gene 1 particles
