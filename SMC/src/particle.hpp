@@ -631,7 +631,8 @@ class Particle {
         assert (_name == "species");
         
         double max_depth = 0.0;
-        _forest.chooseSpeciesIncrement(max_depth, true);
+//        _forest.chooseSpeciesIncrement(max_depth, true);
+        _forest.chooseSpeciesIncrement(max_depth, false);
         double edge_len = _forest._last_edge_length;
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
@@ -643,7 +644,8 @@ class Particle {
                 
                 // if the species tree is not finished, add another species increment
                 if (_forest._lineages.size()>1) {
-                    _forest.addSpeciesIncrement(true);
+//                    _forest.addSpeciesIncrement(true);
+                    _forest.addSpeciesIncrement(false);
                 }
                 
                 double edge_len = 0.0;

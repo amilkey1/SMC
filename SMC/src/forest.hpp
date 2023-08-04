@@ -237,6 +237,7 @@ class Forest {
             }
         _nleaves=_ntaxa;
         _ninternals=0;
+        _index = 0;
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -1180,7 +1181,7 @@ class Forest {
         int nlineages = (int) existing_lineages.size();
         
         // hybridization prior
-        double rate = (_speciation_rate+_hybridization_rate)*nlineages;
+        double rate = (_speciation_rate + _hybridization_rate)*nlineages;
 
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
@@ -2054,6 +2055,7 @@ class Forest {
         
         // calculate the coalescent likelihood for the first join since it's the same for all joins
         
+//        first = false; // TODO: careful
         if (first) {
             // update increments and priors
             double log_increment_prior = 0.0;
@@ -2090,6 +2092,7 @@ class Forest {
             
             _gene_tree_log_coalescent_likelihood += log_increment_prior;
         }
+        _gene_tree_log_coalescent_likelihood = 0.0;
         return make_tuple(subtree1, subtree2, new_nd);
     }
 
@@ -2331,7 +2334,7 @@ class Forest {
             // hybridization prior
             double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
             if (short_tree) {
-                rate = (_speciation_rate*10+_hybridization_rate)*_lineages.size();
+                rate = (_speciation_rate*100+_hybridization_rate)*_lineages.size();
             }
 
             _last_edge_length = rng.gamma(1.0, 1.0/rate);
@@ -2698,6 +2701,8 @@ class Forest {
             }
         }
         _gene_tree_log_coalescent_likelihood += log_increment_prior;
+        // TODO: careful
+//        _gene_tree_log_coalescent_likelihood = 0.0;
         _increments.push_back(make_pair(increment, log_increment_prior));
         _extended_increment = 0.0;
         _deep_coalescent_increments.clear();
@@ -3387,7 +3392,7 @@ class Forest {
         double rate = (_speciation_rate)*_lineages.size();
         if (short_tree) {
             // artificially inflate lambda for first gen if sampling from prior
-            rate = (_speciation_rate*10)*_lineages.size();
+            rate = (_speciation_rate*100)*_lineages.size();
             
         }
 

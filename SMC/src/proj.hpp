@@ -53,7 +53,7 @@ namespace proj {
             void                writeSpeciesTreeLoradFile(vector<Particle::SharedPtr> species_particles, int nspecies);
             void                setStartingVariables();
             void                setUpInitialData();
-            void                saveGeneAndSpeciesTrees(Particle::SharedPtr species_particle, Particle::SharedPtr gene1, Particle::SharedPtr gene2, Particle::SharedPtr gene3);
+            void                saveGeneAndSpeciesTrees(Particle::SharedPtr species_particle, Particle::SharedPtr gene1, Particle::SharedPtr gene2, Particle::SharedPtr gene3, Particle::SharedPtr gene4);
             void                updateTheta(Particle & p, unsigned ntries, double delta, vector<Particle> & gene_particles);
             double              updateLambda();
             void                acceptLambda(double proposed_speciation_rate);
@@ -154,12 +154,12 @@ namespace proj {
         nodef.close();
     }
 
-    inline void Proj::saveGeneAndSpeciesTrees(Particle::SharedPtr species_particle, Particle::SharedPtr gene1, Particle::SharedPtr gene2, Particle::SharedPtr gene3) {
+    inline void Proj::saveGeneAndSpeciesTrees(Particle::SharedPtr species_particle, Particle::SharedPtr gene1, Particle::SharedPtr gene2, Particle::SharedPtr gene3, Particle::SharedPtr gene4) {
         // TODO: only works for one data set
         ofstream testf("coalescent-likelihood.txt");
         testf << "params : " << endl;
-        testf << "\t" << "theta = 0.05" << endl;
-        testf << "\t" << "lambda = 6.4" << endl;
+        testf << "\t" << "theta = 0.01" << endl;
+        testf << "\t" << "lambda = 2.0" << endl;
         
         testf << "coalescent likelihood = " << species_particle->getCoalescentLikelihood() << endl;
         
@@ -170,6 +170,8 @@ namespace proj {
         testf << "gene2: " << gene2->saveForestNewick() << endl;
         testf << endl;
         testf << "gene3: " << gene3->saveForestNewick() << endl;
+        testf << endl;
+        testf << "gene4: " << gene4->saveForestNewick() << endl;
         
         testf.close();
         
@@ -1166,13 +1168,15 @@ namespace proj {
                             }
                                 assert (_accepted_particle_vec.size() == nsubsets+1);
                                 _accepted_particle_vec[s] = my_vec[s];
-//                                    saveParticleWeights(my_vec[0]);
+                                    saveParticleWeights(my_vec[0]);
                             } // s loop
                         deconstruct = false;
                     } // g loop
                 }
                 
-                    writeGeneTreeFile();
+//                if (i == _niterations - 2) {
+//                    writeGeneTreeFile();
+//                }
                     
                     // filter species trees now
                     
@@ -1254,6 +1258,23 @@ namespace proj {
                         }
                         
                         proposeSpeciesParticles(my_vec, s, nspecies, nsubsets);
+                        
+                        if (s == 0) {
+                            ofstream sel_gene_treesf("selected_gene_trees.txt");
+                            for (int s=1; s<nsubsets+1; s++) {
+                                sel_gene_treesf << "gene : " << s << " " << my_vec[s][0]->saveForestNewick();
+                            }
+                            sel_gene_treesf.close();
+                            
+                            int a = 0;
+                            ofstream first_species_incrementf("first_species_increment.txt");
+                            for (auto &p:my_vec[0]) {
+                                double increment = p->getSpeciesTreeHeight();
+                                first_species_incrementf << "particle " << a << " : " << increment << endl;
+                                a++;
+                            }
+                            first_species_incrementf.close();
+                        }
 
                         // filter - make sure all gene trees go along with correct species tree
                         
@@ -1287,7 +1308,7 @@ namespace proj {
                         _accepted_particle_vec[0] = my_vec[0];
                         start = "species";
 
-//                        saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]); // save species tree and associated gene trees
+                        saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0], my_vec[4][0]); // save species tree and associated gene trees
                     } // s loop
                     // TODO: decide to accept or reject new lambda?
                     if (_estimate_speciation_rate) {
@@ -1298,7 +1319,7 @@ namespace proj {
                     if (i == _niterations - 2) {
                         writeSpeciesTreeLoradFile(my_vec[0], nspecies);
                     }
-                    saveParticleWeights(my_vec[0]);
+//                    saveParticleWeights(my_vec[0]);
                 }
             }
                                 
