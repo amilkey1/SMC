@@ -1145,6 +1145,7 @@ namespace proj {
                 }
                 
                 if (_sample_from_gene_tree_prior) {
+                    _sample_from_gene_tree_prior = false;
                     start = "gene";
                     for (int s=1; s<nsubsets+1; s++) {
                         for (auto &p:my_vec[s]) {
