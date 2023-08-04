@@ -124,7 +124,6 @@ class Forest {
         vector<string>              updateExistingLineagesVector(vector<string> existing_lineages, tuple<string, string, string> species_joined);
         vector<string>              setUpExistingLineagesVector();
         void                        chooseSpeciesIncrementFromNewick(vector<string> existing_lineages);
-        void                        combineSpeciesPartition();
         void                        drawFromGeneTreePrior();
 
         std::vector<Node *>         _lineages;
@@ -1238,21 +1237,6 @@ class Forest {
         }
         
         return existing_lineages;
-    }
-
-    inline void Forest::combineSpeciesPartition() {
-        string new_name = "new_species";
-        vector<string> species;
-        
-        for (auto &s:_species_partition) {
-            species.push_back(s.first);
-        }
-        
-        for (int i=0; i<species.size(); i++) {
-            list<Node*> &nodes = _species_partition[new_name];
-            copy(_species_partition[species[i]].begin(), _species_partition[species[i]].end(), back_inserter(nodes));
-            _species_partition.erase(species[i]);
-        }
     }
 
     inline void Forest::chooseSpeciesIncrementFromNewick(vector<string> existing_lineages) {
