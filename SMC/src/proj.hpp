@@ -1015,8 +1015,13 @@ namespace proj {
             if (_species_newicks_name != "null") {
                 ifstream infile(_species_newicks_name);
                 string newick;
+                int size_before = (int) newicks.size();
                 while (getline(infile, newick)) {
                     newicks.push_back(newick);
+                }
+                int size_after = (int) newicks.size();
+                if (size_before == size_after) {
+                    throw XProj("cannot find species newick file");
                 }
             }
             
@@ -1026,8 +1031,13 @@ namespace proj {
                 }
                 ifstream infile(_gene_newicks_names);
                 string newick;
+                int size_before = (int) newicks.size();
                 while (getline(infile, newick)) {
                     newicks.push_back(newick);
+                }
+                int size_after = (int) newicks.size();
+                if (size_before == size_after) {
+                    throw XProj("cannot find gene newick file");
                 }
             }
             
@@ -1054,7 +1064,7 @@ namespace proj {
                         my_vec[0][p]->processSpeciesNewick(newicks, true); // if no newick specified, program will sample from species tree prior
                     }
                     
-                    if (s == 0 && _species_newicks_name != "null" && newicks.size() > 1 && _sample_from_species_tree_prior) {
+                    if (s == 0 && _species_newicks_name != "null" && newicks.size() > 1) {
                         vector<string> species_newick;
                         species_newick.push_back(newicks[0]);
                         my_vec[0][p]->processSpeciesNewick(species_newick, false); // read in species newick
