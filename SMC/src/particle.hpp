@@ -104,7 +104,11 @@ class Particle {
         void                                            drawHeightsFromPrior();
         void                                            resetLogTopologyPrior(){_forest._log_joining_prob = 0.0;}
         double                                          calcCoalLikeForNewTheta(double proposed_theta, vector<pair<tuple<string, string, string>, double>> species_info, bool both);
-
+    vector<pair<tuple<string, string, string>, double>>                                        buildFakeSpeciesTree();
+        void                                            buildEntireGeneTree();
+        void                                            panmicticSpeciesPartition();
+        void                                            sampleGeneTreePrior();
+    
     private:
 
         static unsigned                         _nsubsets;
@@ -448,9 +452,45 @@ class Particle {
 
     inline void Particle::processGeneNewicks(vector<string> newicks, int gene_number) {
         assert (_name != "species");
-        
         _forest.buildFromNewick(newicks[gene_number], true, false);
         _forest.refreshPreorder();
+    }
+
+    inline void Particle::panmicticSpeciesPartition() {
+        _forest.combineSpeciesPartition();
+    }
+
+    inline void Particle::buildEntireGeneTree() {
+        _forest.drawFromGeneTreePrior();
+    }
+
+    inline void Particle::sampleGeneTreePrior() {
+        double prev_log_likelihood = _forest._gene_tree_log_likelihood;
+        
+        _forest.drawFromGeneTreePrior();
+        if (Forest::_proposal == "prior-prior") {
+            _log_weight = _forest._gene_tree_log_likelihood - prev_log_likelihood;
+        }
+        else {
+            _log_weight = _forest._gene_tree_log_weight;
+        }
+    }
+
+    inline vector<pair<tuple<string, string, string>, double>> Particle::buildFakeSpeciesTree() {
+        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+        double edge_len = 0.0;
+        
+        vector<pair<tuple<string, string, string>, double>> fake_species;
+        
+        fake_species.push_back(make_pair(species_joined, edge_len));
+        
+        for (int i=0; i < Forest::_nspecies-1; i++) {
+            tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+            
+            double edge_len = 0.0;
+            fake_species.push_back(make_pair(species_joined, edge_len));
+        }
+        return fake_species;
     }
 
     inline double Particle::calcHeight() {

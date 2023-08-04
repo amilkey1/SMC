@@ -60,6 +60,7 @@ class Forest {
         std::string                 makeNewick(unsigned precision, bool use_names);
         pair<unsigned, unsigned>    chooseTaxaToJoin(double s);
         tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> p, list<Node*> node_list, double increment, string species, bool first);
+        tuple<Node*, Node*, Node*>    createNewSubtreeFromPrior(pair<unsigned, unsigned> p, double increment);
         void                        calcPartialArray(Node* new_nd);
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
@@ -74,7 +75,7 @@ class Forest {
         double                      getRunningSumChoices(vector<double> &log_weight_choices);
         double                      getRunningSumHybridChoices(vector<double> &log_weight_choices);
         vector<double>              reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
-        pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
+    pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
         int                         selectPair(vector<double> weight_vec);
         void                        chooseSpeciesIncrement(double max_depth, bool short_tree);
         void                        addSpeciesIncrement(bool short_tree);
@@ -105,6 +106,7 @@ class Forest {
         void                        updateSpeciesPartition(tuple<string, string, string> species_info);
         pair<double, string>        chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info);
         pair<Node*, Node*>          chooseAllPairs(list<Node*> &nodes, double increment, string species);
+        pair<Node*, Node*>          chooseAllPairsFromPrior(double increment);
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
         vector< pair<double, Node *>>      sortPreorder();
         void                        calcMinDepth();
@@ -122,6 +124,8 @@ class Forest {
         vector<string>              updateExistingLineagesVector(vector<string> existing_lineages, tuple<string, string, string> species_joined);
         vector<string>              setUpExistingLineagesVector();
         void                        chooseSpeciesIncrementFromNewick(vector<string> existing_lineages);
+        void                        combineSpeciesPartition();
+        void                        drawFromGeneTreePrior();
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -237,7 +241,7 @@ class Forest {
             }
         _nleaves=_ntaxa;
         _ninternals=0;
-        _index = 0;
+//        _index = 0; // TODO: fix this
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -720,6 +724,65 @@ class Forest {
         return _gene_tree_log_likelihood;
     }
 
+    inline pair<Node*, Node*> Forest::chooseAllPairsFromPrior(double increment) {
+        _node_choices.clear();
+        _log_likelihood_choices.clear();
+        _gene_tree_log_weight = 0.0;
+       
+        // choose pair of nodes to try
+        for (int i = 0; i < (int) _lineages.size()-1; i++) {
+            for (int j = i+1; j < (int) _lineages.size(); j++) {
+                // createNewSubtree returns subtree1, subtree2, new_nd
+                
+                tuple<Node*, Node*, Node*> t = createNewSubtreeFromPrior(make_pair(i,j), increment);
+                
+                _log_likelihood_choices.push_back(calcLogLikelihood()); // no coalescent likelihood
+                // gene tree log coalescent likelihood is the same for every possible join
+
+                // revert _lineages
+                revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
+
+                //reset siblings and parents of original nodes back to 0
+                get<0>(t)->resetNode(); //subtree1
+                get<1>(t)->resetNode(); //subtree2
+
+                // clear new node from _nodes
+                //clear new node that was just created
+                get<2>(t)->clear(); //new_nd
+            }
+        }
+        
+        // reweight each choice of pairs
+       double prev_log_likelihood = _prev_gene_tree_log_likelihood; // no coalescent likelihood
+       vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, prev_log_likelihood);
+
+
+        // sum unnormalized weights before choosing the pair
+        // must include the likelihoods of all pairs in the final particle weight
+        double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
+        _gene_tree_log_weight = log_weight_choices_sum;
+        for (int b=0; b < (int) log_weight_choices.size(); b++) {
+            log_weight_choices[b] -= log_weight_choices_sum;
+        }
+        
+        // randomly select a pair
+        _index_of_choice = selectPair(log_weight_choices);
+
+        // find nodes to join in node_list
+        Node *subtree1 = _node_choices[_index_of_choice].first;
+        Node *subtree2 = _node_choices[_index_of_choice].second;
+    
+        _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice]; // no coalescent likelihood
+       
+        // erase extra nodes created from node list
+        for (int i = 0; i < _node_choices.size(); i++) {
+            _nodes.pop_back();
+        }
+       
+       // no coalescent likelihood
+        return make_pair(subtree1, subtree2);
+    }
+
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment, string species) {
          _node_choices.clear();
          _log_likelihood_choices.clear();
@@ -1175,6 +1238,21 @@ class Forest {
         }
         
         return existing_lineages;
+    }
+
+    inline void Forest::combineSpeciesPartition() {
+        string new_name = "new_species";
+        vector<string> species;
+        
+        for (auto &s:_species_partition) {
+            species.push_back(s.first);
+        }
+        
+        for (int i=0; i<species.size(); i++) {
+            list<Node*> &nodes = _species_partition[new_name];
+            copy(_species_partition[species[i]].begin(), _species_partition[species[i]].end(), back_inserter(nodes));
+            _species_partition.erase(species[i]);
+        }
     }
 
     inline void Forest::chooseSpeciesIncrementFromNewick(vector<string> existing_lineages) {
@@ -2023,6 +2101,40 @@ class Forest {
         return s;
     }
 
+    inline tuple<Node*, Node*, Node*> Forest::createNewSubtreeFromPrior(pair<unsigned, unsigned> t, double increment) {
+        
+        Node* subtree1 = _lineages[t.first];
+        Node* subtree2 = _lineages[t.second];
+
+//        new node is always needed
+        Node nd;
+        _nodes.push_back(nd);
+        Node* new_nd = &_nodes.back();
+        new_nd->_parent=0;
+        new_nd->_number=_nleaves+_ninternals;
+        new_nd->_edge_length=0.0;
+        new_nd->_right_sib=0;
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+
+        //always calculating partials now
+        assert (new_nd->_partial == nullptr);
+        new_nd->_partial=ps.getPartial(_npatterns*4);
+        assert(new_nd->_left_child->_right_sib);
+        calcPartialArray(new_nd);
+
+        // don't update the species list
+        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+        
+        _node_choices.push_back(make_pair(subtree1, subtree2));
+        
+        return make_tuple(subtree1, subtree2, new_nd);
+    }
+
     inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, double increment, string species, bool first) {
         pair<Node*, Node*> p = getSubtreeAt(t, node_list);
 
@@ -2424,13 +2536,82 @@ class Forest {
         assert (_species_partition.size() > 0);
     }
 
+    inline void Forest::drawFromGeneTreePrior() {
+        assert (_lineages.size() > 1);
+        
+//        while (_lineages.size() > 1) {
+            double coalescence_rate = (_lineages.size()*(_lineages.size() - 1)) / _theta;
+            
+            double increment = rng.gamma(1.0, 1.0/(coalescence_rate));
+            
+            for (auto &nd:_lineages) {
+                nd->_edge_length += increment;
+            }
+            
+            // choose taxa to join
+        Node* subtree1;
+        Node* subtree2;
+        
+        // prior-prior proposal
+        if (_proposal == "prior-prior") {
+            pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
+            
+            subtree1 = _lineages[t.first];
+            subtree2 = _lineages[t.second];
+        }
+        else {
+            if (_lineages.size() != _ntaxa) {
+                _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
+            }
+            else {
+                _prev_gene_tree_log_likelihood = 0.0;
+            }
+            pair<Node*, Node*> t = chooseAllPairsFromPrior(increment);
+            
+            subtree1 = t.first;
+            subtree2 = t.second;
+        }
+            
+            assert (subtree1 != subtree2);
+            
+            //new node is always needed
+            Node nd;
+            _nodes.push_back(nd);
+            Node* new_nd = &_nodes.back();
+
+            new_nd->_parent=0;
+            new_nd->_number=_nleaves+_ninternals;
+            new_nd->_edge_length=0.0;
+            _ninternals++;
+            new_nd->_right_sib=0;
+
+            new_nd->_left_child=subtree1;
+            subtree1->_right_sib=subtree2;
+
+            subtree1->_parent=new_nd;
+            subtree2->_parent=new_nd;
+
+            //always calculating partials now
+            assert (new_nd->_partial == nullptr);
+            new_nd->_partial=ps.getPartial(_npatterns*4);
+            assert(new_nd->_left_child->_right_sib);
+            
+//            _new_nodes.push_back(new_nd);
+
+            //update species list
+            updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+//        }
+        calcPartialArray(new_nd);
+        calcLogLikelihood();
+    }
+
     inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info) {
          // get species info
         double species_increment = species_info[_species_join_number].second;
         assert (species_increment >= 0.0);
         
         if (_species_join_number == 0) {
-            assert (species_increment > 0.0);
+//            assert (species_increment > 0.0);
         }
 
          // join species if necessary

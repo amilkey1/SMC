@@ -44,7 +44,7 @@ namespace proj {
             void                showFinal(vector<vector<Particle::SharedPtr>>);
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
             void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets);
-            void                proposeSpeciesParticles( vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets);
+            void                proposeSpeciesParticles(vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets);
             void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, Particle::SharedPtr species_tree_particle);
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
             void                writeGeneTreeFile();
@@ -58,7 +58,9 @@ namespace proj {
             double              updateLambda();
             void                acceptLambda(double proposed_speciation_rate);
             double              calcLogSum(vector<double> vec);
-        unsigned                multinomialDraw (const vector<double> & probs);
+            unsigned            multinomialDraw (const vector<double> & probs);
+            void                buildGeneTrees(vector<vector<Particle::SharedPtr>> my_vec, vector<vector<Particle::SharedPtr>> my_vec_1, vector<vector<Particle::SharedPtr>> my_vec_2, int nsubsets, int nparticles, int ntaxa);
+            void                proposeGeneParticlesFromPrior(vector<Particle::SharedPtr> &particles);
         
         private:
 
@@ -113,6 +115,8 @@ namespace proj {
             int                         _species_particles_per_gene_particle;
             double                      _prev_speciation_rate_prior;
             double                      _prev_species_tree_log_marginal_likelihood;
+            bool                        _sample_from_gene_tree_prior;
+            bool                        _sample_from_species_tree_prior;
     };
 
     inline Proj::Proj() {
@@ -241,6 +245,8 @@ namespace proj {
         ("estimate_theta", boost::program_options::value(&_estimate_theta)->default_value(false), "estimate theta parameter")
         ("estimate_speciation_rate", boost::program_options::value(&_estimate_speciation_rate)->default_value(false), "estimate speciation rate parameter")
         ("ntries_theta", boost::program_options::value(&_ntries_theta)->default_value(50), "specify number of values of theta to try")
+        ("start_from_gene_tree_prior", boost::program_options::value(&_sample_from_gene_tree_prior)->default_value(false), "specify starting from gene tree prior")
+        ("start_from_species_tree_prior", boost::program_options::value(&_sample_from_species_tree_prior)->default_value(false), "specify starting from species tree prior")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -902,6 +908,60 @@ namespace proj {
         setNumberTaxa(_data);
     }
 
+    void Proj::buildGeneTrees(vector<vector<Particle::SharedPtr>> my_vec, vector<vector<Particle::SharedPtr>> my_vec_1, vector<vector<Particle::SharedPtr>> my_vec_2, int nsubsets, int nparticles, int ntaxa) {
+        
+        bool use_first = true;
+        
+        for (unsigned g=0; g<ntaxa-1; g++) {
+            cout << "prior generation " << g << endl;
+            // filter particles within each gene
+            
+            for (int s=1; s<nsubsets+1; s++) { // skip species tree particles
+                
+                proposeGeneParticlesFromPrior(my_vec[s]);
+                
+                if (!_run_on_empty) {
+                    bool calc_marg_like = true;
+                    
+                    normalizeWeights(my_vec[s], "g", calc_marg_like);
+                    
+                    double ess_inverse = 0.0;
+                    
+                    for (int p=0; p<_nparticles; p++) {
+                        ess_inverse += exp(2.0*my_vec[s][p]->getLogWeight("g"));
+                    }
+
+//                                    double ess = 1.0/ess_inverse;
+//                                    cout << "   " << "ESS = " << ess << endl;
+                 
+                    resampleParticles(my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s], "g");
+                    //if use_first is true, my_vec = my_vec_2
+                    //if use_first is false, my_vec = my_vec_1
+                    
+                    my_vec[s] = use_first ? my_vec_2[s]:my_vec_1[s];
+                    // do not need to resample species trees; species tree will remain the same throughout all gene tree filtering
+                    
+                    assert(my_vec[s].size() == nparticles);
+//                                    assert(my_vec[s].size() == nparticles*_species_particles_per_gene_particle);
+                }
+                //change use_first from true to false or false to true
+                use_first = !use_first;
+                if (g < ntaxa-2) {
+                    resetWeights(my_vec[s], "g");
+                }
+                    assert (_accepted_particle_vec.size() == nsubsets+1);
+                    _accepted_particle_vec[s] = my_vec[s];
+                        saveParticleWeights(my_vec[0]);
+                } // s loop
+        } // g loop
+    }
+
+    inline void Proj::proposeGeneParticlesFromPrior(vector<Particle::SharedPtr> &particles) {
+        for (auto &p:particles) {
+            p->sampleGeneTreePrior();
+        }
+    }
+
     inline void Proj::run() {
         cout << "Starting..." << endl;
         cout << "Current working directory: " << boost::filesystem::current_path() << endl;
@@ -971,7 +1031,13 @@ namespace proj {
                 }
             }
             
+            if (newicks.size() == 0 && !_sample_from_gene_tree_prior && !_sample_from_species_tree_prior) {
+                throw XProj("Must specify gene newicks, species newicks, gene tree prior, or species tree prior");
+            }
+            
             string start = "species"; // start variable defines if program should start with gene or species trees
+            
+            bool sample_gene_tree_prior = true;
             
             for (int s=0; s<nsubsets+1; s++) {
                 nparticles = _nparticles;
@@ -986,11 +1052,11 @@ namespace proj {
                     my_vec[s][p]->setLogWeight(0.0, "s");
                     
                     // only sample 1 species tree, and use this tree for all the gene filtering
-                    if (s == 0 && _gene_newicks_names == "null" && p == 0) {
+                    if (s == 0 && _gene_newicks_names == "null" && p == 0 && _sample_from_species_tree_prior) {
                         my_vec[0][p]->processSpeciesNewick(newicks, true); // if no newick specified, program will sample from species tree prior
                     }
                     
-                    if (s == 0 && _species_newicks_name != "null" && newicks.size() > 1) {
+                    if (s == 0 && _species_newicks_name != "null" && newicks.size() > 1 && _sample_from_species_tree_prior) {
                         vector<string> species_newick;
                         species_newick.push_back(newicks[0]);
                         my_vec[0][p]->processSpeciesNewick(species_newick, false); // read in species newick
@@ -999,20 +1065,28 @@ namespace proj {
                 }
             }
             bool gene_first = false;
-            if (_gene_newicks_names != "null") {
-                if (both) {
-                    newicks.erase(newicks.begin()); // if specifying gene trees and species trees, erase the species newick because it's already been processed
-                }
-                assert (newicks.size() == nsubsets);
-                for (int s=1; s<nsubsets+1; s++) {
-                    for (int p=0; p<nparticles; p++) {
-                        my_vec[s][p]->processGeneNewicks(newicks, s-1);
-                        my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
-                        start = "gene";
-                        gene_first = true;
+            
+            if (!_sample_from_gene_tree_prior) {
+                
+                if (_gene_newicks_names != "null") {
+                    if (both) {
+                        newicks.erase(newicks.begin()); // if specifying gene trees and species trees, erase the species newick because it's already been processed
                     }
+                    if (!sample_gene_tree_prior) {
+                        assert (newicks.size() == nsubsets);
+                    }
+                    
+                    for (int s=1; s<nsubsets+1; s++) {
+                        for (int p=0; p<nparticles; p++) {
+                            my_vec[s][p]->processGeneNewicks(newicks, s-1);
+                            my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
+                            start = "gene";
+                            gene_first = true;
+                        }
+                    }
+                    
+                    _accepted_particle_vec = my_vec;
                 }
-                _accepted_particle_vec = my_vec;
             }
             
             if (_run_on_empty) {
@@ -1072,6 +1146,59 @@ namespace proj {
             
                 if (i > 0) {
                     deconstruct = true;
+                }
+                
+                if (sample_gene_tree_prior) {
+                    sample_gene_tree_prior = false;
+                    start = "gene";
+                    for (int s=1; s<nsubsets+1; s++) {
+                        for (auto &p:my_vec[s]) {
+                            p->resetGeneTreePartials(_data, _taxon_map, s);
+                        }
+                    }
+//                    buildGeneTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nparticles, ntaxa);
+                    for (unsigned g=0; g<ntaxa-1; g++) {
+                        cout << "prior generation " << g << endl;
+                        // filter particles within each gene
+                        
+                        for (int s=1; s<nsubsets+1; s++) { // skip species tree particles
+                            
+                            proposeGeneParticlesFromPrior(my_vec[s]);
+                            
+                            if (!_run_on_empty) {
+                                bool calc_marg_like = true;
+                                
+                                normalizeWeights(my_vec[s], "g", calc_marg_like);
+                                
+                                double ess_inverse = 0.0;
+                                
+                                for (int p=0; p<_nparticles; p++) {
+                                    ess_inverse += exp(2.0*my_vec[s][p]->getLogWeight("g"));
+                                }
+
+            //                                    double ess = 1.0/ess_inverse;
+            //                                    cout << "   " << "ESS = " << ess << endl;
+                             
+                                resampleParticles(my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s], "g");
+                                //if use_first is true, my_vec = my_vec_2
+                                //if use_first is false, my_vec = my_vec_1
+                                
+                                my_vec[s] = use_first ? my_vec_2[s]:my_vec_1[s];
+                                // do not need to resample species trees; species tree will remain the same throughout all gene tree filtering
+                                
+                                assert(my_vec[s].size() == nparticles);
+            //                                    assert(my_vec[s].size() == nparticles*_species_particles_per_gene_particle);
+                            }
+                            //change use_first from true to false or false to true
+                            use_first = !use_first;
+                            if (g < ntaxa-2) {
+                                resetWeights(my_vec[s], "g");
+                            }
+                                assert (_accepted_particle_vec.size() == nsubsets+1);
+                                _accepted_particle_vec[s] = my_vec[s];
+//                                    saveParticleWeights(my_vec[0]);
+                            } // s loop
+                    } // g loop
                 }
                 
                 // my_vec[0] is the species tree particles
@@ -1168,7 +1295,7 @@ namespace proj {
                             }
                                 assert (_accepted_particle_vec.size() == nsubsets+1);
                                 _accepted_particle_vec[s] = my_vec[s];
-                                    saveParticleWeights(my_vec[0]);
+//                                    saveParticleWeights(my_vec[0]);
                             } // s loop
                         deconstruct = false;
                     } // g loop
@@ -1308,7 +1435,7 @@ namespace proj {
                         _accepted_particle_vec[0] = my_vec[0];
                         start = "species";
 
-                        saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0], my_vec[4][0]); // save species tree and associated gene trees
+//                        saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0], my_vec[4][0]); // save species tree and associated gene trees
                     } // s loop
                     // TODO: decide to accept or reject new lambda?
                     if (_estimate_speciation_rate) {
@@ -1319,7 +1446,7 @@ namespace proj {
                     if (i == _niterations - 2) {
                         writeSpeciesTreeLoradFile(my_vec[0], nspecies);
                     }
-//                    saveParticleWeights(my_vec[0]);
+                    saveParticleWeights(my_vec[0]);
                 }
             }
                                 
