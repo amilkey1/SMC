@@ -62,7 +62,6 @@ class Particle {
 
         static void                                     setNumSubsets(unsigned n);
         void                                            showSpeciesIncrement();
-        void                                            showSpeciesJoined();
         void                                            showSpeciesTree();
         void                                            showHybridNodes();
         string                                          saveHybridNodes();
@@ -523,10 +522,6 @@ class Particle {
     inline void Particle::showSpeciesIncrement(){
         assert (_name == "species");
         cout << "species tree increment: " << "     " << _forest._last_edge_length << endl;
-    }
-
-    inline void Particle::showSpeciesJoined(){
-        _forest.showSpeciesJoined();
     }
 
     inline void Particle::showHybridNodes() {

@@ -151,7 +151,6 @@ class Forest {
         vector<pair<Node*, Node*>>  _node_choices;
         vector<double>              _log_likelihood_choices;
         int                         _index_of_choice;
-        pair<Node*, Node*>          _species_joined;
         tuple<Node*, Node*, Node*>  _hybrid_species_joined;
         double                      _generationf = 0;
         string                      _last_direction;
@@ -169,7 +168,6 @@ class Forest {
         double                      _gene_tree_log_coalescent_likelihood;
         double                      _panmictic_coalescent_likelihood;
 
-        void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
         double                      calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
         void                        setNewEdgeLength(double difference, Node* taxon_to_migrate, string key_to_add);
@@ -2260,7 +2258,6 @@ class Forest {
         _index_of_choice    = other._index_of_choice;
         _node_choices = other._node_choices;
         _log_likelihood_choices = other._log_likelihood_choices;
-        _species_joined = other._species_joined;
         _hybrid_species_joined = other._hybrid_species_joined;
         _migration_rate = other._migration_rate;
         _hybridization_rate = other._hybridization_rate;
@@ -2486,24 +2483,7 @@ class Forest {
 
         updateNodeVector (_lineages, subtree1, subtree2, new_nd);
 
-        _species_joined = make_pair(subtree1, subtree2);
-
         return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
-    }
-
-    inline void Forest::showSpeciesJoined() {
-        assert (_index==0);
-        if (_species_joined.first != NULL) {
-            cout << "joining species " << _species_joined.first->_name << " and " << _species_joined.second->_name << endl;
-        }
-
-        else if (get<0>(_hybrid_species_joined) != NULL) {
-            cout << "hybridizing species " << get<0>(_hybrid_species_joined)->_name << " (hybrid) and " << get<1>(_hybrid_species_joined)->_name << " (parent) and " << get<2>(_hybrid_species_joined)->_name <<  " (parent2) " << endl;
-        }
-
-        else {
-            cout << "no species joined" << endl;
-        }
     }
 
     inline void Forest::setUpGeneForest(map<string, string> &taxon_map) {

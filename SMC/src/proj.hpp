@@ -961,7 +961,6 @@ namespace proj {
     inline void Proj::debugSpeciesTree(vector<Particle::SharedPtr> &particles) {
         cout << "debugging species tree" << endl;
         for (auto &p:particles) {
-            p->showSpeciesJoined();
             p->showSpeciesIncrement();
             p->showSpeciesTree();
             cout << " _______ " << endl;
