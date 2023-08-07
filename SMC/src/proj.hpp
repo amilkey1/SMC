@@ -64,7 +64,6 @@ namespace proj {
             std::string                 _data_file_name;
             Partition::SharedPtr        _partition;
             Data::SharedPtr             _data;
-            bool                        _ambig_missing;
             unsigned                    _nparticles;
             unsigned                    _random_seed;
             double                      _log_marginal_likelihood;
@@ -110,7 +109,6 @@ namespace proj {
     inline void Proj::clear() {
         _data_file_name = "";
         _partition.reset(new Partition());
-        _ambig_missing  = true;
         _nparticles = 50000;
         _data = nullptr;
         _small_enough = 0.0000001;
@@ -190,7 +188,6 @@ namespace proj {
         ("version,v", "show program version")
         ("datafile,d",  boost::program_options::value(&_data_file_name)->required(), "name of a data file in NEXUS format")
         ("subset",  boost::program_options::value(&partition_subsets), "a string defining a partition subset, e.g. 'first:1-1234\3' or 'default[codon:standard]:1-3702'")
-        ("ambigmissing",  boost::program_options::value(&_ambig_missing)->default_value(true), "treat all ambiguities as missing data")
         ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000), "number of particles")
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
         ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.05), "theta")
