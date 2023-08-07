@@ -78,6 +78,7 @@ namespace proj {
             bool                        _estimate_theta;
             bool                        _estimate_speciation_rate;
             int                         _ntries_theta;
+            int                         _ntries_lambda;
 
             static std::string          _program_name;
             static unsigned             _major_version;
@@ -244,6 +245,7 @@ namespace proj {
         ("estimate_theta", boost::program_options::value(&_estimate_theta)->default_value(false), "estimate theta parameter")
         ("estimate_speciation_rate", boost::program_options::value(&_estimate_speciation_rate)->default_value(false), "estimate speciation rate parameter")
         ("ntries_theta", boost::program_options::value(&_ntries_theta)->default_value(50), "specify number of values of theta to try")
+        ("ntries_lambda", boost::program_options::value(&_ntries_lambda)->default_value(50), "specify number of values of lambda to try")
         ("start_from_gene_tree_prior", boost::program_options::value(&_sample_from_gene_tree_prior)->default_value(false), "specify starting from gene tree prior")
         ("start_from_species_tree_prior", boost::program_options::value(&_sample_from_species_tree_prior)->default_value(false), "specify starting from species tree prior")
         ;
@@ -547,7 +549,6 @@ namespace proj {
 
         // Choose one theta value from the probability distribution
         unsigned which = multinomialDraw(probs);
-        cout << "index: " << which << endl;
         double theta_star = proposed_thetas[which];
 
         // Sample ntries-1 new values of theta from symmetric proposal distribution
@@ -608,6 +609,9 @@ namespace proj {
         
         cum_probs.resize(probs.size());
         partial_sum(probs.begin(), probs.end(), cum_probs.begin());
+        
+        // last element of cum_probs should hold 1
+        assert((cum_probs.back() - 1.0) < 0.0001);
 
         // Draw a Uniform(0,1) random deviate
         double u = rng.uniform();
@@ -632,25 +636,6 @@ namespace proj {
         
         return (unsigned)std::distance(cum_probs.begin(), it);
     }
-
-
-//
-//    inline unsigned Proj::multinomialDraw(const vector<double> & probs) {
-//        // choose a random number [0,1]
-//        double u = rng.uniform();
-//        double cum_prob = 0.0;
-//        int index = 0.0;
-//        for (int i=0; i < (int) probs.size(); i++) {
-//            cum_prob += exp(probs[i]);
-//            if (u <= cum_prob) {
-//                index = i;
-//                break;
-//            }
-//        }
-//        // return index of choice
-//        cout << "index: " << index << endl;
-//        return index;
-//    }
 
     inline Particle::SharedPtr Proj::chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species) {
         // get species tree weights
@@ -1335,9 +1320,8 @@ namespace proj {
                         }
                         
                         if (_estimate_speciation_rate) {
-                            int ntries_lambda = 100;
                             double delta_lambda = 10.0;
-                            updateLambda(*species_tree_particle, ntries_lambda, delta_lambda);
+                            updateLambda(*species_tree_particle, _ntries_lambda, delta_lambda);
                         }
             
                         // delete extra particles
