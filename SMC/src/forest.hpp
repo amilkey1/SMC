@@ -125,6 +125,8 @@ class Forest {
         vector<string>              setUpExistingLineagesVector();
         void                        chooseSpeciesIncrementFromNewick(vector<string> existing_lineages);
         void                        drawFromGeneTreePrior();
+        double                      calcLogSpeciesTreeDensity(double speciation_rate);
+        void                        setIndex(int n) {_index = n;}
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -195,6 +197,7 @@ class Forest {
         static double               _hybridization_rate;
         static string               _outgroup;
         static double               _theta_prior_mean;
+        static double               _speciation_rate_prior_mean;
 };
 
 
@@ -2589,6 +2592,48 @@ class Forest {
         calcPartialArray(new_nd);
         calcLogLikelihood();
     }
+
+    inline double Forest::calcLogSpeciesTreeDensity(double speciation_rate) {
+        assert (_index == 0);
+        
+        refreshPreorder();
+        
+        // Assume that this species forest is fully resolved
+//        assert(_preorder.size() == 1);
+        assert(_lineages.size() == 1);
+                
+        vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
+        
+        // Build vector of internal node heights
+        vector<double> internal_heights;
+        
+        for (int i=0; i<heights_and_nodes.size(); i++) {
+            internal_heights.push_back(heights_and_nodes[i].first);
+        }
+        
+        // Number of internal nodes should be _nspecies - 1
+        assert(internal_heights.size() == Forest::_nspecies - 1);
+        
+        // internal heights are already sorted
+        
+        double log_prob_density = 0.0;
+        unsigned n = Forest::_nspecies;
+        double h0 = 0.0;
+        for (auto it = internal_heights.begin(); it != internal_heights.end(); ++it) {
+            double h = *it;
+            double r = speciation_rate*n;
+            double logr = log(r);
+            double t = h - h0;
+            double log_exponential_density = logr - r*t;
+            log_prob_density += log_exponential_density;
+            h0 = h;
+            n--;
+        }
+        
+        return log_prob_density;
+    }
+
+
 
     inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info) {
          // get species info

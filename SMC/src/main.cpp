@@ -34,7 +34,8 @@ double Forest::_migration_rate;
 double Forest::_hybridization_rate;
 string Forest::_outgroup;
 //bool Proj::_run_on_empty;
-double Forest::_theta_prior_mean = 0.05;
+double Forest::_theta_prior_mean = -log(0.05);
+double Forest::_speciation_rate_prior_mean = -log(0.05/100.0); // TODO: ?
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT

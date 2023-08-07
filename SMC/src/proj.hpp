@@ -54,9 +54,8 @@ namespace proj {
             void                setStartingVariables();
             void                setUpInitialData();
             void                saveGeneAndSpeciesTrees(Particle::SharedPtr species_particle, Particle::SharedPtr gene1, Particle::SharedPtr gene2, Particle::SharedPtr gene3, Particle::SharedPtr gene4);
-            void                updateTheta(Particle & p, unsigned ntries, double delta, vector<Particle> & gene_particles);
-            double              updateLambda();
-            void                acceptLambda(double proposed_speciation_rate);
+            void                updateTheta(Particle & species_particle, unsigned ntries, double delta, vector<Particle> & gene_particles);
+            void                updateLambda(Particle & species_particle, unsigned ntries, double delta);
             double              calcLogSum(vector<double> vec);
             unsigned            multinomialDraw (const vector<double> & probs);
             void                buildGeneTrees(vector<vector<Particle::SharedPtr>> my_vec, vector<vector<Particle::SharedPtr>> my_vec_1, vector<vector<Particle::SharedPtr>> my_vec_2, int nsubsets, int nparticles, int ntaxa);
@@ -412,40 +411,91 @@ namespace proj {
         return sum;
     }
 
-    inline void Proj::acceptLambda(double proposed_speciation_rate) {
+    inline void Proj::updateLambda(Particle & species_particle, unsigned ntries, double delta) {
         assert (_estimate_speciation_rate);
         
-        double u = rng.uniform();
+        // Use multiple-try Metropolis to update lambda conditional on the
+        // species forest defined in p. Uses the algorithm presented in
+        // https://en.wikipedia.org/wiki/Multiple-try_Metropolis
+        // assuming a symmetric proposal (so that w(x,y) = pi(x)).
         
-        double exponential_rate = -log(0.05)/100.0;
-        double speciation_rate_prior = (log(exponential_rate) - Forest::_speciation_rate*exponential_rate);
-        
-        double log_acceptance_ratio = (_species_tree_log_marginal_likelihood+speciation_rate_prior)-(_prev_species_tree_log_marginal_likelihood+_prev_speciation_rate_prior);
-        
-        _prev_speciation_rate_prior = speciation_rate_prior;
+        cout << "\nUpdating lambda...\n";
 
-        if (log(u) < log_acceptance_ratio) {
-            // accept proposed theta
-            Forest::_speciation_rate = proposed_speciation_rate;
-            cout << str(format("\n*** new speciation rate: %.5f\n") % proposed_speciation_rate);
-        }
-    }
+        // r is the rate of the lambda exponential prior
+        double prior_rate = 1.0/Forest::_speciation_rate_prior_mean;
+        double log_prior_rate = log(prior_rate);
+        double log_prior = log_prior_rate - prior_rate*Forest::_speciation_rate;
+        double log_likelihood = 0.0;
 
-    inline double Proj::updateLambda() {
-        double u = rng.uniform();
-        double speciation_rate_delta = 25.0;
-        double proposed_speciation_rate = speciation_rate_delta*u+(Forest::_speciation_rate-speciation_rate_delta / 2.0);
+        // lambda0 is the current global lambda value
+        double lambda0 = Forest::_speciation_rate;
         
-        // make sure proposed speciation rate is positive
-        if (proposed_speciation_rate < 0.0) {
-            proposed_speciation_rate*=-1;
+        // Sample ntries new values of lambda from symmetric proposal distribution
+        // (window of width 2*delta centered on lambda0). Compute weights (coalescent
+        // likelihood) for each proposed_lambdas value.
+        vector<double> proposed_lambdas(ntries, 0.0);
+        vector<double> logwstar(ntries, 0.0);
+        for (unsigned i = 0; i < ntries; ++i) {
+            double l = lambda0 - delta + 2.0*delta*rng.uniform();
+            if (l < 0.0)
+                l = -l;
+            proposed_lambdas[i] = l;
+            log_prior = log_prior_rate - prior_rate*l;
+            log_likelihood =  species_particle.calcLogSpeciesTreeDensityGivenLambda(l);
+            
+            logwstar[i] = log_likelihood + log_prior;
         }
         
-        _prev_speciation_rate = Forest::_speciation_rate;
-        return proposed_speciation_rate;
+        // Compute log of the sum of the weights (this sum will form the
+        // denominator of the acceptance ratio)
+        double log_sum_denom_weights = calcLogSum(logwstar);
+
+        // Normalize weights to create a discrete probability distribution
+        vector<double> probs(ntries, 0.0);
+        transform(logwstar.begin(), logwstar.end(), probs.begin(), [log_sum_denom_weights](double logw){
+            return exp(logw - log_sum_denom_weights);
+        });
+        
+        // Choose one lambda value from the probability distribution
+        unsigned which = multinomialDraw(probs); // TODO: these must be on log scale
+        double lambda_star = proposed_lambdas[which];
+        
+        // Sample ntries-1 new values of lambda from symmetric proposal distribution
+        // (window of width 2*delta centered on lambda_star)
+        log_prior = log_prior_rate - prior_rate*lambda0;
+        log_likelihood =  species_particle.calcLogSpeciesTreeDensityGivenLambda(lambda0);
+        logwstar[0] = log_likelihood + log_prior;
+        for (unsigned i = 1; i < ntries; ++i) {
+            double l = lambda_star - delta + 2.0*delta*rng.uniform();
+            if (l < 0.0)
+                l = -l;
+            log_prior = log_prior_rate - prior_rate*l;
+            log_likelihood =  species_particle.calcLogSpeciesTreeDensityGivenLambda(l);
+            logwstar[i] = log_likelihood + log_prior;
+        }
+        
+        // Compute log of the sum of the weights (this sum will form
+        // the numerator of the acceptance ratio)
+        double log_sum_numer_weights = calcLogSum(logwstar);
+
+        // Compute acceptance ratio
+        double logr = log_sum_numer_weights - log_sum_denom_weights;
+        bool accept = true;
+        if (logr < 0.0) {
+            double logu = log(rng.uniform());
+            accept = logu < logr;
+        }
+        if (accept) {
+            Forest::_speciation_rate = lambda_star;
+            cout << str(format("  New lambda: %.5f\n") % Forest::_speciation_rate);
+        }
+        else {
+            cout << str(format("  Lambda unchanged: %.5f\n") % Forest::_speciation_rate);
+        }
     }
 
     inline void Proj::updateTheta(Particle & species_particle, unsigned ntries, double delta, vector<Particle> & gene_particles) {
+        assert (_estimate_theta);
         // Use multiple-try Metropolis to update theta conditional on the gene forests
         // and species forest defined in p. Uses the algorithm presented in
         // https://en.wikipedia.org/wiki/Multiple-try_Metropolis
@@ -482,7 +532,7 @@ namespace proj {
                 gene_particles[s].refreshGeneTreePreorder();
                 log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info, false);
             }
-            logwstar[i] = log_coalescent_likelihood + log_prior; // TODO: add log prior for each gene tree or just once?
+            logwstar[i] = log_coalescent_likelihood + log_prior;
         }
 
         // Compute log of the sum of the weights (this sum will form the
@@ -497,6 +547,7 @@ namespace proj {
 
         // Choose one theta value from the probability distribution
         unsigned which = multinomialDraw(probs);
+        cout << "index: " << which << endl;
         double theta_star = proposed_thetas[which];
 
         // Sample ntries-1 new values of theta from symmetric proposal distribution
@@ -552,20 +603,54 @@ namespace proj {
     }
 
     inline unsigned Proj::multinomialDraw(const vector<double> & probs) {
-        // choose a random number [0,1]
+        // Compute cumulative probababilities
+        vector<double> cum_probs;
+        
+        cum_probs.resize(probs.size());
+        partial_sum(probs.begin(), probs.end(), cum_probs.begin());
+
+        // Draw a Uniform(0,1) random deviate
         double u = rng.uniform();
-        double cum_prob = 0.0;
-        int index = 0.0;
-        for (int i=0; i < (int) probs.size(); i++) {
-            cum_prob += exp(probs[i]);
-            if (u <= cum_prob) {
-                index = i;
-                break;
-            }
-        }
-        // return index of choice
-        return index;
+
+        // Find first element in _cumprobs greater than u
+        // e.g. probs = {0.2, 0.3, 0.4, 0.1}, u = 0.6, should return 2
+        // because u falls in the third bin
+        //
+        //   |   0   |     1     |        2      | 3 | <-- bins
+        //   |---+---+---+---+---+---+---+---+---+---|
+        //   |       |           |   |           |   |
+        //   0      0.2         0.5  |          0.9  1 <-- cumulative probabilities
+        //                          0.6                <-- u
+        //
+        // cum_probs = {0.2, 0.5, 0.9, 1.0}, u = 0.6
+        //               |         |
+        //               begin()   it
+        // returns 2 = 2 - 0
+        auto it = find_if(cum_probs.begin(), cum_probs.end(), [u](double cumpr){return cumpr > u;});
+                
+        assert(it != cum_probs.end());
+        
+        return (unsigned)std::distance(cum_probs.begin(), it);
     }
+
+
+//
+//    inline unsigned Proj::multinomialDraw(const vector<double> & probs) {
+//        // choose a random number [0,1]
+//        double u = rng.uniform();
+//        double cum_prob = 0.0;
+//        int index = 0.0;
+//        for (int i=0; i < (int) probs.size(); i++) {
+//            cum_prob += exp(probs[i]);
+//            if (u <= cum_prob) {
+//                index = i;
+//                break;
+//            }
+//        }
+//        // return index of choice
+//        cout << "index: " << index << endl;
+//        return index;
+//    }
 
     inline Particle::SharedPtr Proj::chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species) {
         // get species tree weights
@@ -1240,13 +1325,19 @@ namespace proj {
                         
                         if (_estimate_theta) {
                             // try multiple theta values
-                            double delta = 0.01;
+                            double delta_theta = 0.1;
                             vector<Particle> gene_particles;
                             for (int s=1; s<nsubsets+1; s++) {
                                 gene_particles.push_back(*my_vec[s][0]); // all gene trees are the same at this point, preserved from previous round of filtering
                             }
                             
-                            updateTheta(*species_tree_particle, _ntries_theta, delta, gene_particles);
+                            updateTheta(*species_tree_particle, _ntries_theta, delta_theta, gene_particles);
+                        }
+                        
+                        if (_estimate_speciation_rate) {
+                            int ntries_lambda = 100;
+                            double delta_lambda = 10.0;
+                            updateLambda(*species_tree_particle, ntries_lambda, delta_lambda);
                         }
             
                         // delete extra particles
@@ -1459,11 +1550,6 @@ namespace proj {
 
 //                        saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0], my_vec[4][0]); // save species tree and associated gene trees
                     } // s loop
-                    // TODO: decide to accept or reject new lambda?
-                    if (_estimate_speciation_rate) {
-                        double proposed_speciation_rate = updateLambda();
-                        acceptLambda(proposed_speciation_rate);
-                    }
                     
                     if (i == _niterations - 2) {
                         writeSpeciesTreeLoradFile(my_vec[0], nspecies);
