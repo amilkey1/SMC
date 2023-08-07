@@ -10,7 +10,6 @@
 #include <thread>
 #include <mutex>
 #include <algorithm>
-#include "tree_summary.hpp"
 
 #include "lot.hpp"
 extern proj::Lot rng;
@@ -167,6 +166,7 @@ class Forest {
         vector<pair<double, pair<string, string>>>              _depths;
         double                      _gene_tree_log_coalescent_likelihood;
         double                      _panmictic_coalescent_likelihood;
+        int                         _nincrements = 0;
 
         double                      calcTransitionProbability(Node* child, double s, double s_child);
         double                      calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
@@ -177,8 +177,6 @@ class Forest {
         void                        deconstructGeneTree();
         void                        refreshPreorder();
         double                      calcLogCoalLikeGivenTheta(double proposed_theta, vector<pair<tuple<string, string, string>, double>> species_info, bool both);
-
-        int                         _nincrements = 0;
 
     public:
 
@@ -1851,12 +1849,9 @@ class Forest {
                             double log_prob_join = log(2/nChooseTwo);
                             double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
                             log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
-                            
-//                            cout << "pr coalescence = " << log_prob_join + log(coalescence_rate) - (increment * coalescence_rate) << endl;
 
                             updateNodeList(s.second, node, node->_right_sib, node->_parent); // update the species lineage
                             a++;
-//                            nincrements++;
                             cum_time += increment;
                         }
                             // no deep coalescence to deal with

@@ -426,7 +426,6 @@ class Particle {
             }
         }
         
-        
         else {
             buildEntireSpeciesTree();
         }
@@ -593,11 +592,9 @@ class Particle {
         return priors;
     }
 
-
     inline vector<double> Particle::getGeneTreeLogLikelihoods() {
         vector<double> gene_tree_log_likelihoods;
         gene_tree_log_likelihoods.push_back(_forest._gene_tree_log_likelihood);
-//        gene_tree_log_likelihoods.push_back(_forest._gene_tree_log_likelihood);
         return gene_tree_log_likelihoods;
     }
 
@@ -610,7 +607,7 @@ class Particle {
     inline vector<double> Particle::getTopologyPriors() {
         // calculate species tree topology probability
         vector<double> topology_priors;
-        topology_priors.push_back(_forest._log_joining_prob); // TODO: I don't think this is correct for multiple genes
+        topology_priors.push_back(_forest._log_joining_prob);
         return topology_priors;
     }
 
@@ -669,7 +666,6 @@ class Particle {
             }
         }
     }
-
 
     inline void Particle::resetGeneTreePartials(Data::SharedPtr d, map<string, string> taxon_map, int i) {
         assert (_name != "species");

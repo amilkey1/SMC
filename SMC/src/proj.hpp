@@ -11,7 +11,6 @@
 #include <vector>
 #include <thread>
 #include <boost/algorithm/string/split.hpp>
-#include "tree_summary.hpp"
 
 using namespace std;
 using namespace boost;
