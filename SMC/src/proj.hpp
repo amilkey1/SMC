@@ -58,8 +58,8 @@ namespace proj {
             void                updateLambda(Particle & species_particle, unsigned ntries, double delta);
             double              calcLogSum(vector<double> vec);
             unsigned            multinomialDraw (const vector<double> & probs);
-            void                buildGeneTrees(vector<vector<Particle::SharedPtr>> my_vec, vector<vector<Particle::SharedPtr>> my_vec_1, vector<vector<Particle::SharedPtr>> my_vec_2, int nsubsets, int nparticles, int ntaxa);
             void                proposeGeneParticlesFromPrior(vector<Particle::SharedPtr> &particles);
+            void                proposeGeneParticlesFromPriorRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
         
         private:
 
@@ -595,7 +595,7 @@ namespace proj {
         partial_sum(probs.begin(), probs.end(), cum_probs.begin());
         
         // last element of cum_probs should hold 1
-        assert((cum_probs.back() - 1.0) < 0.0001);
+        assert((cum_probs.back() - 1.0) < _small_enough);
 
         // Draw a Uniform(0,1) random deviate
         double u = rng.uniform();
@@ -977,58 +977,52 @@ namespace proj {
         setNumberTaxa(_data);
     }
 
-    void Proj::buildGeneTrees(vector<vector<Particle::SharedPtr>> my_vec, vector<vector<Particle::SharedPtr>> my_vec_1, vector<vector<Particle::SharedPtr>> my_vec_2, int nsubsets, int nparticles, int ntaxa) {
+    inline void Proj::proposeGeneParticlesFromPriorRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles) {
         
-        bool use_first = true;
-        
-        for (unsigned g=0; g<ntaxa-1; g++) {
-            cout << "prior generation " << g << endl;
-            // filter particles within each gene
-            
-            for (int s=1; s<nsubsets+1; s++) { // skip species tree particles
-                
-                proposeGeneParticlesFromPrior(my_vec[s]);
-                
-                if (!_run_on_empty) {
-                    bool calc_marg_like = true;
-                    
-                    normalizeWeights(my_vec[s], "g", calc_marg_like);
-                    
-                    double ess_inverse = 0.0;
-                    
-                    for (int p=0; p<_nparticles; p++) {
-                        ess_inverse += exp(2.0*my_vec[s][p]->getLogWeight("g"));
-                    }
-
-//                                    double ess = 1.0/ess_inverse;
-//                                    cout << "   " << "ESS = " << ess << endl;
-                 
-                    resampleParticles(my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s], "g");
-                    //if use_first is true, my_vec = my_vec_2
-                    //if use_first is false, my_vec = my_vec_1
-                    
-                    my_vec[s] = use_first ? my_vec_2[s]:my_vec_1[s];
-                    // do not need to resample species trees; species tree will remain the same throughout all gene tree filtering
-                    
-                    assert(my_vec[s].size() == nparticles);
-//                                    assert(my_vec[s].size() == nparticles*_species_particles_per_gene_particle);
-                }
-                //change use_first from true to false or false to true
-                use_first = !use_first;
-                if (g < ntaxa-2) {
-                    resetWeights(my_vec[s], "g");
-                }
-                    assert (_accepted_particle_vec.size() == nsubsets+1);
-                    _accepted_particle_vec[s] = my_vec[s];
-                        saveParticleWeights(my_vec[0]);
-                } // s loop
-        } // g loop
+        for (unsigned i=first; i<last; i++){
+            particles[i]->sampleGeneTreePrior();
+        }
     }
 
     inline void Proj::proposeGeneParticlesFromPrior(vector<Particle::SharedPtr> &particles) {
-        for (auto &p:particles) {
-            p->sampleGeneTreePrior();
+        assert(_nthreads > 0);
+        
+        if (_nthreads == 1) {
+            for (auto &p:particles) {
+                p->sampleGeneTreePrior();
+            }
         }
+
+        else {
+          // divide up the particles as evenly as possible across threads
+          unsigned first = 0;
+          unsigned incr = _nparticles/_nthreads + (_nparticles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
+          unsigned last = incr;
+
+          // need a vector of threads because we have to wait for each one to finish
+          vector<thread> threads;
+
+            while (true) {
+            // create a thread to handle particles first through last - 1
+                threads.push_back(thread(&Proj::proposeGeneParticlesFromPriorRange, this, first, last, std::ref(particles)));
+                
+            // update first and last
+            first = last;
+            last += incr;
+            if (last > _nparticles) {
+              last = _nparticles;
+              }
+            if (first>=_nparticles) {
+                break;
+            }
+          }
+
+          // the join function causes this loop to pause until the ith thread finishes
+          for (unsigned i = 0; i < threads.size(); i++) {
+            threads[i].join();
+          }
+        }
+        
     }
 
     inline void Proj::run() {
@@ -1231,7 +1225,6 @@ namespace proj {
                             p->resetGeneTreePartials(_data, _taxon_map, s);
                         }
                     }
-//                    buildGeneTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nparticles, ntaxa);
                     for (unsigned g=0; g<ntaxa-1; g++) {
                         cout << "prior generation " << g << endl;
                         // filter particles within each gene
