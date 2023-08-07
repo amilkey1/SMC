@@ -194,6 +194,7 @@ class Forest {
         static double               _migration_rate;
         static double               _hybridization_rate;
         static string               _outgroup;
+        static double               _theta_prior_mean;
 };
 
 

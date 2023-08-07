@@ -450,6 +450,13 @@ namespace proj {
         // and species forest defined in p. Uses the algorithm presented in
         // https://en.wikipedia.org/wiki/Multiple-try_Metropolis
         // assuming a symmetric proposal (so that w(x,y) = pi(x)).
+        
+        cout << "\nUpdating theta...\n";
+
+       // r is the rate of the theta exponential prior
+       double prior_rate = 1.0/Forest::_theta_prior_mean; // TODO: how to set this?
+       double log_prior_rate = log(prior_rate);
+       double log_prior = log_prior_rate - prior_rate*Forest::_theta;
 
         // theta0 is the current global theta value
         double theta0 = Forest::_theta;
@@ -471,22 +478,21 @@ namespace proj {
             proposed_thetas[i] = q;
             double log_coalescent_likelihood = 0.0;
             for (int s=0; s<gene_particles.size(); s++) {
-                    gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
-                    gene_particles[s].refreshGeneTreePreorder();
-                    log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info, false);
-
-                }
-            logwstar[i] = log_coalescent_likelihood;
+                gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
+                gene_particles[s].refreshGeneTreePreorder();
+                log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info, false);
+            }
+            logwstar[i] = log_coalescent_likelihood + log_prior; // TODO: add log prior for each gene tree or just once?
         }
 
         // Compute log of the sum of the weights (this sum will form the
         // numerator of the acceptance ratio)
-        double log_sum_numer_weights = calcLogSum(logwstar);
+        double log_sum_denom_weights = calcLogSum(logwstar);
 
         // Normalize weights to create a discrete probability distribution
         vector<double> probs(ntries, 0.0);
-        transform(logwstar.begin(), logwstar.end(), probs.begin(), [log_sum_numer_weights](double logw){
-            return exp(logw - log_sum_numer_weights);
+        transform(logwstar.begin(), logwstar.end(), probs.begin(), [log_sum_denom_weights](double logw){
+            return exp(logw - log_sum_denom_weights);
         });
 
         // Choose one theta value from the probability distribution
@@ -495,33 +501,39 @@ namespace proj {
 
         // Sample ntries-1 new values of theta from symmetric proposal distribution
         // (window of width 2*delta centered on theta_star)
+        log_prior = log_prior_rate - prior_rate * theta0;
+        
         double log_coalescent_likelihood = 0.0;
+        
         for (int s=0; s<gene_particles.size(); s++) {
                 gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
                 gene_particles[s].refreshGeneTreePreorder();
                 log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(theta0, species_info, false);
-
             }
-        logwstar[0] = log_coalescent_likelihood;
         
-        for (unsigned i = 1; i < ntries; ++i) {
-            double q = theta_star - delta + 2.0*delta*rng.uniform();
-            if (q < 0.0)
+        logwstar[0] = log_coalescent_likelihood + log_prior;
+        
+        for (unsigned i=1; i<ntries; i++) {
+            double q = theta_star - delta + 2.0 * delta * rng.uniform();
+            if (q < 0.0) {
                 q = -q;
+            }
+            
+            log_prior = log_prior_rate - prior_rate * q;
             
             double log_coalescent_likelihood = 0.0;
             for (int s=0; s<gene_particles.size(); s++) {
-                    gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
-                    gene_particles[s].refreshGeneTreePreorder();
-                    log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info, false);
-
+                gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
+                gene_particles[s].refreshGeneTreePreorder();
+                log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info, false);
                 }
-            logwstar[i] = log_coalescent_likelihood;
+
+            logwstar[i] = log_coalescent_likelihood + log_prior;
         }
 
 //         Compute log of the sum of the weights (this sum will form
-        // the denominator of the acceptance ratio)
-        double log_sum_denom_weights = calcLogSum(logwstar);
+        // the numerator of the acceptance ratio)
+        double log_sum_numer_weights = calcLogSum(logwstar);
 
         // Compute acceptance ratio
         double logr = log_sum_numer_weights - log_sum_denom_weights;
@@ -533,6 +545,9 @@ namespace proj {
         if (accept) {
             Forest::_theta = theta_star;
             cout << str(format("\n*** new theta: %.5f\n") % theta_star);
+        }
+        else {
+            cout << str(format("  Theta unchanged: %.5f\n") % Forest::_theta);
         }
     }
 
