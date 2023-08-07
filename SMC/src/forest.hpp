@@ -75,7 +75,7 @@ class Forest {
         double                      getRunningSumChoices(vector<double> &log_weight_choices);
         double                      getRunningSumHybridChoices(vector<double> &log_weight_choices);
         vector<double>              reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
-    pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
+        pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
         int                         selectPair(vector<double> weight_vec);
         void                        chooseSpeciesIncrement(double max_depth);
         void                        addSpeciesIncrement();
@@ -163,7 +163,6 @@ class Forest {
         double                      _extended_increment;
         int                         _species_join_number;
         double                      _prev_gene_tree_log_likelihood;
-        vector<pair<string, string>>        _names_of_species_joined;
         bool                        _ready_to_join_species;
         vector<Node*>               _preorder;
         vector<pair<double, pair<string, string>>>              _depths;
@@ -2280,7 +2279,6 @@ class Forest {
         _extended_increment = other._extended_increment;
         _species_join_number = other._species_join_number;
         _prev_gene_tree_log_likelihood = other._prev_gene_tree_log_likelihood;
-        _names_of_species_joined = other._names_of_species_joined;
         _ready_to_join_species = other._ready_to_join_species;
         _depths = other._depths;
         _nincrements = other._nincrements;
@@ -2661,8 +2659,6 @@ class Forest {
              _species_partition.erase(species1);
              _species_partition.erase(species2);
 
-             _names_of_species_joined.push_back(make_pair(species1, species2));
-
              species_increment = species_info[_species_join_number].second;
          }
          
@@ -2726,9 +2722,7 @@ class Forest {
                  copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
                  _species_partition.erase(species1);
                  _species_partition.erase(species2);
-                 
-                 _names_of_species_joined.push_back(make_pair(species1, species2));
-                 
+                                  
                  species_increment = species_info[_species_join_number].second;
                  assert (species_increment >= 0.0);
                  

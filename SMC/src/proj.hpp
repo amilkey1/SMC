@@ -595,6 +595,9 @@ namespace proj {
         partial_sum(probs.begin(), probs.end(), cum_probs.begin());
         
         // last element of cum_probs should hold 1
+        if (abs(cum_probs.back() - 1.0) > _small_enough) {
+            cout << "last element of cum_probs is " << cum_probs.back() << endl;
+        }
         assert(abs((cum_probs.back() - 1.0)) < _small_enough);
 
         // Draw a Uniform(0,1) random deviate
