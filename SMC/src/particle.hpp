@@ -194,8 +194,6 @@ class Particle {
         log_likelihood += gene_tree_log_likelihood;
         log_likelihood += _forest._gene_tree_log_coalescent_likelihood;
 
-        // set _generation for each forest
-        _forest.setGeneration(_generation);
         _generation++;
         return log_likelihood;
     }
@@ -261,7 +259,6 @@ class Particle {
         else {
             return _log_weight;
         }
-        
     }
 
     inline void Particle::setLogWeight(double w, string a) {
@@ -271,7 +268,6 @@ class Particle {
         else {
             _log_weight = w;
         }
-        
     }
 
     inline tuple<string, string, string> Particle::speciesTopologyProposal() {
@@ -368,12 +364,10 @@ class Particle {
         }
     }
 
-
     inline void Particle::calcParticleWeight() {
         // particle weight is the forest weight
         _log_weight = _forest._gene_tree_log_weight;
     }
-
 
     inline Particle::Particle(const Particle & other) {
         *this = other;

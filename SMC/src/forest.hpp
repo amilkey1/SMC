@@ -59,7 +59,7 @@ class Forest {
         std::string                 makeNewick(unsigned precision, bool use_names);
         pair<unsigned, unsigned>    chooseTaxaToJoin(double s);
         tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> p, list<Node*> node_list, double increment, string species, bool first);
-        tuple<Node*, Node*, Node*>    createNewSubtreeFromPrior(pair<unsigned, unsigned> p, double increment);
+        tuple<Node*, Node*, Node*>  createNewSubtreeFromPrior(pair<unsigned, unsigned> p, double increment);
         void                        calcPartialArray(Node* new_nd);
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
@@ -80,7 +80,6 @@ class Forest {
         void                        addSpeciesIncrement();
         string                      chooseEvent();
         void                        allowMigration(list<Node*> &nodes);
-        void                        setGeneration(double g) {_generationf = g;}
         double                      chooseTaxonToMigrate(double s);
         string                      findKeyToDel(Node* taxon_to_migrate);
         void                        migrateTaxon(unsigned taxon_choice, string key_to_del, Node* taxon_to_migrate);
@@ -151,7 +150,6 @@ class Forest {
         vector<double>              _log_likelihood_choices;
         int                         _index_of_choice;
         tuple<Node*, Node*, Node*>  _hybrid_species_joined;
-        double                      _generationf = 0;
         string                      _last_direction;
         vector<pair<double, double>>    _increments;
         double                      _topology_prior;
@@ -1829,7 +1827,7 @@ class Forest {
                 assert (_species_partition.size() == 1);
                 for (int i=nincrements; i<heights_and_nodes.size(); i++) {
                     // there must be coalescence at this point
-                    Node* node;
+                    Node* node = nullptr;
                     string species;
                     bool found = false;
                     for (auto &s:_species_partition) {
@@ -1977,7 +1975,7 @@ class Forest {
             assert (_species_partition.size() == 1);
             for (int i=_nincrements; i<heights_and_nodes.size(); i++) {
                 // there must be coalescence at this point
-                Node* node;
+                Node* node = nullptr;
                 string species;
                 for (auto &s:_species_partition) {
                     for (auto &nd:s.second) {
@@ -2257,7 +2255,6 @@ class Forest {
         _migration_rate = other._migration_rate;
         _hybridization_rate = other._hybridization_rate;
         _last_direction = other._last_direction;
-        _generationf = other._generationf;
         _gamma = other._gamma;
         _gene_tree_log_weight = other._gene_tree_log_weight;
         _prev_log_likelihood = other._prev_log_likelihood;
@@ -2436,8 +2433,8 @@ class Forest {
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
         // this function creates a new node and joins two species
 
-        Node* subtree1;
-        Node* subtree2;
+        Node* subtree1 = nullptr;
+        Node* subtree2 = nullptr;
         
         bool done = false;
         while (!done) {
@@ -3669,7 +3666,6 @@ class Forest {
         _gene_tree_log_weight = 0.0;
         _gene_tree_log_likelihood = 0.0;
         _node_choices.clear();
-        _generationf = 0;
         _extended_increment = 0.0;
         _prev_gene_tree_log_likelihood = 0.0;
         _ready_to_join_species = false;
@@ -3715,7 +3711,6 @@ class Forest {
         _gene_tree_log_weight = 0.0;
         _gene_tree_log_likelihood = 0.0;
         _node_choices.clear();
-        _generationf = 0;
         _extended_increment = 0.0;
         _prev_gene_tree_log_likelihood = 0.0;
         _ready_to_join_species = false;
