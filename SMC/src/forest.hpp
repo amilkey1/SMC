@@ -2400,11 +2400,8 @@ class Forest {
             
             double u = rng.uniform();
             double inner_term = 1-exp(-rate*max_depth);
-    //        double exp = rng.gamma(1.0, 1.0/(rate*max_depth));
             _last_edge_length = -log(1-u*inner_term)/rate;
             assert (_last_edge_length < max_depth);
-
-    //        _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
             for (auto nd:_lineages) {
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
@@ -2414,8 +2411,6 @@ class Forest {
             double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
             
             _increments.push_back(make_pair(_last_edge_length, increment_prior));
-            
-//            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
         }
         else {
             // hybridization prior
@@ -2481,7 +2476,7 @@ class Forest {
     inline void Forest::setUpGeneForest(map<string, string> &taxon_map) {
         assert (_index >0);
         _species_partition.clear();
-//        for (auto nd:_lineages) {
+        
         for (auto &nd:_nodes) {
             if (!nd._left_child) {
                 string species_name = taxon_map[nd._name];
@@ -2494,16 +2489,15 @@ class Forest {
     inline void Forest::drawFromGeneTreePrior() {
         assert (_lineages.size() > 1);
         
-//        while (_lineages.size() > 1) {
-            double coalescence_rate = (_lineages.size()*(_lineages.size() - 1)) / _theta;
+        double coalescence_rate = (_lineages.size()*(_lineages.size() - 1)) / _theta;
+        
+        double increment = rng.gamma(1.0, 1.0/(coalescence_rate));
+        
+        for (auto &nd:_lineages) {
+            nd->_edge_length += increment;
+        }
             
-            double increment = rng.gamma(1.0, 1.0/(coalescence_rate));
-            
-            for (auto &nd:_lineages) {
-                nd->_edge_length += increment;
-            }
-            
-            // choose taxa to join
+        // choose taxa to join
         Node* subtree1;
         Node* subtree2;
         
@@ -2514,6 +2508,7 @@ class Forest {
             subtree1 = _lineages[t.first];
             subtree2 = _lineages[t.second];
         }
+        
         else {
             if (_lineages.size() != _ntaxa) {
                 _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
@@ -2527,35 +2522,33 @@ class Forest {
             subtree2 = t.second;
         }
             
-            assert (subtree1 != subtree2);
-            
-            //new node is always needed
-            Node nd;
-            _nodes.push_back(nd);
-            Node* new_nd = &_nodes.back();
+        assert (subtree1 != subtree2);
+        
+        //new node is always needed
+        Node nd;
+        _nodes.push_back(nd);
+        Node* new_nd = &_nodes.back();
 
-            new_nd->_parent=0;
-            new_nd->_number=_nleaves+_ninternals;
-            new_nd->_edge_length=0.0;
-            _ninternals++;
-            new_nd->_right_sib=0;
+        new_nd->_parent=0;
+        new_nd->_number=_nleaves+_ninternals;
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+        new_nd->_right_sib=0;
 
-            new_nd->_left_child=subtree1;
-            subtree1->_right_sib=subtree2;
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
 
-            subtree1->_parent=new_nd;
-            subtree2->_parent=new_nd;
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
 
-            //always calculating partials now
-            assert (new_nd->_partial == nullptr);
-            new_nd->_partial=ps.getPartial(_npatterns*4);
-            assert(new_nd->_left_child->_right_sib);
-            
-//            _new_nodes.push_back(new_nd);
+        //always calculating partials now
+        assert (new_nd->_partial == nullptr);
+        new_nd->_partial=ps.getPartial(_npatterns*4);
+        assert(new_nd->_left_child->_right_sib);
+        
+        //update species list
+        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
 
-            //update species list
-            updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-//        }
         calcPartialArray(new_nd);
         calcLogLikelihood();
     }

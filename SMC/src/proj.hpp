@@ -30,7 +30,6 @@ namespace proj {
             void                clear();
             void                processCommandLineOptions(int argc, const char * argv[]);
             void                run();
-            void                saveAllForests(vector<Particle::SharedPtr> &v) const ;
             void                saveParticleWeights(vector<Particle::SharedPtr> &v) const;
             void                saveParticleLikelihoods(vector<Particle::SharedPtr> &v) const;
 
@@ -52,7 +51,7 @@ namespace proj {
             void                writeSpeciesTreeLoradFile(vector<Particle::SharedPtr> species_particles, int nspecies);
             void                setStartingVariables();
             void                setUpInitialData();
-            void                saveGeneAndSpeciesTrees(Particle::SharedPtr species_particle, Particle::SharedPtr gene1, Particle::SharedPtr gene2, Particle::SharedPtr gene3, Particle::SharedPtr gene4);
+            void                saveGeneAndSpeciesTrees(vector<Particle::SharedPtr> particles);
             void                updateTheta(Particle & species_particle, unsigned ntries, double delta, vector<Particle> & gene_particles);
             void                updateLambda(Particle & species_particle, unsigned ntries, double delta);
             double              calcLogSum(vector<double> vec);
@@ -65,8 +64,6 @@ namespace proj {
             std::string                 _data_file_name;
             Partition::SharedPtr        _partition;
             Data::SharedPtr             _data;
-            double                      _prev_log_marginal_likelihood = 0.0;
-            bool                        _use_gpu;
             bool                        _ambig_missing;
             unsigned                    _nparticles;
             unsigned                    _random_seed;
@@ -97,7 +94,6 @@ namespace proj {
             string                      _species_newicks_name;
             string                      _gene_newicks_names;
             int                         _species_particles_per_gene_particle;
-            double                      _prev_species_tree_log_marginal_likelihood;
             bool                        _sample_from_gene_tree_prior;
             bool                        _sample_from_species_tree_prior;
     };
@@ -114,23 +110,11 @@ namespace proj {
     inline void Proj::clear() {
         _data_file_name = "";
         _partition.reset(new Partition());
-        _use_gpu        = true;
         _ambig_missing  = true;
         _nparticles = 50000;
         _data = nullptr;
         _small_enough = 0.0000001;
     }
-
-    inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
-            ofstream treef("forest.trees");
-            treef << "#nexus\n\n";
-            treef << "begin trees;\n";
-            for (auto &p:v) {
-                treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
-            }
-            treef << "end;\n";
-            treef.close();
-        }
 
     inline void Proj::saveAllHybridNodes(vector<Particle::SharedPtr> &v) const {
         ofstream nodef("nodes.txt");
@@ -141,24 +125,23 @@ namespace proj {
         nodef.close();
     }
 
-    inline void Proj::saveGeneAndSpeciesTrees(Particle::SharedPtr species_particle, Particle::SharedPtr gene1, Particle::SharedPtr gene2, Particle::SharedPtr gene3, Particle::SharedPtr gene4) {
-        // TODO: only works for one data set
+    inline void Proj::saveGeneAndSpeciesTrees(vector<Particle::SharedPtr> particles) {
+        // this function takes one species tree and associated gene trees and prints out the newicks + coalescent likelihood
+
         ofstream testf("coalescent-likelihood.txt");
         testf << "params : " << endl;
-        testf << "\t" << "theta = 0.01" << endl;
-        testf << "\t" << "lambda = 2.0" << endl;
+        testf << "\t" << "theta = " << Forest::_theta << endl;
+        testf << "\t" << "lambda = " << Forest::_lambda << endl;
         
-        testf << "coalescent likelihood = " << species_particle->getCoalescentLikelihood() << endl;
+        testf << "coalescent likelihood = " << particles[0]->getCoalescentLikelihood() << endl;
         
-        testf << "species tree: " << species_particle->saveForestNewick() << endl;
+        testf << "species tree: " << particles[0]->saveForestNewick() << endl;
         testf << endl;
-        testf << "gene1: " << gene1->saveForestNewick() << endl;
-        testf << endl;
-        testf << "gene2: " << gene2->saveForestNewick() << endl;
-        testf << endl;
-        testf << "gene3: " << gene3->saveForestNewick() << endl;
-        testf << endl;
-        testf << "gene4: " << gene4->saveForestNewick() << endl;
+        
+        for (int s=1; s<particles.size(); s++) {
+            testf << "gene " << s << ": " << particles[s]->saveForestNewick() << endl;
+            testf << endl;
+        }
         
         testf.close();
         
@@ -169,10 +152,11 @@ namespace proj {
         
         ofstream weightf("weights.txt");
         weightf << "begin trees;" << endl;
-//        for (auto &p:v) {
+        
         for (int i=0; i<v.size(); i++) {
             weightf << "tree " << i << " = " << v[i]->getSpeciesNewick() << "; " << "\n";
         }
+        
         weightf << "end trees;" << endl;
         weightf.close();
         
@@ -206,7 +190,6 @@ namespace proj {
         ("version,v", "show program version")
         ("datafile,d",  boost::program_options::value(&_data_file_name)->required(), "name of a data file in NEXUS format")
         ("subset",  boost::program_options::value(&partition_subsets), "a string defining a partition subset, e.g. 'first:1-1234\3' or 'default[codon:standard]:1-3702'")
-        ("gpu",           boost::program_options::value(&_use_gpu)->default_value(true), "use GPU if available")
         ("ambigmissing",  boost::program_options::value(&_ambig_missing)->default_value(true), "treat all ambiguities as missing data")
         ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000), "number of particles")
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
@@ -1060,7 +1043,6 @@ namespace proj {
                 _accepted_particle_vec.push_back(vector<Particle::SharedPtr>(nparticles));
             }
             
-            _prev_log_marginal_likelihood = _log_marginal_likelihood;
             _log_marginal_likelihood = 0.0;
         
             for (unsigned s=0; s<nsubsets+1; s++) {
@@ -1171,7 +1153,6 @@ namespace proj {
             bool deconstruct = false;
             
             for (int i=0; i<_niterations; i++) {
-                _prev_species_tree_log_marginal_likelihood = _species_tree_log_marginal_likelihood;
                 _species_tree_log_marginal_likelihood = 0.0;
                 _log_marginal_likelihood = 0.0;
                 cout << "beginning iteration: " << i << endl;
@@ -1510,7 +1491,6 @@ namespace proj {
                         _accepted_particle_vec[0] = my_vec[0];
                         start = "species";
 
-//                        saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0], my_vec[4][0]); // save species tree and associated gene trees
                     } // s loop
                     
                     if (i == _niterations - 2) {
@@ -1523,9 +1503,7 @@ namespace proj {
             writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
             
             writeGeneTreeFile();
-            
-//            saveGeneAndSpeciesTrees(my_vec[0][0], my_vec[1][0], my_vec[2][0], my_vec[3][0]);
-            
+                        
             // saveParticleWeights(_accepted_particle_vec);
             // saveParticleLikelihoods(_accepted_particle_vec);
 
