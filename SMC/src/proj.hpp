@@ -490,7 +490,7 @@ namespace proj {
         cout << "\nUpdating theta...\n";
 
        // r is the rate of the theta exponential prior
-       double prior_rate = 1.0/Forest::_theta_prior_mean; // TODO: how to set this?
+       double prior_rate = 1.0/Forest::_theta_prior_mean;
        double log_prior_rate = log(prior_rate);
        double log_prior = log_prior_rate - prior_rate*Forest::_theta;
 
@@ -595,7 +595,7 @@ namespace proj {
         partial_sum(probs.begin(), probs.end(), cum_probs.begin());
         
         // last element of cum_probs should hold 1
-        assert((cum_probs.back() - 1.0) < _small_enough);
+        assert(abs((cum_probs.back() - 1.0)) < _small_enough);
 
         // Draw a Uniform(0,1) random deviate
         double u = rng.uniform();
