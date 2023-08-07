@@ -106,7 +106,7 @@ class Particle {
         double                                          calcCoalLikeForNewTheta(double proposed_theta, vector<pair<tuple<string, string, string>, double>> species_info, bool both);
         void                                            buildEntireGeneTree();
         void                                            sampleGeneTreePrior();
-        double                                          calcLogSpeciesTreeDensityGivenLambda(double speciation_rate);
+        double                                          calcLogSpeciesTreeDensityGivenLambda(double lambda);
     
     private:
 
@@ -693,15 +693,15 @@ class Particle {
         _forest.refreshPreorder();
     }
 
-    inline double Particle::calcLogSpeciesTreeDensityGivenLambda(double speciation_rate) {
+    inline double Particle::calcLogSpeciesTreeDensityGivenLambda(double lambda) {
         assert (_name == "species");
         
-         double prev_speciation_rate = Forest::_speciation_rate;
-         Forest::_speciation_rate = speciation_rate;
+         double prev_lambda = Forest::_lambda;
+         Forest::_lambda = lambda;
          
-         double log_density = _forest.calcLogSpeciesTreeDensity(speciation_rate);
+         double log_density = _forest.calcLogSpeciesTreeDensity(lambda);
          
-         Forest::_speciation_rate = prev_speciation_rate;
+         Forest::_lambda = prev_lambda;
         
          return log_density;
     }

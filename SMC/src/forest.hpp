@@ -125,7 +125,7 @@ class Forest {
         vector<string>              setUpExistingLineagesVector();
         void                        chooseSpeciesIncrementFromNewick(vector<string> existing_lineages);
         void                        drawFromGeneTreePrior();
-        double                      calcLogSpeciesTreeDensity(double speciation_rate);
+        double                      calcLogSpeciesTreeDensity(double lambda);
         void                        setIndex(int n) {_index = n;}
 
         std::vector<Node *>         _lineages;
@@ -187,7 +187,7 @@ class Forest {
 
         typedef std::shared_ptr<Forest> SharedPtr;
         static double               _theta;
-        static double               _speciation_rate;
+        static double               _lambda;
         static string               _proposal;
         static string               _model;
         static double               _kappa;
@@ -197,7 +197,7 @@ class Forest {
         static double               _hybridization_rate;
         static string               _outgroup;
         static double               _theta_prior_mean;
-        static double               _speciation_rate_prior_mean;
+        static double               _lambda_prior_mean;
 };
 
 
@@ -1247,7 +1247,7 @@ class Forest {
         int nlineages = (int) existing_lineages.size();
         
         // hybridization prior
-        double rate = (_speciation_rate + _hybridization_rate)*nlineages;
+        double rate = (_lambda + _hybridization_rate)*nlineages;
 
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
@@ -2409,7 +2409,7 @@ class Forest {
         assert (max_depth >= 0.0);
         if (max_depth > 0.0) {
             // hybridization prior
-            double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
+            double rate = (_lambda+_hybridization_rate)*_lineages.size();
             
             double u = rng.uniform();
             double inner_term = 1-exp(-rate*max_depth);
@@ -2432,7 +2432,7 @@ class Forest {
         }
         else {
             // hybridization prior
-            double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
+            double rate = (_lambda +_hybridization_rate)*_lineages.size();
 
             _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
@@ -2590,7 +2590,7 @@ class Forest {
         calcLogLikelihood();
     }
 
-    inline double Forest::calcLogSpeciesTreeDensity(double speciation_rate) {
+    inline double Forest::calcLogSpeciesTreeDensity(double lambda) {
         assert (_index == 0);
         
         refreshPreorder();
@@ -2618,7 +2618,7 @@ class Forest {
         double h0 = 0.0;
         for (auto it = internal_heights.begin(); it != internal_heights.end(); ++it) {
             double h = *it;
-            double r = speciation_rate*n;
+            double r = lambda * n;
             double logr = log(r);
             double t = h - h0;
             double log_exponential_density = logr - r*t;
@@ -3597,7 +3597,7 @@ class Forest {
     }
 
     inline void Forest::addSpeciesIncrement() {
-        double rate = (_speciation_rate)*_lineages.size();
+        double rate = (_lambda)*_lineages.size();
 
         // choose edge length but don't add it yet
         _last_edge_length = rng.gamma(1.0, 1.0/rate);

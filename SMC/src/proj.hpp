@@ -76,7 +76,7 @@ namespace proj {
             double                      _species_tree_log_marginal_likelihood;
             bool                        _run_on_empty;
             bool                        _estimate_theta;
-            bool                        _estimate_speciation_rate;
+            bool                        _estimate_lambda;
             int                         _ntries_theta;
             int                         _ntries_lambda;
 
@@ -88,22 +88,7 @@ namespace proj {
             double                      getRunningSum(const vector<double> &) const;
             vector<string>              _species_names;
             map<string, string>         _taxon_map;
-            double                      _prev_speciation_rate = 0.0;
-            double                      _prev_hybridization_rate = 0.0;
             vector<vector<Particle::SharedPtr>>            _accepted_particle_vec;
-            vector<Particle::SharedPtr>            _prev_particles;
-            vector<pair<double, double>>  _theta_vector;
-            vector<pair<double, double>>  _speciation_rate_vector;
-            vector<pair<double, double>> _hybridization_rate_vector;
-            double                      _theta_accepted_number = 0.0;
-            double                      _speciation_rate_accepted_number = 0.0;
-            double                      _hybridization_rate_accepted_number = 0.0;
-            int                         _nattempts = 0;
-            bool                        _tuning = true;
-            double                      _target_acceptance = 0.3;
-            double                      _theta_lambda;
-            double                      _speciation_rate_lambda;
-            double                      _hybrid_rate_lambda;
             unsigned                    _nthreads;
             double                      _hybridization_rate;
             void                        handleBaseFrequencies();
@@ -113,7 +98,6 @@ namespace proj {
             string                      _species_newicks_name;
             string                      _gene_newicks_names;
             int                         _species_particles_per_gene_particle;
-            double                      _prev_speciation_rate_prior;
             double                      _prev_species_tree_log_marginal_likelihood;
             bool                        _sample_from_gene_tree_prior;
             bool                        _sample_from_species_tree_prior;
@@ -228,7 +212,7 @@ namespace proj {
         ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000), "number of particles")
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
         ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.05), "theta")
-        ("speciation_rate", boost::program_options::value(&Forest::_speciation_rate)->default_value(1), "speciation rate")
+        ("lambda", boost::program_options::value(&Forest::_lambda)->default_value(1), "lambda (speciation rate)")
         ("proposal",  boost::program_options::value(&Forest::_proposal)->default_value("prior-post"), "a string defining a proposal (prior-prior or prior-post or prior-post-ish)")
         ("model", boost::program_options::value(&Forest::_model)->default_value("JC"), "a string defining a substitution model")
         ("kappa",  boost::program_options::value(&Forest::_kappa)->default_value(1.0), "value of kappa")
@@ -243,7 +227,7 @@ namespace proj {
         ("species_particles_per_gene_particle", boost::program_options::value(&_species_particles_per_gene_particle)->default_value(1), "increase number of particles for species trees by this amount")
         ("outgroup", boost::program_options::value(&Forest::_outgroup)->default_value("null"), "specify outgroup in species tree")
         ("estimate_theta", boost::program_options::value(&_estimate_theta)->default_value(false), "estimate theta parameter")
-        ("estimate_speciation_rate", boost::program_options::value(&_estimate_speciation_rate)->default_value(false), "estimate speciation rate parameter")
+        ("estimate_lambda", boost::program_options::value(&_estimate_lambda)->default_value(false), "estimate lambda parameter")
         ("ntries_theta", boost::program_options::value(&_ntries_theta)->default_value(50), "specify number of values of theta to try")
         ("ntries_lambda", boost::program_options::value(&_ntries_lambda)->default_value(50), "specify number of values of lambda to try")
         ("start_from_gene_tree_prior", boost::program_options::value(&_sample_from_gene_tree_prior)->default_value(false), "specify starting from gene tree prior")
@@ -414,7 +398,7 @@ namespace proj {
     }
 
     inline void Proj::updateLambda(Particle & species_particle, unsigned ntries, double delta) {
-        assert (_estimate_speciation_rate);
+        assert (_estimate_lambda);
         
         // Use multiple-try Metropolis to update lambda conditional on the
         // species forest defined in p. Uses the algorithm presented in
@@ -424,13 +408,13 @@ namespace proj {
         cout << "\nUpdating lambda...\n";
 
         // r is the rate of the lambda exponential prior
-        double prior_rate = 1.0/Forest::_speciation_rate_prior_mean;
+        double prior_rate = 1.0/Forest::_lambda_prior_mean;
         double log_prior_rate = log(prior_rate);
-        double log_prior = log_prior_rate - prior_rate*Forest::_speciation_rate;
+        double log_prior = log_prior_rate - prior_rate*Forest::_lambda;
         double log_likelihood = 0.0;
 
         // lambda0 is the current global lambda value
-        double lambda0 = Forest::_speciation_rate;
+        double lambda0 = Forest::_lambda;
         
         // Sample ntries new values of lambda from symmetric proposal distribution
         // (window of width 2*delta centered on lambda0). Compute weights (coalescent
@@ -488,11 +472,11 @@ namespace proj {
             accept = logu < logr;
         }
         if (accept) {
-            Forest::_speciation_rate = lambda_star;
-            cout << str(format("  New lambda: %.5f\n") % Forest::_speciation_rate);
+            Forest::_lambda = lambda_star;
+            cout << str(format("  New lambda: %.5f\n") % Forest::_lambda);
         }
         else {
-            cout << str(format("  Lambda unchanged: %.5f\n") % Forest::_speciation_rate);
+            cout << str(format("  Lambda unchanged: %.5f\n") % Forest::_lambda);
         }
     }
 
@@ -815,7 +799,7 @@ namespace proj {
         cout << "mean height equals " << sum_h << endl;
         cout << "log marginal likelihood = " << setprecision(12) << _log_marginal_likelihood << endl;
         cout << "theta = " << Forest::_theta << endl;
-        cout << "speciation rate = " << Forest::_speciation_rate << endl;
+        cout << "speciation rate = " << Forest::_lambda << endl;
         cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
     }
 
@@ -1319,7 +1303,7 @@ namespace proj {
                             updateTheta(*species_tree_particle, _ntries_theta, delta_theta, gene_particles);
                         }
                         
-                        if (_estimate_speciation_rate) {
+                        if (_estimate_lambda) {
                             double delta_lambda = 10.0;
                             updateLambda(*species_tree_particle, _ntries_lambda, delta_lambda);
                         }
