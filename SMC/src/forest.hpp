@@ -77,8 +77,8 @@ class Forest {
         vector<double>              reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
     pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
         int                         selectPair(vector<double> weight_vec);
-        void                        chooseSpeciesIncrement(double max_depth, bool short_tree);
-        void                        addSpeciesIncrement(bool short_tree);
+        void                        chooseSpeciesIncrement(double max_depth);
+        void                        addSpeciesIncrement();
         string                      chooseEvent();
         void                        allowMigration(list<Node*> &nodes);
         void                        setGeneration(double g) {_generationf = g;}
@@ -2405,7 +2405,7 @@ class Forest {
         _lineages.resize(_nspecies);
     }
 
-    inline void Forest::chooseSpeciesIncrement(double max_depth, bool short_tree) {
+    inline void Forest::chooseSpeciesIncrement(double max_depth) {
         assert (max_depth >= 0.0);
         if (max_depth > 0.0) {
             // hybridization prior
@@ -2433,9 +2433,6 @@ class Forest {
         else {
             // hybridization prior
             double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
-            if (short_tree) {
-                rate = (_speciation_rate*100+_hybridization_rate)*_lineages.size();
-            }
 
             _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
@@ -3599,13 +3596,8 @@ class Forest {
         return hybridized_nodes;
     }
 
-    inline void Forest::addSpeciesIncrement(bool short_tree) {
+    inline void Forest::addSpeciesIncrement() {
         double rate = (_speciation_rate)*_lineages.size();
-        if (short_tree) {
-            // artificially inflate lambda for first gen if sampling from prior
-            rate = (_speciation_rate*100)*_lineages.size();
-            
-        }
 
         // choose edge length but don't add it yet
         _last_edge_length = rng.gamma(1.0, 1.0/rate);

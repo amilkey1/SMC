@@ -342,7 +342,7 @@ class Particle {
         
         if (_forest._lineages.size() > 1) {
             assert (max_depth > 0.0);
-            _forest.chooseSpeciesIncrement(max_depth, false);
+            _forest.chooseSpeciesIncrement(max_depth);
             _species_tree_height += _forest._last_edge_length;
         }
         
@@ -488,7 +488,7 @@ class Particle {
     inline void Particle::hybridizationProposal() {
         vector<string> hybridized_nodes = _forest.hybridizeSpecies();
         if (_forest._lineages.size()>1) {
-            _forest.addSpeciesIncrement(false);
+            _forest.addSpeciesIncrement();
         }
         _forest.hybridizeGene(hybridized_nodes, _forest._last_edge_length);
         calculateGamma();
@@ -651,8 +651,7 @@ class Particle {
         assert (_name == "species");
         
         double max_depth = 0.0;
-//        _forest.chooseSpeciesIncrement(max_depth, true);
-        _forest.chooseSpeciesIncrement(max_depth, false);
+        _forest.chooseSpeciesIncrement(max_depth);
         double edge_len = _forest._last_edge_length;
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
@@ -664,8 +663,7 @@ class Particle {
                 
                 // if the species tree is not finished, add another species increment
                 if (_forest._lineages.size()>1) {
-//                    _forest.addSpeciesIncrement(true);
-                    _forest.addSpeciesIncrement(false);
+                    _forest.addSpeciesIncrement();
                 }
                 
                 double edge_len = 0.0;
