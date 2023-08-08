@@ -289,7 +289,7 @@ namespace proj {
             try {
                 int_value = std::stoi(str_value);
             }
-            catch(std::invalid_argument) {
+            catch(std::invalid_argument &) {
                 throw XProj(boost::format("Could not interpret \"%s\" as a number in partition subset definition") % s.str());
             }
             
