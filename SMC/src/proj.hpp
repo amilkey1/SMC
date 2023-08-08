@@ -1441,15 +1441,6 @@ namespace proj {
                                 sel_gene_treesf << "gene : " << s << " " << my_vec[s][0]->saveForestNewick();
                             }
                             sel_gene_treesf.close();
-                            
-                            int a = 0;
-                            ofstream first_species_incrementf("first_species_increment.txt");
-                            for (auto &p:my_vec[0]) {
-                                double increment = p->getSpeciesTreeHeight();
-                                first_species_incrementf << "particle " << a << " : " << increment << endl;
-                                a++;
-                            }
-                            first_species_incrementf.close();
                         }
 
                         // filter - make sure all gene trees go along with correct species tree
