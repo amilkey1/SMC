@@ -311,13 +311,13 @@ namespace proj {
         unsigned i = 0;
         vector<double> log_weight_vec(nparticles);
 
-        for (int p=0; p<nparticles; p++ ) {
+        for (unsigned p=0; p<nparticles; p++ ) {
             log_weight_vec[i++] = particles[p]->getLogWeight(a);
         }
 
         double log_particle_sum = getRunningSum(log_weight_vec);
 
-        for (int p=0; p<nparticles; p++ ) {
+        for (unsigned p=0; p<nparticles; p++ ) {
             particles[p]->setLogWeight(particles[p]->getLogWeight(a) - log_particle_sum, a);
         }
         
@@ -838,7 +838,7 @@ namespace proj {
                     vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
 
                     if (s < nspecies-1) {
-                        for (int j=1; j<nsubsets+1; j++) {
+                        for (unsigned j=1; j<nsubsets+1; j++) {
                             max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
                         }
 
@@ -847,7 +847,7 @@ namespace proj {
                     }
                     
                     else {
-                        for (int j=1; j<nsubsets+1; j++) {
+                        for (unsigned j=1; j<nsubsets+1; j++) {
                             my_vec[j][p]->calcConstrainedProposal(species_joined); // update the gene tree species partitions
                             max_depths.push_back(0.0);
                         }
@@ -857,7 +857,7 @@ namespace proj {
                     double log_coalescent_likelihood = 0.0;
 
                     // calculate coalescent likelihood for each gene on each particle
-                        for (int j=1; j<nsubsets+1; j++) {
+                        for (unsigned j=1; j<nsubsets+1; j++) {
                             double last_edge_len = my_vec[0][p]->getLastEdgeLen();
                             double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
                             log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
@@ -875,7 +875,7 @@ namespace proj {
                 vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
                 
                 if (s < nspecies-1) {
-                    for (int j=1; j<nsubsets+1; j++) {
+                    for (unsigned j=1; j<nsubsets+1; j++) {
                         
                         max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
                     }
@@ -884,7 +884,7 @@ namespace proj {
                     my_vec[0][p]->speciesProposal(max_depths, species_joined); // branch length proposal
                 }
                 else {
-                    for (int j=1; j<nsubsets+1; j++) {
+                    for (unsigned j=1; j<nsubsets+1; j++) {
                         my_vec[j][p]->calcConstrainedProposal(species_joined); // update the gene tree species partitions
                         max_depths.push_back(0.0);
                     }
@@ -894,7 +894,7 @@ namespace proj {
                 double log_coalescent_likelihood = 0.0;
                 
                 // calculate coalescent likelihood for each gene on each particle
-                    for (int j=1; j<nsubsets+1; j++) {
+                    for (unsigned j=1; j<nsubsets+1; j++) {
                         double last_edge_len = my_vec[0][p]->getLastEdgeLen();
                         double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
                         log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
@@ -1372,7 +1372,7 @@ namespace proj {
                 for (unsigned s=1; s<nsubsets+1; s++) {
                     normalizeWeights(my_vec[s], "g", false);
                     Particle gene_x = *chooseTree(my_vec[s], "g");
-                    for (int p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
+                    for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
                         if (p<nparticles) {
                             *my_vec[s][p] = gene_x;
                         }
@@ -1386,7 +1386,7 @@ namespace proj {
                 }
                     
                 // increase size of species vector
-                for (int p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
+                for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
                     my_vec[0].push_back(Particle::SharedPtr(new Particle));
                     my_vec_2[0].push_back(Particle::SharedPtr(new Particle));
                 }
@@ -1406,7 +1406,7 @@ namespace proj {
                     }
                     
                     for (unsigned s=1; s<nsubsets+1; s++) {
-                        for (int p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
+                        for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
                             my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
                             my_vec[s][p]->refreshGeneTreePreorder();
                             my_vec[s][p]->calcGeneTreeMinDepth(); // reset min depth vector for gene trees
@@ -1415,7 +1415,7 @@ namespace proj {
                     }
                     
                     // filter species trees
-                    for (int p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
+                    for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
                         my_vec[0][p]->setLogLikelihood(0.0);
                         my_vec[0][p]->setLogWeight(0.0, "g");
                         my_vec[0][p]->setLogWeight(0.0, "s");
@@ -1428,9 +1428,9 @@ namespace proj {
                         //taxon joining and reweighting step
                         
                         if (s == 0) {
-                            for (int j=1; j<nsubsets+1; j++) {
+                            for (unsigned j=1; j<nsubsets+1; j++) {
                                 // reset gene tree log coalescent likelihoods to 0
-                                for (int p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
+                                for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
                                     my_vec[j][p]->setLogCoalescentLikelihood(0.0);
                                 }
                             }
@@ -1594,16 +1594,16 @@ namespace proj {
             
             logf << a << "\t" << Forest::_theta;
             
-            for (int g=0; g<gene_tree_log_like.size(); g++) {
+            for (unsigned g=0; g<gene_tree_log_like.size(); g++) {
                 logf << "\t" << setprecision(12) << gene_tree_log_like[g];
             }
             
-            for (int g=0; g<gene_tree_log_coalescent_like.size(); g++) {
+            for (unsigned g=0; g<gene_tree_log_coalescent_like.size(); g++) {
                 logf << "\t" << setprecision(12) << gene_tree_log_coalescent_like[g];
             }
 
             
-            for (int i=0; i<prior_vec.size(); i++) {
+            for (unsigned i=0; i<prior_vec.size(); i++) {
                 logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
             }
             
@@ -1669,7 +1669,7 @@ namespace proj {
             
             logf << a << "\t" << Forest::_theta;
             
-            for (int i=0; i<prior_vec.size(); i++) {
+            for (unsigned i=0; i<prior_vec.size(); i++) {
                 logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
             }
             

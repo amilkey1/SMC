@@ -1746,7 +1746,7 @@ class Forest {
             
             if (!both) {
                 species_tree_height = 0.0;
-                for (int i=0; i<species_join_number+1; i++) {
+                for (unsigned i=0; i<species_join_number+1; i++) {
                     species_tree_height += species_info[i].second;
                 }
             }
@@ -2337,7 +2337,6 @@ class Forest {
             }
             else
                 nd->_right_sib = 0;
-
                 nd->_number = othernd._number;
                 nd->_name = othernd._name;
                 nd->_edge_length = othernd._edge_length;
@@ -2657,7 +2656,7 @@ class Forest {
          string species_for_join = eligible_species[index];
                  
          double species_tree_height = 0.0;
-         for (int a=0; a<_species_join_number+1; a++) {
+         for (unsigned a=0; a<_species_join_number+1; a++) {
              species_tree_height += species_info[a].second;
          }
          
@@ -2889,7 +2888,7 @@ class Forest {
         }
         
         double species_tree_height = 0.0;
-        for (int a=0; a<_species_join_number+1; a++) {
+        for (unsigned a=0; a<_species_join_number+1; a++) {
             species_tree_height += _t[a].second;
         }
         
