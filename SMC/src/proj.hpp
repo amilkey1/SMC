@@ -41,13 +41,13 @@ namespace proj {
             void                createSpeciesMap(Data::SharedPtr);
             void                showFinal(vector<vector<Particle::SharedPtr>>);
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
-            void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets);
-            void                proposeSpeciesParticles(vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets);
+            void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
+            void                proposeSpeciesParticles(vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
             void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, Particle::SharedPtr species_tree_particle);
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
             void                writeGeneTreeFile();
             Particle::SharedPtr chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species);
-            void                writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa);
+            void                writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, unsigned nparticles, unsigned nsubsets, unsigned nspecies, unsigned ntaxa);
             void                writeSpeciesTreeLoradFile(vector<Particle::SharedPtr> species_particles, int nspecies);
             void                setStartingVariables();
             void                setUpInitialData();
@@ -831,7 +831,7 @@ namespace proj {
         }
     }
 
-    inline void Proj::proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets) {
+    inline void Proj::proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets) {
             for (unsigned p=first; p<last; p++) {
                     tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
 
@@ -867,7 +867,7 @@ namespace proj {
                 } // p loop
     }
 
-    inline void Proj::proposeSpeciesParticles( vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets) {
+    inline void Proj::proposeSpeciesParticles( vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets) {
         if (_nthreads == 1) {
             for (unsigned p=0; p<_nparticles*_species_particles_per_gene_particle; p++) {
                 tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
@@ -1515,7 +1515,7 @@ namespace proj {
         std::cout << "\nFinished!" << std::endl;
     }
 
-    inline void Proj::writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, int nparticles, int nsubsets, int nspecies, int ntaxa) {
+    inline void Proj::writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, unsigned nparticles, unsigned nsubsets, unsigned nspecies, unsigned ntaxa) {
         // open log file
         ofstream logf("params.log");
         
