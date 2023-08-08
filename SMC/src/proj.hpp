@@ -135,7 +135,7 @@ namespace proj {
         testf << "species tree: " << particles[0]->saveForestNewick() << endl;
         testf << endl;
         
-        for (int s=1; s < (int) particles.size(); s++) {
+        for (unsigned s=1; s < particles.size(); s++) {
             testf << "gene " << s << ": " << particles[s]->saveForestNewick() << endl;
             testf << endl;
         }
@@ -150,7 +150,7 @@ namespace proj {
         ofstream weightf("weights.txt");
         weightf << "begin trees;" << endl;
         
-        for (int i=0; i < (int) v.size(); i++) {
+        for (unsigned i=0; i < v.size(); i++) {
             weightf << "tree " << i << " = " << v[i]->getSpeciesNewick() << "; " << "\n";
         }
         
@@ -158,11 +158,11 @@ namespace proj {
         weightf.close();
         
         ofstream alltreesf("alltrees.txt");
-        for (int i=0; i < (int) v.size(); i++) {
+        for (unsigned i=0; i < v.size(); i++) {
             alltreesf << "particle " << i << endl;
             alltreesf << "species tree = " << v[i]->getSpeciesNewick() << "; " << "\n";
             vector<string> gene_newicks = v[i]->getGeneTreeNewicks();
-            for (int g=0; g < (int) gene_newicks.size(); g++) {
+            for (unsigned g=0; g < gene_newicks.size(); g++) {
                 alltreesf << "gene tree " << g+1 << " = " << gene_newicks[g] << "\n";
             }
         }
@@ -304,7 +304,7 @@ namespace proj {
     }
 
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles, string a, bool calc_marg_like) {
-        int nparticles = _nparticles;
+        unsigned nparticles = _nparticles;
         if (a == "s") {
             nparticles *= _species_particles_per_gene_particle;
         }
@@ -340,7 +340,7 @@ namespace proj {
         genef << "let gene_forests = [\n";
         for (unsigned p=0; p < _nparticles; p++) {
             genef << "particle " << endl;
-            for (int s=1; s < (int) _accepted_particle_vec.size(); s++) {
+            for (unsigned s=1; s < _accepted_particle_vec.size(); s++) {
                 genef << "gene " << s << endl;
                 vector<string> newicks = _accepted_particle_vec[s][p]->getGeneTreeNewicks();
                 string newick = newicks[0];
@@ -491,7 +491,7 @@ namespace proj {
                 q = -q;
             proposed_thetas[i] = q;
             double log_coalescent_likelihood = 0.0;
-            for (int s=0; s < (int) gene_particles.size(); s++) {
+            for (unsigned s=0; s < gene_particles.size(); s++) {
                 gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
                 gene_particles[s].refreshGeneTreePreorder();
                 log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info, false);
@@ -519,7 +519,7 @@ namespace proj {
         
         double log_coalescent_likelihood = 0.0;
         
-        for (int s=0; s < (int) gene_particles.size(); s++) {
+        for (unsigned s=0; s < gene_particles.size(); s++) {
                 gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
                 gene_particles[s].refreshGeneTreePreorder();
                 log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(theta0, species_info, false);
@@ -536,7 +536,7 @@ namespace proj {
             log_prior = log_prior_rate - prior_rate * q;
             
             double log_coalescent_likelihood = 0.0;
-            for (int s=0; s < (int) gene_particles.size(); s++) {
+            for (unsigned s=0; s < gene_particles.size(); s++) {
                 gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
                 gene_particles[s].refreshGeneTreePreorder();
                 log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info, false);
@@ -605,7 +605,7 @@ namespace proj {
     inline Particle::SharedPtr Proj::chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species) {
         // get species tree weights
         vector<double> log_weights;
-        int nparticles = _nparticles;
+        unsigned nparticles = _nparticles;
         if (gene_or_species == "s") {
             nparticles *= _species_particles_per_gene_particle;
         }
@@ -617,7 +617,7 @@ namespace proj {
         double u = rng.uniform();
         double cum_prob = 0.0;
         int index = 0.0;
-        for (int i=0; i < (int) log_weights.size(); i++) {
+        for (unsigned i=0; i < log_weights.size(); i++) {
             cum_prob += exp(log_weights[i]);
             if (u <= cum_prob) {
                 index = i;
@@ -733,7 +733,7 @@ namespace proj {
     }
 
     inline void Proj::resetWeights(vector<Particle::SharedPtr> & particles, string a) {
-        int nparticles = _nparticles;
+        unsigned nparticles = _nparticles;
         if (a == "s") {
             nparticles *= _species_particles_per_gene_particle;
         }
@@ -1057,11 +1057,11 @@ namespace proj {
             if (_species_newicks_name != "null") {
                 ifstream infile(_species_newicks_name);
                 string newick;
-                int size_before = (int) newicks.size();
+                unsigned size_before = (int) newicks.size();
                 while (getline(infile, newick)) {
                     newicks.push_back(newick);
                 }
-                int size_after = (int) newicks.size();
+                unsigned size_after = (int) newicks.size();
                 if (size_before == size_after) {
                     throw XProj("cannot find species newick file");
                 }
@@ -1400,7 +1400,7 @@ namespace proj {
                 if (i < _niterations-1) {
                     _species_tree_log_marginal_likelihood = 0.0;
                     
-                for (int p=0; p<my_vec[0].size(); p++) {
+                for (unsigned p=0; p < my_vec[0].size(); p++) {
                         my_vec[0][p]->mapSpecies(_taxon_map, _species_names, 0);
                         my_vec[0][p]->resetSpecies();
                     }
@@ -1607,7 +1607,7 @@ namespace proj {
                 logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
             }
             
-            for (int j=0; j<log_topology_priors.size(); j++) {
+            for (unsigned j=0; j < log_topology_priors.size(); j++) {
                 logf << "\t" << setprecision(12) << log_topology_priors[j];
             }
             
@@ -1673,7 +1673,7 @@ namespace proj {
                 logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
             }
             
-            for (int j=0; j<log_topology_priors.size(); j++) {
+            for (unsigned j=0; j < log_topology_priors.size(); j++) {
                 logf << "\t" << setprecision(12) << log_topology_priors[j];
             }
             

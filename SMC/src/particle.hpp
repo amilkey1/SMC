@@ -116,7 +116,7 @@ class Particle {
         Data::SharedPtr                         _data;
         double                                  _log_likelihood;
         double                                  _log_coalescent_likelihood;
-        int                                     _generation = 0;
+        unsigned                                _generation = 0;
         bool                                    _running_on_empty = false;
         double                                  _species_tree_height;
         vector<pair<tuple<string, string, string>, double>> _t;
@@ -209,7 +209,7 @@ class Particle {
         
         string event;
         
-        if (_generation == 0 || _generation == (int) Forest::_ntaxa - 1) {
+        if (_generation == 0 || _generation == Forest::_ntaxa - 1) {
             _forest._nincrements = 0;
             _forest._gene_tree_log_coalescent_likelihood = 0.0;
         }
@@ -643,7 +643,7 @@ class Particle {
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
         _t.push_back(make_pair(species_joined, edge_len));
 
-        for (int i=0; i < (int) _forest._nspecies-1; i++) {
+        for (unsigned i=0; i < _forest._nspecies-1; i++) {
             if (_forest._lineages.size() > 1) {
                 species_joined = _forest.speciesTreeProposal();
                 
