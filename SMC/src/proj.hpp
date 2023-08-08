@@ -1233,7 +1233,6 @@ namespace proj {
                                 // do not need to resample species trees; species tree will remain the same throughout all gene tree filtering
                                 
                                 assert(my_vec[s].size() == nparticles);
-            //                                    assert(my_vec[s].size() == nparticles*_species_particles_per_gene_particle);
                             }
                             //change use_first from true to false or false to true
                             use_first = !use_first;
@@ -1422,8 +1421,6 @@ namespace proj {
                     }
                     
                     for (unsigned s=0; s<nspecies; s++) {
-                        // TODO: propose a new lambda
-                        
                         cout << "beginning species tree proposals" << endl;
                         //taxon joining and reweighting step
                         
