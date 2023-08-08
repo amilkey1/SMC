@@ -1794,7 +1794,6 @@ class Forest {
                                     log_coalescent_likelihood = neg_inf;
                                 }
                                 a++;
-//                                nincrements++;
                             }
                             else {
                                 // no coalescence
