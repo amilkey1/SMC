@@ -1576,7 +1576,7 @@ namespace proj {
                     logf << "\t" << "species_tree_increment" << "\t" << "increment_prior";
                 }
                 for (unsigned g=0; g<ngenes; g++) {
-                    for (int j=nspecies; j<nspecies+ntaxa-1; j++) {
+                    for (unsigned j=nspecies; j<nspecies+ntaxa-1; j++) {
                         logf << "\t" << "gene_tree_increment" << "\t" << "increment_prior";
                     }
                 }
@@ -1627,7 +1627,7 @@ namespace proj {
         double a = 0;
         unsigned col_count = 0;
         
-        for (int p=0; p<species_particles.size(); p++) {
+        for (unsigned p=0; p<species_particles.size(); p++) {
             
             vector<double> branch_length_vec;
             for (auto &b:species_particles[p]->getBranchLengths()) {
