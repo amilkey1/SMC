@@ -2318,33 +2318,35 @@ class Forest {
                     nd->_minor_parent = minor_parent;
                 }
 
-            // copy left child
+                // copy left child
                 if (othernd._left_child) {
-                unsigned left_child_number = othernd._left_child->_number;
+                    unsigned left_child_number = othernd._left_child->_number;
                     Node* left_child = &*next(_nodes.begin(), left_child_number);
                     nd->_left_child = left_child;
-            }
+                }
+                
                 else {
                     nd->_left_child = 0;
                 }
 
-            // copy right sibling
-            if (othernd._right_sib) {
-                unsigned right_sib_number = othernd._right_sib->_number;
-                Node* right_sib = &*next(_nodes.begin(), right_sib_number);
-                nd->_right_sib = right_sib;
-            }
-            else
-                nd->_right_sib = 0;
-                nd->_number = othernd._number;
-                nd->_name = othernd._name;
-                nd->_edge_length = othernd._edge_length;
-                nd->_position_in_lineages = othernd._position_in_lineages;
-                nd->_partial = othernd._partial;
-                nd->_visited = othernd._visited;
-                nd->_hybrid_newick_name = othernd._hybrid_newick_name;
-                nd->_n_descendants = othernd._n_descendants;
-                nd->_done = othernd._done;
+                // copy right sibling
+                if (othernd._right_sib) {
+                    unsigned right_sib_number = othernd._right_sib->_number;
+                    Node* right_sib = &*next(_nodes.begin(), right_sib_number);
+                    nd->_right_sib = right_sib;
+                }
+                else {
+                    nd->_right_sib = 0;
+                    nd->_number = othernd._number;
+                    nd->_name = othernd._name;
+                    nd->_edge_length = othernd._edge_length;
+                    nd->_position_in_lineages = othernd._position_in_lineages;
+                    nd->_partial = othernd._partial;
+                    nd->_visited = othernd._visited;
+                    nd->_hybrid_newick_name = othernd._hybrid_newick_name;
+                    nd->_n_descendants = othernd._n_descendants;
+                    nd->_done = othernd._done;
+                }
             }
         }
 
@@ -2464,7 +2466,7 @@ class Forest {
         subtree1->_parent=new_nd;
         subtree2->_parent=new_nd;
 
-        calcTopologyPrior(_lineages.size());
+        calcTopologyPrior((int) _lineages.size());
 
         updateNodeVector (_lineages, subtree1, subtree2, new_nd);
 
@@ -2609,7 +2611,7 @@ class Forest {
              // update species partition
              _species_join_number++;
              if (_species_join_number > species_info.size() - 1) {
-                 _species_join_number = species_info.size() - 1;
+                 _species_join_number = (int) species_info.size() - 1;
              }
 
              string species1 = get<0> (species_info[_species_join_number].first);
@@ -2671,7 +2673,7 @@ class Forest {
                  _species_join_number++;
                  assert (_species_join_number <= species_info.size());
                  if (_species_join_number > species_info.size()-1) {
-                     _species_join_number = species_info.size()-1;
+                     _species_join_number = (int) species_info.size()-1;
                  }
                  
                  species_tree_height += species_info[_species_join_number].second;
@@ -2753,9 +2755,8 @@ class Forest {
      }
 
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double increment, string species) {
-        calcTopologyPrior(_lineages.size());
+        calcTopologyPrior((int) _lineages.size());
         allowCoalescence(nodes, increment, species);
-//        _gene_tree_log_likelihood = calcLogLikelihood();
     }
 
     inline void Forest::allowCoalescence(list<Node*> &nodes, double increment, string species) {
@@ -3474,7 +3475,7 @@ class Forest {
     }
 
     inline void Forest::resetLineages(vector<double> branch_lengths) {
-        for (unsigned a = _new_nodes.size()-1; a>=0; a--) {
+        for (unsigned a = (int) _new_nodes.size()-1; a>=0; a--) {
             revertNodeVector(_lineages, _new_nodes[a]->_left_child, _new_nodes[a]->_left_child->_right_sib, _new_nodes[a]);
         }
 
@@ -3617,7 +3618,7 @@ class Forest {
             double deep_coalescent_prior = 0.0; // must account for a deep coalescence scenario
             
             for (auto &s:_species_partition) {
-                unsigned nlineages = s.second.size();
+                unsigned nlineages = (int) s.second.size();
                 double rate = (nlineages * (nlineages-1) / _theta);
                 deep_coalescent_prior -= extended_increment * rate;
             }
