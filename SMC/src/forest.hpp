@@ -2475,17 +2475,18 @@ class Forest {
                 Node* right_sib = &*next(_nodes.begin(), right_sib_number);
                 nd->_right_sib = right_sib;
             }
-            else
+            else {
                 nd->_right_sib = 0;
-                nd->_number = othernd._number;
-                nd->_name = othernd._name;
-                nd->_edge_length = othernd._edge_length;
-                nd->_position_in_lineages = othernd._position_in_lineages;
-                nd->_partial = othernd._partial;
-                nd->_visited = othernd._visited;
-                nd->_hybrid_newick_name = othernd._hybrid_newick_name;
-                nd->_n_descendants = othernd._n_descendants;
-                nd->_done = othernd._done;
+            }
+                
+            nd->_number = othernd._number;
+            nd->_name = othernd._name;
+            nd->_edge_length = othernd._edge_length;
+            nd->_position_in_lineages = othernd._position_in_lineages;
+            nd->_partial = othernd._partial;
+            nd->_visited = othernd._visited;
+            nd->_hybrid_newick_name = othernd._hybrid_newick_name;
+            nd->_n_descendants = othernd._n_descendants;
             }
         }
 
