@@ -771,7 +771,7 @@ class Forest {
         _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice]; // no coalescent likelihood
        
         // erase extra nodes created from node list
-        for (int i = 0; i < _node_choices.size(); i++) {
+        for (int i = 0; i < (int) _node_choices.size(); i++) {
             _nodes.pop_back();
         }
        
@@ -834,7 +834,7 @@ class Forest {
          _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice] - _gene_tree_log_coalescent_likelihood; // remove the coalescent likelihood to get the ordinary gene tree log likelihood
         
          // erase extra nodes created from node list
-         for (int i = 0; i < _node_choices.size(); i++) {
+         for (int i = 0; i < (int) _node_choices.size(); i++) {
              _nodes.pop_back();
          }
         
@@ -1178,7 +1178,7 @@ class Forest {
             }
             renumberInternals();
         }
-        catch(XProj x) {
+        catch(XProj &x) {
             clear();
             throw x;
         }
@@ -1225,9 +1225,9 @@ class Forest {
     inline vector<string> Forest::setUpExistingLineagesVector() {
         vector<string> existing_lineages;
         
-        int b=0;
+        unsigned b=0;
         for (auto &nd:_nodes) {
-            if (b<Forest::_nspecies) {
+            if (b < Forest::_nspecies) {
                 existing_lineages.push_back(nd._name);
                 b++;
             }
@@ -1294,7 +1294,8 @@ class Forest {
 
         // Resize the _nodes vector
         _nleaves = countNewickLeaves(commentless_newick);
-        if (_nleaves < 4)
+        
+        if (_nleaves < 4) {
             throw XProj("Expecting newick tree description to have at least 4 leaves");
             unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
             _nodes.resize(max_nodes);
@@ -1302,6 +1303,7 @@ class Forest {
                 nd._name = "";
                 nd._number = -1;
             }
+        }
 
         try {
             // Root node is the last node in _nodes
@@ -1539,7 +1541,7 @@ class Forest {
             }
             renumberInternals();
         }
-        catch(XProj x) {
+        catch(XProj &x) {
             clear();
             throw x;
         }
@@ -1574,7 +1576,7 @@ class Forest {
         
         if (!topology_only) {
             // include branch lengths
-            for (int a=0; a<heights_and_nodes.size(); a++) {
+            for (int a=0; a < (int) heights_and_nodes.size(); a++) {
                 species_joined[a].second = heights_and_nodes[a].first;
             }
         }
@@ -1623,7 +1625,7 @@ class Forest {
                 d.second.second = get<2>(species_joined);
             }
         }
-        for (int i=0; i<_depths.size(); i++) {
+        for (int i=0; i < (int) _depths.size(); i++) {
             if (_depths[i].second.first == _depths[i].second.second) {
                 // species have already been joined in the speceis tree, so they are no longer a constraint
                 _depths.erase(_depths.begin()+i);
@@ -1643,8 +1645,8 @@ class Forest {
         string spp_left_child;
         string spp_right_child;
         bool done = false;
-    //        while (spp_left_child == "" || spp_right_child == "") {
-        for (int i=0; i<heights_and_nodes.size(); i++) {
+
+        for (int i=0; i < (int) heights_and_nodes.size(); i++) {
             Node* nd = heights_and_nodes[i].second;
             done = false;
                 // figure out if descendants of internal node are in the same species
@@ -1708,7 +1710,7 @@ class Forest {
         _species_partition.erase(spp2);
         
         if (spp1 != "null") {
-            assert (_species_partition.size() == before - 1);
+            assert ((int) _species_partition.size() == before - 1);
         }
     }
 
@@ -1717,7 +1719,7 @@ class Forest {
         int nincrements = 0.0;
         double log_coalescent_likelihood = 0.0;
         
-        for (int species_join_number = 0; species_join_number < species_info.size(); species_join_number++) {
+        for (int species_join_number = 0; species_join_number < (int) species_info.size(); species_join_number++) {
             
             double neg_inf = -1*numeric_limits<double>::infinity();
             vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
@@ -1751,7 +1753,7 @@ class Forest {
             assert (species_tree_height > 0.0);
             
             if (species_increment > 0) {
-                for (int i=nincrements; i<heights_and_nodes.size(); i++) {
+                for (int i=nincrements; i < (int) heights_and_nodes.size(); i++) {
                     Node* node = nullptr;
                     if (heights_and_nodes[i].first < species_tree_height) {
                         // calc coalescent prob and update species partition
@@ -1825,7 +1827,8 @@ class Forest {
                 // final step; no deep coalescence; one species
                 assert (species_increment == 0.0);
                 assert (_species_partition.size() == 1);
-                for (int i=nincrements; i<heights_and_nodes.size(); i++) {
+                
+                for (int i=nincrements; i < (int) heights_and_nodes.size(); i++) {
                     // there must be coalescence at this point
                     Node* node = nullptr;
                     string species;
@@ -1871,7 +1874,7 @@ class Forest {
         int a = 0;
 
         if (species_increment > 0) {
-            for (int i=_nincrements; i<heights_and_nodes.size(); i++) {
+            for (int i=_nincrements; i < (int) heights_and_nodes.size(); i++) {
                 Node* node = nullptr;
                 if (heights_and_nodes[i].first < species_tree_height) {
                     // calc coalescent prob and update species partition
@@ -1953,7 +1956,7 @@ class Forest {
                 panmictic_nlineages += s.second.size();
             }
             
-            for (int i=_nincrements; i < heights_and_nodes.size(); i++) {
+            for (int i=_nincrements; i < (int) heights_and_nodes.size(); i++) {
                 // calculate increment (should be heights_and_nodes[i].first - species_tree_height - cum_time (no need to worry about species increment now)
                 // calculate prob of coalescence, ln(rate) - rate*increment
                 double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
@@ -1973,7 +1976,7 @@ class Forest {
             // final step; no deep coalescence; one species
             assert (species_increment == 0.0);
             assert (_species_partition.size() == 1);
-            for (int i=_nincrements; i<heights_and_nodes.size(); i++) {
+            for (int i=_nincrements; i < (int) heights_and_nodes.size(); i++) {
                 // there must be coalescence at this point
                 Node* node = nullptr;
                 string species;
@@ -2371,7 +2374,7 @@ class Forest {
 
     inline void Forest::setUpSpeciesForest(vector<string> &species_names) {
 //        assert (_index==0);
-        assert (_nspecies = (unsigned) species_names.size());
+        assert (_nspecies = ((unsigned) species_names.size()));
         clear();
         //create species
         double edge_length = 0.0;
@@ -2567,7 +2570,7 @@ class Forest {
         // Build vector of internal node heights
         vector<double> internal_heights;
         
-        for (int i=0; i<heights_and_nodes.size(); i++) {
+        for (int i=0; i < (int) heights_and_nodes.size(); i++) {
             internal_heights.push_back(heights_and_nodes[i].first);
         }
         
@@ -2610,7 +2613,7 @@ class Forest {
              
              // update species partition
              _species_join_number++;
-             if (_species_join_number > species_info.size() - 1) {
+             if (_species_join_number > (int) species_info.size() - 1) {
                  _species_join_number = (int) species_info.size() - 1;
              }
 
@@ -2671,8 +2674,8 @@ class Forest {
                  
                  // update species partition - two species must merge now to accommodate deep coalescence
                  _species_join_number++;
-                 assert (_species_join_number <= species_info.size());
-                 if (_species_join_number > species_info.size()-1) {
+                 assert (_species_join_number <= (int) species_info.size());
+                 if (_species_join_number > (int) species_info.size()-1) {
                      _species_join_number = (int) species_info.size()-1;
                  }
                  
@@ -2709,7 +2712,7 @@ class Forest {
                  
                  assert (eligible_species.size() > 0);
                  
-    //                // choose which species coalescent event occurred in
+                    // choose which species coalescent event occurred in
                  for (auto &p:population_coalescent_rates) {
                      p = log(p/coalescence_rate);
                  }
@@ -2719,7 +2722,6 @@ class Forest {
                  // draw a new increment
                  int nlineages = 0;
                  for (auto &s:_species_partition) {
-    //                    if (s.first == new_name) {
                      if (s.first == species_for_join) {
                          nlineages = (int) s.second.size();
                          break;
@@ -2734,7 +2736,6 @@ class Forest {
                  for (auto &nd:_lineages) {
                      nd->_edge_length += deep_coalescence_increment;
                      for (int i=0; i<1; i++) {
-//                         cout << "total increment is : " << nd->_edge_length << endl;
                      }
                  }
                  
@@ -2750,14 +2751,6 @@ class Forest {
          else {
              for (auto &nd:_lineages) {
                  nd->_edge_length += increment;
-             }
-         }
-         
-         bool extend = true;
-         for (auto &s:_species_partition) {
-             if (s.second.size() != 1) {
-                 extend = false;
-                 break;
              }
          }
          
@@ -2989,13 +2982,13 @@ class Forest {
         auto position2 = addnode2->_position_in_lineages;
         auto iter2 = addnode2;
 
-        if (position1 > node_vector.size()+1) {
+        if (position1 > (int) node_vector.size()+1) {
             position1 = position1-1;
             if (position2 > 0) {
                 position2 = position2-1;
             }
         }
-        if (position2 > node_vector.size()+1) {
+        if (position2 > (int) node_vector.size()+1) {
             position2 = position2-1;
             if (position1 > 0) {
                 position1 = position1-1;

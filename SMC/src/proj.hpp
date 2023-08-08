@@ -67,7 +67,6 @@ namespace proj {
             unsigned                    _nparticles;
             unsigned                    _random_seed;
             double                      _log_marginal_likelihood;
-            double                      _gene_tree_log_marginal_likelihood;
             double                      _species_tree_log_marginal_likelihood;
             bool                        _run_on_empty;
             bool                        _estimate_theta;
@@ -136,7 +135,7 @@ namespace proj {
         testf << "species tree: " << particles[0]->saveForestNewick() << endl;
         testf << endl;
         
-        for (int s=1; s<particles.size(); s++) {
+        for (int s=1; s < (int) particles.size(); s++) {
             testf << "gene " << s << ": " << particles[s]->saveForestNewick() << endl;
             testf << endl;
         }
@@ -151,7 +150,7 @@ namespace proj {
         ofstream weightf("weights.txt");
         weightf << "begin trees;" << endl;
         
-        for (int i=0; i<v.size(); i++) {
+        for (int i=0; i < (int) v.size(); i++) {
             weightf << "tree " << i << " = " << v[i]->getSpeciesNewick() << "; " << "\n";
         }
         
@@ -159,11 +158,11 @@ namespace proj {
         weightf.close();
         
         ofstream alltreesf("alltrees.txt");
-        for (int i=0; i<v.size(); i++) {
+        for (int i=0; i < (int) v.size(); i++) {
             alltreesf << "particle " << i << endl;
             alltreesf << "species tree = " << v[i]->getSpeciesNewick() << "; " << "\n";
             vector<string> gene_newicks = v[i]->getGeneTreeNewicks();
-            for (int g=0; g<gene_newicks.size(); g++) {
+            for (int g=0; g < (int) gene_newicks.size(); g++) {
                 alltreesf << "gene tree " << g+1 << " = " << gene_newicks[g] << "\n";
             }
         }
@@ -339,9 +338,9 @@ namespace proj {
         // open log file
         ofstream genef("genetrees.txt");
         genef << "let gene_forests = [\n";
-        for (int p=0; p<_nparticles; p++) {
+        for (unsigned p=0; p < _nparticles; p++) {
             genef << "particle " << endl;
-            for (int s=1; s<_accepted_particle_vec.size(); s++) {
+            for (int s=1; s < (int) _accepted_particle_vec.size(); s++) {
                 genef << "gene " << s << endl;
                 vector<string> newicks = _accepted_particle_vec[s][p]->getGeneTreeNewicks();
                 string newick = newicks[0];
@@ -492,7 +491,7 @@ namespace proj {
                 q = -q;
             proposed_thetas[i] = q;
             double log_coalescent_likelihood = 0.0;
-            for (int s=0; s<gene_particles.size(); s++) {
+            for (int s=0; s < (int) gene_particles.size(); s++) {
                 gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
                 gene_particles[s].refreshGeneTreePreorder();
                 log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info, false);
@@ -520,7 +519,7 @@ namespace proj {
         
         double log_coalescent_likelihood = 0.0;
         
-        for (int s=0; s<gene_particles.size(); s++) {
+        for (int s=0; s < (int) gene_particles.size(); s++) {
                 gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
                 gene_particles[s].refreshGeneTreePreorder();
                 log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(theta0, species_info, false);
@@ -537,7 +536,7 @@ namespace proj {
             log_prior = log_prior_rate - prior_rate * q;
             
             double log_coalescent_likelihood = 0.0;
-            for (int s=0; s<gene_particles.size(); s++) {
+            for (int s=0; s < (int) gene_particles.size(); s++) {
                 gene_particles[s].mapSpecies(_taxon_map, _species_names, s+1);
                 gene_particles[s].refreshGeneTreePreorder();
                 log_coalescent_likelihood += gene_particles[s].calcCoalLikeForNewTheta(q, species_info, false);
@@ -610,7 +609,7 @@ namespace proj {
         if (gene_or_species == "s") {
             nparticles *= _species_particles_per_gene_particle;
         }
-        for (int p=0; p<nparticles; p++) {
+        for (unsigned p=0; p<nparticles; p++) {
             log_weights.push_back(species_trees[p]->getLogWeight(gene_or_species));
         }
         
@@ -687,10 +686,10 @@ namespace proj {
         
         vector<pair<double, double>> cum_probs;
             // Create vector of pairs p, with p.first = log weight and p.second = particle index
-            cum_probs.resize(nparticles);
-            unsigned i = 0;
-//            for(auto & p : from_particles) {
-        for (int p=0; p<_nparticles; p++) {
+        cum_probs.resize(nparticles);
+        unsigned i = 0;
+        
+        for (unsigned p=0; p < _nparticles; p++) {
                 cum_probs[i].first = from_particles[p]->getLogWeight(a);
                 cum_probs[i].second = i;
                 ++i;
@@ -739,8 +738,8 @@ namespace proj {
             nparticles *= _species_particles_per_gene_particle;
         }
         double logw = -log(particles.size());
-//        for (auto & p : particles) {
-        for (int p=0; p<nparticles; p++) {
+
+        for (unsigned p=0; p<nparticles; p++) {
             particles[p]->setLogWeight(logw, a);
         }
     }
@@ -791,7 +790,7 @@ namespace proj {
         assert (species_joined.size() > 0);
         
         if (_nthreads == 1) {
-            for (int p=0; p<_nparticles; p++) {
+            for (unsigned p=0; p<_nparticles; p++) {
                 particles[p]->proposal(gene_trees_only, deconstruct, species_joined);
           }
         }
@@ -870,7 +869,7 @@ namespace proj {
 
     inline void Proj::proposeSpeciesParticles( vector<vector<Particle::SharedPtr>> &my_vec, int s, int nspecies, int nsubsets) {
         if (_nthreads == 1) {
-            for (int p=0; p<_nparticles*_species_particles_per_gene_particle; p++) {
+            for (unsigned p=0; p<_nparticles*_species_particles_per_gene_particle; p++) {
                 tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
                 
                 vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
@@ -908,7 +907,7 @@ namespace proj {
         else { // multithreading
             // divide up the particles as evenly as possible across threads
             unsigned first = 0;
-            int nspecies_particles = _nparticles*_species_particles_per_gene_particle;
+            unsigned nspecies_particles = _nparticles*_species_particles_per_gene_particle;
             unsigned incr = nspecies_particles/_nthreads + (nspecies_particles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
             unsigned last = incr;
 
@@ -1036,14 +1035,14 @@ namespace proj {
             vector<vector<Particle::SharedPtr>> my_vec_2(nsubsets+1, vector<Particle::SharedPtr> (nparticles));
             vector<vector<Particle::SharedPtr>> &my_vec = my_vec_1;
             
-            for (int s=0; s<nsubsets+1; s++) {
+            for (unsigned s=0; s<nsubsets+1; s++) {
                 _accepted_particle_vec.push_back(vector<Particle::SharedPtr>(nparticles));
             }
             
             _log_marginal_likelihood = 0.0;
         
             for (unsigned s=0; s<nsubsets+1; s++) {
-                int nparticles = _nparticles;
+                unsigned nparticles = _nparticles;
                 for (unsigned i=0; i<nparticles; i++) {
                     my_vec_1[s][i] = Particle::SharedPtr(new Particle); // TODO: wasteful that this makes species trees with extra lineages
                     my_vec_2[s][i] = Particle::SharedPtr(new Particle);
@@ -1090,10 +1089,10 @@ namespace proj {
             
             string start = "species"; // start variable defines if program should start with gene or species trees
             
-            for (int s=0; s<nsubsets+1; s++) {
+            for (unsigned s=0; s<nsubsets+1; s++) {
                 nparticles = _nparticles;
                 
-                for (int p=0; p<nparticles; p++) {
+                for (unsigned p=0; p<nparticles; p++) {
                     my_vec[s][p]->setData(_data, _taxon_map, s);
                     my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
                     my_vec[s][p]->setParticleGeneration(0);
@@ -1125,8 +1124,8 @@ namespace proj {
                     }
                     assert (newicks.size() == nsubsets);
                     
-                    for (int s=1; s<nsubsets+1; s++) {
-                        for (int p=0; p<nparticles; p++) {
+                    for (unsigned s=1; s<nsubsets+1; s++) {
+                        for (unsigned p=0; p<nparticles; p++) {
                             my_vec[s][p]->processGeneNewicks(newicks, s-1);
                             my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
                             start = "gene";
@@ -1139,14 +1138,14 @@ namespace proj {
             }
             
             if (_run_on_empty) {
-                for (int s=0; s<nsubsets+1; s++) {
-                    for (int p=0; p<nparticles; p++) {
+                for (unsigned s=0; s<nsubsets+1; s++) {
+                    for (unsigned p=0; p<nparticles; p++) {
                         my_vec[s][p]->setRunOnEmpty(_run_on_empty);
                     }
                 }
             }
             
-            int ntaxa = (int) _taxon_map.size();
+            unsigned ntaxa = (unsigned) _taxon_map.size();
             bool deconstruct = false;
             
             for (int i=0; i<_niterations; i++) {
@@ -1155,8 +1154,8 @@ namespace proj {
                 cout << "beginning iteration: " << i << endl;
                 
                 if (i > 0) {
-                    for (int s=0; s<nsubsets+1; s++) {
-                        for (int p=0; p<nparticles; p++) {
+                    for (unsigned s=0; s<nsubsets+1; s++) {
+                        for (unsigned p=0; p<nparticles; p++) {
                             my_vec[s][p]->setParticleGeneration(0);
                             if (s > 0) {
                                 my_vec[s][p]->mapGeneTrees(_taxon_map, _species_names);
@@ -1172,7 +1171,7 @@ namespace proj {
                     vector<pair<tuple<string, string, string>, double>> species_info = my_vec[0][0]->getSpeciesJoined();
                     
                     double log_coalescent_likelihood = 0.0;
-                    for (int s=1; s<nsubsets+1; s++) {
+                    for (unsigned s=1; s<nsubsets+1; s++) {
                             my_vec[s][0]->refreshGeneTreePreorder();
                             log_coalescent_likelihood += my_vec[s][0]->calcCoalLikeForNewTheta(Forest::_theta, species_info, both);
                         }
@@ -1182,9 +1181,9 @@ namespace proj {
                 
                 // keep the species partition for the gene forests at this stage but clear the tree structure
                  if (i == 1 && gene_first == true) {
-                     for (int s=1; s<nsubsets+1; s++) {
+                     for (unsigned s=1; s<nsubsets+1; s++) {
                          // start at s=1 to only modify the gene trees
-                         for (int p=0; p<nparticles; p++) {
+                         for (unsigned p=0; p<nparticles; p++) {
                          my_vec[s][p]->remakeGeneTrees(_taxon_map);
                          my_vec[s][p]->resetGeneTreePartials(_data, _taxon_map, s);
                          deconstruct = false;
@@ -1199,7 +1198,7 @@ namespace proj {
                 if (_sample_from_gene_tree_prior) {
                     _sample_from_gene_tree_prior = false;
                     start = "gene";
-                    for (int s=1; s<nsubsets+1; s++) {
+                    for (unsigned s=1; s<nsubsets+1; s++) {
                         for (auto &p:my_vec[s]) {
                             p->resetGeneTreePartials(_data, _taxon_map, s);
                         }
@@ -1208,7 +1207,7 @@ namespace proj {
                         cout << "prior generation " << g << endl;
                         // filter particles within each gene
                         
-                        for (int s=1; s<nsubsets+1; s++) { // skip species tree particles
+                        for (unsigned s=1; s<nsubsets+1; s++) { // skip species tree particles
                             
                             proposeGeneParticlesFromPrior(my_vec[s]);
                             
@@ -1219,7 +1218,7 @@ namespace proj {
                                 
                                 double ess_inverse = 0.0;
                                 
-                                for (int p=0; p<_nparticles; p++) {
+                                for (unsigned p=0; p<_nparticles; p++) {
                                     ess_inverse += exp(2.0*my_vec[s][p]->getLogWeight("g"));
                                 }
 
@@ -1268,7 +1267,7 @@ namespace proj {
                             // try multiple theta values
                             double delta_theta = 0.1;
                             vector<Particle> gene_particles;
-                            for (int s=1; s<nsubsets+1; s++) {
+                            for (unsigned s=1; s<nsubsets+1; s++) {
                                 gene_particles.push_back(*my_vec[s][0]); // all gene trees are the same at this point, preserved from previous round of filtering
                             }
                             
@@ -1284,7 +1283,7 @@ namespace proj {
                         int nparticles_to_remove = (nparticles*_species_particles_per_gene_particle) - nparticles;
                         
                         if (nparticles_to_remove > 0) {
-                            for (int s=0; s<nsubsets+1; s++) {
+                            for (unsigned s=0; s<nsubsets+1; s++) {
                                 my_vec[s].erase(my_vec[s].end() - nparticles_to_remove, my_vec[s].end());
                                 my_vec_2[s].erase(my_vec_2[s].end() - nparticles_to_remove, my_vec_2[s].end());
                             }
@@ -1297,8 +1296,8 @@ namespace proj {
                     
                     if (i > 0) {
                         // don't need to reset these variables for the first ietration
-                        for (int s=1; s<nsubsets+1; s++) {
-                            for (int p=0; p<nparticles; p++) {
+                        for (unsigned s=1; s<nsubsets+1; s++) {
+                            for (unsigned p=0; p<nparticles; p++) {
                                 my_vec[s][p]->setLogLikelihood(0.0);
                                 my_vec[s][p]->setLogWeight(0.0, "g");
                             }
@@ -1313,7 +1312,7 @@ namespace proj {
                         
                         bool gene_trees_only = true;
                         
-                        for (int s=1; s<nsubsets+1; s++) { // skip species tree particles
+                        for (unsigned s=1; s<nsubsets+1; s++) { // skip species tree particles
                             
                             proposeParticles(my_vec[s], gene_trees_only, "g", deconstruct, species_tree_particle);
                             
@@ -1324,7 +1323,7 @@ namespace proj {
                                 
                                 double ess_inverse = 0.0;
                                 
-                                for (int p=0; p<_nparticles; p++) {
+                                for (unsigned p=0; p<_nparticles; p++) {
                                     ess_inverse += exp(2.0*my_vec[s][p]->getLogWeight("g"));
                                 }
 
@@ -1363,14 +1362,14 @@ namespace proj {
                     // save gene tree variation for use in lorad file
                     vector<vector<Particle>> variable_gene_trees(nsubsets, vector<Particle> (nparticles));
 
-                    for (int s=1; s<nsubsets+1; s++) {
-                        for (int p=0; p<nparticles; p++) {
+                    for (unsigned s=1; s<nsubsets+1; s++) {
+                        for (unsigned p=0; p<nparticles; p++) {
                             variable_gene_trees[s-1][p] = *my_vec[s][p];
                         }
                     }
                     
                 // choose one set of gene trees to use
-                for (int s=1; s<nsubsets+1; s++) {
+                for (unsigned s=1; s<nsubsets+1; s++) {
                     normalizeWeights(my_vec[s], "g", false);
                     Particle gene_x = *chooseTree(my_vec[s], "g");
                     for (int p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
@@ -1392,8 +1391,8 @@ namespace proj {
                     my_vec_2[0].push_back(Particle::SharedPtr(new Particle));
                 }
                 
-                for (int s=1; s<nsubsets+1; s++) {
-                    for (int p=0; p<nparticles; p++) {
+                for (unsigned s=1; s<nsubsets+1; s++) {
+                    for (unsigned p=0; p<nparticles; p++) {
                         *_accepted_particle_vec[s][p] = variable_gene_trees[s-1][p]; // preserve gene tree variation for output
                     }
                 }
@@ -1406,7 +1405,7 @@ namespace proj {
                         my_vec[0][p]->resetSpecies();
                     }
                     
-                    for (int s=1; s<nsubsets+1; s++) {
+                    for (unsigned s=1; s<nsubsets+1; s++) {
                         for (int p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
                             my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
                             my_vec[s][p]->refreshGeneTreePreorder();
@@ -1441,7 +1440,7 @@ namespace proj {
                         
                         if (s == 0) {
                             ofstream sel_gene_treesf("selected_gene_trees.txt");
-                            for (int s=1; s<nsubsets+1; s++) {
+                            for (unsigned s=1; s<nsubsets+1; s++) {
                                 sel_gene_treesf << "gene : " << s << " " << my_vec[s][0]->saveForestNewick();
                             }
                             sel_gene_treesf.close();
@@ -1477,7 +1476,7 @@ namespace proj {
                             
                             my_vec[0] = use_first ? my_vec_2[0]:my_vec_1[0];
                             
-                            for (int s=1; s<nsubsets+1; s++) {
+                            for (unsigned s=1; s<nsubsets+1; s++) {
                                 resetGeneParticles(sel_indices, my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s]);
                                 my_vec[s] = use_first ? my_vec_2[s]:my_vec_1[s];
                             }
@@ -1523,38 +1522,38 @@ namespace proj {
         double a = 0;
         unsigned col_count = 0;
         
-        for (int p=0; p<nparticles; p++) {
+        for (unsigned p=0; p<nparticles; p++) {
             
             vector<double> branch_length_vec;
-            for (int s=0; s<nsubsets+1; s++) {
+            for (unsigned s=0; s<nsubsets+1; s++) {
                 for (auto &b:my_vec[s][p]->getBranchLengths()) {
                     branch_length_vec.push_back(b);
                 }
             }
             
             vector<double> prior_vec;
-            for (int s=0; s<nsubsets+1; s++) {
+            for (unsigned s=0; s<nsubsets+1; s++) {
                 for (auto &b:my_vec[s][p]->getBranchLengthPriors()) {
                     prior_vec.push_back(b);
                 }
             }
             
             vector<double> gene_tree_log_like;
-            for (int s=1; s<nsubsets+1; s++) {
+            for (unsigned s=1; s<nsubsets+1; s++) {
                 for (auto &g:my_vec[s][p]->getGeneTreeLogLikelihoods()) {
                     gene_tree_log_like.push_back(g);
                 }
             }
             
             vector<double> gene_tree_log_coalescent_like;
-            for (int s=1; s<nsubsets+1; s++) {
+            for (unsigned s=1; s<nsubsets+1; s++) {
                 for (auto &g:my_vec[s][p]->getGeneTreeLogCoalescentLikelihood()) {
                     gene_tree_log_coalescent_like.push_back(g);
                 }
             }
             
             vector<double> log_topology_priors;
-            for (int s=0; s<nsubsets+1; s++) {
+            for (unsigned s=0; s<nsubsets+1; s++) {
                 for (auto &t:my_vec[s][p]->getTopologyPriors()) {
                     log_topology_priors.push_back(t);
                 }

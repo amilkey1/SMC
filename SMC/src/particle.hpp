@@ -209,7 +209,7 @@ class Particle {
         
         string event;
         
-        if (_generation == 0 || _generation == Forest::_ntaxa - 1) {
+        if (_generation == 0 || _generation == (int) Forest::_ntaxa - 1) {
             _forest._nincrements = 0;
             _forest._gene_tree_log_coalescent_likelihood = 0.0;
         }
@@ -432,7 +432,7 @@ class Particle {
         
        vector<string> existing_lineages = _forest.setUpExistingLineagesVector();
         
-        for (int a=0; a<Forest::_nspecies-1; a++) {
+        for (unsigned a=0; a < Forest::_nspecies-1; a++) {
             existing_lineages = _forest.updateExistingLineagesVector(existing_lineages, _t[a].first);
             _forest.chooseSpeciesIncrementFromNewick(existing_lineages);
             _t[a].second = _forest._last_edge_length;
@@ -643,7 +643,7 @@ class Particle {
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
         _t.push_back(make_pair(species_joined, edge_len));
 
-        for (int i=0; i < _forest._nspecies-1; i++) {
+        for (int i=0; i < (int) _forest._nspecies-1; i++) {
             if (_forest._lineages.size() > 1) {
                 species_joined = _forest.speciesTreeProposal();
                 
