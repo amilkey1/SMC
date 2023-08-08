@@ -728,7 +728,6 @@ namespace proj {
             to_particles[i]=Particle::SharedPtr(new Particle(*p0));
             
             assert(nparticles == to_particles.size());
-//            assert(nparticles*_species_particles_per_gene_particle == to_particles.size());
         }
     }
 

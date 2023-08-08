@@ -57,6 +57,7 @@ class Forest {
         void                        setData(Data::SharedPtr d, int index, map<string, string> &taxon_map);
         Node *                      findNextPreorder(Node * nd);
         std::string                 makeNewick(unsigned precision, bool use_names);
+        std::string                 makePartialNewick(unsigned precision, bool use_names);
         pair<unsigned, unsigned>    chooseTaxaToJoin(double s);
         tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> p, list<Node*> node_list, double increment, string species, bool first);
         tuple<Node*, Node*, Node*>  createNewSubtreeFromPrior(pair<unsigned, unsigned> p, double increment);
@@ -406,140 +407,281 @@ class Forest {
         cout << "\n";
     }
 
-    inline string Forest::makeNewick(unsigned precision, bool use_names) {
-        string newick = "";
+    inline string Forest::makePartialNewick(unsigned precision, bool use_names) {
+        // this function makes a newick string for a partially constructed tree
+        string newick = "(";
         const boost::format tip_node_name_format( boost::str(boost::format("%%s:%%.%df") % precision) );
         const boost::format tip_node_number_format( boost::str(boost::format("%%d:%%.%df") % precision) );
         const boost::format internal_node_format( boost::str(boost::format("):%%.%df") % precision) );
         stack<Node *> node_stack; // TODO: this function doesn't work with >1 cycles
 
-        // find hybrid nodes, don't visit minor or major parent until hybrid node is visited
-        vector<Node*> hybrid_nodes;
-        int n = _nspecies + 1;
-        for (auto &node:_nodes) {
-            if (node._parent2) {
-                hybrid_nodes.push_back(&node);
-                string name = "#H" + to_string(n);
-                node._hybrid_newick_name = name;
-                n++;
-            }
+    // find hybrid nodes, don't visit minor or major parent until hybrid node is visited
+    vector<Node*> hybrid_nodes;
+    int n = _nspecies + 1;
+    for (auto &node:_nodes) {
+        if (node._parent2) {
+            hybrid_nodes.push_back(&node);
+            string name = "#H" + to_string(n);
+            node._hybrid_newick_name = name;
+            n++;
         }
+    }
 
-            unsigned i = 0;
-            unsigned a = 0;
-            for (auto lineage : _lineages) {
-                Node * nd = lineage;
-                while (nd) {
-                    bool skip = false;
-                    for (auto &i:hybrid_nodes) {
-                        if (nd == i->_major_parent || nd == i->_minor_parent) {
-                            skip = true;
-                        }
+        unsigned i = 0;
+        unsigned a = 0;
+        for (auto lineage : _lineages) {
+            Node * nd = lineage;
+            while (nd) {
+                bool skip = false;
+                for (auto &i:hybrid_nodes) {
+                    if (nd == i->_major_parent || nd == i->_minor_parent) {
+                        skip = true;
                     }
-                    if (nd->_minor_parent && !nd->_visited && !skip) {
-                        a++;
-                        // hybrid node with minor parent
-                        if (use_names) {
-                            newick += "(";
-                            newick += boost::str(boost::format(tip_node_name_format)
-                                % nd->_minor_parent->_name
-                                % nd->_minor_parent->_edge_length);
-                            newick += ",";
-                            newick += boost::str(boost::format(tip_node_name_format)
-                                % nd->_hybrid_newick_name
-                                % nd->_edge_length);
-    //                                nd->_minor_parent->_visited = true;
-                            newick += ")";
-                        }
-
-                        // hybrid node with major parent
-                        if (use_names) {
-                            newick += ",(";
-                            newick += boost::str(boost::format(tip_node_name_format)
-                                % nd->_major_parent->_name
-                                % nd->_major_parent->_edge_length);
-                            newick += ",(";
-    //                            newick += "#H_";
-                            newick += boost::str(boost::format(tip_node_name_format)
-                                % nd->_name
-                                % nd->_edge_length);
-                            newick += "),";
-                            newick += boost::str(boost::format(tip_node_name_format)
-                                % nd->_hybrid_newick_name
-                                % nd->_edge_length);
-    //                                nd->_major_parent->_visited = true; // TODO: I think this only works if major and minor parents are tip nodes
-                        }
-
-                        else {
-
-                        }
-
-                    }
-    //                    else if (nd->_left_child && !nd->_visited && !skip) {
-                    if (nd->_left_child) {
-                        a++;
-    //                        nd->_visited = true;
-                        // internal node
+                }
+                if (nd->_minor_parent && !nd->_visited && !skip) {
+                    a++;
+                    // hybrid node with minor parent
+                    if (use_names) {
                         newick += "(";
-                        node_stack.push(nd);
+                        newick += boost::str(boost::format(tip_node_name_format)
+                            % nd->_minor_parent->_name
+                            % nd->_minor_parent->_edge_length);
+                        newick += ",";
+                        newick += boost::str(boost::format(tip_node_name_format)
+                            % nd->_hybrid_newick_name
+                            % nd->_edge_length);
+                            nd->_minor_parent->_visited = true;
+                        newick += ")";
                     }
-    //                    else if (!nd->_left_child && !nd->_visited && !skip) {
+
+                    // hybrid node with major parent
+                    if (use_names) {
+                        newick += ",(";
+                        newick += boost::str(boost::format(tip_node_name_format)
+                            % nd->_major_parent->_name
+                            % nd->_major_parent->_edge_length);
+                        newick += ",(";
+//                            newick += "#H_";
+                        newick += boost::str(boost::format(tip_node_name_format)
+                            % nd->_name
+                            % nd->_edge_length);
+                        newick += "),";
+                        newick += boost::str(boost::format(tip_node_name_format)
+                            % nd->_hybrid_newick_name
+                            % nd->_edge_length);
+                            nd->_major_parent->_visited = true; // TODO: I think this only works if major and minor parents are tip nodes
+                    }
+
                     else {
-                        a++;
-    //                        nd->_visited = true;
-                        // leaf node
+
+                    }
+
+                }
+//                    else if (nd->_left_child && !nd->_visited && !skip) {
+                if (nd->_left_child) {
+                    a++;
+                    nd->_visited = true;
+                    // internal node
+                    newick += "(";
+                    node_stack.push(nd);
+                }
+//                    else if (!nd->_left_child && !nd->_visited && !skip) {
+                else {
+                    a++;
+                    nd->_visited = true;
+                    // leaf node
+                    if (use_names) {
+                        newick += boost::str(boost::format(tip_node_name_format)
+                            % nd->_name
+                            % nd->_edge_length);
+                    } else {
+                        newick += boost::str(boost::format(tip_node_number_format)
+                            % (nd->_number + 1)
+                            % nd->_edge_length);
+                    }
+                    if (nd->_right_sib)
+                        newick += ",";
+                    else {
+                        Node * popped = (node_stack.empty() ? 0 : node_stack.top());
+                        while (popped && !popped->_right_sib) {
+                            node_stack.pop();
+                            if (node_stack.empty()) {
+                                //newick += ")";
+                                newick += boost::str(boost::format(internal_node_format) % lineage->_edge_length);
+                                popped = 0;
+                            }
+                            else {
+                                newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                                popped = node_stack.top();
+                            }
+                        }
+                        if (popped && popped->_right_sib) {
+                            node_stack.pop();
+                            newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                            newick += ",";
+                        }
+                    }
+                }   // leaf node
+                if (a >= _ninternals + _nleaves - 1 && hybrid_nodes.size()>0) {
+                    break;
+                }
+                nd->_visited = true;
+                nd = findNextPreorder(nd);
+            }   // while (subnd)...
+
+            if (i < _lineages.size() - 1)
+                newick += ",";
+            ++i;
+        }
+    if (hybrid_nodes.size() >0) {
+        newick.pop_back();
+        newick.pop_back();
+    }
+        newick += ")";
+
+        return newick;
+    }
+
+    inline string Forest::makeNewick(unsigned precision, bool use_names) {
+        if (_lineages.size() > 1) {
+            return makePartialNewick(precision, use_names);
+        }
+        
+        else {
+            string newick = "";
+            const boost::format tip_node_name_format( boost::str(boost::format("%%s:%%.%df") % precision) );
+            const boost::format tip_node_number_format( boost::str(boost::format("%%d:%%.%df") % precision) );
+            const boost::format internal_node_format( boost::str(boost::format("):%%.%df") % precision) );
+            stack<Node *> node_stack; // TODO: this function doesn't work with >1 cycles
+
+            // find hybrid nodes, don't visit minor or major parent until hybrid node is visited
+            vector<Node*> hybrid_nodes;
+            int n = _nspecies + 1;
+            for (auto &node:_nodes) {
+                if (node._parent2) {
+                    hybrid_nodes.push_back(&node);
+                    string name = "#H" + to_string(n);
+                    node._hybrid_newick_name = name;
+                    n++;
+                }
+            }
+
+                unsigned i = 0;
+                unsigned a = 0;
+                for (auto lineage : _lineages) {
+                    Node * nd = lineage;
+                    while (nd) {
+                        bool skip = false;
+                        for (auto &i:hybrid_nodes) {
+                            if (nd == i->_major_parent || nd == i->_minor_parent) {
+                                skip = true;
+                            }
+                        }
+                        if (nd->_minor_parent && !nd->_visited && !skip) {
+                            a++;
+                            // hybrid node with minor parent
                             if (use_names) {
+                                newick += "(";
+                                newick += boost::str(boost::format(tip_node_name_format)
+                                    % nd->_minor_parent->_name
+                                    % nd->_minor_parent->_edge_length);
+                                newick += ",";
+                                newick += boost::str(boost::format(tip_node_name_format)
+                                    % nd->_hybrid_newick_name
+                                    % nd->_edge_length);
+        //                                nd->_minor_parent->_visited = true;
+                                newick += ")";
+                            }
+
+                            // hybrid node with major parent
+                            if (use_names) {
+                                newick += ",(";
+                                newick += boost::str(boost::format(tip_node_name_format)
+                                    % nd->_major_parent->_name
+                                    % nd->_major_parent->_edge_length);
+                                newick += ",(";
+        //                            newick += "#H_";
                                 newick += boost::str(boost::format(tip_node_name_format)
                                     % nd->_name
                                     % nd->_edge_length);
-                                } else {
-                                newick += boost::str(boost::format(tip_node_number_format)
-                                    % (nd->_number + 1)
+                                newick += "),";
+                                newick += boost::str(boost::format(tip_node_name_format)
+                                    % nd->_hybrid_newick_name
                                     % nd->_edge_length);
+        //                                nd->_major_parent->_visited = true; // TODO: I think this only works if major and minor parents are tip nodes
                             }
-                            if (nd->_right_sib)
-                                newick += ",";
+
                             else {
-                                Node * popped = (node_stack.empty() ? 0 : node_stack.top());
-                                while (popped && !popped->_right_sib) {
-                                    node_stack.pop();
-                                    if (node_stack.empty()) {
-                                        //newick += ")";
-                                        if (lineage->_edge_length != 0.0) {
-                                            newick += boost::str(boost::format(internal_node_format) % lineage->_edge_length);
-                                        }
-                                        popped = 0;
-                                    }
-                                    else {
-                                        newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
-                                        popped = node_stack.top();
-                                    }
+
+                            }
+
+                        }
+        //                    else if (nd->_left_child && !nd->_visited && !skip) {
+                        if (nd->_left_child) {
+                            a++;
+        //                        nd->_visited = true;
+                            // internal node
+                            newick += "(";
+                            node_stack.push(nd);
+                        }
+        //                    else if (!nd->_left_child && !nd->_visited && !skip) {
+                        else {
+                            a++;
+        //                        nd->_visited = true;
+                            // leaf node
+                                if (use_names) {
+                                    newick += boost::str(boost::format(tip_node_name_format)
+                                        % nd->_name
+                                        % nd->_edge_length);
+                                    } else {
+                                    newick += boost::str(boost::format(tip_node_number_format)
+                                        % (nd->_number + 1)
+                                        % nd->_edge_length);
                                 }
-                                if (popped && popped->_right_sib) {
-                                    node_stack.pop();
-                                    newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                                if (nd->_right_sib)
                                     newick += ",";
-                                }
-                        }   // leaf node
-                    }
-                    if (a >= _ninternals + _nleaves - 1 && hybrid_nodes.size()>0) {
-                        break;
-                    }
-    //                    nd->_visited = true;
-                    nd = findNextPreorder(nd);
-                }   // while (subnd)...
+                                else {
+                                    Node * popped = (node_stack.empty() ? 0 : node_stack.top());
+                                    while (popped && !popped->_right_sib) {
+                                        node_stack.pop();
+                                        if (node_stack.empty()) {
+                                            //newick += ")";
+                                            if (lineage->_edge_length != 0.0) {
+                                                newick += boost::str(boost::format(internal_node_format) % lineage->_edge_length);
+                                            }
+                                            popped = 0;
+                                        }
+                                        else {
+                                            newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                                            popped = node_stack.top();
+                                        }
+                                    }
+                                    if (popped && popped->_right_sib) {
+                                        node_stack.pop();
+                                        newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                                        newick += ",";
+                                    }
+                            }   // leaf node
+                        }
+                        if (a >= _ninternals + _nleaves - 1 && hybrid_nodes.size()>0) {
+                            break;
+                        }
+        //                    nd->_visited = true;
+                        nd = findNextPreorder(nd);
+                    }   // while (subnd)...
 
-                if (i < _lineages.size() - 1)
-                    newick += ",";
-                ++i;
+                    if (i < _lineages.size() - 1)
+                        newick += ",";
+                    ++i;
+                }
+            if (hybrid_nodes.size() >0) {
+                newick.pop_back();
+                newick.pop_back();
             }
-        if (hybrid_nodes.size() >0) {
-            newick.pop_back();
-            newick.pop_back();
-        }
-            newick += ")";
+                newick += ")";
 
-            return newick;
+                return newick;
+            }
         }
 
     inline void Forest::setNumTaxa(unsigned n){
@@ -2237,7 +2379,6 @@ class Forest {
         _lineages.resize(other._lineages.size());
         _new_nodes.resize(other._new_nodes.size());
         _preorder.resize(other._preorder.size());
-//        _heights_and_nodes.resize(other._heights_and_nodes.size());
         _nleaves            = other._nleaves;
         _ninternals         = other._ninternals;
         _last_edge_length   = other._last_edge_length;
@@ -2318,35 +2459,33 @@ class Forest {
                     nd->_minor_parent = minor_parent;
                 }
 
-                // copy left child
+            // copy left child
                 if (othernd._left_child) {
-                    unsigned left_child_number = othernd._left_child->_number;
+                unsigned left_child_number = othernd._left_child->_number;
                     Node* left_child = &*next(_nodes.begin(), left_child_number);
                     nd->_left_child = left_child;
-                }
-                
+            }
                 else {
                     nd->_left_child = 0;
                 }
 
-                // copy right sibling
-                if (othernd._right_sib) {
-                    unsigned right_sib_number = othernd._right_sib->_number;
-                    Node* right_sib = &*next(_nodes.begin(), right_sib_number);
-                    nd->_right_sib = right_sib;
-                }
-                else {
-                    nd->_right_sib = 0;
-                    nd->_number = othernd._number;
-                    nd->_name = othernd._name;
-                    nd->_edge_length = othernd._edge_length;
-                    nd->_position_in_lineages = othernd._position_in_lineages;
-                    nd->_partial = othernd._partial;
-                    nd->_visited = othernd._visited;
-                    nd->_hybrid_newick_name = othernd._hybrid_newick_name;
-                    nd->_n_descendants = othernd._n_descendants;
-                    nd->_done = othernd._done;
-                }
+            // copy right sibling
+            if (othernd._right_sib) {
+                unsigned right_sib_number = othernd._right_sib->_number;
+                Node* right_sib = &*next(_nodes.begin(), right_sib_number);
+                nd->_right_sib = right_sib;
+            }
+            else
+                nd->_right_sib = 0;
+                nd->_number = othernd._number;
+                nd->_name = othernd._name;
+                nd->_edge_length = othernd._edge_length;
+                nd->_position_in_lineages = othernd._position_in_lineages;
+                nd->_partial = othernd._partial;
+                nd->_visited = othernd._visited;
+                nd->_hybrid_newick_name = othernd._hybrid_newick_name;
+                nd->_n_descendants = othernd._n_descendants;
+                nd->_done = othernd._done;
             }
         }
 
