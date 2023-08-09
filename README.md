@@ -13,9 +13,6 @@ proposal: specify the prior-prior or prior-post proposal (default is prior-post 
 seed: specify random number seed
   - default is 1
 
-ambigmissing: treat all ambiguities as missing data
-  - default is true
-
 theta: specify the population-scaled mutation rate
   - if estimate_theta is set to true, this value will be the starting value for theta
 
@@ -56,8 +53,13 @@ species_newicks: specify the name of a .txt file containing a species newick obt
  
   - the program will read in the species newick topology and draw branch lengths from the species tree prior
   
-  - if no newick is specified, the program will begin by sampling from the species tree prior
   - if both gene and species newicks are specified, the program will calculate the coalescent likelihood for the species tree given those gene trees and exit
+
+start_from_species_tree_prior: specify the program is to start by sampling from the species tree prior
+  - do not specify any newicks if using this option
+
+start_from_gene_tree_prior: specify the program is to start by sampling from the gene tree prior
+  - do not specify any newicks if using this option
 
 niterations: specify the number of times the program should alternate between filtering the gene trees and species trees
   - 1 iteration = estimate species trees and then estimate gene trees (or vice versa, depending on whether the program is started with species trees or gene trees)
@@ -78,5 +80,11 @@ outgroup: specify the name of the outgroup
 estimate_theta: set to true to estimate theta
   - default value is false
 
+estimate_lambda: set to true to estimate lambda
+  - default value is false
+
 ntries_theta: specify the number of values of theta to try during theta estimation
+  - default value is 50
+
+ntries_lambda: specify the number of values of lambda to try during lambda estimation
   - default value is 50
