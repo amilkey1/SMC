@@ -2,6 +2,7 @@
 #include <vector>
 #include "proj.hpp"
 #include "particle.hpp"
+#include "conditionals.hpp"
 
 // Initialize our random number generator here so it will be a global variable
 #include "lot.hpp"

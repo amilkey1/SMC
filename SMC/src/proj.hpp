@@ -11,6 +11,7 @@
 #include <vector>
 #include <thread>
 #include <boost/algorithm/string/split.hpp>
+#include "conditionals.hpp"
 
 using namespace std;
 using namespace boost;
