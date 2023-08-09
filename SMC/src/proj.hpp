@@ -156,16 +156,6 @@ namespace proj {
         
         weightf << "end trees;" << endl;
         weightf.close();
-        
-        ofstream alltreesf("alltrees.txt");
-        for (unsigned i=0; i < v.size(); i++) {
-            alltreesf << "particle " << i << endl;
-            alltreesf << "species tree = " << v[i]->getSpeciesNewick() << "; " << "\n";
-            vector<string> gene_newicks = v[i]->getGeneTreeNewicks();
-            for (unsigned g=0; g < gene_newicks.size(); g++) {
-                alltreesf << "gene tree " << g+1 << " = " << gene_newicks[g] << "\n";
-            }
-        }
     }
 
     inline void Proj::saveParticleLikelihoods(vector<Particle::SharedPtr> &v) const {
