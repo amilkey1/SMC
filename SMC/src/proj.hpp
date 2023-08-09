@@ -206,8 +206,8 @@ namespace proj {
         ("outgroup", boost::program_options::value(&Forest::_outgroup)->default_value("null"), "specify outgroup in species tree")
         ("estimate_theta", boost::program_options::value(&_estimate_theta)->default_value(false), "estimate theta parameter")
         ("estimate_lambda", boost::program_options::value(&_estimate_lambda)->default_value(false), "estimate lambda parameter")
-        ("ntries_theta", boost::program_options::value(&_ntries_theta)->default_value(50), "specify number of values of theta to try")
-        ("ntries_lambda", boost::program_options::value(&_ntries_lambda)->default_value(50), "specify number of values of lambda to try")
+        ("ntries_theta", boost::program_options::value(&_ntries_theta)->default_value(100), "specify number of values of theta to try")
+        ("ntries_lambda", boost::program_options::value(&_ntries_lambda)->default_value(100), "specify number of values of lambda to try")
         ("start_from_gene_tree_prior", boost::program_options::value(&_sample_from_gene_tree_prior)->default_value(false), "specify starting from gene tree prior")
         ("start_from_species_tree_prior", boost::program_options::value(&_sample_from_species_tree_prior)->default_value(false), "specify starting from species tree prior")
         ;
