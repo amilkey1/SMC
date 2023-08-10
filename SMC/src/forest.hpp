@@ -1065,8 +1065,9 @@ class Forest {
 
         // Resize the _nodes vector
         _nleaves = countNewickLeaves(commentless_newick);
-        if (_nleaves < 4)
+        if (_nleaves < 4) {
             throw XProj("Expecting newick tree description to have at least 4 leaves");
+        }
         unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
 //        max_nodes--; // no root node
 //        unsigned curr_node_index = max_nodes-1; // walk in reverse through _nodes list
@@ -1439,12 +1440,12 @@ class Forest {
         
         if (_nleaves < 4) {
             throw XProj("Expecting newick tree description to have at least 4 leaves");
-            unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
-            _nodes.resize(max_nodes);
-            for (auto & nd : _nodes ) {
-                nd._name = "";
-                nd._number = -1;
-            }
+        }
+        unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
+        _nodes.resize(max_nodes);
+        for (auto & nd : _nodes ) {
+            nd._name = "";
+            nd._number = -1;
         }
 
         try {

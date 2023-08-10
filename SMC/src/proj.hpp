@@ -1092,7 +1092,7 @@ namespace proj {
                     my_vec[s][p]->setLogWeight(0.0, "s");
                     
                     // only sample 1 species tree, and use this tree for all the gene filtering
-                    if (s == 0 && _gene_newicks_names == "null" && p == 0 && _sample_from_species_tree_prior) {
+                    if (s == 0 && _gene_newicks_names == "null" && p == 0) {
                         my_vec[0][p]->processSpeciesNewick(newicks, true); // if no newick specified, program will sample from species tree prior
                     }
                     
