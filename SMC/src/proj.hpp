@@ -61,6 +61,7 @@ namespace proj {
             void                proposeGeneParticlesFromPrior(vector<Particle::SharedPtr> &particles);
             void                proposeGeneParticlesFromPriorRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
             void                initializeTrees(vector<vector<Particle::SharedPtr>> particles, unsigned i, unsigned ngenes);
+            void                sampleFromGeneTreePrior(vector<vector<Particle::SharedPtr>> &particles, unsigned ngenes, unsigned ntaxa, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2);
         
         private:
 
@@ -1148,6 +1149,58 @@ namespace proj {
         }
     }
 
+    inline void Proj::sampleFromGeneTreePrior(vector<vector<Particle::SharedPtr>> &particles, unsigned ngenes, unsigned ntaxa, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2) {
+        
+        _sample_from_gene_tree_prior = false;
+        _start = "gene";
+        for (unsigned s=1; s<ngenes+1; s++) {
+            for (auto &p:particles[s]) {
+                p->resetGeneTreePartials(_data, _taxon_map, s);
+            }
+        }
+        for (unsigned g=0; g<ntaxa-1; g++) {
+            cout << "prior generation " << g << endl;
+            // filter particles within each gene
+            
+            for (unsigned s=1; s<ngenes+1; s++) { // skip species tree particles
+                
+                proposeGeneParticlesFromPrior(particles[s]);
+                
+                if (!_run_on_empty) {
+                    bool calc_marg_like = true;
+                    
+                    normalizeWeights(particles[s], "g", calc_marg_like);
+                    
+                    double ess_inverse = 0.0;
+                    
+                    for (unsigned p=0; p<_nparticles; p++) {
+                        ess_inverse += exp(2.0*particles[s][p]->getLogWeight("g"));
+                    }
+
+//                    double ess = 1.0/ess_inverse;
+//                    cout << "   " << "ESS = " << ess << endl;
+                 
+                    resampleParticles(particles[s], _use_first ? my_vec_2[s]:my_vec_1[s], "g");
+                    //if use_first is true, my_vec = my_vec_2
+                    //if use_first is false, my_vec = my_vec_1
+                    
+                    particles[s] = _use_first ? my_vec_2[s]:my_vec_1[s];
+                    // do not need to resample species trees; species tree will remain the same throughout all gene tree filtering
+                    
+                    assert(particles[s].size() == _nparticles);
+                }
+                //change use_first from true to false or false to true
+                _use_first = !_use_first;
+                if (g < ntaxa-2) {
+                    resetWeights(particles[s], "g");
+                }
+                    assert (_accepted_particle_vec.size() == ngenes+1);
+                    _accepted_particle_vec[s] = particles[s];
+                } // s loop
+        } // g loop
+        writeGeneTreeFile();
+    }
+
     inline void Proj::run() {
         cout << "Starting..." << endl;
         cout << "Current working directory: " << boost::filesystem::current_path() << endl;
@@ -1192,7 +1245,7 @@ namespace proj {
                 }
             }
 
-            bool use_first = true;
+            _use_first = true;
             _both = false;
             
             handleInitialNewicks(my_vec, nsubsets);
@@ -1204,56 +1257,8 @@ namespace proj {
                 initializeTrees(my_vec, i, nsubsets);
                 
                 if (_sample_from_gene_tree_prior) {
-                    _sample_from_gene_tree_prior = false;
-                    _start = "gene";
-                    for (unsigned s=1; s<nsubsets+1; s++) {
-                        for (auto &p:my_vec[s]) {
-                            p->resetGeneTreePartials(_data, _taxon_map, s);
-                        }
-                    }
-                    for (unsigned g=0; g<ntaxa-1; g++) {
-                        cout << "prior generation " << g << endl;
-                        // filter particles within each gene
-                        
-                        for (unsigned s=1; s<nsubsets+1; s++) { // skip species tree particles
-                            
-                            proposeGeneParticlesFromPrior(my_vec[s]);
-                            
-                            if (!_run_on_empty) {
-                                bool calc_marg_like = true;
-                                
-                                normalizeWeights(my_vec[s], "g", calc_marg_like);
-                                
-                                double ess_inverse = 0.0;
-                                
-                                for (unsigned p=0; p<_nparticles; p++) {
-                                    ess_inverse += exp(2.0*my_vec[s][p]->getLogWeight("g"));
-                                }
-
-            //                                    double ess = 1.0/ess_inverse;
-            //                                    cout << "   " << "ESS = " << ess << endl;
-                             
-                                resampleParticles(my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s], "g");
-                                //if use_first is true, my_vec = my_vec_2
-                                //if use_first is false, my_vec = my_vec_1
-                                
-                                my_vec[s] = use_first ? my_vec_2[s]:my_vec_1[s];
-                                // do not need to resample species trees; species tree will remain the same throughout all gene tree filtering
-                                
-                                assert(my_vec[s].size() == nparticles);
-                            }
-                            //change use_first from true to false or false to true
-                            use_first = !use_first;
-                            if (g < ntaxa-2) {
-                                resetWeights(my_vec[s], "g");
-                            }
-                                assert (_accepted_particle_vec.size() == nsubsets+1);
-                                _accepted_particle_vec[s] = my_vec[s];
-                            } // s loop
-                    } // g loop
-                    writeGeneTreeFile();
+                    sampleFromGeneTreePrior(my_vec, nsubsets, ntaxa, my_vec_1, my_vec_2);
                 }
-                
                 
                 // my_vec[0] is the species tree particles
                 // my_vec[1] is gene 1 particles
@@ -1337,18 +1342,18 @@ namespace proj {
 //                                    double ess = 1.0/ess_inverse;
 //                                    cout << "   " << "ESS = " << ess << endl;
                              
-                                resampleParticles(my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s], "g");
+                                resampleParticles(my_vec[s], _use_first ? my_vec_2[s]:my_vec_1[s], "g");
                                 //if use_first is true, my_vec = my_vec_2
                                 //if use_first is false, my_vec = my_vec_1
                                 
-                                my_vec[s] = use_first ? my_vec_2[s]:my_vec_1[s];
+                                my_vec[s] = _use_first ? my_vec_2[s]:my_vec_1[s];
                                 // do not need to resample species trees; species tree will remain the same throughout all gene tree filtering
                                 
                                 assert(my_vec[s].size() == nparticles);
 //                                    assert(my_vec[s].size() == nparticles*_species_particles_per_gene_particle);
                             }
                             //change use_first from true to false or false to true
-                            use_first = !use_first;
+                            _use_first = !_use_first;
                             if (g < ntaxa-2) {
                                 resetWeights(my_vec[s], "g");
                             }
@@ -1466,19 +1471,19 @@ namespace proj {
 
                             double ess = 1.0/ess_inverse;
                             cout << "   " << "ESS = " << ess << endl;
-                            vector<int> sel_indices = resampleSpeciesParticles(my_vec[0], use_first ? my_vec_2[0]:my_vec_1[0], "s");
+                            vector<int> sel_indices = resampleSpeciesParticles(my_vec[0], _use_first ? my_vec_2[0]:my_vec_1[0], "s");
                             //if use_first is true, my_vec = my_vec_2
                             //if use_first is false, my_vec = my_vec_1
                             
-                            my_vec[0] = use_first ? my_vec_2[0]:my_vec_1[0];
+                            my_vec[0] = _use_first ? my_vec_2[0]:my_vec_1[0];
                             
                             for (unsigned s=1; s<nsubsets+1; s++) {
-                                resetGeneParticles(sel_indices, my_vec[s], use_first ? my_vec_2[s]:my_vec_1[s]);
-                                my_vec[s] = use_first ? my_vec_2[s]:my_vec_1[s];
+                                resetGeneParticles(sel_indices, my_vec[s], _use_first ? my_vec_2[s]:my_vec_1[s]);
+                                my_vec[s] = _use_first ? my_vec_2[s]:my_vec_1[s];
                             }
                             
                             //change use_first from true to false or false to true
-                            use_first = !use_first;
+                            _use_first = !_use_first;
                         }
                         _accepted_particle_vec[0] = my_vec[0];
                         _start = "species";
