@@ -67,6 +67,7 @@ namespace proj {
             void                sampleFromGeneTreePrior(vector<vector<Particle::SharedPtr>> &particles, unsigned ngenes, unsigned ntaxa, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2);
             void                removeExtraParticles(vector<vector<Particle::SharedPtr>> &my_vec, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2, unsigned nparticles, unsigned ngenes);
             void                resetGeneTreeWeights(vector<vector<Particle::SharedPtr>> &my_vec, unsigned ngenes);
+            void                saveSelectedGeneTrees(vector<vector<Particle::SharedPtr>> &my_vec, unsigned ngenes);
         
         private:
 
@@ -1230,6 +1231,14 @@ namespace proj {
         }
     }
 
+    inline void Proj::saveSelectedGeneTrees(vector<vector<Particle::SharedPtr>> &particles, unsigned ngenes) {
+        ofstream sel_gene_treesf("selected_gene_trees.txt");
+        for (unsigned s=1; s<ngenes+1; s++) {
+            sel_gene_treesf << "gene : " << s << " " << particles[s][0]->saveForestNewick();
+        }
+        sel_gene_treesf.close();
+    }
+
     inline void Proj::growGeneTrees(vector<Particle::SharedPtr> &gene_particles, vector<Particle::SharedPtr> &my_vec_1_s, vector<Particle::SharedPtr> &my_vec_2_s, Particle::SharedPtr &species_tree_particle, unsigned ntaxa, unsigned ngenes, unsigned gene_number, unsigned iteration) {
         
         cout <<  "growing gene " << gene_number << endl;
@@ -1455,9 +1464,11 @@ namespace proj {
                     }
                 }
                     
+                saveSelectedGeneTrees(my_vec, nsubsets);
+                
                 if (i < _niterations-1) {
                     setUpForSpeciesFiltering(my_vec, nsubsets, nparticles);
-
+                    
                     // filter species trees now
                     for (unsigned s=0; s<nspecies; s++) {
                         cout << "beginning species tree proposals" << endl;
@@ -1473,14 +1484,6 @@ namespace proj {
                         }
                         
                         proposeSpeciesParticles(my_vec, s, nspecies, nsubsets);
-                        
-                        if (s == 0) {
-                            ofstream sel_gene_treesf("selected_gene_trees.txt");
-                            for (unsigned s=1; s<nsubsets+1; s++) {
-                                sel_gene_treesf << "gene : " << s << " " << my_vec[s][0]->saveForestNewick();
-                            }
-                            sel_gene_treesf.close();
-                        }
 
                         // filter - make sure all gene trees go along with correct species tree
                         
