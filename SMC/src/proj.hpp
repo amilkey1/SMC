@@ -950,6 +950,12 @@ namespace proj {
 
         //set number of species to number in data file
         setNumberTaxa(_data);
+        
+        
+        Particle::_run_on_empty = false;
+        if (_run_on_empty) {
+            Particle::_run_on_empty = true;
+        }
     }
 
     inline void Proj::proposeGeneParticlesFromPriorRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles) {
@@ -1151,11 +1157,6 @@ namespace proj {
             _both = false;
             
             handleInitialNewicks(my_vec, nsubsets);
-            
-            Particle::_run_on_empty = false;
-            if (_run_on_empty) {
-                Particle::_run_on_empty = true;
-            }
             
             unsigned ntaxa = (unsigned) _taxon_map.size();
             bool deconstruct = false;
