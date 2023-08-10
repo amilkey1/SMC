@@ -57,6 +57,8 @@ namespace proj {
             void                saveGeneAndSpeciesTrees(vector<Particle::SharedPtr> particles);
             void                updateTheta(Particle & species_particle, unsigned ntries, double delta, vector<Particle> & gene_particles);
             void                updateLambda(Particle & species_particle, unsigned ntries, double delta);
+            void                estimateParameters(vector<vector<Particle::SharedPtr>> my_vec, Particle::SharedPtr species_tree_particle, unsigned ngenes);
+            void                setUpForSpeciesFiltering(vector<vector<Particle::SharedPtr>> my_vec, unsigned ngenes, unsigned nparticles);
             double              calcLogSum(vector<double> vec);
             unsigned            multinomialDraw (const vector<double> & probs);
             void                proposeGeneParticlesFromPrior(vector<Particle::SharedPtr> &particles);
@@ -1277,6 +1279,48 @@ namespace proj {
         } // g loop
     }
 
+    inline void Proj::estimateParameters(vector<vector<Particle::SharedPtr>> my_vec, Particle::SharedPtr species_tree_particle, unsigned ngenes) {
+        if (_estimate_theta) {
+            // try multiple theta values
+            double delta_theta = 1.0;
+            vector<Particle> gene_particles;
+            for (unsigned s=1; s<ngenes+1; s++) {
+                gene_particles.push_back(*my_vec[s][0]); // all gene trees are the same at this point, preserved from previous round of filtering
+            }
+            
+            updateTheta(*species_tree_particle, _ntries_theta, delta_theta, gene_particles);
+        }
+        
+        if (_estimate_lambda) {
+            double delta_lambda = 50.0;
+            updateLambda(*species_tree_particle, _ntries_lambda, delta_lambda);
+        }
+    }
+
+    inline void Proj::setUpForSpeciesFiltering(vector<vector<Particle::SharedPtr>> particles, unsigned ngenes, unsigned nparticles) {
+        _species_tree_log_marginal_likelihood = 0.0;
+        
+        for (unsigned p=0; p < particles[0].size(); p++) {
+            particles[0][p]->mapSpecies(_taxon_map, _species_names, 0);
+            particles[0][p]->resetSpecies();
+        }
+        
+        for (unsigned s=1; s<ngenes+1; s++) {
+            for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
+                particles[s][p]->mapSpecies(_taxon_map, _species_names, s);
+                particles[s][p]->refreshGeneTreePreorder();
+                particles[s][p]->calcGeneTreeMinDepth(); // reset min depth vector for gene trees
+                particles[s][p]->resetLogTopologyPrior();
+            }
+        }
+        
+        for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
+            particles[0][p]->setLogLikelihood(0.0);
+            particles[0][p]->setLogWeight(0.0, "g");
+            particles[0][p]->setLogWeight(0.0, "s");
+        }
+    }
+
     inline void Proj::run() {
         cout << "Starting..." << endl;
         cout << "Current working directory: " << boost::filesystem::current_path() << endl;
@@ -1350,20 +1394,8 @@ namespace proj {
                     if (i > 0) {
                         species_tree_particle = chooseTree(my_vec[0], "s"); // pass in all the species trees
                         
-                        if (_estimate_theta) {
-                            // try multiple theta values
-                            double delta_theta = 1.0;
-                            vector<Particle> gene_particles;
-                            for (unsigned s=1; s<nsubsets+1; s++) {
-                                gene_particles.push_back(*my_vec[s][0]); // all gene trees are the same at this point, preserved from previous round of filtering
-                            }
-                            
-                            updateTheta(*species_tree_particle, _ntries_theta, delta_theta, gene_particles);
-                        }
-                        
-                        if (_estimate_lambda) {
-                            double delta_lambda = 50.0;
-                            updateLambda(*species_tree_particle, _ntries_lambda, delta_lambda);
+                        if (_estimate_theta || _estimate_lambda) {
+                            estimateParameters(my_vec, species_tree_particle, nsubsets);
                         }
             
                         // delete extra particles
@@ -1424,29 +1456,8 @@ namespace proj {
                 }
                     
                 if (i < _niterations-1) {
-                    _species_tree_log_marginal_likelihood = 0.0;
-                    
-                for (unsigned p=0; p < my_vec[0].size(); p++) {
-                        my_vec[0][p]->mapSpecies(_taxon_map, _species_names, 0);
-                        my_vec[0][p]->resetSpecies();
-                    }
-                    
-                    for (unsigned s=1; s<nsubsets+1; s++) {
-                        for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
-                            my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
-                            my_vec[s][p]->refreshGeneTreePreorder();
-                            my_vec[s][p]->calcGeneTreeMinDepth(); // reset min depth vector for gene trees
-                            my_vec[s][p]->resetLogTopologyPrior();
-                        }
-                    }
-                    
-                    // filter species trees
-                    for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
-                        my_vec[0][p]->setLogLikelihood(0.0);
-                        my_vec[0][p]->setLogWeight(0.0, "g");
-                        my_vec[0][p]->setLogWeight(0.0, "s");
-                    }
-                    
+                    setUpForSpeciesFiltering(my_vec, nsubsets, nparticles);
+
                     // filter species trees now
                     for (unsigned s=0; s<nspecies; s++) {
                         cout << "beginning species tree proposals" << endl;
