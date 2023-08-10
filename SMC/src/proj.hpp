@@ -46,6 +46,7 @@ namespace proj {
             void                proposeSpeciesParticles(vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
             void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, Particle::SharedPtr species_tree_particle);
             void                growGeneTrees(vector<Particle::SharedPtr> &gene_particles, vector<Particle::SharedPtr> &my_vec_1_s, vector<Particle::SharedPtr> &my_vec_2_s, Particle::SharedPtr &species_tree_particle, unsigned ntaxa, unsigned ngenes, unsigned gene_number, unsigned iteration);
+            void                growSpeciesTrees(vector<vector<Particle::SharedPtr>> &particles, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2, unsigned ngenes, unsigned nspecies, unsigned nparticles);
             void                handleInitialNewicks(vector<vector<Particle::SharedPtr>> &particles, unsigned ngenes);
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
             void                writeGeneTreeFile();
@@ -162,7 +163,7 @@ namespace proj {
     inline void Proj::saveParticleWeights(vector<Particle::SharedPtr> &v) const {
         // this function saves particle weights + species tree newick
         
-        ofstream weightf("weights.txt");
+        ofstream weightf("species_trees.txt");
         weightf << "begin trees;" << endl;
         
         for (unsigned i=0; i < v.size(); i++) {
@@ -1330,6 +1331,57 @@ namespace proj {
         }
     }
 
+    inline void Proj::growSpeciesTrees(vector<vector<Particle::SharedPtr>> &particles, vector<vector<Particle::SharedPtr>> &particles_1, vector<vector<Particle::SharedPtr>> &particles_2, unsigned ngenes, unsigned nspecies, unsigned nparticles) {
+        
+        for (unsigned s=0; s<nspecies; s++) {
+            cout << "beginning species tree proposals" << endl;
+            
+            if (s == 0) {
+                for (unsigned j=1; j<ngenes+1; j++) {
+                    // reset gene tree log coalescent likelihoods to 0
+                    for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
+                        particles[j][p]->setLogCoalescentLikelihood(0.0);
+                    }
+                }
+            }
+            
+            proposeSpeciesParticles(particles, s, nspecies, ngenes);
+
+            // filter - make sure all gene trees go along with correct species tree
+            
+            if (!_run_on_empty) {
+                bool calc_marg_like = false;
+                
+                normalizeWeights(particles[0], "s", calc_marg_like);
+                
+                double ess_inverse = 0.0;
+                
+                for (auto & p:particles[0]) {
+                    ess_inverse += exp(2.0*p->getLogWeight("s"));
+                }
+
+                double ess = 1.0/ess_inverse;
+                cout << "   " << "ESS = " << ess << endl;
+                vector<int> sel_indices = resampleSpeciesParticles(particles[0], _use_first ? particles_2[0]:particles_1[0], "s");
+                //if use_first is true, my_vec = my_vec_2
+                //if use_first is false, my_vec = my_vec_1
+                
+                particles[0] = _use_first ? particles_2[0]:particles_1[0];
+                
+                for (unsigned s=1; s<ngenes+1; s++) {
+                    resetGeneParticles(sel_indices, particles[s], _use_first ? particles_2[s]:particles_1[s]);
+                    particles[s] = _use_first ? particles_2[s]:particles_1[s];
+                }
+                
+                //change use_first from true to false or false to true
+                _use_first = !_use_first;
+            }
+            _accepted_particle_vec[0] = particles[0];
+            _start = "species";
+
+        } // s loop
+    }
+
     inline void Proj::run() {
         cout << "Starting..." << endl;
         cout << "Current working directory: " << boost::filesystem::current_path() << endl;
@@ -1422,7 +1474,7 @@ namespace proj {
                     
                     species_tree_particle->showParticle();
                     
-                    for (unsigned s=1; s<nsubsets+1; s++) {
+                    for (unsigned s=1; s<nsubsets+1; s++) { // grow gene trees conditional on selected species tree
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                     }
                 }
@@ -1466,58 +1518,11 @@ namespace proj {
                     
                 saveSelectedGeneTrees(my_vec, nsubsets);
                 
+                // build species trees
+                
                 if (i < _niterations-1) {
                     setUpForSpeciesFiltering(my_vec, nsubsets, nparticles);
-                    
-                    // filter species trees now
-                    for (unsigned s=0; s<nspecies; s++) {
-                        cout << "beginning species tree proposals" << endl;
-                        //taxon joining and reweighting step
-                        
-                        if (s == 0) {
-                            for (unsigned j=1; j<nsubsets+1; j++) {
-                                // reset gene tree log coalescent likelihoods to 0
-                                for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
-                                    my_vec[j][p]->setLogCoalescentLikelihood(0.0);
-                                }
-                            }
-                        }
-                        
-                        proposeSpeciesParticles(my_vec, s, nspecies, nsubsets);
-
-                        // filter - make sure all gene trees go along with correct species tree
-                        
-                        if (!_run_on_empty) {
-                            bool calc_marg_like = false;
-                            
-                            normalizeWeights(my_vec[0], "s", calc_marg_like);
-                            
-                            double ess_inverse = 0.0;
-                            
-                            for (auto & p:my_vec[0]) {
-                                ess_inverse += exp(2.0*p->getLogWeight("s"));
-                            }
-
-                            double ess = 1.0/ess_inverse;
-                            cout << "   " << "ESS = " << ess << endl;
-                            vector<int> sel_indices = resampleSpeciesParticles(my_vec[0], _use_first ? my_vec_2[0]:my_vec_1[0], "s");
-                            //if use_first is true, my_vec = my_vec_2
-                            //if use_first is false, my_vec = my_vec_1
-                            
-                            my_vec[0] = _use_first ? my_vec_2[0]:my_vec_1[0];
-                            
-                            for (unsigned s=1; s<nsubsets+1; s++) {
-                                resetGeneParticles(sel_indices, my_vec[s], _use_first ? my_vec_2[s]:my_vec_1[s]);
-                                my_vec[s] = _use_first ? my_vec_2[s]:my_vec_1[s];
-                            }
-                            
-                            //change use_first from true to false or false to true
-                            _use_first = !_use_first;
-                        }
-                        _accepted_particle_vec[0] = my_vec[0];
-                        _start = "species";
-
-                    } // s loop
+                    growSpeciesTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nspecies, nparticles); // grow and filter species trees conditional on selected gene trees
                     
                     if (i == _niterations - 2) {
                         writeSpeciesTreeLoradFile(my_vec[0], nspecies);
@@ -1529,9 +1534,6 @@ namespace proj {
             writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
             
             writeGeneTreeFile();
-                        
-            // saveParticleWeights(_accepted_particle_vec);
-            // saveParticleLikelihoods(_accepted_particle_vec);
 
 //            saveAllHybridNodes(_accepted_particle_vec);
             showFinal(_accepted_particle_vec);
