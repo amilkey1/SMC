@@ -45,6 +45,7 @@ namespace proj {
             void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
             void                proposeSpeciesParticles(vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
             void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, bool deconstruct, Particle::SharedPtr species_tree_particle);
+            void                handleInitialNewicks(vector<vector<Particle::SharedPtr>> &particles, unsigned ngenes);
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
             void                writeGeneTreeFile();
             Particle::SharedPtr chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species);
@@ -95,6 +96,10 @@ namespace proj {
             int                         _species_particles_per_gene_particle;
             bool                        _sample_from_gene_tree_prior;
             bool                        _sample_from_species_tree_prior;
+            bool                        _both;
+            string                      _start;
+            bool                        _use_first;
+            bool                        _gene_first;
     };
 
     inline Proj::Proj() {
@@ -995,6 +1000,109 @@ namespace proj {
         
     }
 
+    inline void Proj::handleInitialNewicks(vector<vector<Particle::SharedPtr>> &particles, unsigned ngenes) {
+        vector<string> newicks;
+        unsigned nparticles = _nparticles;
+        
+        if (_species_newicks_name != "null") {
+            ifstream infile(_species_newicks_name);
+            string newick;
+            unsigned size_before = (int) newicks.size();
+            while (getline(infile, newick)) {
+                newicks.push_back(newick);
+            }
+            unsigned size_after = (int) newicks.size();
+            if (size_before == size_after) {
+                throw XProj("cannot find species newick file");
+            }
+        }
+        
+        if (_gene_newicks_names != "null") {
+            if (_niterations == 1) {
+                throw XProj(boost::str(boost::format("must specify more than 1 iteration if beginning from gene trees")));
+            }
+            ifstream infile(_gene_newicks_names);
+            string newick;
+            int size_before = (int) newicks.size();
+            while (getline(infile, newick)) {
+                newicks.push_back(newick);
+            }
+            int size_after = (int) newicks.size();
+            if (size_before == size_after) {
+                throw XProj("cannot find gene newick file");
+            }
+        }
+        
+        if (newicks.size() == 0 && !_sample_from_gene_tree_prior && !_sample_from_species_tree_prior) {
+            throw XProj("Must specify gene newicks, species newicks, gene tree prior, or species tree prior");
+        }
+        
+        _start = "species"; // start variable defines if program should start with gene or species trees
+        
+        for (unsigned s=0; s<ngenes+1; s++) {
+            
+            for (unsigned p=0; p<nparticles; p++) {
+                particles[s][p]->setData(_data, _taxon_map, s);
+                particles[s][p]->mapSpecies(_taxon_map, _species_names, s);
+                particles[s][p]->setParticleGeneration(0);
+                particles[s][p]->setLogLikelihood(0.0);
+                particles[s][p]->setLogCoalescentLikelihood(0.0);
+                particles[s][p]->setLogWeight(0.0, "g");
+                particles[s][p]->setLogWeight(0.0, "s");
+                
+                // only sample 1 species tree, and use this tree for all the gene filtering
+                if (s == 0 && _gene_newicks_names == "null" && p == 0) {
+                    particles[0][p]->processSpeciesNewick(newicks, true); // if no newick specified, program will sample from species tree prior
+                }
+                
+                if (s == 0 && _species_newicks_name != "null" && newicks.size() > 1) {
+                    vector<string> species_newick;
+                    species_newick.push_back(newicks[0]);
+                    particles[0][p]->processSpeciesNewick(species_newick, false); // read in species newick
+                    _both = true;
+                }
+            }
+        }
+        _gene_first = false;
+        
+        if (!_sample_from_gene_tree_prior) {
+            
+            if (_gene_newicks_names != "null") {
+                if (_both) {
+                    newicks.erase(newicks.begin()); // if specifying gene trees and species trees, erase the species newick because it's already been processed
+                }
+                assert (newicks.size() == ngenes);
+                
+                for (unsigned s=1; s<ngenes+1; s++) {
+                    for (unsigned p=0; p<nparticles; p++) {
+                        particles[s][p]->processGeneNewicks(newicks, s-1);
+                        particles[s][p]->mapSpecies(_taxon_map, _species_names, s);
+                        _start = "gene";
+                        _gene_first = true;
+                    }
+                }
+                
+                _accepted_particle_vec = particles;
+            }
+        }
+        
+        
+        // if both specified, calculate the coalescent likelihood and return it, ending the program
+        if (_both) {
+            cout << "...... calculating coalescent likelihood for specified trees ......" << endl;
+            vector<pair<tuple<string, string, string>, double>> species_info = particles[0][0]->getSpeciesJoined();
+            
+            double log_coalescent_likelihood = 0.0;
+            for (unsigned s=1; s<ngenes+1; s++) {
+                    particles[s][0]->refreshGeneTreePreorder();
+                    log_coalescent_likelihood += particles[s][0]->calcCoalLikeForNewTheta(Forest::_theta, species_info, _both);
+                }
+            cout << "log coalescent likelihood: " << log_coalescent_likelihood << endl;
+            exit(0);
+        }
+        
+    }
+
     inline void Proj::run() {
         cout << "Starting..." << endl;
         cout << "Current working directory: " << boost::filesystem::current_path() << endl;
@@ -1040,92 +1148,9 @@ namespace proj {
             }
 
             bool use_first = true;
-            bool both = false;
+            _both = false;
             
-            vector<string> newicks;
-            
-            if (_species_newicks_name != "null") {
-                ifstream infile(_species_newicks_name);
-                string newick;
-                unsigned size_before = (int) newicks.size();
-                while (getline(infile, newick)) {
-                    newicks.push_back(newick);
-                }
-                unsigned size_after = (int) newicks.size();
-                if (size_before == size_after) {
-                    throw XProj("cannot find species newick file");
-                }
-            }
-            
-            if (_gene_newicks_names != "null") {
-                if (_niterations == 1) {
-                    throw XProj(boost::str(boost::format("must specify more than 1 iteration if beginning from gene trees")));
-                }
-                ifstream infile(_gene_newicks_names);
-                string newick;
-                int size_before = (int) newicks.size();
-                while (getline(infile, newick)) {
-                    newicks.push_back(newick);
-                }
-                int size_after = (int) newicks.size();
-                if (size_before == size_after) {
-                    throw XProj("cannot find gene newick file");
-                }
-            }
-            
-            if (newicks.size() == 0 && !_sample_from_gene_tree_prior && !_sample_from_species_tree_prior) {
-                throw XProj("Must specify gene newicks, species newicks, gene tree prior, or species tree prior");
-            }
-            
-            string start = "species"; // start variable defines if program should start with gene or species trees
-            
-            for (unsigned s=0; s<nsubsets+1; s++) {
-                nparticles = _nparticles;
-                
-                for (unsigned p=0; p<nparticles; p++) {
-                    my_vec[s][p]->setData(_data, _taxon_map, s);
-                    my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
-                    my_vec[s][p]->setParticleGeneration(0);
-                    my_vec[s][p]->setLogLikelihood(0.0);
-                    my_vec[s][p]->setLogCoalescentLikelihood(0.0);
-                    my_vec[s][p]->setLogWeight(0.0, "g");
-                    my_vec[s][p]->setLogWeight(0.0, "s");
-                    
-                    // only sample 1 species tree, and use this tree for all the gene filtering
-                    if (s == 0 && _gene_newicks_names == "null" && p == 0) {
-                        my_vec[0][p]->processSpeciesNewick(newicks, true); // if no newick specified, program will sample from species tree prior
-                    }
-                    
-                    if (s == 0 && _species_newicks_name != "null" && newicks.size() > 1) {
-                        vector<string> species_newick;
-                        species_newick.push_back(newicks[0]);
-                        my_vec[0][p]->processSpeciesNewick(species_newick, false); // read in species newick
-                        both = true;
-                    }
-                }
-            }
-            bool gene_first = false;
-            
-            if (!_sample_from_gene_tree_prior) {
-                
-                if (_gene_newicks_names != "null") {
-                    if (both) {
-                        newicks.erase(newicks.begin()); // if specifying gene trees and species trees, erase the species newick because it's already been processed
-                    }
-                    assert (newicks.size() == nsubsets);
-                    
-                    for (unsigned s=1; s<nsubsets+1; s++) {
-                        for (unsigned p=0; p<nparticles; p++) {
-                            my_vec[s][p]->processGeneNewicks(newicks, s-1);
-                            my_vec[s][p]->mapSpecies(_taxon_map, _species_names, s);
-                            start = "gene";
-                            gene_first = true;
-                        }
-                    }
-                    
-                    _accepted_particle_vec = my_vec;
-                }
-            }
+            handleInitialNewicks(my_vec, nsubsets);
             
             if (_run_on_empty) {
                 for (unsigned s=0; s<nsubsets+1; s++) {
@@ -1155,22 +1180,8 @@ namespace proj {
                     }
                 }
                 
-                // if both specified, calculate the coalescent likelihood and return it, ending the program
-                if (both) {
-                    cout << "...... calculating coalescent likelihood for specified trees ......" << endl;
-                    vector<pair<tuple<string, string, string>, double>> species_info = my_vec[0][0]->getSpeciesJoined();
-                    
-                    double log_coalescent_likelihood = 0.0;
-                    for (unsigned s=1; s<nsubsets+1; s++) {
-                            my_vec[s][0]->refreshGeneTreePreorder();
-                            log_coalescent_likelihood += my_vec[s][0]->calcCoalLikeForNewTheta(Forest::_theta, species_info, both);
-                        }
-                    cout << "log coalescent likelihood: " << log_coalescent_likelihood << endl;
-                    exit(0);
-                }
-                
                 // keep the species partition for the gene forests at this stage but clear the tree structure
-                 if (i == 1 && gene_first == true) {
+                 if (i == 1 && _gene_first == true) {
                      for (unsigned s=1; s<nsubsets+1; s++) {
                          // start at s=1 to only modify the gene trees
                          for (unsigned p=0; p<nparticles; p++) {
@@ -1187,7 +1198,7 @@ namespace proj {
                 
                 if (_sample_from_gene_tree_prior) {
                     _sample_from_gene_tree_prior = false;
-                    start = "gene";
+                    _start = "gene";
                     for (unsigned s=1; s<nsubsets+1; s++) {
                         for (auto &p:my_vec[s]) {
                             p->resetGeneTreePartials(_data, _taxon_map, s);
@@ -1243,7 +1254,7 @@ namespace proj {
                 // etc
                 
                 // filter gene trees
-                if (start == "species") {
+                if (_start == "species") {
                     // pick a species tree to use for all the gene trees for this step
                     
                     Particle::SharedPtr species_tree_particle;
@@ -1463,7 +1474,7 @@ namespace proj {
                             use_first = !use_first;
                         }
                         _accepted_particle_vec[0] = my_vec[0];
-                        start = "species";
+                        _start = "species";
 
                     } // s loop
                     

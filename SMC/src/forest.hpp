@@ -1069,15 +1069,11 @@ class Forest {
             throw XProj("Expecting newick tree description to have at least 4 leaves");
         }
         unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
-//        max_nodes--; // no root node
-//        unsigned curr_node_index = max_nodes-1; // walk in reverse through _nodes list
         _nodes.resize(max_nodes);
 //        int b=0;
         for (auto & nd : _nodes ) {
             nd._name = "";
             nd._number = -1;
-//            nd._number = b;
-//            b++;
         }
 
         try {
