@@ -1152,12 +1152,9 @@ namespace proj {
             
             handleInitialNewicks(my_vec, nsubsets);
             
+            Particle::_run_on_empty = false;
             if (_run_on_empty) {
-                for (unsigned s=0; s<nsubsets+1; s++) {
-                    for (unsigned p=0; p<nparticles; p++) {
-                        my_vec[s][p]->setRunOnEmpty(_run_on_empty);
-                    }
-                }
+                Particle::_run_on_empty = true;
             }
             
             unsigned ntaxa = (unsigned) _taxon_map.size();

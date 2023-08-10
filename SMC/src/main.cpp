@@ -34,7 +34,7 @@ string Forest::_string_base_frequencies;
 double Forest::_migration_rate;
 double Forest::_hybridization_rate;
 string Forest::_outgroup;
-//bool Proj::_run_on_empty;
+bool Particle::_run_on_empty;
 double Forest::_theta_prior_mean = 1;
 double Forest::_lambda_prior_mean = 1;
 

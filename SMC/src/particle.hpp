@@ -70,7 +70,6 @@ class Particle {
         void                                            showGamma();
         string                                          saveGamma();
         void                                            calculateGamma();
-        void                                            setRunOnEmpty(bool a) {_running_on_empty = a;}
         vector<double>                                  getBranchLengths();
         vector<double>                                  getBranchLengthPriors();
         vector<double>                                  getGeneTreeLogLikelihoods();
@@ -106,6 +105,7 @@ class Particle {
         void                                            buildEntireGeneTree();
         void                                            sampleGeneTreePrior();
         double                                          calcLogSpeciesTreeDensityGivenLambda(double lambda);
+        static bool                                     _run_on_empty;
     
     private:
 
@@ -117,7 +117,6 @@ class Particle {
         double                                  _log_likelihood;
         double                                  _log_coalescent_likelihood;
         unsigned                                _generation = 0;
-        bool                                    _running_on_empty = false;
         double                                  _species_tree_height;
         vector<pair<tuple<string, string, string>, double>> _t;
         bool                                    _inf = false;
@@ -217,7 +216,7 @@ class Particle {
             geneTreeProposal(deconstruct, species_joined);
         }
         
-        if (_running_on_empty) {
+        if (_run_on_empty) {
             _generation++;
             _log_weight = 0.0;
         }
@@ -238,7 +237,7 @@ class Particle {
             _forest.refreshPreorder();
         }
 
-        if (!_running_on_empty) {
+        if (!_run_on_empty) {
             double prev_log_likelihood = _log_likelihood;
             _log_likelihood = _forest._gene_tree_log_likelihood + _forest._gene_tree_log_coalescent_likelihood;
 
@@ -354,7 +353,7 @@ class Particle {
         double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
         _log_coalescent_likelihood = log_coalescent_likelihood;
         
-        if (!_running_on_empty) {
+        if (!_run_on_empty) {
             _species_log_weight = log_coalescent_likelihood - prev_log_coalescent_likelihood;
             double test = 1 / _species_log_weight;
             if (test == -0) {
@@ -699,7 +698,6 @@ class Particle {
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;
         _t              = other._t;
-        _running_on_empty = other._running_on_empty;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _species_tree_height = other._species_tree_height;
         _inf = other._inf;
