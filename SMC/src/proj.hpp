@@ -63,6 +63,7 @@ namespace proj {
             void                initializeTrees(vector<vector<Particle::SharedPtr>> particles, unsigned i, unsigned ngenes);
             void                sampleFromGeneTreePrior(vector<vector<Particle::SharedPtr>> &particles, unsigned ngenes, unsigned ntaxa, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2);
             void                removeExtraParticles(vector<vector<Particle::SharedPtr>> &my_vec, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2, unsigned nparticles, unsigned ngenes);
+            void                resetGeneTreeWeights(vector<vector<Particle::SharedPtr>> &my_vec, unsigned ngenes);
         
         private:
 
@@ -1216,6 +1217,16 @@ namespace proj {
         }
     }
 
+    inline void Proj::resetGeneTreeWeights(vector<vector<Particle::SharedPtr>> &particles, unsigned ngenes) {
+        // don't need to reset these variables for the first iteration
+        for (unsigned s=1; s<ngenes+1; s++) {
+            for (unsigned p=0; p<_nparticles; p++) {
+                particles[s][p]->setLogLikelihood(0.0);
+                particles[s][p]->setLogWeight(0.0, "g");
+            }
+        }
+}
+
     inline void Proj::run() {
         cout << "Starting..." << endl;
         cout << "Current working directory: " << boost::filesystem::current_path() << endl;
@@ -1314,13 +1325,8 @@ namespace proj {
                     }
                     
                     if (i > 0) {
-                        // don't need to reset these variables for the first iteration
-                        for (unsigned s=1; s<nsubsets+1; s++) {
-                            for (unsigned p=0; p<nparticles; p++) {
-                                my_vec[s][p]->setLogLikelihood(0.0);
-                                my_vec[s][p]->setLogWeight(0.0, "g");
-                            }
-                        }
+                        // don't need to reset variables for first iteration
+                        resetGeneTreeWeights(my_vec, nsubsets); // reset gene tree weights and likelihoods
                     }
                     
                     species_tree_particle->showParticle();
