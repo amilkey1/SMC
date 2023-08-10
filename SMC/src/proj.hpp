@@ -60,6 +60,7 @@ namespace proj {
             unsigned            multinomialDraw (const vector<double> & probs);
             void                proposeGeneParticlesFromPrior(vector<Particle::SharedPtr> &particles);
             void                proposeGeneParticlesFromPriorRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
+            void                initializeTrees(vector<vector<Particle::SharedPtr>> particles, unsigned i, unsigned ngenes);
         
         private:
 
@@ -100,6 +101,7 @@ namespace proj {
             string                      _start;
             bool                        _use_first;
             bool                        _gene_first;
+            bool                        _deconstruct;
     };
 
     inline Proj::Proj() {
@@ -1092,7 +1094,6 @@ namespace proj {
             }
         }
         
-        
         // if both specified, calculate the coalescent likelihood and return it, ending the program
         if (_both) {
             cout << "...... calculating coalescent likelihood for specified trees ......" << endl;
@@ -1106,7 +1107,45 @@ namespace proj {
             cout << "log coalescent likelihood: " << log_coalescent_likelihood << endl;
             exit(0);
         }
+    }
+
+    inline void Proj::initializeTrees(vector<vector<Particle::SharedPtr>> particles, unsigned i, unsigned ngenes) {
+        // reset trees for next iteration
         
+        _species_tree_log_marginal_likelihood = 0.0;
+        _log_marginal_likelihood = 0.0;
+        
+        unsigned nparticles = _nparticles;
+        
+        cout << "beginning iteration: " << i << endl;
+
+        if (i > 0) {
+            for (unsigned s=0; s<ngenes+1; s++) {
+                for (unsigned p=0; p<nparticles; p++) {
+                    particles[s][p]->setParticleGeneration(0);
+                    if (s > 0) {
+                        particles[s][p]->mapGeneTrees(_taxon_map, _species_names);
+                        particles[s][p]->resetGeneIncrements();
+                    }
+                }
+            }
+        }
+        
+        // keep the species partition for the gene forests at this stage but clear the tree structure
+         if (i == 1 && _gene_first == true) {
+             for (unsigned s=1; s<ngenes+1; s++) {
+                 // start at s=1 to only modify the gene trees
+                 for (unsigned p=0; p<nparticles; p++) {
+                     particles[s][p]->remakeGeneTrees(_taxon_map);
+                     particles[s][p]->resetGeneTreePartials(_data, _taxon_map, s);
+                 _deconstruct = false;
+                 }
+             }
+         }
+        
+        if (i > 0) {
+            _deconstruct = true;
+        }
     }
 
     inline void Proj::run() {
@@ -1159,40 +1198,10 @@ namespace proj {
             handleInitialNewicks(my_vec, nsubsets);
             
             unsigned ntaxa = (unsigned) _taxon_map.size();
-            bool deconstruct = false;
+            _deconstruct = false;
             
-            for (int i=0; i<_niterations; i++) {
-                _species_tree_log_marginal_likelihood = 0.0;
-                _log_marginal_likelihood = 0.0;
-                cout << "beginning iteration: " << i << endl;
-                
-                if (i > 0) {
-                    for (unsigned s=0; s<nsubsets+1; s++) {
-                        for (unsigned p=0; p<nparticles; p++) {
-                            my_vec[s][p]->setParticleGeneration(0);
-                            if (s > 0) {
-                                my_vec[s][p]->mapGeneTrees(_taxon_map, _species_names);
-                                my_vec[s][p]->resetGeneIncrements();
-                            }
-                        }
-                    }
-                }
-                
-                // keep the species partition for the gene forests at this stage but clear the tree structure
-                 if (i == 1 && _gene_first == true) {
-                     for (unsigned s=1; s<nsubsets+1; s++) {
-                         // start at s=1 to only modify the gene trees
-                         for (unsigned p=0; p<nparticles; p++) {
-                         my_vec[s][p]->remakeGeneTrees(_taxon_map);
-                         my_vec[s][p]->resetGeneTreePartials(_data, _taxon_map, s);
-                         deconstruct = false;
-                         }
-                     }
-                 }
-            
-                if (i > 0) {
-                    deconstruct = true;
-                }
+            for (unsigned i=0; i<_niterations; i++) {
+                initializeTrees(my_vec, i, nsubsets);
                 
                 if (_sample_from_gene_tree_prior) {
                     _sample_from_gene_tree_prior = false;
@@ -1312,7 +1321,7 @@ namespace proj {
                         
                         for (unsigned s=1; s<nsubsets+1; s++) { // skip species tree particles
                             
-                            proposeParticles(my_vec[s], gene_trees_only, "g", deconstruct, species_tree_particle);
+                            proposeParticles(my_vec[s], gene_trees_only, "g", _deconstruct, species_tree_particle);
                             
                             if (!_run_on_empty) {
                                 bool calc_marg_like = true;
@@ -1347,7 +1356,7 @@ namespace proj {
                                 _accepted_particle_vec[s] = my_vec[s];
 //                                    saveParticleWeights(my_vec[0]);
                             } // s loop
-                        deconstruct = false;
+                        _deconstruct = false;
                     } // g loop
                 }
                 
