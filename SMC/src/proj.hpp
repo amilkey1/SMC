@@ -601,15 +601,17 @@ namespace proj {
         return (unsigned)std::distance(cum_probs.begin(), it);
     }
 
-    inline Particle::SharedPtr Proj::chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species) {
-        // get species tree weights
+    inline Particle::SharedPtr Proj::chooseTree(vector<Particle::SharedPtr> particles, string gene_or_species) {
+        normalizeWeights(particles, "gene_or_species", false);
+        
+        // get weights
         vector<double> log_weights;
         unsigned nparticles = _nparticles;
         if (gene_or_species == "s") {
             nparticles *= _species_particles_per_gene_particle;
         }
         for (unsigned p=0; p<nparticles; p++) {
-            log_weights.push_back(species_trees[p]->getLogWeight(gene_or_species));
+            log_weights.push_back(particles[p]->getLogWeight(gene_or_species));
         }
         
 //        // choose a random number [0,1]
@@ -624,7 +626,7 @@ namespace proj {
             }
         }
 //        // return particle of choice
-        return species_trees[index];
+        return particles[index];
     }
 
     inline vector<int> Proj::resampleSpeciesParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles, string a) {
@@ -1272,7 +1274,6 @@ namespace proj {
                     Particle::SharedPtr species_tree_particle;
                     
                     if (i > 0) {
-                        normalizeWeights(my_vec[0], "s", false);
                         species_tree_particle = chooseTree(my_vec[0], "s"); // pass in all the species trees
                         
                         if (_estimate_theta) {
@@ -1307,7 +1308,7 @@ namespace proj {
                     }
                     
                     if (i > 0) {
-                        // don't need to reset these variables for the first ietration
+                        // don't need to reset these variables for the first iteration
                         for (unsigned s=1; s<nsubsets+1; s++) {
                             for (unsigned p=0; p<nparticles; p++) {
                                 my_vec[s][p]->setLogLikelihood(0.0);
@@ -1382,7 +1383,6 @@ namespace proj {
                     
                 // choose one set of gene trees to use
                 for (unsigned s=1; s<nsubsets+1; s++) {
-                    normalizeWeights(my_vec[s], "g", false);
                     Particle gene_x = *chooseTree(my_vec[s], "g");
                     for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
                         if (p<nparticles) {
