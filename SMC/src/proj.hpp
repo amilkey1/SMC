@@ -45,6 +45,7 @@ namespace proj {
             void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
             void                proposeSpeciesParticles(vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
             void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, Particle::SharedPtr species_tree_particle);
+            void                growGeneTrees(vector<Particle::SharedPtr> &gene_particles, vector<Particle::SharedPtr> &my_vec_1_s, vector<Particle::SharedPtr> &my_vec_2_s, Particle::SharedPtr &species_tree_particle, unsigned ntaxa, unsigned ngenes, unsigned gene_number, unsigned iteration);
             void                handleInitialNewicks(vector<vector<Particle::SharedPtr>> &particles, unsigned ngenes);
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
             void                writeGeneTreeFile();
@@ -1225,7 +1226,56 @@ namespace proj {
                 particles[s][p]->setLogWeight(0.0, "g");
             }
         }
-}
+    }
+
+    inline void Proj::growGeneTrees(vector<Particle::SharedPtr> &gene_particles, vector<Particle::SharedPtr> &my_vec_1_s, vector<Particle::SharedPtr> &my_vec_2_s, Particle::SharedPtr &species_tree_particle, unsigned ntaxa, unsigned ngenes, unsigned gene_number, unsigned iteration) {
+        
+        cout <<  "growing gene " << gene_number << endl;
+        
+        for (unsigned g=0; g<ntaxa-1; g++) {
+            if (g == 0 && iteration > 0) {
+                _deconstruct = true;
+            }
+//            cout << "generation " << g << endl;
+            // filter particles within each gene
+            
+            bool gene_trees_only = true;
+
+                proposeParticles(gene_particles, gene_trees_only, "g", species_tree_particle);
+
+                if (!_run_on_empty) {
+                    bool calc_marg_like = true;
+
+                    normalizeWeights(gene_particles, "g", calc_marg_like);
+
+                    double ess_inverse = 0.0;
+
+                    for (unsigned p=0; p<_nparticles; p++) {
+                        ess_inverse += exp(2.0*gene_particles[p]->getLogWeight("g"));
+                    }
+
+//                double ess = 1.0/ess_inverse;
+//                cout << "   " << "ESS = " << ess << endl;
+
+                    resampleParticles(gene_particles, _use_first ? my_vec_2_s:my_vec_1_s, "g");
+                    //if use_first is true, my_vec = my_vec_2
+                    //if use_first is false, my_vec = my_vec_1
+
+                    gene_particles = _use_first ? my_vec_2_s:my_vec_1_s;
+                    // do not need to resample species trees; species tree will remain the same throughout all gene tree filtering
+
+                    assert(gene_particles.size() == _nparticles);
+                }
+                //change use_first from true to false or false to true
+                _use_first = !_use_first;
+                if (g < ntaxa-2) {
+                    resetWeights(gene_particles, "g");
+                }
+                assert (_accepted_particle_vec.size() == ngenes+1);
+                _accepted_particle_vec[gene_number] = gene_particles;
+            _deconstruct = false;
+        } // g loop
+    }
 
     inline void Proj::run() {
         cout << "Starting..." << endl;
@@ -1330,67 +1380,20 @@ namespace proj {
                     }
                     
                     species_tree_particle->showParticle();
-                                            
-                    for (unsigned g=0; g<ntaxa-1; g++) {
-                        cout << "generation " << g << endl;
-                        // filter particles within each gene
-                        
-                        bool gene_trees_only = true;
-                        
-                        for (unsigned s=1; s<nsubsets+1; s++) { // skip species tree particles
-                            
-                            proposeParticles(my_vec[s], gene_trees_only, "g", species_tree_particle);
-                            
-                            if (!_run_on_empty) {
-                                bool calc_marg_like = true;
-                                
-                                normalizeWeights(my_vec[s], "g", calc_marg_like);
-                                
-                                double ess_inverse = 0.0;
-                                
-                                for (unsigned p=0; p<_nparticles; p++) {
-                                    ess_inverse += exp(2.0*my_vec[s][p]->getLogWeight("g"));
-                                }
-
-//                                    double ess = 1.0/ess_inverse;
-//                                    cout << "   " << "ESS = " << ess << endl;
-                             
-                                resampleParticles(my_vec[s], _use_first ? my_vec_2[s]:my_vec_1[s], "g");
-                                //if use_first is true, my_vec = my_vec_2
-                                //if use_first is false, my_vec = my_vec_1
-                                
-                                my_vec[s] = _use_first ? my_vec_2[s]:my_vec_1[s];
-                                // do not need to resample species trees; species tree will remain the same throughout all gene tree filtering
-                                
-                                assert(my_vec[s].size() == nparticles);
-                            }
-                            //change use_first from true to false or false to true
-                            _use_first = !_use_first;
-                            if (g < ntaxa-2) {
-                                resetWeights(my_vec[s], "g");
-                            }
-                                assert (_accepted_particle_vec.size() == nsubsets+1);
-                                _accepted_particle_vec[s] = my_vec[s];
-//                                    saveParticleWeights(my_vec[0]);
-                            } // s loop
-                        _deconstruct = false;
-                    } // g loop
-                }
-                
-//                if (i == _niterations - 2) {
-//                    writeGeneTreeFile();
-//                }
                     
-                    // filter species trees now
-                    
-                    // save gene tree variation for use in lorad file
-                    vector<vector<Particle>> variable_gene_trees(nsubsets, vector<Particle> (nparticles));
-
                     for (unsigned s=1; s<nsubsets+1; s++) {
-                        for (unsigned p=0; p<nparticles; p++) {
-                            variable_gene_trees[s-1][p] = *my_vec[s][p];
-                        }
+                        growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                     }
+                }
+                    
+                // save gene tree variation for use in lorad file
+                vector<vector<Particle>> variable_gene_trees(nsubsets, vector<Particle> (nparticles));
+
+                for (unsigned s=1; s<nsubsets+1; s++) {
+                    for (unsigned p=0; p<nparticles; p++) {
+                        variable_gene_trees[s-1][p] = *my_vec[s][p];
+                    }
+                }
                     
                 // choose one set of gene trees to use
                 for (unsigned s=1; s<nsubsets+1; s++) {
@@ -1444,6 +1447,7 @@ namespace proj {
                         my_vec[0][p]->setLogWeight(0.0, "s");
                     }
                     
+                    // filter species trees now
                     for (unsigned s=0; s<nspecies; s++) {
                         cout << "beginning species tree proposals" << endl;
                         //taxon joining and reweighting step
