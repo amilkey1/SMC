@@ -13,6 +13,11 @@
 #include <boost/algorithm/string/split.hpp>
 #include "conditionals.hpp"
 
+#if defined(USING_MPI)
+extern int my_rank;
+extern int ntasks;
+#endif
+
 using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
