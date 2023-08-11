@@ -81,7 +81,7 @@ int main(int argc, const char * argv[]) {
     MPI_Init(NULL, NULL);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
-    std::cerr << my_rank << "    " << ntasks << endl;
+//    std::cerr << my_rank << "    " << ntasks << endl;
 #endif
     
     Proj proj;

@@ -22,6 +22,8 @@ using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
 
+extern void output(string msg);
+
 #include "partial_store.hpp"
 extern proj::PartialStore ps;
 
@@ -115,6 +117,12 @@ namespace proj {
             bool                        _use_first;
             bool                        _gene_first;
             bool                        _deconstruct;
+            vector<string>              _starting_gene_newicks;
+#if defined(USING_MPI)
+            void mpiSetSchedule();
+            vector<unsigned>            _mpi_first_gene;
+            vector<unsigned>            _mpi_last_gene;
+#endif
     };
 
     inline Proj::Proj() {
@@ -1054,6 +1062,9 @@ namespace proj {
             if (size_before == size_after) {
                 throw XProj("cannot find gene newick file");
             }
+            for (auto &n:newicks) {
+                _starting_gene_newicks.push_back(n);
+            }
         }
         
         if (newicks.size() == 0 && !_sample_from_gene_tree_prior && !_sample_from_species_tree_prior) {
@@ -1213,6 +1224,9 @@ namespace proj {
                 } // s loop
         } // g loop
         writeGeneTreeFile();
+        for (int i=1; i<ngenes; i++) {
+            _starting_gene_newicks.push_back(particles[i][0]->getGeneTreeNewick());
+        }
     }
 
     inline void Proj::removeExtraParticles(vector<vector<Particle::SharedPtr>> &my_vec, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2, unsigned nparticles, unsigned ngenes) {
@@ -1336,6 +1350,42 @@ namespace proj {
         }
     }
 
+
+#if defined(USING_MPI)
+    inline void Proj::mpiSetSchedule() {
+       // Determine which genes will be handled by this processor: e.g.
+       // 20 = number of genes
+       //  3 = number of processors
+       //  6 = 20 / 3
+       //  2 = 20 % 3
+       //  rank 0 gets 6, rank 1 gets 7, rank 2 gets 7
+       vector<unsigned> genes_per_task(ntasks, (unsigned)(Forest::_ngenes / ntasks));
+
+       unsigned gene_remainder = Forest::_ngenes % ntasks;
+
+       // Each rank > 0 gets an extra job if there is any remainder
+       for (unsigned rank = 1; rank < ntasks; ++rank) {
+           if (gene_remainder > 0) {
+               genes_per_task[rank] += 1;
+               --gene_remainder;
+           }
+       }
+
+       _mpi_first_gene.resize(ntasks);
+       _mpi_last_gene.resize(ntasks);
+       unsigned gene_cum = 0;
+       output("\nGene schedule:\n");
+       output(str(format("%12s %25s %25s\n") % "rank" % "first gene" % "last gene"));
+       for (unsigned rank = 0; rank < ntasks; ++rank) {
+           _mpi_first_gene[rank] = gene_cum;
+           _mpi_last_gene[rank]  = gene_cum + genes_per_task[rank];
+           gene_cum += genes_per_task[rank];
+           
+           output(str(format("%12d %25d %25d\n") % rank % (_mpi_first_gene[rank] + 1) % _mpi_last_gene[rank]));
+       }
+    }
+#endif
+
     inline void Proj::growSpeciesTrees(vector<vector<Particle::SharedPtr>> &particles, vector<vector<Particle::SharedPtr>> &particles_1, vector<vector<Particle::SharedPtr>> &particles_2, unsigned ngenes, unsigned nspecies, unsigned nparticles) {
         
         for (unsigned s=0; s<nspecies; s++) {
@@ -1388,11 +1438,19 @@ namespace proj {
     }
 
     inline void Proj::run() {
-        cout << "Starting..." << endl;
-        cout << "Current working directory: " << boost::filesystem::current_path() << endl;
-        cout << "Random seed: " << _random_seed << endl;
-        cout << "Theta: " << Forest::_theta << endl;
-        cout << "Number of threads: " << _nthreads << endl;
+#if defined(USING_MPI)
+        output("Starting MPI parallel version...\n");
+        output(str(format("No. processors: %d\n") % ntasks));
+#else
+        output("Starting serial version...\n");
+#endif
+        output(str(format("Current working directory: %s\n") % boost::filesystem::current_path()));
+        
+//        cout << "Starting..." << endl;
+//        cout << "Current working directory: " << boost::filesystem::current_path() << endl;
+//        cout << "Random seed: " << _random_seed << endl;
+//        cout << "Theta: " << Forest::_theta << endl;
+//        cout << "Number of threads: " << _nthreads << endl;
 
         try {
             
@@ -1451,6 +1509,9 @@ namespace proj {
                 // my_vec[2] is gene 2 particles
                 // etc
                 
+#if defined(USING_MPI)
+                mpisetSchedule();
+#endif
                 // filter gene trees
                 if (_start == "species") {
                     // pick a species tree to use for all the gene trees for this step
@@ -1479,62 +1540,128 @@ namespace proj {
                     
                     species_tree_particle->showParticle();
                     
+#if defined(USING_MPI)
                     for (unsigned s=1; s<nsubsets+1; s++) { // grow gene trees conditional on selected species tree
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                     }
-                }
                     
-                // save gene tree variation for use in lorad file
-                vector<vector<Particle>> variable_gene_trees(nsubsets, vector<Particle> (nparticles));
-
-                for (unsigned s=1; s<nsubsets+1; s++) {
-                    for (unsigned p=0; p<nparticles; p++) {
-                        variable_gene_trees[s-1][p] = *my_vec[s][p];
-                    }
-                }
+                    // save gene tree variation for use in lorad file
+                    vector<vector<Particle>> variable_gene_trees(nsubsets, vector<Particle> (nparticles));
                     
-                // choose one set of gene trees to use
-                for (unsigned s=1; s<nsubsets+1; s++) {
-                    Particle gene_x = *chooseTree(my_vec[s], "g");
-                    for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
-                        if (p<nparticles) {
-                            *my_vec[s][p] = gene_x;
-                        }
-                        else {
-                            // add in null particles here
-                            my_vec[s].push_back(Particle::SharedPtr(new Particle));
-                            *my_vec[s][p] = gene_x;
-                            my_vec_2[s].push_back(Particle::SharedPtr(new Particle));
+                    for (unsigned s=1; s<nsubsets+1; s++) {
+                        for (unsigned p=0; p<nparticles; p++) {
+                            variable_gene_trees[s-1][p] = *my_vec[s][p];
                         }
                     }
-                }
                     
-                // increase size of species vector
-                for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
-                    my_vec[0].push_back(Particle::SharedPtr(new Particle));
-                    my_vec_2[0].push_back(Particle::SharedPtr(new Particle));
-                }
-                
-                for (unsigned s=1; s<nsubsets+1; s++) {
-                    for (unsigned p=0; p<nparticles; p++) {
-                        *_accepted_particle_vec[s][p] = variable_gene_trees[s-1][p]; // preserve gene tree variation for output
+                    _starting_gene_newicks.clear();
+                    // choose one set of gene trees to use
+                    for (unsigned s=1; s<nsubsets+1; s++) {
+                        Particle gene_x = *chooseTree(my_vec[s], "g");
+                        _starting_gene_newicks.push_back(gene_x.getGeneTreeNewick());
+                        for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
+                            if (p<nparticles) {
+                                *my_vec[s][p] = gene_x;
+                            }
+                            else {
+                                // add in null particles here
+                                my_vec[s].push_back(Particle::SharedPtr(new Particle));
+                                *my_vec[s][p] = gene_x;
+                                my_vec_2[s].push_back(Particle::SharedPtr(new Particle));
+                            }
+                        }
+                        
+                        // increase size of species vector
+                        for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
+                            my_vec[0].push_back(Particle::SharedPtr(new Particle));
+                            my_vec_2[0].push_back(Particle::SharedPtr(new Particle));
+                        }
+                        
+                        for (unsigned s=1; s<nsubsets+1; s++) {
+                            for (unsigned p=0; p<nparticles; p++) {
+                                *_accepted_particle_vec[s][p] = variable_gene_trees[s-1][p]; // preserve gene tree variation for output
+                            }
+                        }
+                        
+                        saveSelectedGeneTrees(my_vec, nsubsets);
+                        
+                        // build species trees
+                        
+                        if (i < _niterations-1) {
+                            setUpForSpeciesFiltering(my_vec, nsubsets, nparticles);
+                            growSpeciesTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nspecies, nparticles); // grow and filter species trees conditional on selected gene trees
+                            
+                            if (i == _niterations - 2) {
+                                writeSpeciesTreeLoradFile(my_vec[0], nspecies);
+                            }
+                            saveParticleWeights(my_vec[0]);
+                        }
                     }
-                }
-                    
-                saveSelectedGeneTrees(my_vec, nsubsets);
-                
-                // build species trees
-                
-                if (i < _niterations-1) {
-                    setUpForSpeciesFiltering(my_vec, nsubsets, nparticles);
-                    growSpeciesTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nspecies, nparticles); // grow and filter species trees conditional on selected gene trees
-                    
-                    if (i == _niterations - 2) {
-                        writeSpeciesTreeLoradFile(my_vec[0], nspecies);
+#else
+                    for (unsigned s=1; s<nsubsets+1; s++) { // grow gene trees conditional on selected species tree
+                        growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                     }
-                    saveParticleWeights(my_vec[0]);
+                    
+                    // save gene tree variation for use in lorad file
+                    vector<vector<Particle>> variable_gene_trees(nsubsets, vector<Particle> (nparticles));
+                    
+                    for (unsigned s=1; s<nsubsets+1; s++) {
+                        for (unsigned p=0; p<nparticles; p++) {
+                            variable_gene_trees[s-1][p] = *my_vec[s][p];
+                        }
+                    }
+                    
+                    _starting_gene_newicks.clear();
+                    // choose one set of gene trees to use
+                    for (unsigned s=1; s<nsubsets+1; s++) {
+                        Particle gene_x = *chooseTree(my_vec[s], "g");
+                        _starting_gene_newicks.push_back(gene_x.getGeneTreeNewick());
+                        for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
+                            if (p<nparticles) {
+                                *my_vec[s][p] = gene_x;
+                            }
+                            else {
+                                // add in null particles here
+                                my_vec[s].push_back(Particle::SharedPtr(new Particle));
+                                *my_vec[s][p] = gene_x;
+                                my_vec_2[s].push_back(Particle::SharedPtr(new Particle));
+                            }
+                        }
+                    }
+                    
+                    // increase size of species vector
+                    for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
+                        my_vec[0].push_back(Particle::SharedPtr(new Particle));
+                        my_vec_2[0].push_back(Particle::SharedPtr(new Particle));
+                    }
+                    
+                    for (unsigned s=1; s<nsubsets+1; s++) {
+                        for (unsigned p=0; p<nparticles; p++) {
+                            *_accepted_particle_vec[s][p] = variable_gene_trees[s-1][p]; // preserve gene tree variation for output
+                        }
+                    }
+                    
+                    saveSelectedGeneTrees(my_vec, nsubsets);
+                    
+                    // build species trees
+                    
+                    if (i < _niterations-1) {
+                        setUpForSpeciesFiltering(my_vec, nsubsets, nparticles);
+                        growSpeciesTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nspecies, nparticles); // grow and filter species trees conditional on selected gene trees
+                        
+                        if (i == _niterations - 2) {
+                            writeSpeciesTreeLoradFile(my_vec[0], nspecies);
+                        }
+                        saveParticleWeights(my_vec[0]);
+                    }
+#endif
                 }
             }
+            
+#if defined(USING_MPI)
+        // Ensure no one starts on next iteration until coordinator is ready
+        MPI_Barrier(MPI_COMM_WORLD);
+#endif
                                 
             writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
             

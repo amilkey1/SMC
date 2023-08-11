@@ -79,6 +79,7 @@ class Particle {
         void                                            calcParticleWeight();
         void                                            speciesJoinedProposal();
         vector<string>                                  getGeneTreeNewicks();
+        string                                          getGeneTreeNewick();
         vector<pair<tuple<string, string, string>, double>>                    getSpeciesJoined(){return _t;}
         double                                          getCoalescentLikelihood(){return _log_coalescent_likelihood;}
         void                                            geneTreeProposal(bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
@@ -609,6 +610,11 @@ class Particle {
         string newick = _forest.makeNewick(9, true);
         newicks.push_back(newick);
         return newicks;
+    }
+
+    inline string Particle::getGeneTreeNewick() {
+        string newick = _forest.makeNewick(9, true);
+        return newick;
     }
 
     inline void Particle::resetSpecies() {

@@ -249,7 +249,6 @@
 					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",
 					"/Users/analisamilkey/Documents/projects/libraries/beagle-lib-master",
-					"/Users/analisamilkey/Documents/projects/libraries/open-mpi/include",
 				);
 				LIBRARY_SEARCH_PATHS = (
 					$HOME/lib,
@@ -313,7 +312,6 @@
 					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",
 					"/Users/analisamilkey/Documents/projects/libraries/beagle-lib-master",
-					"/Users/analisamilkey/Documents/projects/libraries/open-mpi/include",
 				);
 				LIBRARY_SEARCH_PATHS = (
 					$HOME/lib,
@@ -337,7 +335,6 @@
 					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",
 					"/Users/analisamilkey/Documents/projects/libraries/beagle-lib-master",
-					"/Users/analisamilkey/Documents/projects/libraries/open-mpi/include",
 				);
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_LDFLAGS = "";
@@ -355,7 +352,6 @@
 					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",
 					"/Users/analisamilkey/Documents/projects/libraries/beagle-lib-master",
-					"/Users/analisamilkey/Documents/projects/libraries/open-mpi/include",
 				);
 				ONLY_ACTIVE_ARCH = NO;
 				OTHER_LDFLAGS = "";

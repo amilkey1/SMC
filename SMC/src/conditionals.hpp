@@ -1,5 +1,5 @@
-# define USING_MPI
+//# define USING_MPI
 #if defined(USING_MPI)
-#   include <mpi.h> // TODO: ?
+#   include <mpi.h>
 #endif
 
