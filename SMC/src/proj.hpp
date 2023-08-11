@@ -1311,6 +1311,20 @@ namespace proj {
         for (unsigned p=0; p<_nparticles; p++) {
             _accepted_particle_vec[gene_number][p] = gene_particles[p]; // preserve gene tree variation for output
         }
+        
+        // choose one set of gene trees to use
+            Particle chosen_gene = *chooseTree(gene_particles, "g");
+            for (unsigned p=0; p<_nparticles*_species_particles_per_gene_particle; p++) {
+                if (p<_nparticles) {
+                    *gene_particles[p] = chosen_gene;
+                }
+                else {
+                    // add in null particles here
+                    gene_particles.push_back(Particle::SharedPtr(new Particle));
+                    *gene_particles[p] = chosen_gene;
+                    my_vec_2_s.push_back(Particle::SharedPtr(new Particle));
+                }
+            }
     }
 
     inline void Proj::estimateParameters(vector<vector<Particle::SharedPtr>> my_vec, Particle::SharedPtr species_tree_particle, unsigned ngenes) {
@@ -1550,25 +1564,9 @@ namespace proj {
                     _starting_gene_newicks.resize(nsubsets);
 #if defined(USING_MPI)
 #else
-                    for (unsigned s=1; s<nsubsets+1; s++) { // grow gene trees conditional on selected species tree
+                    for (unsigned s=1; s<nsubsets+1; s++) { // grow gene trees conditional on selected species tree, choose final one
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
-                    }
-                    
-                    // choose one set of gene trees to use
-                    for (unsigned s=1; s<nsubsets+1; s++) {
-                        Particle gene_x = *chooseTree(my_vec[s], "g");
-                        for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
-                            if (p<nparticles) {
-                                *my_vec[s][p] = gene_x;
-                            }
-                            else {
-                                // add in null particles here
-                                my_vec[s].push_back(Particle::SharedPtr(new Particle));
-                                *my_vec[s][p] = gene_x;
-                                my_vec_2[s].push_back(Particle::SharedPtr(new Particle));
-                            }
-                        }
-                    }
+                    } // TODO: double check what's going on with my_vec_2 after this
                     
                     // increase size of species vector
                     for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
