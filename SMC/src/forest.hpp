@@ -55,6 +55,7 @@ class Forest {
         typedef std::vector <double> partial_array_t;
         void                        clear();
         void                        setData(Data::SharedPtr d, int index, map<string, string> &taxon_map);
+        void                        setDataTwo(Data::SharedPtr d);
         Node *                      findNextPreorder(Node * nd);
         std::string                 makeNewick(unsigned precision, bool use_names);
         std::string                 makePartialNewick(unsigned precision, bool use_names);
@@ -244,6 +245,10 @@ class Forest {
     inline Forest::Forest(const Forest & other) {
         clear();
         *this = other;
+    }
+
+    inline void Forest::setDataTwo(Data::SharedPtr d) {
+        _data = d;
     }
 
     inline void Forest::setData(Data::SharedPtr d, int index, map<string, string> &taxon_map) {
@@ -2008,6 +2013,8 @@ class Forest {
         double cum_time = 0.0;
         int a = 0;
 
+        assert (heights_and_nodes.size() > 0);
+        
         if (species_increment > 0) {
             for (unsigned i=_nincrements; i < heights_and_nodes.size(); i++) {
                 Node* node = nullptr;

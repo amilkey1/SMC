@@ -107,6 +107,7 @@ class Particle {
         void                                            sampleGeneTreePrior();
         double                                          calcLogSpeciesTreeDensityGivenLambda(double lambda);
         static bool                                     _run_on_empty;
+        void                                            initGeneForest(string newick, unsigned gene_number, map<string, string> taxon_map);
     
     private:
 
@@ -445,6 +446,21 @@ class Particle {
         assert (_name != "species");
         _forest.buildFromNewick(newicks[gene_number], true, false);
         _forest.refreshPreorder();
+    }
+
+    inline void Particle::initGeneForest(string newick, unsigned gene_number, map<string, string> taxon_map) {
+        assert (_name != "species");
+        _forest.clear();
+//        _forest.setData(_data, gene_number, taxon_map);
+        _forest.setDataTwo(_data);
+        _forest.buildFromNewick(newick, true, false);
+        _forest.refreshPreorder();
+        
+//        _forest._new_nodes.clear();
+//        _forest._nodes.clear();
+//        _forest._lineages.clear();
+//        _forest.buildFromNewick(newick, true, false); // TODO: need to reset partials too
+//        _forest.refreshPreorder();
     }
 
     inline void Particle::buildEntireGeneTree() {

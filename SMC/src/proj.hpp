@@ -118,8 +118,9 @@ namespace proj {
             bool                        _gene_first;
             bool                        _deconstruct;
             vector<string>              _starting_gene_newicks;
+            vector<unsigned>            _starting_gene_indices;
 #if defined(USING_MPI)
-            void mpiSetSchedule();
+            void mpiSetSchedule(unsigned ngenes);
             vector<unsigned>            _mpi_first_gene;
             vector<unsigned>            _mpi_last_gene;
 #endif
@@ -644,6 +645,9 @@ namespace proj {
                 index = i;
                 break;
             }
+        }
+        if (gene_or_species == "g") {
+            _starting_gene_indices.push_back(index);
         }
 //        // return particle of choice
         return particles[index];
@@ -1312,14 +1316,15 @@ namespace proj {
             _accepted_particle_vec[gene_number][p] = gene_particles[p]; // preserve gene tree variation for output
         }
         
+        Particle chosen_gene = *chooseTree(gene_particles, "g");
+        
 #if defined(USING_MPI)
         // send newick for selected gene tree to coordinator
-        Particle chosen_gene = *chooseTree(gene_particles, "g");
         string newick = chosen_gene.getGeneTreeNewick();
         
         if (my_rank == 0) {
             // copy chosen gene tree to _starting_gene_newicks
-            _starting_gene_newicks[gene_number] = newick;
+            _starting_gene_newicks[gene_number-1] = newick;
         }
         else {
             // Send the newick string to the coordinator
@@ -1329,23 +1334,26 @@ namespace proj {
                 msglen,                 // int count,
                 MPI_CHAR,               // MPI_Datatype datatype,
                 0,                      // int destination,
-                gene,                   // int tag,
+                gene_number,            // int tag,
                 MPI_COMM_WORLD);        // MPI_Comm communicator)
         }
 #else
         // choose one set of gene trees to use
-        Particle chosen_gene = *chooseTree(gene_particles, "g");
-        for (unsigned p=0; p<_nparticles*_species_particles_per_gene_particle; p++) {
-            if (p<_nparticles) {
-                *gene_particles[p] = chosen_gene;
-            }
-            else {
-                // add in null particles here
-                gene_particles.push_back(Particle::SharedPtr(new Particle));
-                *gene_particles[p] = chosen_gene;
-                my_vec_2_s.push_back(Particle::SharedPtr(new Particle));
-            }
-        }
+        
+        string newick = chosen_gene.getGeneTreeNewick();
+        _starting_gene_newicks[gene_number-1] = newick;
+        
+//        for (unsigned p=0; p<_nparticles*_species_particles_per_gene_particle; p++) {
+//            if (p<_nparticles) {
+//                *gene_particles[p] = chosen_gene;
+//            }
+//            else {
+//                // add in null particles here
+//                gene_particles.push_back(Particle::SharedPtr(new Particle));
+//                *gene_particles[p] = chosen_gene;
+//                my_vec_2_s.push_back(Particle::SharedPtr(new Particle));
+//            }
+//        }
 #endif
     }
 
@@ -1393,16 +1401,16 @@ namespace proj {
 
 
 #if defined(USING_MPI)
-    inline void Proj::mpiSetSchedule() {
+    inline void Proj::mpiSetSchedule(unsigned ngenes) {
        // Determine which genes will be handled by this processor: e.g.
        // 20 = number of genes
        //  3 = number of processors
        //  6 = 20 / 3
        //  2 = 20 % 3
        //  rank 0 gets 6, rank 1 gets 7, rank 2 gets 7
-       vector<unsigned> genes_per_task(ntasks, (unsigned)(Forest::_ngenes / ntasks));
+       vector<unsigned> genes_per_task(ntasks, ngenes / ntasks);
 
-       unsigned gene_remainder = Forest::_ngenes % ntasks;
+       unsigned gene_remainder = ngenes % ntasks;
 
        // Each rank > 0 gets an extra job if there is any remainder
        for (unsigned rank = 1; rank < ntasks; ++rank) {
@@ -1428,6 +1436,32 @@ namespace proj {
 #endif
 
     inline void Proj::growSpeciesTrees(vector<vector<Particle::SharedPtr>> &particles, vector<vector<Particle::SharedPtr>> &particles_1, vector<vector<Particle::SharedPtr>> &particles_2, unsigned ngenes, unsigned nspecies, unsigned nparticles) {
+        
+        assert( _starting_gene_indices.size() == ngenes);
+        
+        // initialize chosen gene trees
+        for (unsigned s=1; s<ngenes+1; s++) {
+            Particle gene_x = *particles[s][_starting_gene_indices[s-1]];
+            for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
+                if (p<nparticles) {
+                    *particles[s][p] = gene_x;
+                }
+                else {
+                    // add in null particles here
+                    particles[s].push_back(Particle::SharedPtr(new Particle));
+                    *particles[s][p] = gene_x;
+                    particles_2[s].push_back(Particle::SharedPtr(new Particle));
+                }
+            }
+        }
+
+        // increase size of species vector
+        for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
+            particles[0].push_back(Particle::SharedPtr(new Particle));
+            particles_2[0].push_back(Particle::SharedPtr(new Particle));
+        }
+
+        setUpForSpeciesFiltering(particles, ngenes, nparticles);
         
         for (unsigned s=0; s<nspecies; s++) {
             cout << "beginning species tree proposals" << endl;
@@ -1545,7 +1579,7 @@ namespace proj {
                 // etc
                 
 #if defined(USING_MPI)
-                mpisetSchedule();
+                mpiSetSchedule(nsubsets);
 #endif
                 // filter gene trees
                 if (_start == "species") {
@@ -1575,27 +1609,113 @@ namespace proj {
                     
                     species_tree_particle->showParticle();
                     
-                    // save newicks from previous gene forest filtering
+                    // reset starting gene newicks
                     _starting_gene_newicks.clear();
                     _starting_gene_newicks.resize(nsubsets);
                     
-#if defined(USING_MPI)
-                    for (unsigned s=1; s<nsubsets+1; s++) { // grow gene trees conditional on selected species tree, choose final one
-                        growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
-                    } // TODO: double check what's going on with my_vec_2 after this
+                    _starting_gene_indices.clear();
                     
-                    // increase size of species vector
-                    for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
-                        my_vec[0].push_back(Particle::SharedPtr(new Particle));
-                        my_vec_2[0].push_back(Particle::SharedPtr(new Particle));
+#if defined(USING_MPI)
+                    cout << "beginning MPI" << endl;
+                    // must add s+1 because genes in my_vec begin at 1, not 0
+                    for (unsigned s = _mpi_first_gene[my_rank]+1; s < _mpi_last_gene[my_rank]+1; ++s) {// grow gene trees conditional on selected species tree, choose final one
+                        growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                     }
                     
+                    if (my_rank == 0) {
+                        // Make a list of genes that we haven't heard from yet
+                        list<unsigned> outstanding;
+                        cout << "ntasks: " << ntasks << endl;
+                        for (unsigned rank = 1; rank < ntasks; ++rank) {
+                            for (unsigned g = _mpi_first_gene[rank]+1; g < _mpi_last_gene[rank]+1; ++g) {
+                                outstanding.push_back(g);
+                            }
+                        }
+                        
+                        // Receive gene trees from genes being handled by other processors
+                        // until outstanding is empty
+                        while (!outstanding.empty()) {
+                            // Probe to get message status
+                            int message_length = 0;
+                            MPI_Status status;
+                            MPI_Probe(MPI_ANY_SOURCE,   // Source rank or MPI_ANY_SOURCE
+                                MPI_ANY_TAG,            // Message tag
+                                MPI_COMM_WORLD,         // Communicator
+                                &status                 // Status object
+                            );
+                        
+                            // Get length of message
+                            MPI_Get_count(&status, MPI_CHAR, &message_length);
+
+                            // Get gene
+                            unsigned gene = (unsigned)status.MPI_TAG;
+
+                            // Get the message itself
+                            string newick;
+                            newick.resize(message_length);
+                            MPI_Recv(&newick[0],    // Initial address of receive buffer
+                                message_length,     // Maximum number of elements to receive
+                                MPI_CHAR,           // Datatype of each receive buffer entry
+                                MPI_ANY_SOURCE,     // Rank of source
+                                MPI_ANY_TAG,        // Message tag
+                                MPI_COMM_WORLD,     // Communicator
+                                MPI_STATUS_IGNORE   // Status object
+                            );
+                            
+                            // Store the newick and remove gene from outstanding
+                            newick.resize(message_length - 1);  // remove '\0' at end
+                            _starting_gene_newicks[gene] = newick;
+                                                            
+                            auto it = find(outstanding.begin(), outstanding.end(), gene);
+                            assert(it != outstanding.end());
+                            outstanding.erase(it);
+                        }
+                    }
+
+                    string message;
+                    int message_length;
+                    
+                    // save gene newicks to particle vectors
+//                    for (unsigned s=1; s<nsubsets+1; s++) {
+//                        my_vec[s][0]->initGeneForest(_starting_gene_newicks[s-1], s); // TODO: make a gene newick init function
+//                    }
+                    
+//                    for (unsigned s=1; s<nsubsets+1; s++) {
+//                        Particle chosen_gene = *my_vec[s][0];
+//                        for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
+//                            if (p<nparticles) {
+//                                *my_vec[s][p] = chosen_gene;
+//                            }
+//                            else {
+//                                // add in null particles here
+//                                my_vec[s].push_back(Particle::SharedPtr(new Particle));
+//                                *my_vec[s][p] = chosen_gene;
+//                                my_vec_2[s].push_back(Particle::SharedPtr(new Particle));
+//                            }
+//                        }
+//                    }
+                    
+                    // TODO: what next? need to save the gene newicks to the particle vectors
+                    
+                    if (my_rank == 0) {
+                        cout << "increasing size of species vector " << endl;
+                        // increase size of species vector
+                        for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
+                            my_vec[0].push_back(Particle::SharedPtr(new Particle));
+                            my_vec_2[0].push_back(Particle::SharedPtr(new Particle));
+                        }
+                    
+                        cout << "saving selected gene trees " << endl;
+                        
                     saveSelectedGeneTrees(my_vec, nsubsets);
                     
                     // build species trees
                     
                     if (i < _niterations-1) {
+                        cout << "setting up for species filtering" << endl;
                         setUpForSpeciesFiltering(my_vec, nsubsets, nparticles);
+                        
+                        cout << "growing species trees " << endl;
                         growSpeciesTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nspecies, nparticles); // grow and filter species trees conditional on selected gene trees
                         
                         if (i == _niterations - 2) {
@@ -1603,24 +1723,48 @@ namespace proj {
                         }
                         saveParticleWeights(my_vec[0]);
                     }
+                        // TODO: more MPI here?
+                }
                     
 #else
                     for (unsigned s=1; s<nsubsets+1; s++) { // grow gene trees conditional on selected species tree, choose final one
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
-                    } // TODO: double check what's going on with my_vec_2 after this
-                    
-                    // increase size of species vector
-                    for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
-                        my_vec[0].push_back(Particle::SharedPtr(new Particle));
-                        my_vec_2[0].push_back(Particle::SharedPtr(new Particle));
                     }
                     
+//                    for (unsigned s=1; s<nsubsets+1; s++) {
+//                        my_vec[s][0]->initGeneForest(_starting_gene_newicks[s-1], s, _taxon_map); // TODO: make a gene newick init function
+//                    }
+////
+////                    Particle::SharedPtr test = my_vec[1][0];
+////
+//                    for (unsigned s=1; s<nsubsets+1; s++) { // TODO: do this in grow species trees - do first for each particle
+//                        Particle chosen_gene = *my_vec[s][0];
+//                        for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
+//                            if (p<nparticles) {
+//                                *my_vec[s][p] = chosen_gene;
+//                            }
+//                            else {
+//                                // add in null particles here
+//                                my_vec[s].push_back(Particle::SharedPtr(new Particle));
+//                                *my_vec[s][p] = chosen_gene;
+//                                my_vec_2[s].push_back(Particle::SharedPtr(new Particle));
+//                            }
+//                        }
+//                    }
+                    
+                    
+//                    // increase size of species vector
+//                    for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
+//                        my_vec[0].push_back(Particle::SharedPtr(new Particle));
+//                        my_vec_2[0].push_back(Particle::SharedPtr(new Particle));
+//                    }
+//
                     saveSelectedGeneTrees(my_vec, nsubsets);
                     
                     // build species trees
                     
                     if (i < _niterations-1) {
-                        setUpForSpeciesFiltering(my_vec, nsubsets, nparticles);
+//                        setUpForSpeciesFiltering(my_vec, nsubsets, nparticles);
                         growSpeciesTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nspecies, nparticles); // grow and filter species trees conditional on selected gene trees
                         
                         if (i == _niterations - 2) {
