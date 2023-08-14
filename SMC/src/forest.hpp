@@ -55,7 +55,7 @@ class Forest {
         typedef std::vector <double> partial_array_t;
         void                        clear();
         void                        setData(Data::SharedPtr d, int index, map<string, string> &taxon_map);
-        void                        setDataTwo(Data::SharedPtr d);
+        void                        setDataTwo(Data::SharedPtr d, int index, map<string, string> &taxon_map);
         Node *                      findNextPreorder(Node * nd);
         std::string                 makeNewick(unsigned precision, bool use_names);
         std::string                 makePartialNewick(unsigned precision, bool use_names);
@@ -127,6 +127,7 @@ class Forest {
         void                        drawFromGeneTreePrior();
         double                      calcLogSpeciesTreeDensity(double lambda);
         void                        setIndex(int n) {_index = n;}
+        void                        resetLineages();
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -247,8 +248,40 @@ class Forest {
         *this = other;
     }
 
-    inline void Forest::setDataTwo(Data::SharedPtr d) {
+    inline void Forest::setDataTwo(Data::SharedPtr d, int index, map<string, string> &taxon_map) {
         _data = d;
+        _index = index;
+
+        //don't set data for species tree
+        if (index>0) {
+            Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index-1);
+            _first_pattern = gene_begin_end.first;
+            _npatterns = _data->getNumPatternsInSubset(index-1);
+            }
+
+        const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
+        unsigned i = 0;
+        auto data_matrix=_data->getDataMatrix();
+
+        for (auto &nd:_nodes) { // only need to reset partials for tips since the Felsenstein likelihood will not be calculated for this complete tree again
+            if (!nd._left_child) {
+                if (index>0) {
+                    nd._partial=ps.getPartial(_npatterns*4);
+                    for (unsigned p=0; p<_npatterns; p++) {
+                        unsigned pp = _first_pattern+p;
+                        for (unsigned s=0; s<_nstates; s++) {
+                            Data::state_t state = (Data::state_t)1 << s;
+                            Data::state_t d = data_matrix[nd._number][pp];
+                            double result = state & d;
+                            (*nd._partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        }
+                    }
+                }
+            }
+        }
+        if (index > 0) {
+            setUpGeneForest(taxon_map);
+        }
     }
 
     inline void Forest::setData(Data::SharedPtr d, int index, map<string, string> &taxon_map) {
@@ -1348,6 +1381,7 @@ class Forest {
 //                     return getLineageHeight(&lhs) < getLineageHeight(&rhs); } );
         
         _lineages.clear();
+        
         _lineages.push_back(&_nodes.back());
         
         // reset node names
@@ -2014,7 +2048,6 @@ class Forest {
         int a = 0;
 
         assert (heights_and_nodes.size() > 0);
-        
         if (species_increment > 0) {
             for (unsigned i=_nincrements; i < heights_and_nodes.size(); i++) {
                 Node* node = nullptr;
@@ -2327,7 +2360,7 @@ class Forest {
             
             _gene_tree_log_coalescent_likelihood += log_increment_prior;
         }
-        _gene_tree_log_coalescent_likelihood = 0.0;
+//        _gene_tree_log_coalescent_likelihood = 0.0; // TODO: careful - why this?
         return make_tuple(subtree1, subtree2, new_nd);
     }
 
@@ -2737,6 +2770,26 @@ class Forest {
         return log_prob_density;
     }
 
+    inline void Forest::resetLineages() {
+        assert (_lineages.size () == 1);
+        // this function reset the _lineages vector to the tip nodes and then rebuilds it, setting _position_in_lineages
+        
+        _lineages.clear();
+        unsigned i=0;
+        for (auto &nd:_nodes) {
+            if (!nd._left_child) {
+                _lineages.push_back(&nd);
+                nd._position_in_lineages = i;
+                i++;
+            }
+        }
+        
+        for (auto &nd : _nodes) {
+            if (nd._left_child) {
+                updateNodeVector(_lineages, nd._left_child, nd._left_child->_right_sib, &nd);
+            }
+        }
+    }
 
 
     inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info) {

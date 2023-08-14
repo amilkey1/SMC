@@ -107,7 +107,7 @@ class Particle {
         void                                            sampleGeneTreePrior();
         double                                          calcLogSpeciesTreeDensityGivenLambda(double lambda);
         static bool                                     _run_on_empty;
-        void                                            initGeneForest(string newick, unsigned gene_number, map<string, string> taxon_map);
+        void                                            initGeneForest(string newick, unsigned gene_number, map<string, string> taxon_map, Data::SharedPtr d);
     
     private:
 
@@ -216,6 +216,7 @@ class Particle {
         }
         if (gene_trees_only) {
             geneTreeProposal(deconstruct, species_joined);
+            // TODO: reset gene tree partials here
         }
         
         if (_run_on_empty) {
@@ -448,19 +449,13 @@ class Particle {
         _forest.refreshPreorder();
     }
 
-    inline void Particle::initGeneForest(string newick, unsigned gene_number, map<string, string> taxon_map) {
+    inline void Particle::initGeneForest(string newick, unsigned gene_number, map<string, string> taxon_map, Data::SharedPtr d) {
         assert (_name != "species");
         _forest.clear();
-//        _forest.setData(_data, gene_number, taxon_map);
-        _forest.setDataTwo(_data);
         _forest.buildFromNewick(newick, true, false);
+        _forest.resetLineages();
         _forest.refreshPreorder();
-        
-//        _forest._new_nodes.clear();
-//        _forest._nodes.clear();
-//        _forest._lineages.clear();
-//        _forest.buildFromNewick(newick, true, false); // TODO: need to reset partials too
-//        _forest.refreshPreorder();
+        _forest.setDataTwo(d, gene_number, taxon_map); // reset data and species partition
     }
 
     inline void Particle::buildEntireGeneTree() {
