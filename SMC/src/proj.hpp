@@ -1234,7 +1234,7 @@ namespace proj {
                 } // s loop
         } // g loop
         writeGeneTreeFile();
-        for (int i=1; i<ngenes; i++) {
+        for (int i=1; i<ngenes+1; i++) {
             _starting_gene_newicks.push_back(particles[i][0]->getGeneTreeNewick());
         }
     }
@@ -1589,6 +1589,7 @@ namespace proj {
                 
                 if (_sample_from_gene_tree_prior) {
                     sampleFromGeneTreePrior(my_vec, nsubsets, ntaxa, my_vec_1, my_vec_2);
+                    _start = "gene";
                 }
                 
                 // my_vec[0] is the species tree particles
