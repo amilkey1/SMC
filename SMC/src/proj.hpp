@@ -1037,6 +1037,23 @@ namespace proj {
         vector<string> newicks;
         unsigned nparticles = _nparticles;
         
+        // can't specify a newick and sampling from a prior
+        bool newicks_specified = false;
+        bool priors = false;
+        if (_species_newicks_name != "null" || _gene_newicks_names != "null") {
+            newicks_specified = true;
+        }
+        if (_sample_from_species_tree_prior || _sample_from_gene_tree_prior) {
+            priors = true;
+        }
+        if (_sample_from_species_tree_prior && _sample_from_gene_tree_prior) {
+            throw XProj(boost::str(boost::format("cannot specify sampling from gene and species tree priors")));
+        }
+        
+        if (newicks_specified && priors) {
+            throw XProj(boost::str(boost::format("cannot specify starting newicks and prior sampling")));
+        }
+
         if (_species_newicks_name != "null") {
             ifstream infile(_species_newicks_name);
             string newick;
