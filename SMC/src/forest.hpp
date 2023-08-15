@@ -259,8 +259,6 @@ class Forest {
             _npatterns = _data->getNumPatternsInSubset(index-1);
             }
 
-        const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
-        unsigned i = 0;
         auto data_matrix=_data->getDataMatrix();
 
         for (auto &nd:_nodes) { // only need to reset partials for tips since the Felsenstein likelihood will not be calculated for this complete tree again
@@ -2772,8 +2770,24 @@ class Forest {
 
     inline void Forest::resetLineages() {
         assert (_lineages.size () == 1);
-        // this function reset the _lineages vector to the tip nodes and then rebuilds it, setting _position_in_lineages
-        
+//        int count = 0;
+//        bool increase_count = true;
+//        for (auto &nd:_nodes) {
+//            nd._position_in_lineages = count;
+//            if (count == _ntaxa-1) {
+//                increase_count = false;
+//            }
+//
+//            if (increase_count) {
+//                count++;
+//            }
+//            else {
+//                count --;
+//            }
+//        }
+//        assert (count == -1);
+//        // this function reset the _lineages vector to the tip nodes and then rebuilds it, setting _position_in_lineages
+//
         _lineages.clear();
         unsigned i=0;
         for (auto &nd:_nodes) {
@@ -2783,7 +2797,7 @@ class Forest {
                 i++;
             }
         }
-        
+
         for (auto &nd : _nodes) {
             if (nd._left_child) {
                 updateNodeVector(_lineages, nd._left_child, nd._left_child->_right_sib, &nd);

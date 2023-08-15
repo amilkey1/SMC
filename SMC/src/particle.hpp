@@ -242,7 +242,7 @@ class Particle {
 
         if (!_run_on_empty) {
             double prev_log_likelihood = _log_likelihood;
-            _log_likelihood = _forest._gene_tree_log_likelihood + _forest._gene_tree_log_coalescent_likelihood;
+            _log_likelihood = _forest._gene_tree_log_likelihood + _forest._gene_tree_log_coalescent_likelihood; // _log_likelihood contains the coalescent likelihood and the Felsenstein likelihood
 
             if (Forest::_proposal == "prior-prior") {
                 _log_weight = _log_likelihood - prev_log_likelihood;
@@ -451,11 +451,13 @@ class Particle {
 
     inline void Particle::initGeneForest(string newick, unsigned gene_number, map<string, string> taxon_map, Data::SharedPtr d) {
         assert (_name != "species");
-        _forest.clear();
+        _forest.clear(); // TODO: double check this clears everything
         _forest.buildFromNewick(newick, true, false);
         _forest.resetLineages();
         _forest.refreshPreorder();
-        _forest.setDataTwo(d, gene_number, taxon_map); // reset data and species partition
+//        _forest.setDataTwo(d, gene_number, taxon_map); // reset data and species partition
+        _log_likelihood = 0.0;
+        _log_weight = 0.0;
     }
 
     inline void Particle::buildEntireGeneTree() {
