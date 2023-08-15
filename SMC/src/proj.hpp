@@ -1164,7 +1164,7 @@ namespace proj {
 //             for (unsigned s=1; s<ngenes+1; s++) {
 //                 // start at s=1 to only modify the gene trees
 //                 for (unsigned p=0; p<nparticles; p++) {
-//                     particles[s][p]->remakeGeneTrees(_taxon_map); // TODO: verify this doesn't need to be done anymore for gene tree start
+//                     particles[s][p]->remakeGeneTrees(_taxon_map);
 //                     particles[s][p]->resetGeneTreePartials(_data, _taxon_map, s);
 //                 _deconstruct = false;
 //                 }
@@ -1424,7 +1424,7 @@ namespace proj {
 
        _mpi_first_gene.resize(ntasks);
        _mpi_last_gene.resize(ntasks);
-       unsigned gene_cum = 0; // TODO: not sure
+       unsigned gene_cum = 0; // TODO: not sure if this should start at 1
        output("\nGene schedule:\n");
        output(str(format("%12s %25s %25s\n") % "rank" % "first gene" % "last gene"));
        for (unsigned rank = 0; rank < ntasks; ++rank) {
@@ -1636,12 +1636,14 @@ namespace proj {
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                     }
                     
+//                    cout << "my rank is : " << my_rank << endl;
                     if (my_rank == 0) {
                         // Make a list of genes that we haven't heard from yet
                         list<unsigned> outstanding;
                         for (unsigned rank = 1; rank < ntasks; ++rank) {
                             for (unsigned g = _mpi_first_gene[rank]+1; g < _mpi_last_gene[rank]+1; ++g) {
                                 outstanding.push_back(g);
+//                                cout << "outstanding contains: " << g << endl;
                             }
                         }
                         
@@ -1679,6 +1681,7 @@ namespace proj {
                             newick.resize(message_length - 1);  // remove '\0' at end
 //                            cout << "gene number is " << gene << endl;
 //                            cout << "newicks size is " << _starting_gene_newicks.size() << endl;
+                            cout << "gene being added is number: " << gene << endl;
                             _starting_gene_newicks[gene-1] = newick;
                                                             
                             auto it = find(outstanding.begin(), outstanding.end(), gene);
@@ -1691,11 +1694,11 @@ namespace proj {
                     
                     // build species trees
                     
+                }
+                    
                     if (i < _niterations-1) {
                         output("\nGrowing species tree...\n");
-                        
-//                        cout << "gene 1 newick: " << _starting_gene_newicks[0] << endl;
-                        
+                                                
                         growSpeciesTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nspecies, nparticles); // grow and filter species trees conditional on selected gene trees
                         
                         if (i == _niterations - 2) {
@@ -1712,6 +1715,7 @@ namespace proj {
                     }
                     
                     saveSelectedGeneTrees(my_vec, nsubsets);
+                }
 //                    my_vec[1][0]->showParticle();
 //                    my_vec[2][0]->showParticle();
 //                    my_vec[3][0]->showParticle();
@@ -1729,7 +1733,7 @@ namespace proj {
                         saveParticleWeights(my_vec[0]);
                     }
 #endif
-                }
+//                }
             }
             
 #if defined(USING_MPI)
