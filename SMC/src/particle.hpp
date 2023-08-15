@@ -148,7 +148,7 @@ class Particle {
         }
         cout << "  _log_weight: " << log_weight << "\n" ;
         if (_name != "species") {
-            cout << " _log_likelihood: " << _log_likelihood << "\n";
+            cout << " log Felsenstein + log coalescent likelihood: " << _log_likelihood << "\n";
         }
         cout << "  _forest: " << "\n";
         cout << "\n";
