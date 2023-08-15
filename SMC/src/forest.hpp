@@ -3878,6 +3878,7 @@ class Forest {
     inline void Forest::deconstructGeneTree() {
         // break apart gene tree to starting tree
         assert (_index > 0);
+        
         int count = 0;
         
         for (auto &nd : boost::adaptors::reverse(_nodes)) {

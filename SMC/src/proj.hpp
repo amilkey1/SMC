@@ -1160,21 +1160,22 @@ namespace proj {
         }
         
         // keep the species partition for the gene forests at this stage but clear the tree structure
-         if (i == 1 && _gene_first == true) {
-             for (unsigned s=1; s<ngenes+1; s++) {
-                 // start at s=1 to only modify the gene trees
-                 for (unsigned p=0; p<nparticles; p++) {
-                     particles[s][p]->remakeGeneTrees(_taxon_map);
-                     particles[s][p]->resetGeneTreePartials(_data, _taxon_map, s);
-                 _deconstruct = false;
-                 }
-             }
-         }
+//         if (i == 1 && _gene_first == true) {
+//             for (unsigned s=1; s<ngenes+1; s++) {
+//                 // start at s=1 to only modify the gene trees
+//                 for (unsigned p=0; p<nparticles; p++) {
+//                     particles[s][p]->remakeGeneTrees(_taxon_map); // TODO: verify this doesn't need to be done anymore for gene tree start
+//                     particles[s][p]->resetGeneTreePartials(_data, _taxon_map, s);
+//                 _deconstruct = false;
+//                 }
+//             }
+//         }
         
         if (i > 0) {
             _deconstruct = true;
             for (unsigned s=1; s<ngenes+1; s++) {
                 // start at s=1 to only modify the gene trees
+                // need to reset the partials here if passing gene newicks around as strings
                 for (unsigned p=0; p<nparticles; p++) {
                     particles[s][p]->remakeGeneTrees(_taxon_map);
                     particles[s][p]->resetGeneTreePartials(_data, _taxon_map, s);

@@ -229,10 +229,10 @@ class Particle {
 
     inline void Particle::geneTreeProposal(bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
         assert(_name != "species");
-        
-        if (deconstruct) {
-            _forest.deconstructGeneTree();
-        }
+//        
+//        if (deconstruct) {
+//            _forest.deconstructGeneTree(); // TODO:  this may be doing extra work now
+//        }
         
         pair<double, string> species_info = _forest.chooseDelta(species_joined);
         _forest.geneTreeProposal(species_info, species_joined);
