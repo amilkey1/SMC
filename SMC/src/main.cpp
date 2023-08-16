@@ -13,8 +13,9 @@ proj::PartialStore ps;
 
 using namespace proj;
 
-#if defined(USING_MPI)
 int my_rank = 0;
+#if defined(USING_MPI)
+//int my_rank = 0;
 int ntasks = 0;
 
 void output(string msg) {

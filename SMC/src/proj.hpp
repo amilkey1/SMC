@@ -13,8 +13,9 @@
 #include <boost/algorithm/string/split.hpp>
 #include "conditionals.hpp"
 
-#if defined(USING_MPI)
 extern int my_rank;
+#if defined(USING_MPI)
+//extern int my_rank;
 extern int ntasks;
 #endif
 
@@ -354,6 +355,8 @@ namespace proj {
 
 
     inline void Proj::writeGeneTreeFile() {
+        assert (my_rank == 0);
+        
         // open log file
         ofstream genef("genetrees.txt");
         genef << "let gene_forests = [\n";
@@ -786,8 +789,8 @@ namespace proj {
     inline void Proj::showFinal(vector<vector<Particle::SharedPtr>> my_vec) {
         // this function displays the final species trees
 //        for (int p=0; p<_nparticles; p++) {
-//                my_vec[0][p]->showParticle();
-//            }
+//            my_vec[0][p]->showParticle();
+//        }
         
         double sum_h = 0.0;
         for (auto & p:my_vec[0]) {
@@ -1292,8 +1295,6 @@ namespace proj {
 
     inline void Proj::growGeneTrees(vector<Particle::SharedPtr> &gene_particles, vector<Particle::SharedPtr> &my_vec_1_s, vector<Particle::SharedPtr> &my_vec_2_s, Particle::SharedPtr &species_tree_particle, unsigned ntaxa, unsigned ngenes, unsigned gene_number, unsigned iteration) {
         
-//        cout <<  "growing gene " << gene_number << endl;
-        
         for (unsigned g=0; g<ntaxa-1; g++) {
             if (g == 0 && iteration > 0) {
                 _deconstruct = true;
@@ -1333,11 +1334,12 @@ namespace proj {
                 if (g < ntaxa-2) {
                     resetWeights(gene_particles, "g");
                 }
-                assert (_accepted_particle_vec.size() == ngenes+1);
-                _accepted_particle_vec[gene_number] = gene_particles;
+//                assert (_accepted_particle_vec.size() == ngenes+1);
+//                _accepted_particle_vec[gene_number] = gene_particles;
             _deconstruct = false;
         } // g loop
         
+        assert (_accepted_particle_vec.size() == ngenes+1);
         // preserve gene tree variation for use in lorad file before choosing one gene tree
         for (unsigned p=0; p<_nparticles; p++) {
             _accepted_particle_vec[gene_number][p] = gene_particles[p]; // preserve gene tree variation for output
@@ -1352,6 +1354,7 @@ namespace proj {
         
         if (my_rank == 0) {
             _starting_gene_newicks[gene_number-1] = newick;
+//            cout << "my rank is: " << my_rank << " and gene number is : " << gene_number << " and the tree is: " << _starting_gene_newicks[gene_number-1] << endl;
         }
         
         else {
@@ -1455,40 +1458,33 @@ namespace proj {
 #endif
 
     inline void Proj::growSpeciesTrees(vector<vector<Particle::SharedPtr>> &particles, vector<vector<Particle::SharedPtr>> &particles_1, vector<vector<Particle::SharedPtr>> &particles_2, unsigned ngenes, unsigned nspecies, unsigned nparticles) {
-        
-//        cout << "gene 1 newick: " << _starting_gene_newicks[0] << endl;
 
         assert (_starting_gene_newicks.size() == ngenes);
-        
+            
         // initialize chosen gene trees
         for (unsigned s=1; s<ngenes+1; s++) {
             // fill in gene vector with the chosen gene
             string newick = _starting_gene_newicks[s-1];
-//            cout << "gene 1 newick: " << _starting_gene_newicks[0] << endl;
-//            if (newick == "") {
-//                cout << "blank gene is " << s << endl;
-//            }
-            assert (newick != "");
+            if (newick == "") {
+                throw XProj("my rank has 0 newick");
+            }
+            
             assert(particles[s].size() == nparticles);
             Particle chosen_particle;
             chosen_particle.initGeneForest(newick,s,_taxon_map, _data);
             for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
                 if (p<nparticles) {
                     *particles[s][p] = chosen_particle;
-//                    particles[s][p]->initGeneForest(newick, s, _taxon_map, _data);
                 }
                 else {
                     // add in null particles first
                     particles[s].push_back(Particle::SharedPtr(new Particle));
                     *particles[s][p] = chosen_particle;
-//                    particles[s][p]->initGeneForest(newick, s, _taxon_map, _data);
                     particles_2[s].push_back(Particle::SharedPtr(new Particle));
                 }
             }
         }
-        
-//        saveSelectedGeneTrees(particles, ngenes);
-        
+                
         // increase size of species vector
         for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
             particles[0].push_back(Particle::SharedPtr(new Particle));
@@ -1540,10 +1536,11 @@ namespace proj {
                 //change use_first from true to false or false to true
                 _use_first = !_use_first;
             }
-            _accepted_particle_vec[0] = particles[0];
+//            _accepted_particle_vec[0] = particles[0];
             _start = "species";
 
         } // s loop
+        _accepted_particle_vec[0] = particles[0];
     }
 
     inline void Proj::run() {
@@ -1596,7 +1593,6 @@ namespace proj {
             _both = false;
             
             handleInitialNewicks(my_vec, nsubsets);
-//            my_vec[0][0]->showParticle();
             
             unsigned ntaxa = (unsigned) _taxon_map.size();
             _deconstruct = false;
@@ -1654,7 +1650,6 @@ namespace proj {
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                     }
                     
-//                    cout << "my rank is : " << my_rank << endl;
                     if (my_rank == 0) {
                         // Make a list of genes that we haven't heard from yet
                         list<unsigned> outstanding;
@@ -1697,9 +1692,6 @@ namespace proj {
                             
                             // Store the newick and remove gene from outstanding
                             newick.resize(message_length - 1);  // remove '\0' at end
-//                            cout << "gene number is " << gene << endl;
-//                            cout << "newicks size is " << _starting_gene_newicks.size() << endl;
-                            cout << "gene being added is number: " << gene << endl;
                             _starting_gene_newicks[gene-1] = newick;
                                                             
                             auto it = find(outstanding.begin(), outstanding.end(), gene);
@@ -1708,11 +1700,11 @@ namespace proj {
                         }
                     }
                     
-                    saveSelectedGeneTrees(my_vec, nsubsets);
-                    
                     // build species trees
                     
                 }
+                if (my_rank == 0) {
+                   saveSelectedGeneTrees(my_vec, nsubsets);
                     
                     if (i < _niterations-1) {
                         output("\nGrowing species tree...\n");
@@ -1724,19 +1716,16 @@ namespace proj {
                         }
                         saveParticleWeights(my_vec[0]);
                     }
+                }
                     
 #else
                     for (unsigned s=1; s<nsubsets+1; s++) {
                         cout << "growing gene " << s << endl;
-//                        _use_first = true; // grow gene trees conditional on selected species tree, choose final one
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                     }
                     
                     saveSelectedGeneTrees(my_vec, nsubsets);
                 }
-//                    my_vec[1][0]->showParticle();
-//                    my_vec[2][0]->showParticle();
-//                    my_vec[3][0]->showParticle();
                     
                     // build species trees
                     
@@ -1751,21 +1740,21 @@ namespace proj {
                         saveParticleWeights(my_vec[0]);
                     }
 #endif
-//                }
             }
             
 #if defined(USING_MPI)
         // Ensure no one starts on next iteration until coordinator is ready
         MPI_Barrier(MPI_COMM_WORLD);
 #endif
-                                
-            writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
-            
-            writeGeneTreeFile();
+    if (my_rank == 0) {
+//            writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
+
+//            writeGeneTreeFile();
 
 //            saveAllHybridNodes(_accepted_particle_vec);
             showFinal(_accepted_particle_vec);
-            cout << "marg like: " << setprecision(12) << _log_marginal_likelihood << endl;
+            cout << "marginal likelihood: " << setprecision(12) << _log_marginal_likelihood << endl;
+    }
         }
 
         catch (XProj & x) {
