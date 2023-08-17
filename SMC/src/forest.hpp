@@ -17,6 +17,7 @@ std::mutex mtx;
 
 #include "partial_store.hpp"
 extern proj::PartialStore ps;
+extern int my_rank;
 
 #include "node.hpp"
 
@@ -1090,6 +1091,7 @@ class Forest {
     }
 
     inline void Forest::buildFromNewick(const std::string newick, bool rooted, bool allow_polytomies) {
+//        cout << newick << endl;
         set<unsigned> used; // used to ensure that no two leaf nodes have the same number
         unsigned curr_leaf = 0;
         unsigned num_edge_lengths = 0;
@@ -2807,6 +2809,14 @@ class Forest {
 
 
     inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info) {
+        // assert forest is not fully resolved
+        if (_lineages.size() == 1) {
+            cout << "growing tree is fully resolved on rank " << my_rank << endl;
+            showForest();
+//            throw XProj ("growing tree is fully resolved");
+        }
+        
+        assert (_lineages.size() > 1);
          // get species info
         double species_increment = species_info[_species_join_number].second;
         assert (species_increment >= 0.0);

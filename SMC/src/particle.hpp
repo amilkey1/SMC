@@ -14,6 +14,7 @@ using namespace boost;
 #include "lot.hpp"
 
 extern proj::Lot rng;
+extern int my_rank;
 
 namespace proj {
 
@@ -49,6 +50,7 @@ class Particle {
         double                                  getLogWeight(string a);
         void                                    setLogWeight(double w, string a);
         void                                    operator=(const Particle & other);
+        double                                   getForestLikelihood(){return _forest._gene_tree_log_likelihood;}
         std::string                             saveForestNewick() {
             return _forest.makeNewick(25, true);
         }
@@ -80,6 +82,7 @@ class Particle {
         void                                            speciesJoinedProposal();
         vector<string>                                  getGeneTreeNewicks();
         string                                          getGeneTreeNewick();
+        string                                          getSpeciesTreeNewick();
         vector<pair<tuple<string, string, string>, double>>                    getSpeciesJoined(){return _t;}
         double                                          getCoalescentLikelihood(){return _log_coalescent_likelihood;}
         void                                            geneTreeProposal(bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined);
@@ -108,6 +111,7 @@ class Particle {
         double                                          calcLogSpeciesTreeDensityGivenLambda(double lambda);
         static bool                                     _run_on_empty;
         void                                            initGeneForest(string newick, unsigned gene_number, map<string, string> taxon_map, Data::SharedPtr d);
+        void                                            initSpeciesForest(string newick);
     
     private:
 
@@ -207,7 +211,6 @@ class Particle {
 
     inline double Particle::proposal(bool gene_trees_only, bool deconstruct, vector<pair<tuple<string, string, string>, double>> species_joined) {
         // this function proposes gene trees, not species trees
-        
         string event;
         
         if (_generation == 0 || _generation == Forest::_ntaxa - 1) {
@@ -216,7 +219,6 @@ class Particle {
         }
         if (gene_trees_only) {
             geneTreeProposal(deconstruct, species_joined);
-            // TODO: reset gene tree partials here
         }
         
         if (_run_on_empty) {
@@ -460,6 +462,20 @@ class Particle {
         _log_weight = 0.0;
     }
 
+    inline void Particle::initSpeciesForest(string newick) {
+        _forest.clear();
+        _t = _forest.buildFromNewickTopology(newick, false);
+        _log_weight = 0.0;
+        _species_log_weight = 0.0;
+        _log_likelihood = 0.0;
+        _log_coalescent_likelihood = 0.0;
+        _generation = 0;
+        _species_tree_height = 0.0;
+        _inf = false;
+        _name = "species";
+        assert (_t.size() == Forest::_nspecies);
+    }
+
     inline void Particle::buildEntireGeneTree() {
         _forest.drawFromGeneTreePrior();
     }
@@ -626,6 +642,11 @@ class Particle {
     }
 
     inline string Particle::getGeneTreeNewick() {
+        string newick = _forest.makeNewick(9, true);
+        return newick;
+    }
+
+    inline string Particle::getSpeciesTreeNewick() {
         string newick = _forest.makeNewick(9, true);
         return newick;
     }
