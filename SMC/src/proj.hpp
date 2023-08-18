@@ -1362,7 +1362,7 @@ namespace proj {
                 msglen,                 // int count,
                 MPI_CHAR,               // MPI_Datatype datatype,
                 0,                      // int destination,
-                gene_number,            // int tag,
+                (int) gene_number,            // int tag,
                 MPI_COMM_WORLD);        // MPI_Comm communicator)
         }
         
@@ -1457,6 +1457,7 @@ namespace proj {
     inline void Proj::growSpeciesTrees(vector<vector<Particle::SharedPtr>> &particles, vector<vector<Particle::SharedPtr>> &particles_1, vector<vector<Particle::SharedPtr>> &particles_2, unsigned ngenes, unsigned nspecies, unsigned nparticles) {
 
         assert (_starting_gene_newicks.size() == ngenes);
+        assert (my_rank == 0);
             
         // initialize chosen gene trees
         for (unsigned s=1; s<ngenes+1; s++) {
@@ -1468,23 +1469,20 @@ namespace proj {
             
             assert(particles[s].size() == nparticles);
             Particle chosen_particle;
+                cout << "initializing gene forest " << s << endl;
             chosen_particle.initGeneForest(newick,s,_taxon_map, _data);
-//            cout << "total particles is : " << nparticles*_species_particles_per_gene_particle << endl;
             for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
-//                cout << "p = " << p << endl;
                 if (p<nparticles) {
                     *particles[s][p] = chosen_particle;
                 }
                 else {
                     // add in null particles first
-//                    cout << "adding null particles to gene vector " << endl;
                     particles[s].push_back(Particle::SharedPtr(new Particle));
                     *particles[s][p] = chosen_particle;
                     particles_2[s].push_back(Particle::SharedPtr(new Particle));
                 }
             }
         }
-//        cout << "done adding null particles to gene vector " << endl;
         // increase size of species vector
         for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
 //            cout << "increasing size of species vector" << endl;
@@ -1591,9 +1589,9 @@ namespace proj {
                 }
             }
 
-#if defined(USING_MPI)
-                mpiSetSchedule(nsubsets);
-#endif
+//#if defined(USING_MPI)
+//                mpiSetSchedule(nsubsets);
+//#endif
             Particle::SharedPtr species_tree_particle;
 
             _use_first = true;
@@ -1612,6 +1610,9 @@ namespace proj {
             if (_start == "species") {
                 species_tree_particle = my_vec[0][0];
             }
+#if defined(USING_MPI)
+                mpiSetSchedule(nsubsets);
+#endif
         
             for (unsigned i=0; i<_niterations; i++) {
                 
@@ -1663,8 +1664,8 @@ namespace proj {
                             MPI_Get_count(&status, MPI_CHAR, &message_length);
 
                             // Get gene
-//                            unsigned gene = (unsigned)status.MPI_TAG;
-//                            cout << "gene found in message is " << gene << endl;
+                            unsigned gene = (unsigned)status.MPI_TAG;
+                            cout << "gene found in message is " << gene << endl;
 
                             // Get the message itself
                             string newick;
@@ -1684,7 +1685,7 @@ namespace proj {
                             
                             vector<string> parts;
                             split(parts, newick, is_any_of("|"));
-                           unsigned gene = stod(parts[0]);
+//                           unsigned gene = stod(parts[0]);
                            string chosen_newick = parts[1];
                             
 //                            _starting_gene_newicks[gene-1] = newick;
@@ -1696,11 +1697,11 @@ namespace proj {
                         }
                     }
                 }
-//#if defined(USING_MPI)
-//        // Ensure no one starts on species tree until coordinator is ready
-//                cout << "mpi barrier " << endl;
-//        MPI_Barrier(MPI_COMM_WORLD);
-//#endif
+#if defined(USING_MPI)
+        // Ensure no one starts on species tree until coordinator is ready
+                cout << "mpi barrier " << endl;
+        MPI_Barrier(MPI_COMM_WORLD);
+#endif
                 // TODO: random number sequence is the same for all processors - problematic?
                 // build species trees
                 string message;
