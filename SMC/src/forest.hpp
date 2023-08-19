@@ -1092,9 +1092,6 @@ class Forest {
 
     inline void Forest::buildFromNewick(const std::string newick, bool rooted, bool allow_polytomies) {
         cout << "gene number is " << _index << endl;
-        if (_index == 7) {
-            cout << "newick is " << newick << endl;
-        }
         
         set<unsigned> used; // used to ensure that no two leaf nodes have the same number
         unsigned curr_leaf = 0;
@@ -1171,10 +1168,6 @@ class Forest {
             unsigned position_in_string = 0;
             for (auto ch : commentless_newick) {
                 position_in_string++;
-                if (_index == 7 && position_in_string == 4) {
-                    showForest();
-                    throw XProj ("stop");
-                }
 
                 if (inside_quoted_name) {
                     if (ch == '\'') {
@@ -1188,9 +1181,6 @@ class Forest {
                     else if (iswspace(ch))
                         nd->_name += ' ';
                     else {
-                        if (_index == 7) {
-//                            cout << "adding name " << ch << endl;
-                        }
                         nd->_name += ch;
                     }
 
@@ -1214,9 +1204,6 @@ class Forest {
                         previous = Prev_Tok_Name;
                     }
                     else {
-                        if (_index == 7) {
-//                            cout << "adding name " << ch << endl;
-                        }
                         nd->_name += ch;
                         continue;
                     }
@@ -1345,13 +1332,6 @@ class Forest {
                         }
                         else {
                             // Get the node name
-                            if (_index == 7) {
-                                assert (my_rank == 0);
-//                                showForest();
-                                cout << "node number is " << nd->_number << endl;
-                                cout << "node name is " << nd->_name << endl;
-                                cout << "adding name " << ch << endl;
-                            }
                             nd->_name = ch;
     
                             inside_unquoted_name = true;
@@ -1573,9 +1553,6 @@ class Forest {
                     else if (iswspace(ch))
                         nd->_name += ' ';
                     else {
-//                        if (_index == 7) {
-//                            cout << "adding name " << ch << endl;
-//                        }
                         nd->_name += ch;
                     }
 
@@ -1599,9 +1576,6 @@ class Forest {
                         previous = Prev_Tok_Name;
                     }
                     else {
-//                        if (_index == 7) {
-//                            cout << "adding name " << ch << endl;
-//                        }
                         nd->_name += ch;
                         continue;
                     }

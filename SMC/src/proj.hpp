@@ -1673,8 +1673,8 @@ namespace proj {
                             MPI_Recv(&newick[0],    // Initial address of receive buffer
                                 message_length,     // Maximum number of elements to receive
                                 MPI_CHAR,           // Datatype of each receive buffer entry
-                                MPI_ANY_SOURCE,     // Rank of source
-                                MPI_ANY_TAG,        // Message tag
+                                status.MPI_SOURCE,     // Rank of source
+                                status.MPI_TAG,        // Message tag
                                 MPI_COMM_WORLD,     // Communicator
                                 MPI_STATUS_IGNORE   // Status object
                             );
