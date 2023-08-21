@@ -1091,7 +1091,6 @@ class Forest {
     }
 
     inline void Forest::buildFromNewick(const std::string newick, bool rooted, bool allow_polytomies) {
-        cout << "gene number is " << _index << endl;
         
         set<unsigned> used; // used to ensure that no two leaf nodes have the same number
         unsigned curr_leaf = 0;

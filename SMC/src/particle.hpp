@@ -454,7 +454,6 @@ class Particle {
     inline void Particle::initGeneForest(string newick, unsigned gene_number, map<string, string> taxon_map, Data::SharedPtr d) {
         assert (_name != "species");
         assert (my_rank == 0);
-        cout << "clearing forest gene " << gene_number << endl;
         _forest.clear(); // TODO: double check this clears everything
         _forest._index = gene_number;
         _forest.buildFromNewick(newick, true, false);
