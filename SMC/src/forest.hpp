@@ -1757,11 +1757,18 @@ class Forest {
         }
         
         if (!topology_only) {
+            double height = 0.0;
             // include branch lengths
             for (unsigned a=0; a < heights_and_nodes.size(); a++) {
-                species_joined[a].second = heights_and_nodes[a].first;
+                species_joined[a].second = heights_and_nodes[a].first - height;
+                height += species_joined[a].second;
             }
         }
+        double height = 0.0;
+        for (auto &s:species_joined) {
+            height += s.second;
+        }
+        assert (height == heights_and_nodes[Forest::_nspecies-2].first); // total species increments should add up to species tree height
         return species_joined;
     }
 
@@ -2820,6 +2827,9 @@ class Forest {
 //            throw XProj ("growing tree is fully resolved");
         }
         
+//        for (auto &s:species_info) {
+//            cout << "species increments are " << s.second << endl;
+//        }
         assert (_lineages.size() > 1);
          // get species info
         double species_increment = species_info[_species_join_number].second;
@@ -2842,7 +2852,7 @@ class Forest {
              string species1 = get<0> (species_info[_species_join_number].first);
              string species2 = get<1> (species_info[_species_join_number].first);
              string new_name = get<2> (species_info[_species_join_number].first);
-
+             
              list<Node*> &nodes = _species_partition[new_name];
              copy(_species_partition[species1].begin(), _species_partition[species1].end(), back_inserter(nodes));
              copy(_species_partition[species2].begin(), _species_partition[species2].end(), back_inserter(nodes));
@@ -2870,7 +2880,6 @@ class Forest {
          
          // use combined rate to draw an increment (delta)
          double increment = rng.gamma(1.0, 1.0/(coalescence_rate));
-//            cout << "proposed increment is: " << increment << endl;
          
          // choose which species coalescent event occurred in
          
@@ -2887,6 +2896,18 @@ class Forest {
          }
          
          bool done = false;
+//        cout << "species increment is " << species_increment << endl;
+//        cout << "increment is " << increment << endl;
+//        cout << "species partition size is " << _species_partition.size() << endl;
+//        for (auto &s:_species_partition) {
+//            cout << "s first is " << s.first << " and s second is " << s.second.size() << endl;
+//        }
+//        cout << "species join number is " << _species_join_number << endl;
+//        for (auto &s:species_info) {
+//            cout << "species info is: " << s.second << endl;
+//        }
+//
+//        showForest();
          if (increment > species_increment && _species_partition.size() > 1 && species_increment > 0.0) {
              // deep coalescence
              double cum_time = species_increment;
@@ -3091,8 +3112,16 @@ class Forest {
 
     inline void Forest::geneTreeProposal(pair<double, string> species_info, vector<pair<tuple<string, string, string>, double>> _t) {
         string species_name = species_info.second;
+//        cout << "species name is " << species_name << endl;
+        
         bool joined = false;
         double increment = species_info.first;
+        
+//        cout << "species increment is " << increment << endl;
+        
+//        for (auto &s:_species_partition) {
+//            cout << "species partition name is " << s.first << endl;
+//        }
         for (auto &s:_species_partition) {
             if (s.first == species_name) {
                 evolveSpeciesFor(s.second, increment, species_name);
