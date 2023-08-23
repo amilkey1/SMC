@@ -51,7 +51,7 @@ namespace proj {
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, vector<pair<tuple<string, string, string>, double>> species_joined);
             void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
             void                proposeSpeciesParticles(vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
-            void                proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, Particle::SharedPtr species_tree_particle);
+            void                proposeGeneTreeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, Particle::SharedPtr species_tree_particle);
             void                growGeneTrees(vector<Particle::SharedPtr> &gene_particles, vector<Particle::SharedPtr> &my_vec_1_s, vector<Particle::SharedPtr> &my_vec_2_s, Particle::SharedPtr &species_tree_particle, unsigned ntaxa, unsigned ngenes, unsigned gene_number, unsigned iteration);
             void                growSpeciesTrees(vector<vector<Particle::SharedPtr>> &particles, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2, unsigned ngenes, unsigned nspecies, unsigned nparticles);
             void                handleInitialNewicks(vector<vector<Particle::SharedPtr>> &particles, unsigned ngenes);
@@ -811,7 +811,7 @@ namespace proj {
         cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
     }
 
-    inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, Particle::SharedPtr species_tree_particle) {
+    inline void Proj::proposeGeneTreeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, Particle::SharedPtr species_tree_particle) {
         assert(_nthreads > 0);
         
         vector<pair<tuple<string, string, string>, double>> species_joined = species_tree_particle->getSpeciesJoined();
@@ -1302,7 +1302,7 @@ namespace proj {
             
             bool gene_trees_only = true;
             
-                proposeParticles(gene_particles, gene_trees_only, "g", species_tree_particle);
+                proposeGeneTreeParticles(gene_particles, gene_trees_only, "g", species_tree_particle);
             
                 if (!_run_on_empty) {
                     bool calc_marg_like = true;
