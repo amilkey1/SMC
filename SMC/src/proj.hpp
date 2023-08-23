@@ -1764,9 +1764,6 @@ namespace proj {
 
                     saveSelectedGeneTrees(nsubsets);
                 }
-            for (auto &s:_starting_gene_newicks) {
-                cout << s << endl;
-            }
                     // build species trees
                     if (i < _niterations-1) {
                         growSpeciesTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nspecies, nparticles); // grow and filter species trees conditional on selected gene trees

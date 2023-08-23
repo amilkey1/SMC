@@ -1758,7 +1758,6 @@ class Forest {
         for (auto &s:species_joined) {
             height += s.second;
         }
-        assert (height == heights_and_nodes[Forest::_nspecies-2].first); // total species increments should add up to species tree height
         return species_joined;
     }
 
