@@ -48,7 +48,7 @@ namespace proj {
             void                resetWeights(vector<Particle::SharedPtr> & particles, string a);
             void                createSpeciesMap(Data::SharedPtr);
             void                showFinal();
-            void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, vector<pair<tuple<string, string, string>, double>> species_joined);
+            void                proposeGeneTreeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, vector<pair<tuple<string, string, string>, double>> species_joined);
             void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
             void                proposeSpeciesParticles(vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
             void                proposeGeneTreeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, Particle::SharedPtr species_tree_particle);
@@ -834,7 +834,7 @@ namespace proj {
 
             while (true) {
             // create a thread to handle particles first through last - 1
-              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles), gene_trees_only, a, species_joined));
+              threads.push_back(thread(&Proj::proposeGeneTreeParticleRange, this, first, last, std::ref(particles), gene_trees_only, a, species_joined));
             // update first and last
             first = last;
             last += incr;
@@ -853,7 +853,7 @@ namespace proj {
         }
     }
 
-    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, vector<pair<tuple<string, string, string>, double>> species_joined) {
+    inline void Proj::proposeGeneTreeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, vector<pair<tuple<string, string, string>, double>> species_joined) {
         for (unsigned i=first; i<last; i++){
             particles[i]->proposal(gene_trees_only, species_joined);
         }
@@ -861,38 +861,38 @@ namespace proj {
 
     inline void Proj::proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets) {
             for (unsigned p=first; p<last; p++) {
-                    tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
+                tuple<string, string, string> species_joined = my_vec[0][p]->speciesTopologyProposal();
 
-                    vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
+                vector<double> max_depths; // this vector contains list of maximum depths for each gene tree
 
-                    if (s < nspecies-1) {
-                        for (unsigned j=1; j<nsubsets+1; j++) {
-                            max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
-                        }
-
-                        // now finish the species tree branch length proposal
-                        my_vec[0][p]->speciesProposal(max_depths, species_joined);
+                if (s < nspecies-1) {
+                    for (unsigned j=1; j<nsubsets+1; j++) {
+                        max_depths.push_back(my_vec[j][p]->calcConstrainedProposal(species_joined));
                     }
+
+                    // now finish the species tree branch length proposal
+                    my_vec[0][p]->speciesProposal(max_depths, species_joined);
+                }
                     
-                    else {
-                        for (unsigned j=1; j<nsubsets+1; j++) {
-                            my_vec[j][p]->calcConstrainedProposal(species_joined); // update the gene tree species partitions
-                            max_depths.push_back(0.0);
-                        }
-                        my_vec[0][p]->speciesProposal(max_depths, species_joined); // set last edge length of species tree to 0.0
+                else {
+                    for (unsigned j=1; j<nsubsets+1; j++) {
+                        my_vec[j][p]->calcConstrainedProposal(species_joined); // update the gene tree species partitions
+                        max_depths.push_back(0.0);
+                    }
+                    my_vec[0][p]->speciesProposal(max_depths, species_joined); // set last edge length of species tree to 0.0
+                }
+
+                double log_coalescent_likelihood = 0.0;
+
+                // calculate coalescent likelihood for each gene on each particle
+                    for (unsigned j=1; j<nsubsets+1; j++) {
+                        double last_edge_len = my_vec[0][p]->getLastEdgeLen();
+                        double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
+                        log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
                     }
 
-                    double log_coalescent_likelihood = 0.0;
-
-                    // calculate coalescent likelihood for each gene on each particle
-                        for (unsigned j=1; j<nsubsets+1; j++) {
-                            double last_edge_len = my_vec[0][p]->getLastEdgeLen();
-                            double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
-                            log_coalescent_likelihood += my_vec[j][p]->calcGeneCoalescentLikelihood(last_edge_len, species_joined, species_tree_height);
-                        }
-
-                    my_vec[0][p]->calcSpeciesParticleWeight(log_coalescent_likelihood);
-                } // p loop
+                my_vec[0][p]->calcSpeciesParticleWeight(log_coalescent_likelihood);
+            } // p loop
     }
 
     inline void Proj::proposeSpeciesParticles( vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets) {
