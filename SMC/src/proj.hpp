@@ -445,7 +445,7 @@ namespace proj {
         });
         
         // Choose one lambda value from the probability distribution
-        unsigned which = multinomialDraw(probs); // TODO: these must be on log scale
+        unsigned which = multinomialDraw(probs);
         double lambda_star = proposed_lambdas[which];
         
         // Sample ntries-1 new values of lambda from symmetric proposal distribution
@@ -1331,10 +1331,6 @@ namespace proj {
 #if defined(USING_MPI)
         // choose one set of gene trees to use
         Particle chosen_gene = *chooseTree(gene_particles, "g");
-        
-        if (iteration == 0 && gene_number == 1) {
-            chosen_gene.showParticle();
-        }
                 
         if (my_rank == 0) {
             string newick = chosen_gene.saveForestNewick();
@@ -1359,10 +1355,6 @@ namespace proj {
 #else
         // choose one set of gene trees to use
         Particle chosen_gene = *chooseTree(gene_particles, "g");
-        
-        if (iteration == 0 && gene_number == 1) {
-            chosen_gene.showParticle();
-        }
 
         // save newick of chosen gene
         string newick = chosen_gene.saveForestNewick();
@@ -1768,9 +1760,6 @@ namespace proj {
                 
 #else
                     for (unsigned s=1; s<nsubsets+1; s++) {
-                        if (my_rank == 0) {
-                            cout << "growing gene tree " << s << endl;
-                        }
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                     }
 
