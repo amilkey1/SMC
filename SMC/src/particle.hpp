@@ -450,12 +450,11 @@ class Particle {
     inline void Particle::initGeneForest(string newick, unsigned gene_number, map<string, string> taxon_map, Data::SharedPtr d) {
         assert (_name != "species");
         assert (my_rank == 0);
-        _forest.clear(); // TODO: double check this clears everything
+        _forest.clear();
         _forest._index = gene_number;
         _forest.buildFromNewick(newick, true, false);
         _forest.resetLineages();
         _forest.refreshPreorder();
-//        _forest.setDataTwo(d, gene_number, taxon_map); // reset data and species partition
         _log_likelihood = 0.0;
         _log_weight = 0.0;
     }

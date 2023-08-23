@@ -1256,16 +1256,12 @@ namespace proj {
     inline void Proj::removeExtraParticles(vector<vector<Particle::SharedPtr>> &my_vec, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2, unsigned nparticles, unsigned ngenes) {
         
         unsigned nparticles_to_remove = (nparticles*_species_particles_per_gene_particle) - nparticles;
-//        cout << "nparticles to remove on processor " << my_rank << " is " << nparticles_to_remove << endl;
         // TODO: use resize here?
         if (nparticles_to_remove > 0) {
             for (unsigned s=0; s<ngenes+1; s++) {
                 my_vec[s].erase(my_vec[s].end() - nparticles_to_remove, my_vec[s].end());
                 my_vec_2[s].erase(my_vec_2[s].end() - nparticles_to_remove, my_vec_2[s].end());
-                
-//                cout << "my vec size is " << my_vec[s].size() << endl;
-//                cout << "my vec1 size is " << my_vec_1[s].size() << endl;
-//                cout << "my vec2 size is " << my_vec_2[s].size() << endl;
+
                 assert (my_vec[s].size() == nparticles);
                 assert (my_vec_2[s].size() == nparticles);
                 assert (my_vec_1[s].size() == nparticles);
@@ -1339,12 +1335,9 @@ namespace proj {
         if (iteration == 0 && gene_number == 1) {
             chosen_gene.showParticle();
         }
-
-//        string newick = chosen_gene.saveForestNewick();
                 
         if (my_rank == 0) {
             string newick = chosen_gene.saveForestNewick();
-//            chosen_gene.showParticle();
             // Copy selected gene tree to _starting_gene_newicks
             _starting_gene_newicks[gene_number-1] = newick;
         }
@@ -1551,9 +1544,6 @@ namespace proj {
 
         try {
             
-//            std::cout << "\n*** Reading and storing the data in the file " << _data_file_name << std::endl;
-//            std::cout << "data file name is " << _data_file_name << std::endl;
-            
             rng.setSeed(_random_seed);
             
             setUpInitialData();
@@ -1677,10 +1667,8 @@ namespace proj {
                             
                             vector<string> parts;
                             split(parts, newick, is_any_of("|"));
-//                           unsigned gene = stod(parts[0]);
-                           string chosen_newick = parts[1];
+                            string chosen_newick = parts[1];
                             
-//                            _starting_gene_newicks[gene-1] = newick;
                             _starting_gene_newicks[gene-1] = chosen_newick;
                             
                             auto it = find(outstanding.begin(), outstanding.end(), gene);
@@ -1823,7 +1811,7 @@ namespace proj {
     if (my_rank == 0) {
 //            writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
 
-//            writeGeneTreeFile(); // TODO: do this earlier
+//            writeGeneTreeFile(); // TODO: ok to do this here because we end on gene filtering
 
             showFinal();
             cout << "marginal likelihood: " << setprecision(12) << _log_marginal_likelihood << endl;
@@ -2011,5 +1999,4 @@ namespace proj {
         
         logf.close();
     }
-
 }

@@ -222,8 +222,18 @@ class Forest {
         _gene_tree_log_likelihood = 0.0;
         _gene_tree_log_weight = 0.0;
         _gene_tree_log_coalescent_likelihood = 0.0;
-//        _theta = 0.0;
         _panmictic_coalescent_likelihood = 0.0;
+        _log_weight_vec.clear();
+        _node_choices.clear();
+        _prev_log_likelihood = 0.0;
+        _increment_choices.clear();
+        _extended_increment = 0.0;
+        _species_join_number = 0;
+        _deep_coalescent_increments.clear();
+        _prev_gene_tree_log_likelihood = 0.0;
+        _ready_to_join_species = false;
+        _preorder.clear();
+        _depths.clear();
         
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -240,7 +250,6 @@ class Forest {
             }
         _nleaves=_ntaxa;
         _ninternals=0;
-//        _index = 0; // TODO: fix this
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -2782,24 +2791,7 @@ class Forest {
 
     inline void Forest::resetLineages() {
         assert (_lineages.size () == 1);
-//        int count = 0;
-//        bool increase_count = true;
-//        for (auto &nd:_nodes) {
-//            nd._position_in_lineages = count;
-//            if (count == _ntaxa-1) {
-//                increase_count = false;
-//            }
-//
-//            if (increase_count) {
-//                count++;
-//            }
-//            else {
-//                count --;
-//            }
-//        }
-//        assert (count == -1);
-//        // this function reset the _lineages vector to the tip nodes and then rebuilds it, setting _position_in_lineages
-//
+//        // this function rebuilds the _lineages vector, setting _position_in_lineages
         _lineages.clear();
         unsigned i=0;
         for (auto &nd:_nodes) {
