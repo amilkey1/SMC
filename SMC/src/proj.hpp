@@ -38,7 +38,7 @@ namespace proj {
             void                clear();
             void                processCommandLineOptions(int argc, const char * argv[]);
             void                run();
-            void                saveParticleWeights(vector<Particle::SharedPtr> &v) const;
+            void                saveSpeciesTrees(vector<Particle::SharedPtr> &v) const;
             void                saveParticleLikelihoods(vector<Particle::SharedPtr> &v) const;
 
             void                normalizeWeights(vector<Particle::SharedPtr> & particles, string a, bool calc_marg_like);
@@ -172,7 +172,7 @@ namespace proj {
         
     }
 
-    inline void Proj::saveParticleWeights(vector<Particle::SharedPtr> &v) const {
+    inline void Proj::saveSpeciesTrees(vector<Particle::SharedPtr> &v) const {
         // this function saves particle weights + species tree newick
         
         ofstream weightf("species_trees.txt");
@@ -277,7 +277,6 @@ namespace proj {
             Forest::_base_frequencies.push_back(f);
             sum +=f;
         }
-//        cout << sum-1 << endl;
         assert (fabs(sum-1) < 0.000001);
         if (fabs(sum-1)>0.000001) {
             throw XProj(format("base frequencies (%s) don't add to 1")%Forest::_string_base_frequencies);
@@ -1704,7 +1703,7 @@ namespace proj {
                         }
                         
                         // save species tree variation before removing extra particles
-                        saveParticleWeights(my_vec[0]);
+                        saveSpeciesTrees(my_vec[0]);
                         
                         if (i == _niterations - 1) {
                             writeSpeciesTreeLoradFile(my_vec[0], nspecies);
@@ -1765,6 +1764,9 @@ namespace proj {
 
                     saveSelectedGeneTrees(nsubsets);
                 }
+            for (auto &s:_starting_gene_newicks) {
+                cout << s << endl;
+            }
                     // build species trees
                     if (i < _niterations-1) {
                         growSpeciesTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nspecies, nparticles); // grow and filter species trees conditional on selected gene trees
@@ -1779,7 +1781,7 @@ namespace proj {
                         }
 
                         // save species tree variation before removing extra particles
-                        saveParticleWeights(my_vec[0]);
+                        saveSpeciesTrees(my_vec[0]);
 
                         if (i == _niterations - 1) {
                             writeSpeciesTreeLoradFile(my_vec[0], nspecies);

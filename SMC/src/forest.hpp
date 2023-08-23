@@ -1907,27 +1907,19 @@ class Forest {
             
             double species_increment = species_info[species_join_number].second;
             
-            if (both) { // species info is in a different format when getting coalescent likelihood from gene and species newicks
-                if (species_join_number > 0.0 && species_increment > 0.0) {
-                    species_increment -= species_info[species_join_number - 1].second;
-                }
-            }
-            
             tuple<string, string, string> species_joined = species_info[species_join_number].first;
             
             // update species partition with species_joined
             updateSpeciesPartition(species_joined);
             
             double species_tree_height = species_info[species_join_number].second;
-            if (both && species_tree_height == 0.0) {
+            if (species_tree_height == 0.0) {
                 species_tree_height = species_info[species_join_number-1].second;
             }
             
-            if (!both) {
-                species_tree_height = 0.0;
-                for (unsigned i=0; i<species_join_number+1; i++) {
-                    species_tree_height += species_info[i].second;
-                }
+            species_tree_height = 0.0;
+            for (unsigned i=0; i<species_join_number+1; i++) {
+                species_tree_height += species_info[i].second;
             }
             assert (species_tree_height > 0.0);
             
