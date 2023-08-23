@@ -115,7 +115,6 @@ namespace proj {
             string                      _start;
             bool                        _use_first;
             bool                        _gene_first;
-            bool                        _deconstruct;
             vector<string>              _starting_gene_newicks;
             string                      _starting_species_newick;
 #if defined(USING_MPI)
@@ -816,18 +815,11 @@ namespace proj {
         assert(_nthreads > 0);
         
         vector<pair<tuple<string, string, string>, double>> species_joined = species_tree_particle->getSpeciesJoined();
-//
-//        cout << "using species tree particle: " << endl;
-//        species_tree_particle->showParticle();
-//
-//        for (auto &s:species_joined) {
-//            cout << "species increments are " << s.second << endl;
-//        }
         
         assert (species_joined.size() > 0);
         if (_nthreads == 1) {
             for (unsigned p=0; p<_nparticles; p++) {
-                particles[p]->proposal(gene_trees_only, _deconstruct, species_joined);
+                particles[p]->proposal(gene_trees_only, species_joined);
           }
         }
 
@@ -863,7 +855,7 @@ namespace proj {
 
     inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, vector<pair<tuple<string, string, string>, double>> species_joined) {
         for (unsigned i=first; i<last; i++){
-            particles[i]->proposal(gene_trees_only, _deconstruct, species_joined);
+            particles[i]->proposal(gene_trees_only, species_joined);
         }
     }
 
@@ -1195,7 +1187,6 @@ namespace proj {
         }
         
         if (i > 0) {
-            _deconstruct = true;
             for (unsigned s=1; s<ngenes+1; s++) {
                 // start at s=1 to only modify the gene trees
                 // need to reset the partials here if passing gene newicks around as strings
@@ -1307,25 +1298,11 @@ namespace proj {
         assert (my_vec_2_s.size() == _nparticles);
         
         for (unsigned g=0; g<ntaxa-1; g++) {
-            if (g == 0 && iteration > 0) {
-                _deconstruct = true;
-            }
             // filter particles within each gene
             
             bool gene_trees_only = true;
             
-//            if (iteration == 1 && g == 9 && gene_number == 1) {
-//                cout << "stop";
-//            }
-            
                 proposeParticles(gene_particles, gene_trees_only, "g", species_tree_particle);
-            
-//            if (iteration == 1 && g == 9 && gene_number == 1) {
-//                for (auto &p:gene_particles) {
-//                    p->showParticle();
-//                }
-//                throw XProj ("stop");
-//            }
             
                 if (!_run_on_empty) {
                     bool calc_marg_like = true;
@@ -1353,7 +1330,6 @@ namespace proj {
                 if (g < ntaxa-2) {
                     resetWeights(gene_particles, "g");
                 }
-            _deconstruct = false;
         } // g loop
         
 #if defined(USING_MPI)
@@ -1615,7 +1591,6 @@ namespace proj {
             handleInitialNewicks(my_vec, nsubsets);
             
             unsigned ntaxa = (unsigned) _taxon_map.size();
-            _deconstruct = false;
                 
             if (_sample_from_gene_tree_prior && my_rank == 0) {
                 sampleFromGeneTreePrior(my_vec, nsubsets, ntaxa, my_vec_1, my_vec_2);

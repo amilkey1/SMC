@@ -176,7 +176,6 @@ class Forest {
         void                        hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment);
         void                        resetToMinor(vector<Node*> minor_nodes, vector<Node*> minor_left_children, vector<Node*> minor_right_children, vector<double> minor_left_edge_lengths, vector<double> minor_right_edge_lengths);
         vector<pair<double, double>>              _deep_coalescent_increments; // increment, prior
-        void                        deconstructGeneTree();
         void                        refreshPreorder();
         double                      calcLogCoalLikeGivenTheta(double proposed_theta, vector<pair<tuple<string, string, string>, double>> species_info, bool both);
 
@@ -3916,46 +3915,6 @@ class Forest {
         
         // reset the species partition
         setUpGeneForest(taxon_map);
-    }
-
-    inline void Forest::deconstructGeneTree() {
-        // break apart gene tree to starting tree
-        assert (_index > 0);
-        
-        int count = 0;
-        
-        for (auto &nd : boost::adaptors::reverse(_nodes)) {
-            if (nd._left_child) {
-                revertNodeVector(_lineages, nd._left_child, nd._left_child->_right_sib, &nd);
-                count++;
-            }
-        }
-        // reset _nodes
-        for (int i=0; i<count; i++) {
-            _nodes.pop_back();
-        }
-        
-        for (auto &nd:_nodes) {
-            nd.resetNode();
-//            nd._left_child->clear();
-//            nd._right_sib->clear();
-            nd._edge_length = 0.0;
-        }
-        _ninternals = 0;
-        _log_likelihood_choices.clear();
-        _new_nodes.clear();
-        _species_join_number = 0;
-        _gene_tree_log_weight = 0.0;
-        _gene_tree_log_likelihood = 0.0;
-        _node_choices.clear();
-        _extended_increment = 0.0;
-        _prev_gene_tree_log_likelihood = 0.0;
-        _ready_to_join_species = false;
-        _deep_coalescent_increments.clear();
-        _preorder.clear();
-        _increments.clear();
-        _extended_increment = 0.0;
-        _gene_tree_log_coalescent_likelihood = 0.0;
     }
 
 }
