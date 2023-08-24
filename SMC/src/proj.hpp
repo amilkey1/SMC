@@ -56,9 +56,9 @@ namespace proj {
             void                growSpeciesTrees(vector<vector<Particle::SharedPtr>> &particles, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2, unsigned ngenes, unsigned nspecies, unsigned nparticles);
             void                handleInitialNewicks(vector<vector<Particle::SharedPtr>> &particles, unsigned ngenes);
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
-            void                writeGeneTreeFile();
+            void                writeGeneTreeFile(string file_name, vector<Particle::SharedPtr> gene_particles);
             Particle::SharedPtr chooseTree(vector<Particle::SharedPtr> species_trees, string gene_or_species);
-            void                writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, unsigned nparticles, unsigned nsubsets, unsigned nspecies, unsigned ntaxa);
+            void                writeGeneTreeLoradFile(string file_name, vector<Particle::SharedPtr> gene_tree_vec, unsigned ntaxa);
             void                writeSpeciesTreeLoradFile(vector<Particle::SharedPtr> species_particles, unsigned nspecies);
             void                setStartingVariables();
             void                setUpInitialData();
@@ -355,20 +355,16 @@ namespace proj {
 
 
 
-    inline void Proj::writeGeneTreeFile() { // TODO: this doesn't work
-        assert (my_rank == 0);
+    inline void Proj::writeGeneTreeFile(string file_name, vector<Particle::SharedPtr> gene_particles) {        
+        unsigned nparticles = (int) gene_particles.size();
         
         // open log file
-        ofstream genef("genetrees.txt");
+        ofstream genef(file_name);
         genef << "let gene_forests = [\n";
-        for (unsigned p=0; p < _nparticles; p++) {
+        for (unsigned p=0; p < nparticles; p++) {
             genef << "particle " << endl;
-//            for (unsigned s=1; s < _accepted_particle_vec.size(); s++) {
-//                genef << "gene " << s << endl;
-//                vector<string> newicks = _accepted_particle_vec[s][p].getGeneTreeNewicks();
-//                string newick = newicks[0];
-//                genef << newick << endl;
-//            }
+            string newick = gene_particles[p]->getGeneTreeNewick();
+            genef << newick << endl;
         }
         genef << "];";
         genef.close();
@@ -1246,7 +1242,10 @@ namespace proj {
                 }
                 } // s loop
         } // g loop
-//        writeGeneTreeFile(); // TODO: fix this for gene tree prior
+        for (int s=1; s<ngenes; s++) {
+            string file_name = "gene" + to_string(s)+ ".txt";
+            writeGeneTreeFile(file_name, particles[s]);
+        }
         for (int i=1; i<ngenes+1; i++) {
             _starting_gene_newicks.push_back(particles[i][0]->getGeneTreeNewick());
         }
@@ -1330,6 +1329,14 @@ namespace proj {
 #if defined(USING_MPI)
         // choose one set of gene trees to use
         Particle chosen_gene = *chooseTree(gene_particles, "g");
+        
+        if (iteration == _niterations - 1) {
+            string file_name = "gene" + to_string(gene_number)+ ".log";
+            writeGeneTreeLoradFile(file_name, gene_particles, ntaxa);
+        }
+        
+        string file_name = "gene" + to_string(gene_number)+ ".txt";
+        writeGeneTreeFile(file_name, gene_particles);
                 
         if (my_rank == 0) {
             string newick = chosen_gene.saveForestNewick();
@@ -1358,6 +1365,14 @@ namespace proj {
         // save newick of chosen gene
         string newick = chosen_gene.saveForestNewick();
         _starting_gene_newicks[gene_number-1] = newick;
+        
+        if (iteration == _niterations - 1) {
+            string file_name = "gene" + to_string(gene_number)+ ".log";
+            writeGeneTreeLoradFile(file_name, gene_particles, ntaxa);
+        }
+        
+        string file_name = "gene" + to_string(gene_number)+ ".txt";
+        writeGeneTreeFile(file_name, gene_particles);
         
 #endif
     }
@@ -1698,16 +1713,12 @@ namespace proj {
                             estimateParameters(my_vec, species_tree_particle, nsubsets);
                         }
                         
-                        if (i == _niterations - 1) {
+                        if (i == _niterations - 2) {
                             writeSpeciesTreeLoradFile(my_vec[0], nspecies);
                         }
                         
                         // save species tree variation before removing extra particles
                         saveSpeciesTrees(my_vec[0]);
-                        
-                        if (i == _niterations - 1) {
-                            writeSpeciesTreeLoradFile(my_vec[0], nspecies);
-                        }
                         
                         // delete extra particles
                         removeExtraParticles(my_vec, my_vec_1, my_vec_2, nparticles, nsubsets);
@@ -1780,7 +1791,7 @@ namespace proj {
                         // save species tree variation before removing extra particles
                         saveSpeciesTrees(my_vec[0]);
 
-                        if (i == _niterations - 1) {
+                        if (i == _niterations - 2) {
                             writeSpeciesTreeLoradFile(my_vec[0], nspecies);
                         }
 
@@ -1797,10 +1808,7 @@ namespace proj {
         MPI_Barrier(MPI_COMM_WORLD);
 #endif
     if (my_rank == 0) {
-//            writeLoradFile(my_vec, nparticles, nsubsets, nspecies, ntaxa);
-
-//            writeGeneTreeFile(); // TODO: ok to do this here because we end on gene filtering
-
+        // TODO: combine gene tree files
             showFinal();
             cout << "marginal likelihood: " << setprecision(12) << _log_marginal_likelihood << endl;
     }
@@ -1813,114 +1821,81 @@ namespace proj {
         std::cout << "\nFinished!" << std::endl;
     }
 
-    inline void Proj::writeLoradFile(vector<vector<Particle::SharedPtr>> my_vec, unsigned nparticles, unsigned nsubsets, unsigned nspecies, unsigned ntaxa) {
-        // open log file
-        assert (my_rank == 0);
-        ofstream logf("params.log");
-        
-        double a = 0;
-        unsigned col_count = 0;
-        
-        for (unsigned p=0; p<nparticles; p++) {
-            
-            vector<double> branch_length_vec;
-            for (unsigned s=0; s<nsubsets+1; s++) {
-                for (auto &b:my_vec[s][p]->getBranchLengths()) {
-                    branch_length_vec.push_back(b);
-                }
-            }
-            
-            vector<double> prior_vec;
-            for (unsigned s=0; s<nsubsets+1; s++) {
-                for (auto &b:my_vec[s][p]->getBranchLengthPriors()) {
-                    prior_vec.push_back(b);
-                }
-            }
-            
-            vector<double> gene_tree_log_like;
-            for (unsigned s=1; s<nsubsets+1; s++) {
-                for (auto &g:my_vec[s][p]->getGeneTreeLogLikelihoods()) {
-                    gene_tree_log_like.push_back(g);
-                }
-            }
-            
-            vector<double> gene_tree_log_coalescent_like;
-            for (unsigned s=1; s<nsubsets+1; s++) {
-                for (auto &g:my_vec[s][p]->getGeneTreeLogCoalescentLikelihood()) {
-                    gene_tree_log_coalescent_like.push_back(g);
-                }
-            }
-            
-            vector<double> log_topology_priors;
-            for (unsigned s=0; s<nsubsets+1; s++) {
-                for (auto &t:my_vec[s][p]->getTopologyPriors()) {
-                    log_topology_priors.push_back(t);
-                }
-            }
-            
-            double species_tree_height = my_vec[0][p]->getSpeciesTreeHeight();
-            
-            assert(branch_length_vec.size() == prior_vec.size());
-            
-            double log_coalescent_likelihood = my_vec[0][p]->getCoalescentLikelihood();
-            
-            unsigned ngenes = nsubsets;
-            
-            if (col_count == 0) {
-                logf << "iter" << "\t" << "theta";
-                for (unsigned g=0; g<ngenes; g++) {
-                    logf << "\t" << "gene_tree_log_like";
-                }
-                for (unsigned g=0; g<ngenes; g++) {
-                    logf << "\t" << "gene_tree_log_coalescent_like";
-                }
-                for (unsigned i=0; i<nspecies-1; i++) {
-                    logf << "\t" << "species_tree_increment" << "\t" << "increment_prior";
-                }
-                for (unsigned g=0; g<ngenes; g++) {
-                    for (unsigned j=nspecies; j<nspecies+ntaxa-1; j++) {
-                        logf << "\t" << "gene_tree_increment" << "\t" << "increment_prior";
-                    }
-                }
-                logf << "\t" << "species_tree_topology_prior";
-                for (unsigned g=0; g<ngenes; g++) {
-                    logf << "\t" << "gene_tree_topology_prior";
-                }
-                logf << "\t" << "log_coal_like";
-                
-                logf << "\t" << "species_tree_height" << endl;
-            }
-            
-            logf << a << "\t" << Forest::_theta;
-            
-            for (unsigned g=0; g<gene_tree_log_like.size(); g++) {
-                logf << "\t" << setprecision(12) << gene_tree_log_like[g];
-            }
-            
-            for (unsigned g=0; g<gene_tree_log_coalescent_like.size(); g++) {
-                logf << "\t" << setprecision(12) << gene_tree_log_coalescent_like[g];
-            }
-
-            
-            for (unsigned i=0; i<prior_vec.size(); i++) {
-                logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
-            }
-            
-            for (unsigned j=0; j < log_topology_priors.size(); j++) {
-                logf << "\t" << setprecision(12) << log_topology_priors[j];
-            }
-            
-            logf << "\t" << setprecision(12) << log_coalescent_likelihood;
-            
-            logf << "\t" << setprecision(12) << species_tree_height;
-            
-            logf << endl;
-            a++;
-            col_count++;
+inline void Proj::writeGeneTreeLoradFile(string file_name, vector<Particle::SharedPtr> gene_tree_vec, unsigned ntaxa) {
+    // open log file
+    unsigned nparticles = (int) gene_tree_vec.size();
+    
+    ofstream logf(file_name);
+    
+    double a = 0;
+    unsigned col_count = 0;
+    
+    for (unsigned p=0; p<nparticles; p++) {
+        vector<double> branch_length_vec;
+        for (auto &b:gene_tree_vec[p]->getBranchLengths()) {
+            branch_length_vec.push_back(b);
         }
         
-        logf.close();
+        vector<double> prior_vec;
+        for (auto &b:gene_tree_vec[p]->getBranchLengthPriors()) {
+            prior_vec.push_back(b);
+        }
+        
+        vector<double> gene_tree_log_like;
+        for (auto &g:gene_tree_vec[p]->getGeneTreeLogLikelihoods()) {
+            gene_tree_log_like.push_back(g);
+        }
+        
+        vector<double> gene_tree_log_coalescent_like;
+        for (auto &g:gene_tree_vec[p]->getGeneTreeLogCoalescentLikelihood()) {
+            gene_tree_log_coalescent_like.push_back(g);
+        }
+        
+        vector<double> log_topology_priors;
+        for (auto &t:gene_tree_vec[p]->getTopologyPriors()) {
+            log_topology_priors.push_back(t);
+        }
+        
+        assert(branch_length_vec.size() == prior_vec.size());
+        
+        if (col_count == 0) {
+            logf << "iter";
+            logf << "\t" << "gene_tree_log_like";
+            logf << "\t" << "gene_tree_log_coalescent_like";
+            
+            for (unsigned j=0; j<ntaxa-1; j++) {
+                logf << "\t" << "gene_tree_increment" << "\t" << "increment_prior";
+            }
+            
+            logf << "\t" << "gene_tree_topology_prior";
+            logf << endl;
+        }
+        
+        logf << a;
+        for (unsigned g=0; g<gene_tree_log_like.size(); g++) {
+            logf << "\t" << setprecision(12) << gene_tree_log_like[g];
+        }
+        
+        for (unsigned g=0; g<gene_tree_log_coalescent_like.size(); g++) {
+            logf << "\t" << setprecision(12) << gene_tree_log_coalescent_like[g];
+        }
+
+        
+        for (unsigned i=0; i<prior_vec.size(); i++) {
+            logf << "\t" << setprecision(11) << branch_length_vec[i] << "\t" << prior_vec[i];
+        }
+        
+        for (unsigned j=0; j < log_topology_priors.size(); j++) {
+            logf << "\t" << setprecision(12) << log_topology_priors[j];
+        }
+        
+        logf << endl;
+        col_count++;
+        a++;
     }
+    
+    logf.close();
+}
 
     inline void Proj::writeSpeciesTreeLoradFile(vector<Particle::SharedPtr> species_particles, unsigned nspecies) {
         // open log file
