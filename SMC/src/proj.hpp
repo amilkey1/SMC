@@ -47,7 +47,7 @@ namespace proj {
             void                resetGeneParticles(vector<int> sel_indices, vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                resetWeights(vector<Particle::SharedPtr> & particles, string a);
             void                createSpeciesMap(Data::SharedPtr);
-            void                showFinal();
+            void                showFinal(vector<Particle::SharedPtr> species_particles);
             void                proposeGeneTreeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, vector<pair<tuple<string, string, string>, double>> species_joined);
             void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
             void                proposeSpeciesParticles(vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
@@ -785,21 +785,20 @@ namespace proj {
         }
     }
     
-    inline void Proj::showFinal() {
+    inline void Proj::showFinal(vector<Particle::SharedPtr> species_particles) {
         // this function displays the final species trees
-//        for (int p=0; p<_nparticles; p++) {
-//            my_vec[0][p]->showParticle();
-//        }
+        unsigned nparticles = (int) species_particles.size();
+        double sum_h = 0.0;
+        for (int p=0; p<nparticles; p++) {
+            double h = species_particles[p]->calcHeight();
+            sum_h += h;
+        }
         
-//        double sum_h = 0.0;
-//        for (auto & p:_accepted_particle_vec[0]) {
-//            double h = p.calcHeight();
-//            sum_h += h;
-//        }
-//        sum_h/=_accepted_particle_vec[0].size(); // TODO: mean height won't work now
+        sum_h /= nparticles;
+
         cout << "species tree marg like: " << _species_tree_log_marginal_likelihood << endl;
         
-//        cout << "mean height equals " << sum_h << endl;
+        cout << "mean height equals " << sum_h << endl;
         cout << "log marginal likelihood = " << setprecision(12) << _log_marginal_likelihood << endl;
         cout << "theta = " << Forest::_theta << endl;
         cout << "speciation rate = " << Forest::_lambda << endl;
@@ -1621,7 +1620,7 @@ namespace proj {
 #if defined(USING_MPI)
 //                    output(str(format("\nGrowing gene trees...%d\n")%my_rank));
                     if (i > 0) {
-                        species_tree_particle->initSpeciesForest(_starting_species_newick); // TODO: double check this is working
+                        species_tree_particle->initSpeciesForest(_starting_species_newick);
                     }
                     
                     for (unsigned s = _mpi_first_gene[my_rank]+1; s < _mpi_last_gene[my_rank]+1; ++s) {
@@ -1810,7 +1809,7 @@ namespace proj {
 #endif
     if (my_rank == 0) {
         // TODO: combine gene tree files
-            showFinal();
+            showFinal(my_vec[0]);
             cout << "marginal likelihood: " << setprecision(12) << _log_marginal_likelihood << endl;
     }
         }
