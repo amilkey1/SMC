@@ -890,7 +890,7 @@ namespace proj {
             } // p loop
     }
 
-    inline void Proj::proposeSpeciesParticles( vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets) {
+    inline void Proj::proposeSpeciesParticles(vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets) {
         assert (my_rank == 0);
         
         if (_nthreads == 1) {
@@ -1258,17 +1258,13 @@ namespace proj {
 
     inline void Proj::removeExtraParticles(vector<vector<Particle::SharedPtr>> &my_vec, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2, unsigned nparticles, unsigned ngenes) {
         
-        unsigned nparticles_to_remove = (nparticles*_species_particles_per_gene_particle) - nparticles;
-        // TODO: use resize here?
-        if (nparticles_to_remove > 0) {
-            for (unsigned s=0; s<ngenes+1; s++) {
-                my_vec[s].erase(my_vec[s].end() - nparticles_to_remove, my_vec[s].end());
-                my_vec_2[s].erase(my_vec_2[s].end() - nparticles_to_remove, my_vec_2[s].end());
-
-                assert (my_vec[s].size() == nparticles);
-                assert (my_vec_2[s].size() == nparticles);
-                assert (my_vec_1[s].size() == nparticles);
-            }
+        for (unsigned s=0; s<ngenes+1; s++) {
+            my_vec[s].resize(nparticles);
+            my_vec_2[s].resize(nparticles);
+            
+            assert (my_vec[s].size() == nparticles);
+            assert (my_vec_2[s].size() == nparticles);
+            assert (my_vec_1[s].size() == nparticles);
         }
     }
 
