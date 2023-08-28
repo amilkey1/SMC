@@ -228,6 +228,8 @@ namespace proj {
         ("ntries_lambda", boost::program_options::value(&_ntries_lambda)->default_value(100), "specify number of values of lambda to try")
         ("start_from_gene_tree_prior", boost::program_options::value(&_sample_from_gene_tree_prior)->default_value(false), "specify starting from gene tree prior")
         ("start_from_species_tree_prior", boost::program_options::value(&_sample_from_species_tree_prior)->default_value(false), "specify starting from species tree prior")
+        ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(1.0), "specify theta prior mean")
+        ("lambda_prior_mean", boost::program_options::value(&Forest::_lambda_prior_mean)->default_value(1000.0), "specify lambda prior mean")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);

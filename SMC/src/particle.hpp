@@ -50,7 +50,7 @@ class Particle {
         double                                  getLogWeight(string a);
         void                                    setLogWeight(double w, string a);
         void                                    operator=(const Particle & other);
-        double                                   getForestLikelihood(){return _forest._gene_tree_log_likelihood;}
+        double                                  getForestLikelihood(){return _forest._gene_tree_log_likelihood;}
         std::string                             saveForestNewick() {
             return _forest.makeNewick(25, true);
         }

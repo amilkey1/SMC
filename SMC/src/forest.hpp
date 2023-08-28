@@ -2782,15 +2782,7 @@ class Forest {
 
     inline pair<double, string> Forest::chooseDelta(vector<pair<tuple<string, string, string>, double>> species_info) {
         // assert forest is not fully resolved
-        if (_lineages.size() == 1) {
-            cout << "growing tree is fully resolved on rank " << my_rank << endl;
-            showForest();
-//            throw XProj ("growing tree is fully resolved");
-        }
         
-//        for (auto &s:species_info) {
-//            cout << "species increments are " << s.second << endl;
-//        }
         assert (_lineages.size() > 1);
          // get species info
         double species_increment = species_info[_species_join_number].second;
