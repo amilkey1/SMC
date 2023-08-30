@@ -1632,7 +1632,7 @@ namespace proj {
                 for (unsigned s = _mpi_first_gene[my_rank]+1; s < _mpi_last_gene[my_rank]+1; ++s) {
                     assert (_starting_gene_newicks[s-1] == "");
                     sampleFromGeneTreePrior(my_vec[s], ntaxa, my_vec_1[s], my_vec_2[s], s);
-                    cout << "marginal likelihood is " << _log_marginal_likelihood << " on rank " << my_rank << endl;
+//                    cout << "marginal likelihood is " << _log_marginal_likelihood << " on rank " << my_rank << endl;
                 }
 
                 if (my_rank == 0) {
@@ -1702,12 +1702,7 @@ namespace proj {
 #endif
             }
             
-//            if (_start == "species") {
-                species_tree_particle = my_vec[0][0]; // TODO: not sure if this should be just on rank 0
-//            }
-//#if defined(USING_MPI)
-//                mpiSetSchedule(nsubsets); // TODO: need to set this earlier - make sure it works
-//#endif
+            species_tree_particle = my_vec[0][0]; // TODO: not sure if this should be just on rank 0
         
             for (unsigned i=0; i<_niterations; i++) {
 //                cout << "start is " << _start << " on rank " << my_rank << endl;
@@ -1730,24 +1725,14 @@ namespace proj {
 #if defined(USING_MPI)
 //                    output(str(format("\nGrowing gene trees...%d\n")%my_rank));
                     if (i > 0) {
-                        if (my_rank == 1) {
-                            cout << "initializing species newick on rank " << my_rank << endl;
-                        }
-//                        if (my_rank == 1) {
-//                            cout << "starting species newick is " << _starting_species_newick << " on rank " << my_rank << endl;
-//                        }
                         species_tree_particle->initSpeciesForest(_starting_species_newick);
-                        if (my_rank == 1) {
-                            cout << "done initializing species forest on rank " << my_rank << endl;
-                        }
                     }
                     
                     for (unsigned s = _mpi_first_gene[my_rank]+1; s < _mpi_last_gene[my_rank]+1; ++s) {
                         assert (_starting_gene_newicks[s-1] == "");
-                        cout << "growing gene tree " << s << " on rank " << my_rank << endl;
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                         
-                        cout << "marginal likelihood is " << _log_marginal_likelihood << " on rank " << my_rank << endl; // TODO: need to pass marginal likelihood around as a message?
+//                        cout << "marginal likelihood is " << _log_marginal_likelihood << " on rank " << my_rank << endl; // TODO: need to pass marginal likelihood around as a message?
                     }
                     
                     if (my_rank == 0) {
