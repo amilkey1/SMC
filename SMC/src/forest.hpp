@@ -971,7 +971,10 @@ class Forest {
          _log_likelihood_choices.clear();
          _gene_tree_log_weight = 0.0;
          
-        double starting_gene_tree_log_coalescent_likelihood = _gene_tree_log_coalescent_likelihood;
+//        double starting_gene_tree_log_coalescent_likelihood = _gene_tree_log_coalescent_likelihood;
+        // TODO: testing this
+                double starting_gene_tree_log_coalescent_likelihood = 0.0;
+        
         bool first = true;
         
          // choose pair of nodes to try
@@ -981,6 +984,9 @@ class Forest {
                  
                  tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment, species, first);
                  first = false;
+                 
+                 // TODO: testing this
+                 _gene_tree_log_coalescent_likelihood = 0.0;
                  
                  _log_likelihood_choices.push_back(calcLogLikelihood()+_gene_tree_log_coalescent_likelihood);
                  // gene tree log coalescent likelihood is the same for every possible join
@@ -3055,7 +3061,9 @@ class Forest {
                 log_increment_prior += d.second;
             }
         }
-        _gene_tree_log_coalescent_likelihood += log_increment_prior;
+        // TODO: trying this
+//        _gene_tree_log_coalescent_likelihood += log_increment_prior;
+        _gene_tree_log_coalescent_likelihood = 0.0;
         _increments.push_back(make_pair(increment, log_increment_prior));
         _extended_increment = 0.0;
         _deep_coalescent_increments.clear();

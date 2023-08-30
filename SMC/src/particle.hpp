@@ -460,8 +460,18 @@ class Particle {
     }
 
     inline void Particle::initSpeciesForest(string newick) {
+        if (my_rank == 1) {
+            cout << "init species forest on rank " << my_rank << endl;
+            showParticle(); // TODO: why does the forest not exist?
+        }
         _forest.clear();
+//        if (my_rank == 1) {
+//            cout << "cleared forest on rank  " << my_rank << endl;
+//        }
         _t = _forest.buildFromNewickTopology(newick, false);
+//        if (my_rank == 1) {
+//            cout << "done building from newick topology on rank " << my_rank << endl;
+//        }
         _log_weight = 0.0;
         _species_log_weight = 0.0;
         _log_likelihood = 0.0;
@@ -470,6 +480,14 @@ class Particle {
         _species_tree_height = 0.0;
         _inf = false;
         _name = "species";
+        if (_t.size() != Forest::_nspecies) {
+            cout << "size of _t is " << _t.size() << endl;
+            cout << "num species is " << Forest::_nspecies << endl;
+            for (auto &t:_t) {
+                cout << "t first is " << get<0>(t.first) << " and " << get<1>(t.first) << " and " << get<2>(t.first) << endl;
+                cout << "t second is " << t.second << endl;
+            }
+        }
         assert (_t.size() == Forest::_nspecies);
     }
 
