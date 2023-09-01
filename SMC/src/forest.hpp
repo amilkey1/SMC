@@ -2839,6 +2839,7 @@ class Forest {
          
          // use combined rate to draw an increment (delta)
          double increment = rng.gamma(1.0, 1.0/(coalescence_rate));
+//        cout << increment << endl;
          
          // choose which species coalescent event occurred in
          

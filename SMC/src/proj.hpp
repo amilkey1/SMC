@@ -1043,11 +1043,6 @@ namespace proj {
         vector<string> newicks;
         unsigned nparticles = _nparticles;
         
-        // must specify newicks OR sampling from a prior
-        if (_species_newicks_name == "null" && _gene_newicks_names == "null" && !_sample_from_species_tree_prior && !_sample_from_gene_tree_prior) {
-            throw XProj(boost::str(boost::format("must specify a prior or newick(s) to start from")));
-        }
-        
         // can't specify a newick and sampling from a prior
         bool newicks_specified = false;
         bool priors = false;
@@ -1632,7 +1627,7 @@ namespace proj {
                 for (unsigned s = _mpi_first_gene[my_rank]+1; s < _mpi_last_gene[my_rank]+1; ++s) {
                     assert (_starting_gene_newicks[s-1] == "");
                     sampleFromGeneTreePrior(my_vec[s], ntaxa, my_vec_1[s], my_vec_2[s], s);
-//                    cout << "marginal likelihood is " << _log_marginal_likelihood << " on rank " << my_rank << endl;
+                    cout << "log marginal likelihood is " << _log_marginal_likelihood << " on rank " << my_rank << endl;
                 }
 
                 if (my_rank == 0) {
@@ -1702,7 +1697,11 @@ namespace proj {
 #endif
             }
             
-            species_tree_particle = my_vec[0][0]; // TODO: not sure if this should be just on rank 0
+            species_tree_particle = my_vec[0][0];
+            if (_start == "species" && my_rank == 0) {
+                cout << "starting species tree is: " << endl;
+                species_tree_particle->showParticle();
+            }
         
             for (unsigned i=0; i<_niterations; i++) {
 //                cout << "start is " << _start << " on rank " << my_rank << endl;
@@ -1732,7 +1731,7 @@ namespace proj {
                         assert (_starting_gene_newicks[s-1] == "");
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                         
-//                        cout << "marginal likelihood is " << _log_marginal_likelihood << " on rank " << my_rank << endl; // TODO: need to pass marginal likelihood around as a message?
+                        cout << "log marginal likelihood is " << _log_marginal_likelihood << " on rank " << my_rank << endl; // TODO: need to pass marginal likelihood around as a message?
                     }
                     
                     if (my_rank == 0) {
