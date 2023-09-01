@@ -61,7 +61,7 @@ class Forest {
         std::string                 makeNewick(unsigned precision, bool use_names);
         std::string                 makePartialNewick(unsigned precision, bool use_names);
         pair<unsigned, unsigned>    chooseTaxaToJoin(double s);
-        tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> p, list<Node*> node_list, double increment, string species, bool first);
+        tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> p, list<Node*> node_list, double increment, string species);
         tuple<Node*, Node*, Node*>  createNewSubtreeFromPrior(pair<unsigned, unsigned> p, double increment);
         void                        calcPartialArray(Node* new_nd);
         void                        setUpGeneForest(map<string, string> &taxon_map);
@@ -971,23 +971,23 @@ class Forest {
          _log_likelihood_choices.clear();
          _gene_tree_log_weight = 0.0;
          
-//        double starting_gene_tree_log_coalescent_likelihood = _gene_tree_log_coalescent_likelihood;
-        // TODO: testing this
-                double starting_gene_tree_log_coalescent_likelihood = 0.0;
-        
-        bool first = true;
+# if defined(GENE_TREE_COALESCENT_LIKELIHOOD)
+        double starting_gene_tree_log_coalescent_likelihood = _gene_tree_log_coalescent_likelihood;
+# else
+        double starting_gene_tree_log_coalescent_likelihood = 0.0;
+# endif
         
          // choose pair of nodes to try
          for (unsigned i = 0; i < node_list.size()-1; i++) {
              for (unsigned j = i+1; j < node_list.size(); j++) {
                  // createNewSubtree returns subtree1, subtree2, new_nd
                  
-                 tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment, species, first);
-                 first = false;
+                 tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment, species);
                  
-                 // TODO: testing this
-                 _gene_tree_log_coalescent_likelihood = 0.0;
-                 
+#if !defined(GENE_TREE_COALESCENT_LIKELIHOOD)
+                 assert (_gene_tree_log_coalescent_likelihood == 0.0);
+                 assert (starting_gene_tree_log_coalescent_likelihood == 0.0);
+#endif
                  _log_likelihood_choices.push_back(calcLogLikelihood()+_gene_tree_log_coalescent_likelihood);
                  // gene tree log coalescent likelihood is the same for every possible join
 
@@ -2250,7 +2250,6 @@ class Forest {
 
         pair<Node*, Node*> s = make_pair(subtree1, subtree2);
         _node_choices.push_back(make_pair(subtree1, subtree2));
-//        _node_choices.push_back(make_tuple(subtree1, subtree2, true));
 
         return s;
     }
@@ -2289,7 +2288,7 @@ class Forest {
         return make_tuple(subtree1, subtree2, new_nd);
     }
 
-    inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, double increment, string species, bool first) {
+    inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, double increment, string species) {
         pair<Node*, Node*> p = getSubtreeAt(t, node_list);
 
         Node* subtree1 = p.first;
@@ -2321,7 +2320,7 @@ class Forest {
         
         // calculate the coalescent likelihood for the first join since it's the same for all joins
         
-        if (first) {
+#if defined(GENE_TREE_LOG_COALESCENT_LIKELIHOOD)
             // update increments and priors
             double log_increment_prior = 0.0;
             bool coalescence = false;
@@ -2353,9 +2352,10 @@ class Forest {
                     log_increment_prior += d.second;
                 }
             }
-            
             _gene_tree_log_coalescent_likelihood += log_increment_prior;
-        }
+#else
+            _gene_tree_log_coalescent_likelihood = 0.0;
+#endif
         return make_tuple(subtree1, subtree2, new_nd);
     }
 
@@ -2982,7 +2982,6 @@ class Forest {
         }
         else {
             if (_lineages.size() != _ntaxa) {
-    //                _prev_gene_tree_log_likelihood = calcLogLikelihood();
                 _prev_gene_tree_log_likelihood = _gene_tree_log_likelihood;
             }
             else {
@@ -3062,9 +3061,11 @@ class Forest {
                 log_increment_prior += d.second;
             }
         }
-        // TODO: trying this
-//        _gene_tree_log_coalescent_likelihood += log_increment_prior;
+#if defined(GENE_TREE_LOG_COALESCENT_LIKELIHOOD)
+        _gene_tree_log_coalescent_likelihood += log_increment_prior;
+#else
         _gene_tree_log_coalescent_likelihood = 0.0;
+#endif
         _increments.push_back(make_pair(increment, log_increment_prior));
         _extended_increment = 0.0;
         _deep_coalescent_increments.clear();
@@ -3072,7 +3073,6 @@ class Forest {
 
     inline void Forest::geneTreeProposal(pair<double, string> species_info, vector<pair<tuple<string, string, string>, double>> _t) {
         string species_name = species_info.second;
-//        cout << "species name is " << species_name << endl;
         
         bool joined = false;
         double increment = species_info.first;

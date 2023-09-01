@@ -240,6 +240,9 @@ class Particle {
 
         if (!_run_on_empty) {
             double prev_log_likelihood = _log_likelihood;
+#if !defined(GENE_TREE_COALESCENT_LIKELIHOOD)
+            assert (_forest._gene_tree_log_coalescent_likelihood == 0.0);
+#endif
             _log_likelihood = _forest._gene_tree_log_likelihood + _forest._gene_tree_log_coalescent_likelihood; // _log_likelihood contains the coalescent likelihood and the Felsenstein likelihood
 
             if (Forest::_proposal == "prior-prior") {
