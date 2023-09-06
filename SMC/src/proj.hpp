@@ -1954,10 +1954,12 @@ inline void Proj::writeGeneTreeLoradFile(string file_name, vector<Particle::Shar
             gene_tree_log_like.push_back(g);
         }
         
+#if defined GENE_TREE_COALESCENT_LIKELIHOOD
         vector<double> gene_tree_log_coalescent_like;
         for (auto &g:gene_tree_vec[p]->getGeneTreeLogCoalescentLikelihood()) {
             gene_tree_log_coalescent_like.push_back(g);
         }
+# endif
         
         vector<double> log_topology_priors;
         for (auto &t:gene_tree_vec[p]->getTopologyPriors()) {
@@ -1969,7 +1971,9 @@ inline void Proj::writeGeneTreeLoradFile(string file_name, vector<Particle::Shar
         if (col_count == 0) {
             logf << "iter";
             logf << "\t" << "gene_tree_log_like";
+#if defined GENE_TREE_COALESCENT_LIKELIHOOD
             logf << "\t" << "gene_tree_log_coalescent_like";
+#endif
             
             for (unsigned j=0; j<ntaxa-1; j++) {
                 logf << "\t" << "gene_tree_increment" << "\t" << "increment_prior";
@@ -1984,9 +1988,11 @@ inline void Proj::writeGeneTreeLoradFile(string file_name, vector<Particle::Shar
             logf << "\t" << setprecision(12) << gene_tree_log_like[g];
         }
         
+#if defined GENE_TREE_COALESCENT_LIKELIHOOD
         for (unsigned g=0; g<gene_tree_log_coalescent_like.size(); g++) {
             logf << "\t" << setprecision(12) << gene_tree_log_coalescent_like[g];
         }
+#endif
 
         
         for (unsigned i=0; i<prior_vec.size(); i++) {
