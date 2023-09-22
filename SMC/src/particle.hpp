@@ -7,6 +7,7 @@
 #include <random>
 #include <iostream>
 #include <iomanip>
+#include "conditionals.hpp"
 
 using namespace std;
 using namespace boost;
@@ -416,16 +417,28 @@ class Particle {
         }
         
         if (newicks.size() > 0) {
+#if defined(SIMULATED)
+//            condition on the true species tree for this dataset
+            
+            _forest._lineages[0]->_edge_length = 0.038273807;
+            _forest._lineages[1]->_edge_length = 0.038273807;
+            tuple<string, string, string> species_joined = _forest.speciesTreeProposal();
+            _t.push_back(make_pair(species_joined, 0.038273807));
+            }
+        
+#else
+            else {
             string newick = newicks[0];
                 _t = _forest.buildFromNewickTopology(newick, topology_only);
             if (topology_only) {
                 drawHeightsFromPrior();
             }
         }
-        
+#endif
         else {
             buildEntireSpeciesTree();
         }
+            
     }
 
     inline void Particle::drawHeightsFromPrior() {

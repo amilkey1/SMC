@@ -3,4 +3,6 @@
 #   include <mpi.h>
 #endif
 
-//# define GENE_TREE_COALESCENT_LIKELIHOOD
+//#define GENE_TREE_COALESCENT_LIKELIHOOD
+
+#define SIMULATED

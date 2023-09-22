@@ -10,6 +10,7 @@
 #include <thread>
 #include <mutex>
 #include <algorithm>
+#include "conditionals.hpp"
 
 #include "lot.hpp"
 extern proj::Lot rng;
@@ -2320,7 +2321,7 @@ class Forest {
         
         // calculate the coalescent likelihood for the first join since it's the same for all joins
         
-#if defined(GENE_TREE_LOG_COALESCENT_LIKELIHOOD)
+#if defined(GENE_TREE_COALESCENT_LIKELIHOOD)
             // update increments and priors
             double log_increment_prior = 0.0;
             bool coalescence = false;
@@ -2961,7 +2962,8 @@ class Forest {
      }
 
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double increment, string species) {
-        calcTopologyPrior((int) _lineages.size());
+//        calcTopologyPrior((int) _lineages.size());
+        calcTopologyPrior((int) nodes.size()); // TODO: unsure about this - should this be total lineages or lineages in the species being dealt with?
         allowCoalescence(nodes, increment, species);
     }
 
@@ -3061,12 +3063,13 @@ class Forest {
                 log_increment_prior += d.second;
             }
         }
-#if defined(GENE_TREE_LOG_COALESCENT_LIKELIHOOD)
+#if defined(GENE_TREE_COALESCENT_LIKELIHOOD)
         _gene_tree_log_coalescent_likelihood += log_increment_prior;
 #else
         _gene_tree_log_coalescent_likelihood = 0.0;
 #endif
-        _increments.push_back(make_pair(increment, log_increment_prior));
+//        _increments.push_back(make_pair(increment, log_increment_prior));
+        _increments.push_back(make_pair(increment+_extended_increment, log_increment_prior));
         _extended_increment = 0.0;
         _deep_coalescent_increments.clear();
     }
@@ -3835,6 +3838,8 @@ class Forest {
             
             _deep_coalescent_increments.push_back(make_pair(extended_increment, deep_coalescent_prior));
         }
+        
+        _extended_increment = extended_increment;
     }
 
     inline void Forest::remakeGeneTree(map<string, string> &taxon_map) {
