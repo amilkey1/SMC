@@ -2962,8 +2962,7 @@ class Forest {
      }
 
     inline void Forest::evolveSpeciesFor(list<Node*> &nodes, double increment, string species) {
-//        calcTopologyPrior((int) _lineages.size());
-        calcTopologyPrior((int) nodes.size()); // TODO: unsure about this - should this be total lineages or lineages in the species being dealt with?
+        calcTopologyPrior((int) nodes.size());
         allowCoalescence(nodes, increment, species);
     }
 
