@@ -1415,6 +1415,7 @@ class Forest {
     }
 
     inline void Forest::chooseSpeciesIncrementFromNewick(vector<string> existing_lineages) {
+        // not conditioning on anything
         unsigned nlineages = (int) existing_lineages.size();
         
         // hybridization prior
@@ -1431,7 +1432,12 @@ class Forest {
             
             // add increment to tip nodes that have already joined
         }
-        _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+        double nChooseTwo = _lineages.size()*(_lineages.size()-1);
+        double log_prob_join = log(2/nChooseTwo);
+        
+        double log_increment_prior = log(rate)-(_last_edge_length*rate) + log_prob_join;
+        
+        _increments.push_back(make_pair(_last_edge_length, log_increment_prior));
     }
 
     inline vector<string> Forest::updateExistingLineagesVector(vector<string> existing_lineages, tuple<string, string, string> species_joined) {
@@ -2566,6 +2572,7 @@ class Forest {
     }
 
     inline void Forest::chooseSpeciesIncrement(double max_depth) {
+        // conditioning on max gene tree height
         assert (max_depth >= 0.0);
         if (max_depth > 0.0) {
             // hybridization prior
@@ -2579,9 +2586,9 @@ class Forest {
             for (auto nd:_lineages) {
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
             }
-            double nChooseTwo = _lineages.size()*_lineages.size();
+            double nChooseTwo = _lineages.size()*(_lineages.size()-1);
             double log_prob_join = log(2/nChooseTwo);
-            double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
+            double increment_prior = log(rate) - (_last_edge_length*rate) - log(1 - exp(-rate*max_depth)) + log_prob_join;
             
             _increments.push_back(make_pair(_last_edge_length, increment_prior));
         }
@@ -2594,7 +2601,12 @@ class Forest {
             for (auto nd:_lineages) {
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
             }
-            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+            
+            double nChooseTwo = _lineages.size()*(_lineages.size()-1);
+            double log_prob_join = log(2/nChooseTwo);
+            double increment_prior = log(rate) - (_last_edge_length*rate) - log(1 - exp(-rate*max_depth)) + log_prob_join;
+            
+            _increments.push_back(make_pair(_last_edge_length, increment_prior));
         }
     }
 
@@ -3067,8 +3079,8 @@ class Forest {
 #else
         _gene_tree_log_coalescent_likelihood = 0.0;
 #endif
-//        _increments.push_back(make_pair(increment, log_increment_prior));
-        _increments.push_back(make_pair(increment+_extended_increment, log_increment_prior));
+        _increments.push_back(make_pair(increment, log_increment_prior));
+        
         _extended_increment = 0.0;
         _deep_coalescent_increments.clear();
     }

@@ -330,6 +330,7 @@ namespace proj {
         unsigned nparticles = _nparticles;
         if (a == "s") {
             nparticles *= _species_particles_per_gene_particle;
+            assert (nparticles == particles.size());
         }
         unsigned i = 0;
         vector<double> log_weight_vec(nparticles);
@@ -344,13 +345,12 @@ namespace proj {
             particles[p]->setLogWeight(particles[p]->getLogWeight(a) - log_particle_sum, a);
         }
         
-        if (calc_marg_like) {
-            _log_marginal_likelihood += log_particle_sum - log(_nparticles);
+        if (calc_marg_like && a == "g") {
+            _log_marginal_likelihood += log_particle_sum - log(nparticles);
 //            cout << setprecision(12) << "   " << _log_marginal_likelihood << endl;
         }
-        else {
-            _species_tree_log_marginal_likelihood += log_particle_sum - log(_nparticles);
-//            cout << setprecision(12) << "   " << _species_tree_log_marginal_likelihood << endl;
+        else if (calc_marg_like && a == "s") {
+            _species_tree_log_marginal_likelihood += log_particle_sum - log(nparticles);
         }
 //        sort(particles.begin(), particles.end(), greater<Particle::SharedPtr>());
     }
@@ -624,7 +624,8 @@ namespace proj {
     }
 
     inline Particle::SharedPtr Proj::chooseTree(vector<Particle::SharedPtr> particles, string gene_or_species) {
-        normalizeWeights(particles, "gene_or_species", false);
+//        normalizeWeights(particles, "gene_or_species", false);
+        normalizeWeights(particles, gene_or_species, false); // TODO: weights should already be normalized going into this function
         
         // get weights
         vector<double> log_weights;
@@ -1532,7 +1533,7 @@ namespace proj {
             // filter - make sure all gene trees go along with correct species tree
 
             if (!_run_on_empty) {
-                bool calc_marg_like = false;
+                bool calc_marg_like = true;
 
                 normalizeWeights(particles[0], "s", calc_marg_like);
 
@@ -1886,7 +1887,8 @@ namespace proj {
                     if (i < _niterations-1) {
                         growSpeciesTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nspecies, nparticles); // grow and filter species trees conditional on selected gene trees
                         
-                        species_tree_particle = chooseTree(my_vec[0], "s"); // pass in all the speceis trees
+                        species_tree_particle = chooseTree(my_vec[0], "s"); // pass in all the species trees
+                        
                         _starting_species_newick = species_tree_particle->getSpeciesTreeNewick();
                         cout << "chosen species tree is : ";
                         species_tree_particle->showParticle();
@@ -2013,6 +2015,8 @@ inline void Proj::writeGeneTreeLoradFile(string file_name, vector<Particle::Shar
 
     inline void Proj::writeSpeciesTreeLoradFile(vector<Particle::SharedPtr> species_particles, unsigned nspecies) {
         // open log file
+        cout << "writing species tree file...." << endl;
+        cout << "log species tree marginal likelihood is " << _species_tree_log_marginal_likelihood << endl;
         ofstream logf("species_params.log");
         
         double a = 0;
