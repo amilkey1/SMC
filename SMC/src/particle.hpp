@@ -427,7 +427,6 @@ class Particle {
             }
         
 #else
-            else {
             string newick = newicks[0];
                 _t = _forest.buildFromNewickTopology(newick, topology_only);
             if (topology_only) {
