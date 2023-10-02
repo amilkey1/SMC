@@ -98,6 +98,10 @@ int main(int argc, const char * argv[]) {
         std::cerr << "Exception of unknown type!\n";
     }
     
+    ofstream memfile("allocs.txt");
+    ps.memoryReport(memfile);
+    memfile.close();
+    
 #if defined(USING_MPI)
     MPI_Finalize();
 #endif

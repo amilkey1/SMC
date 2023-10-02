@@ -71,7 +71,6 @@ namespace proj {
             unsigned            multinomialDraw (const vector<double> & probs);
             void                proposeGeneParticlesFromPrior(vector<Particle::SharedPtr> &particles);
             void                proposeGeneParticlesFromPriorRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
-//            void                initializeTrees(vector<vector<Particle::SharedPtr>> particles, unsigned i, unsigned ngenes);
             void                initializeTrees(vector<Particle::SharedPtr> particles, unsigned i, unsigned ngenes, string a, unsigned gene_number);
             void                sampleFromGeneTreePrior(vector<Particle::SharedPtr> &gene_particles, unsigned ntaxa, vector<Particle::SharedPtr> &my_vec_1_g, vector<Particle::SharedPtr> &my_vec_2_g, unsigned gene_number);
             void                removeExtraParticles(vector<vector<Particle::SharedPtr>> &my_vec, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2, unsigned nparticles, unsigned ngenes);
@@ -1100,6 +1099,8 @@ namespace proj {
         
         _start = "species"; // start variable defines if program should start with gene or species trees
         
+        ps.setNGenes(ngenes);
+        
         for (unsigned s=0; s<ngenes+1; s++) {
             
             for (unsigned p=0; p<nparticles; p++) {
@@ -1171,6 +1172,8 @@ namespace proj {
             cout << "beginning iteration: " << i << endl;
         }
         
+//        ps.setNGenes(ngenes); // TODO: not sure if this is necessary
+        
         if (i > 0) {
             for (unsigned p=0; p<nparticles; p++) {
                 particles[p]->setParticleGeneration(0);
@@ -1179,44 +1182,9 @@ namespace proj {
                     particles[p]->resetGeneIncrements();
                     
                     particles[p]->remakeGeneTrees(_taxon_map);
-//                    cout << "resetting partials for gene" << gene_number << " on rank " << my_rank << endl;
                     particles[p]->resetGeneTreePartials(_data, _taxon_map, gene_number);
+                }
             }
-        }
-            
-                //        if (i > 0) {
-                //            for (unsigned s=1; s<ngenes+1; s++) {
-                //                // start at s=1 to only modify the gene trees
-                //                // need to reset the partials here if passing gene newicks around as strings
-                //                for (unsigned p=0; p<nparticles; p++) {
-                //                    particles[s][p]->remakeGeneTrees(_taxon_map);
-                //                    cout << "resetting partials for gene" << s << " on rank " << my_rank << endl;
-                //                    particles[s][p]->resetGeneTreePartials(_data, _taxon_map, s);
-                //                }
-                //            }
-
-//        if (i > 0) {
-//            for (unsigned s=0; s<ngenes+1; s++) {
-//                for (unsigned p=0; p<nparticles; p++) {
-//                    particles[s][p]->setParticleGeneration(0);
-//                    if (s > 0) {
-//                        particles[s][p]->mapGeneTrees(_taxon_map, _species_names);
-//                        particles[s][p]->resetGeneIncrements();
-//                    }
-//                }
-//            }
-//        }
-        
-//        if (i > 0) {
-//            for (unsigned s=1; s<ngenes+1; s++) {
-//                // start at s=1 to only modify the gene trees
-//                // need to reset the partials here if passing gene newicks around as strings
-//                for (unsigned p=0; p<nparticles; p++) {
-//                    particles[s][p]->remakeGeneTrees(_taxon_map);
-//                    cout << "resetting partials for gene" << s << " on rank " << my_rank << endl;
-//                    particles[s][p]->resetGeneTreePartials(_data, _taxon_map, s);
-//                }
-//            }
         }
     }
 
@@ -1899,9 +1867,7 @@ namespace proj {
                 }
                 
                 // reset everything - needs to happen on all processors
-                // TODO: initialize trees doesn't need to happen on every processor - just for the genes the processor will build
                 resetGeneTreeWeights(my_vec, nsubsets); // reset gene tree weights and likelihoods if not at last step
-//                initializeTrees(my_vec, i+1, nsubsets); // initialize trees for next round of filtering
                 initializeTrees(my_vec[0], i+1, nsubsets, "species", -1); // initialize species trees for next round of filtering
                 // reset _start for all processors
                 _start = "species";
@@ -1937,7 +1903,6 @@ namespace proj {
                         removeExtraParticles(my_vec, my_vec_1, my_vec_2, nparticles, nsubsets);
 
                         resetGeneTreeWeights(my_vec, nsubsets); // reset gene tree weights and likelihoods if not at last step
-//                        initializeTrees(my_vec, i+1, nsubsets); // initialize trees for next round of filtering if not at last step
                         initializeTrees(my_vec[0], i+1, nsubsets, "species", -1); // initialize species trees for next round of filtering if not at last step
                     }
 #endif

@@ -248,9 +248,20 @@ class Forest {
             nd->_edge_length=0.0;
             nd->_position_in_lineages=i;
             _lineages.push_back(nd);
+            nd->_partial.reset();
             }
         _nleaves=_ntaxa;
         _ninternals=0;
+        
+        // TODO: trying to add stow partial
+        // Return partials to PartialStore
+//        for (auto & nd : _nodes) {
+//            if (nd._partial) {
+//                ps.stowPartial(nd._partial, _index);
+//                nd._partial.reset();
+//            }
+//        }
+
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -267,6 +278,8 @@ class Forest {
             Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index-1);
             _first_pattern = gene_begin_end.first;
             _npatterns = _data->getNumPatternsInSubset(index-1);
+            
+            ps.setNElements(_npatterns, index-1);
             }
 
         auto data_matrix=_data->getDataMatrix();
@@ -274,7 +287,7 @@ class Forest {
         for (auto &nd:_nodes) { // only need to reset partials for tips since the Felsenstein likelihood will not be calculated for this complete tree again
             if (!nd._left_child) {
                 if (index>0) {
-                    nd._partial=ps.getPartial(_npatterns*4);
+                    nd._partial=ps.getPartial(_npatterns*4, index-1);
                     for (unsigned p=0; p<_npatterns; p++) {
                         unsigned pp = _first_pattern+p;
                         for (unsigned s=0; s<_nstates; s++) {
@@ -301,6 +314,7 @@ class Forest {
             Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index-1);
             _first_pattern = gene_begin_end.first;
             _npatterns = _data->getNumPatternsInSubset(index-1);
+            ps.setNElements(_npatterns, index-1);
             }
 
         const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
@@ -316,7 +330,7 @@ class Forest {
                 nd->_name = name;
 
                 if (index>0) {
-                    nd->_partial=ps.getPartial(_npatterns*4);
+                    nd->_partial=ps.getPartial(_npatterns*4, index-1);
                     for (unsigned p=0; p<_npatterns; p++) {
                         unsigned pp = _first_pattern+p;
                         for (unsigned s=0; s<_nstates; s++) {
@@ -992,7 +1006,7 @@ class Forest {
                  _log_likelihood_choices.push_back(calcLogLikelihood()+_gene_tree_log_coalescent_likelihood);
                  // gene tree log coalescent likelihood is the same for every possible join
 
-                 // revert _lineages
+                 // revert _lineages if > 1 choice
                  revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
 
                  //reset siblings and parents of original nodes back to 0
@@ -1017,13 +1031,13 @@ class Forest {
          for (unsigned b=0; b < log_weight_choices.size(); b++) {
              log_weight_choices[b] -= log_weight_choices_sum;
          }
-         
+        
          // randomly select a pair
          _index_of_choice = selectPair(log_weight_choices);
 
          // find nodes to join in node_list
-         Node *subtree1 = _node_choices[_index_of_choice].first;
-         Node *subtree2 = _node_choices[_index_of_choice].second;
+         Node* subtree1 = _node_choices[_index_of_choice].first;
+         Node* subtree2 = _node_choices[_index_of_choice].second;
      
          _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice] - _gene_tree_log_coalescent_likelihood; // remove the coalescent likelihood to get the ordinary gene tree log likelihood
         
@@ -2283,7 +2297,7 @@ class Forest {
 
         //always calculating partials now
         assert (new_nd->_partial == nullptr);
-        new_nd->_partial=ps.getPartial(_npatterns*4);
+        new_nd->_partial=ps.getPartial(_npatterns*4, _index-1);
         assert(new_nd->_left_child->_right_sib);
         calcPartialArray(new_nd);
 
@@ -2318,7 +2332,7 @@ class Forest {
 
         //always calculating partials now
         assert (new_nd->_partial == nullptr);
-        new_nd->_partial=ps.getPartial(_npatterns*4);
+        new_nd->_partial=ps.getPartial(_npatterns*4, _index-1);
         assert(new_nd->_left_child->_right_sib);
         calcPartialArray(new_nd);
 
@@ -2728,7 +2742,7 @@ class Forest {
 
         //always calculating partials now
         assert (new_nd->_partial == nullptr);
-        new_nd->_partial=ps.getPartial(_npatterns*4);
+        new_nd->_partial=ps.getPartial(_npatterns*4, _index-1);
         assert(new_nd->_left_child->_right_sib);
         
         //update species list
@@ -2982,6 +2996,7 @@ class Forest {
         Node *subtree1 = nullptr;
         Node *subtree2 = nullptr;
         unsigned s = (unsigned) nodes.size();
+        bool one_choice = false;
 
         // prior-prior proposal
         if (_proposal == "prior-prior") {
@@ -3000,12 +3015,23 @@ class Forest {
             else {
                 _prev_gene_tree_log_likelihood = 0.0;
             }
-            pair<Node*, Node*> t = chooseAllPairs(nodes, increment, species);
             
-            subtree1 = t.first;
-            subtree2 = t.second;
+            if (nodes.size() > 3) {
+                pair<Node*, Node*> t = chooseAllPairs(nodes, increment, species);
+                
+                subtree1 = t.first;
+                subtree2 = t.second;
+            }
+            else {
+                one_choice = true;
+                
+                subtree1 = nodes.front();
+                subtree2 = nodes.back();
+            }
+                
         }
         
+        // if only 1 choice, subtree has already been created in chooseAllPairs function
         assert (subtree1 != subtree2);
         
         //new node is always needed
@@ -3027,7 +3053,7 @@ class Forest {
 
         //always calculating partials now
         assert (new_nd->_partial == nullptr);
-        new_nd->_partial=ps.getPartial(_npatterns*4);
+        new_nd->_partial=ps.getPartial(_npatterns*4, _index-1);
         assert(new_nd->_left_child->_right_sib);
         
         _new_nodes.push_back(new_nd);
@@ -3037,9 +3063,16 @@ class Forest {
         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         
-        if (_proposal == "prior-prior") {
+        if (_proposal == "prior-prior" || one_choice) {
+            double prev_log_likelihood = _gene_tree_log_likelihood;
             _gene_tree_log_likelihood = calcLogLikelihood();
-            // don't need to recalculate this for prior-post
+            vector<double> choice;
+            choice.push_back(_gene_tree_log_likelihood);
+            // don't need to recalculate this for prior-post with >1 choice
+            
+            vector<double> log_weight = reweightChoices(choice, prev_log_likelihood);
+            double log_weight_choices_sum = getRunningSumChoices(log_weight);
+            _gene_tree_log_weight = log_weight_choices_sum;
         }
         
         // update increments and priors

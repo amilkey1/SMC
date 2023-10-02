@@ -246,7 +246,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = (
-					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
+					/Users/analisamilkey/Documents/projects/libraries/boost_1_83_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",
 					"/Users/analisamilkey/Documents/projects/libraries/beagle-lib-master",
 				);
@@ -309,7 +309,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = (
-					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
+					/Users/analisamilkey/Documents/projects/libraries/boost_1_83_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",
 					"/Users/analisamilkey/Documents/projects/libraries/beagle-lib-master",
 				);
@@ -332,7 +332,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				EXCLUDED_ARCHS = "";
 				HEADER_SEARCH_PATHS = (
-					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
+					/Users/analisamilkey/Documents/projects/libraries/boost_1_83_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",
 					"/Users/analisamilkey/Documents/projects/libraries/beagle-lib-master",
 				);
@@ -349,7 +349,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				EXCLUDED_ARCHS = "";
 				HEADER_SEARCH_PATHS = (
-					/Users/analisamilkey/Documents/projects/libraries/boost_1_77_0,
+					/Users/analisamilkey/Documents/projects/libraries/boost_1_83_0,
 					"/Users/analisamilkey/Documents/projects/libraries/ncl-2.1.18",
 					"/Users/analisamilkey/Documents/projects/libraries/beagle-lib-master",
 				);
