@@ -1877,8 +1877,17 @@ namespace proj {
                     }
 
                     saveSelectedGeneTrees(nsubsets);
+                
+                // TODO: clear gene forests here because we are just saving the newicks at this point
+//                    for (unsigned s=1; s<nsubsets+1; s++) {
+//                        for (int p=0; p<_nparticles; p++) {
+//                            my_vec[s][p]->clearPartials();
+//                            my_vec[s][p]->remakeGeneTrees(_taxon_map);
+//                        }
+//                    }
                 }
                     // build species trees
+            
                     if (i < _niterations-1) {
                         growSpeciesTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nspecies, nparticles); // grow and filter species trees conditional on selected gene trees
                         

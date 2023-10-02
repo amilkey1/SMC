@@ -130,6 +130,7 @@ class Forest {
         double                      calcLogSpeciesTreeDensity(double lambda);
         void                        setIndex(int n) {_index = n;}
         void                        resetLineages();
+        void                        stowForestPartials();
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -208,6 +209,15 @@ class Forest {
     }
 
     inline void Forest::clear() {
+        // TODO: trying to add stow partial
+        // Return partials to PartialStore
+        for (auto & nd : _nodes) {
+            if (nd._partial) {
+                ps.stowPartial(nd._partial, _index-1);
+                nd._partial.reset();
+            }
+        }
+        
         _nodes.clear();
         _lineages.clear();
         _nodes.resize(_ntaxa);
@@ -248,25 +258,27 @@ class Forest {
             nd->_edge_length=0.0;
             nd->_position_in_lineages=i;
             _lineages.push_back(nd);
-            nd->_partial.reset();
+//            nd->_partial.reset();
             }
         _nleaves=_ntaxa;
         _ninternals=0;
-        
-        // TODO: trying to add stow partial
-        // Return partials to PartialStore
-//        for (auto & nd : _nodes) {
-//            if (nd._partial) {
-//                ps.stowPartial(nd._partial, _index);
-//                nd._partial.reset();
-//            }
-//        }
 
     }
 
     inline Forest::Forest(const Forest & other) {
         clear();
         *this = other;
+    }
+
+    inline void Forest::stowForestPartials() {
+        // TODO: trying to add stow partial
+        // Return partials to PartialStore
+        for (auto & nd : _nodes) {
+            if (nd._partial) {
+                ps.stowPartial(nd._partial, _index-1);
+                nd._partial.reset();
+            }
+        }
     }
 
     inline void Forest::setDataTwo(Data::SharedPtr d, int index, map<string, string> &taxon_map) {
@@ -1015,6 +1027,9 @@ class Forest {
 
                  // clear new node from _nodes
                  //clear new node that was just created
+                 
+                 // stow partial before removing it
+                 ps.stowPartial(get<2>(t)->_partial, _index-1);
                  get<2>(t)->clear(); //new_nd
              }
          }
@@ -2685,7 +2700,7 @@ class Forest {
         assert (_species_partition.size() > 0);
     }
 
-    inline void Forest::drawFromGeneTreePrior() {
+    inline void Forest::drawFromGeneTreePrior() { // TODO: don't need to join and rejoin for choice of 2, but this should rarely happen
         assert (_lineages.size() > 1);
         
         double coalescence_rate = (_lineages.size()*(_lineages.size() - 1)) / _theta;
