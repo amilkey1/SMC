@@ -1029,7 +1029,7 @@ class Forest {
                  //clear new node that was just created
                  
                  // stow partial before removing it
-                 ps.stowPartial(get<2>(t)->_partial, _index-1);
+//                 ps.stowPartial(get<2>(t)->_partial, _index-1);
                  get<2>(t)->clear(); //new_nd
              }
          }

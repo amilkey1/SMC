@@ -373,7 +373,7 @@ namespace proj {
     }
 
     inline void Proj::resetGeneParticles(vector<int> sel_indices, vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles) {
-        
+        // TODO: this function is using a lot of memory
          unsigned nparticles = (unsigned)from_particles.size();
         
         for (unsigned i = 0; i < nparticles; i++) {
