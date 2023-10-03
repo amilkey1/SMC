@@ -113,7 +113,7 @@ class Particle {
         static bool                                     _run_on_empty;
         void                                            initGeneForest(string newick, unsigned gene_number, map<string, string> taxon_map, Data::SharedPtr d);
         void                                            initSpeciesForest(string newick);
-        void                                            clearPartials();
+//        void                                            clearPartials();
     
     private:
 
@@ -475,9 +475,9 @@ class Particle {
         _log_weight = 0.0;
     }
 
-    inline void Particle::clearPartials() {
-        _forest.stowForestPartials();
-    }
+//    inline void Particle::clearPartials() {
+//        _forest.stowForestPartials();
+//    }
 
     inline void Particle::initSpeciesForest(string newick) {
         _forest.clear();

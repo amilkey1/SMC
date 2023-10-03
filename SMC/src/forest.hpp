@@ -130,7 +130,7 @@ class Forest {
         double                      calcLogSpeciesTreeDensity(double lambda);
         void                        setIndex(int n) {_index = n;}
         void                        resetLineages();
-        void                        stowForestPartials();
+//        void                        stowForestPartials();
 
         std::vector<Node *>         _lineages;
         std::list<Node>             _nodes;
@@ -211,12 +211,12 @@ class Forest {
     inline void Forest::clear() {
         // TODO: trying to add stow partial
         // Return partials to PartialStore
-        for (auto & nd : _nodes) {
-            if (nd._partial) {
-                ps.stowPartial(nd._partial, _index-1);
-                nd._partial.reset();
-            }
-        }
+//        for (auto & nd : _nodes) {
+//            if (nd._partial) {
+//                ps.stowPartial(nd._partial, _index-1);
+//                nd._partial.reset();
+//            }
+//        }
         
         _nodes.clear();
         _lineages.clear();
@@ -258,7 +258,7 @@ class Forest {
             nd->_edge_length=0.0;
             nd->_position_in_lineages=i;
             _lineages.push_back(nd);
-//            nd->_partial.reset();
+            nd->_partial.reset();
             }
         _nleaves=_ntaxa;
         _ninternals=0;
@@ -270,16 +270,16 @@ class Forest {
         *this = other;
     }
 
-    inline void Forest::stowForestPartials() {
-        // TODO: trying to add stow partial
-        // Return partials to PartialStore
-        for (auto & nd : _nodes) {
-            if (nd._partial) {
-                ps.stowPartial(nd._partial, _index-1);
-                nd._partial.reset();
-            }
-        }
-    }
+//    inline void Forest::stowForestPartials() {
+//        // TODO: trying to add stow partial
+//        // Return partials to PartialStore
+//        for (auto & nd : _nodes) {
+//            if (nd._partial) {
+//                ps.stowPartial(nd._partial, _index-1);
+//                nd._partial.reset();
+//            }
+//        }
+//    }
 
     inline void Forest::setDataTwo(Data::SharedPtr d, int index, map<string, string> &taxon_map) {
         _data = d;
@@ -911,7 +911,7 @@ class Forest {
     }
 
     inline double Forest::calcLogLikelihood() {
-        auto data_matrix=_data->getDataMatrix();
+//        auto data_matrix=_data->getDataMatrix();
 
         //calc likelihood for each lineage separately
         auto &counts = _data->getPatternCounts();

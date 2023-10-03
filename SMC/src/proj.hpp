@@ -1163,24 +1163,25 @@ namespace proj {
 
     inline void Proj::initializeTrees(vector<Particle::SharedPtr> particles, unsigned i, unsigned ngenes, string a, unsigned gene_number) {
         // reset trees for next iteration
+        // TODO: this function may be crashing
         _species_tree_log_marginal_likelihood = 0.0;
         _log_marginal_likelihood = 0.0;
-        
+
         unsigned nparticles = _nparticles;
-        
+
         if (my_rank == 0) {
             cout << "beginning iteration: " << i << endl;
         }
-        
+
 //        ps.setNGenes(ngenes); // TODO: not sure if this is necessary
-        
+
         if (i > 0) {
             for (unsigned p=0; p<nparticles; p++) {
                 particles[p]->setParticleGeneration(0);
                 if (a == "gene") {
                     particles[p]->mapGeneTrees(_taxon_map, _species_names);
                     particles[p]->resetGeneIncrements();
-                    
+
                     particles[p]->remakeGeneTrees(_taxon_map);
                     particles[p]->resetGeneTreePartials(_data, _taxon_map, gene_number);
                 }
@@ -1308,7 +1309,7 @@ namespace proj {
         assert (my_vec_1_s.size() == _nparticles);
         assert (my_vec_2_s.size() == _nparticles);
         
-        initializeTrees(gene_particles, iteration, ngenes, "gene", gene_number);
+        initializeTrees(gene_particles, iteration, ngenes, "gene", gene_number); // TODO: this is causing incorrect likelihoods + crash with MPI
         
         for (unsigned g=0; g<ntaxa-1; g++) {
             // filter particles within each gene
@@ -1921,7 +1922,6 @@ namespace proj {
         MPI_Barrier(MPI_COMM_WORLD);
 #endif
     if (my_rank == 0) {
-        // TODO: combine gene tree files
             showFinal(my_vec[0]);
 //            cout << "marginal likelihood: " << setprecision(12) << _log_marginal_likelihood << endl;
     }
