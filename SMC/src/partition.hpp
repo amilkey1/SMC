@@ -43,7 +43,7 @@ namespace proj {
             subset_sizes_vect_t                         calcSubsetSizes() const;
 
             void                                        defaultPartition(unsigned nsites = std::numeric_limits<unsigned>::max());
-            void                                        parseSubsetDefinition(std::string & s);
+            void                                        parseSubsetDefinition(std::string & s, unsigned rank);
             void                                        finalize(unsigned nsites);
 
             void                                        clear();
@@ -165,7 +165,7 @@ namespace proj {
         _subset_ranges.push_back(std::make_tuple(1, _infinity, 1, 0));
     }    ///end_clear
     
-    inline void Partition::parseSubsetDefinition(std::string & s) {
+    inline void Partition::parseSubsetDefinition(std::string & s, unsigned rank) {
         std::vector<std::string> v;
         
         // first separate part before colon (stored in v[0]) from part after colon (stored in v[1])
@@ -240,7 +240,9 @@ namespace proj {
         _num_subsets = (unsigned)_subset_names.size();
         addSubset(_num_subsets - 1, subset_definition);
 
-        std::cout << boost::str(boost::format("Partition subset %s comprises sites %s and has type %s") % subset_name % subset_definition % datatype) << std::endl;
+        if (rank == 0) {
+            std::cout << boost::str(boost::format("Partition subset %s comprises sites %s and has type %s") % subset_name % subset_definition % datatype) << std::endl;
+        }
     }
     
     inline void Partition::addSubset(unsigned subset_index, std::string subset_definition) {

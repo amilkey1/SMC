@@ -117,6 +117,8 @@ namespace proj {
             bool                        _gene_first;
             vector<string>              _starting_gene_newicks;
             string                      _starting_species_newick;
+            bool                        _coal_like_only = false;
+        
 #if defined(USING_MPI)
             void mpiSetSchedule(unsigned ngenes);
             vector<unsigned>            _mpi_first_gene;
@@ -259,7 +261,7 @@ namespace proj {
         if (vm.count("subset") > 0) {
             _partition.reset(new Partition());
             for (auto s : partition_subsets) {
-                _partition->parseSubsetDefinition(s);
+                _partition->parseSubsetDefinition(s, my_rank);
             }
         }
         
@@ -776,7 +778,9 @@ namespace proj {
             regex re(".+\\^(.+)");
             smatch match_obj;
             bool matched=regex_match(name, match_obj, re); //search name for regular expression, store result in match_obj
-            cout << "taxon name: " << name << endl;
+            if (my_rank == 0) {
+                cout << "taxon name: " << name << endl;
+            }
             if (matched) {
                 string species_name = match_obj[1];
                 string taxon_name = name;
@@ -1147,17 +1151,19 @@ namespace proj {
         }
         
         // if both specified, calculate the coalescent likelihood and return it, ending the program
-        if (_both && my_rank == 0) {
-            cout << "...... calculating coalescent likelihood for specified trees ......" << endl;
-            vector<pair<tuple<string, string, string>, double>> species_info = particles[0][0]->getSpeciesJoined();
-            
-            double log_coalescent_likelihood = 0.0;
-            for (unsigned s=1; s<ngenes+1; s++) {
-                    particles[s][0]->refreshGeneTreePreorder();
-                    log_coalescent_likelihood += particles[s][0]->calcCoalLikeForNewTheta(Forest::_theta, species_info, _both);
-                }
-            cout << "log coalescent likelihood: " << log_coalescent_likelihood << endl;
-            exit(0);
+        if (_both) {
+            _coal_like_only = true;
+            if (my_rank == 0) {
+                cout << "...... calculating coalescent likelihood for specified trees ......" << endl;
+                vector<pair<tuple<string, string, string>, double>> species_info = particles[0][0]->getSpeciesJoined();
+                
+                double log_coalescent_likelihood = 0.0;
+                for (unsigned s=1; s<ngenes+1; s++) {
+                        particles[s][0]->refreshGeneTreePreorder();
+                        log_coalescent_likelihood += particles[s][0]->calcCoalLikeForNewTheta(Forest::_theta, species_info, _both);
+                    }
+                cout << "log coalescent likelihood: " << log_coalescent_likelihood << endl;
+            }
         }
     }
 
@@ -1608,6 +1614,7 @@ namespace proj {
             
             handleInitialNewicks(my_vec, nsubsets);
             
+            if (!_coal_like_only) {
             unsigned ntaxa = (unsigned) _taxon_map.size();
             
             if (_gene_newicks_names == "null") {
@@ -1930,7 +1937,8 @@ namespace proj {
         // Ensure no one starts on next iteration until coordinator is ready
         MPI_Barrier(MPI_COMM_WORLD);
 #endif
-    if (my_rank == 0) {
+        }
+    if (my_rank == 0 && !_coal_like_only) {
             showFinal(my_vec[0]);
 //            cout << "marginal likelihood: " << setprecision(12) << _log_marginal_likelihood << endl;
     }
