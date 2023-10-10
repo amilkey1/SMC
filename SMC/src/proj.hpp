@@ -1175,10 +1175,6 @@ namespace proj {
 
         unsigned nparticles = _nparticles;
 
-        if (my_rank == 0) {
-            cout << "beginning iteration: " << i << endl;
-        }
-
 //        ps.setNGenes(ngenes); // TODO: not sure if this is necessary
 
         if (i > 0) {
@@ -1315,7 +1311,7 @@ namespace proj {
         assert (my_vec_1_s.size() == _nparticles);
         assert (my_vec_2_s.size() == _nparticles);
         
-        initializeTrees(gene_particles, iteration, ngenes, "gene", gene_number); // TODO: this is causing incorrect likelihoods + crash with MPI
+        initializeTrees(gene_particles, iteration, ngenes, "gene", gene_number);
         
         for (unsigned g=0; g<ntaxa-1; g++) {
             // filter particles within each gene
@@ -1736,7 +1732,12 @@ namespace proj {
                         species_tree_particle->initSpeciesForest(_starting_species_newick);
                     }
                     
+                    unsigned print_i = 0;
                     for (unsigned s = _mpi_first_gene[my_rank]+1; s < _mpi_last_gene[my_rank]+1; ++s) {
+                        if (print_i == 0) {
+                            cout << "beginning iteration: " << i << endl;
+                            print_i++;
+                        }
                         assert (_starting_gene_newicks[s-1] == "");
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                         
@@ -1884,7 +1885,12 @@ namespace proj {
                 // reset _start for all processors
                 _start = "species";
 #else
+                    unsigned print_i = 0;
                     for (unsigned s=1; s<nsubsets+1; s++) {
+                        if (my_rank == 0 && print_i==0) {
+                            cout << "beginning iteration: " << i << endl;
+                            print_i++;
+                        }
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                     }
 
