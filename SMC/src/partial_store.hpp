@@ -41,7 +41,6 @@ namespace proj {
 
     inline PartialStore::partial_t PartialStore::getPartial(unsigned nelements, unsigned gene) {
         assert(nelements>0);
-//        _nelements[gene] = nelements;
         assert(_nelements.size() > gene);
         assert(_nallocated.size() > gene);
         assert(_storage.size() > gene);

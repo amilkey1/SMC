@@ -727,9 +727,9 @@ class Particle {
 
     inline void Particle::resetGeneTreePartials(Data::SharedPtr d, map<string, string> taxon_map, int i) {
         assert (_name != "species");
-        _nsubsets = d->getNumSubsets();
-        _data = d;
-        _forest.setData(d, i, taxon_map);
+//        _nsubsets = d->getNumSubsets(); // TODO: don't think this needs to be reset
+//        _data = d; // TODO: don't think this needs to be reset either?
+        _forest.setData(d, i, taxon_map); // TODO: check what's going on in this function
     }
 
     inline void Particle::calcGeneTreeMinDepth() {

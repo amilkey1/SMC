@@ -380,7 +380,7 @@ namespace proj {
             int sel_index = sel_indices[i];
             assert(sel_index > -1);
             Particle::SharedPtr p0 = from_particles[sel_index];
-            to_particles[i]=Particle::SharedPtr(new Particle(*p0));
+            to_particles[i]=Particle::SharedPtr(new Particle(*p0)); // TODO: is it necessary to use new here?
             assert(nparticles == to_particles.size());
         }
     }
@@ -1147,7 +1147,7 @@ namespace proj {
         }
         
         // if both specified, calculate the coalescent likelihood and return it, ending the program
-        if (_both) {
+        if (_both && my_rank == 0) {
             cout << "...... calculating coalescent likelihood for specified trees ......" << endl;
             vector<pair<tuple<string, string, string>, double>> species_info = particles[0][0]->getSpeciesJoined();
             
@@ -1701,7 +1701,11 @@ namespace proj {
                 species_tree_particle->showParticle();
             }
         
+//            char ch;
             for (unsigned i=0; i<_niterations; i++) {
+//                cout << "press any key to continue " << endl;
+//                cin >> ch;
+//                cout << endl;
 //                cout << "start is " << _start << " on rank " << my_rank << endl;
 
                 // my_vec[0] is the species tree particles
@@ -1877,6 +1881,11 @@ namespace proj {
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                     }
 
+//                char ch;
+//                cout << "press any key to continue " << endl;
+//                cin >> ch;
+//                cout << endl;
+                
                     saveSelectedGeneTrees(nsubsets);
                 
                 // TODO: clear gene forests here because we are just saving the newicks at this point

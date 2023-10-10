@@ -171,6 +171,7 @@ class Forest {
         double                      _gene_tree_log_coalescent_likelihood;
         double                      _panmictic_coalescent_likelihood;
         int                         _nincrements = 0;
+        double                      _count = 0;
 
         double                      calcTransitionProbability(Node* child, double s, double s_child);
         double                      calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
@@ -1038,7 +1039,6 @@ class Forest {
         double prev_log_likelihood = _prev_gene_tree_log_likelihood + starting_gene_tree_log_coalescent_likelihood;
         vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, prev_log_likelihood);
 
-
          // sum unnormalized weights before choosing the pair
          // must include the likelihoods of all pairs in the final particle weight
          double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
@@ -1147,9 +1147,9 @@ class Forest {
 
         // Resize the _nodes vector
         _nleaves = countNewickLeaves(commentless_newick);
-        if (_nleaves < 4) {
-            throw XProj("Expecting newick tree description to have at least 4 leaves");
-        }
+//        if (_nleaves < 4) {
+//            throw XProj("Expecting newick tree description to have at least 4 leaves");
+//        }
         unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
         _nodes.resize(max_nodes);
 //        int b=0;
@@ -1508,9 +1508,9 @@ class Forest {
         // Resize the _nodes vector
         _nleaves = countNewickLeaves(commentless_newick);
         
-        if (_nleaves < 4) {
-            throw XProj("Expecting newick tree description to have at least 4 leaves");
-        }
+//        if (_nleaves < 4) {
+//            throw XProj("Expecting newick tree description to have at least 4 leaves");
+//        }
         unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
         _nodes.resize(max_nodes);
         for (auto & nd : _nodes ) {
@@ -2440,6 +2440,7 @@ class Forest {
     }
 
     inline void Forest::operator=(const Forest & other) {
+        _count = other._count;
         _nstates = other._nstates;
         _npatterns = other._npatterns;
         _nodes.clear();
