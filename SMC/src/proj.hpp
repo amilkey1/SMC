@@ -1916,7 +1916,7 @@ namespace proj {
                         
                         species_tree_particle = chooseTree(my_vec[0], "s"); // pass in all the species trees
                         
-                        _starting_species_newick = species_tree_particle->getSpeciesTreeNewick();
+                        _starting_species_newick = species_tree_particle->getSpeciesNewick();
                         cout << "chosen species tree is : ";
                         species_tree_particle->showParticle();
 

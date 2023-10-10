@@ -99,7 +99,7 @@ int main(int argc, const char * argv[]) {
     }
     
     ofstream memfile("allocs.txt");
-    ps.memoryReport(memfile);
+//    ps.memoryReport(memfile);
     memfile.close();
     
 #if defined(USING_MPI)
