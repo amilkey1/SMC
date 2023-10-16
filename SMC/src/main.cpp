@@ -1,8 +1,16 @@
+#include "conditionals.hpp"
+
+#if defined(USING_SIGNPOSTS)
+#include <os/log.h>
+#include <os/signpost.h>
+os_log_t log_handle;
+os_signpost_id_t signpost_id;
+#endif
+
 #include <iostream>
 #include <vector>
 #include "proj.hpp"
 #include "particle.hpp"
-#include "conditionals.hpp"
 
 // Initialize our random number generator here so it will be a global variable
 #include "lot.hpp"
@@ -77,6 +85,12 @@ GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
 };
 
 int main(int argc, const char * argv[]) {
+    
+#if defined(USING_SIGNPOSTS)
+log_handle  = os_log_create("edu.uconn.eeb.phylogeny", OS_LOG_CATEGORY_POINTS_OF_INTEREST);
+signpost_id = os_signpost_id_generate(log_handle);
+assert(signpost_id != OS_SIGNPOST_ID_INVALID);
+#endif
     
 #if defined(USING_MPI)
     MPI_Init(NULL, NULL);

@@ -22,6 +22,11 @@ using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
 
+#if defined(USING_SIGNPOSTS)
+extern os_log_t log_handle;
+extern os_signpost_id_t signpost_id;
+#endif
+
 extern void output(string msg);
 
 #include "partial_store.hpp"
@@ -48,10 +53,10 @@ namespace proj {
             void                resetWeights(vector<Particle::SharedPtr> & particles, string a);
             void                createSpeciesMap(Data::SharedPtr);
             void                showFinal(vector<Particle::SharedPtr> species_particles);
-            void                proposeGeneTreeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, vector<pair<tuple<string, string, string>, double>> species_joined);
+            void                proposeGeneTreeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, string a, vector<pair<tuple<string, string, string>, double>> species_joined);
             void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
             void                proposeSpeciesParticles(vector<vector<Particle::SharedPtr>> &my_vec, unsigned s, unsigned nspecies, unsigned nsubsets);
-            void                proposeGeneTreeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, Particle::SharedPtr species_tree_particle);
+            void                proposeGeneTreeParticles(vector<Particle::SharedPtr> &particles, string a, Particle::SharedPtr species_tree_particle);
             void                growGeneTrees(vector<Particle::SharedPtr> &gene_particles, vector<Particle::SharedPtr> &my_vec_1_s, vector<Particle::SharedPtr> &my_vec_2_s, Particle::SharedPtr &species_tree_particle, unsigned ntaxa, unsigned ngenes, unsigned gene_number, unsigned iteration);
             void                growSpeciesTrees(vector<vector<Particle::SharedPtr>> &particles, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2, unsigned ngenes, unsigned nspecies, unsigned nparticles);
             void                handleInitialNewicks(vector<vector<Particle::SharedPtr>> &particles, unsigned ngenes);
@@ -71,7 +76,7 @@ namespace proj {
             unsigned            multinomialDraw (const vector<double> & probs);
             void                proposeGeneParticlesFromPrior(vector<Particle::SharedPtr> &particles);
             void                proposeGeneParticlesFromPriorRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
-            void                initializeTrees(vector<Particle::SharedPtr> particles, unsigned i, unsigned ngenes, string a, unsigned gene_number);
+            void                initializeTrees(vector<Particle::SharedPtr> particles, unsigned i, string a, unsigned gene_number);
             void                sampleFromGeneTreePrior(vector<Particle::SharedPtr> &gene_particles, unsigned ntaxa, vector<Particle::SharedPtr> &my_vec_1_g, vector<Particle::SharedPtr> &my_vec_2_g, unsigned gene_number);
             void                removeExtraParticles(vector<vector<Particle::SharedPtr>> &my_vec, vector<vector<Particle::SharedPtr>> &my_vec_1, vector<vector<Particle::SharedPtr>> &my_vec_2, unsigned nparticles, unsigned ngenes);
             void                resetGeneTreeWeights(vector<vector<Particle::SharedPtr>> &my_vec, unsigned ngenes);
@@ -382,7 +387,11 @@ namespace proj {
             int sel_index = sel_indices[i];
             assert(sel_index > -1);
             Particle::SharedPtr p0 = from_particles[sel_index];
+            
+//            *to_particles[i] = *p0;
+            
             to_particles[i]=Particle::SharedPtr(new Particle(*p0)); // TODO: is it necessary to use new here?
+            
             assert(nparticles == to_particles.size());
         }
     }
@@ -697,7 +706,11 @@ namespace proj {
             }
             assert(sel_index > -1);
             Particle::SharedPtr p0 = from_particles[sel_index];
+            
+//            Particle new_particle = *p0; // TODO: this uses more memory than new?
+//            *to_particles[i] = new_particle;
             to_particles[i]=Particle::SharedPtr(new Particle(*p0));
+            
             assert(nparticles == to_particles.size());
             
             sel_indices.push_back(sel_index);
@@ -753,6 +766,7 @@ namespace proj {
             }
             assert(sel_index > -1);
             Particle::SharedPtr p0 = from_particles[sel_index];
+            
             to_particles[i]=Particle::SharedPtr(new Particle(*p0));
             
             assert(nparticles == to_particles.size());
@@ -812,7 +826,7 @@ namespace proj {
         cout << "hybridization rate = " << Forest::_hybridization_rate << endl;
     }
 
-    inline void Proj::proposeGeneTreeParticles(vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, Particle::SharedPtr species_tree_particle) {
+    inline void Proj::proposeGeneTreeParticles(vector<Particle::SharedPtr> &particles, string a, Particle::SharedPtr species_tree_particle) {
         assert(_nthreads > 0);
         
         vector<pair<tuple<string, string, string>, double>> species_joined = species_tree_particle->getSpeciesJoined();
@@ -820,7 +834,7 @@ namespace proj {
         assert (species_joined.size() > 0);
         if (_nthreads == 1) {
             for (unsigned p=0; p<_nparticles; p++) {
-                particles[p]->proposal(gene_trees_only, species_joined);
+                particles[p]->proposal(species_joined);
           }
         }
 
@@ -835,7 +849,7 @@ namespace proj {
 
             while (true) {
             // create a thread to handle particles first through last - 1
-              threads.push_back(thread(&Proj::proposeGeneTreeParticleRange, this, first, last, std::ref(particles), gene_trees_only, a, species_joined));
+              threads.push_back(thread(&Proj::proposeGeneTreeParticleRange, this, first, last, std::ref(particles), a, species_joined));
             // update first and last
             first = last;
             last += incr;
@@ -854,9 +868,9 @@ namespace proj {
         }
     }
 
-    inline void Proj::proposeGeneTreeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, bool gene_trees_only, string a, vector<pair<tuple<string, string, string>, double>> species_joined) {
+    inline void Proj::proposeGeneTreeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, string a, vector<pair<tuple<string, string, string>, double>> species_joined) {
         for (unsigned i=first; i<last; i++){
-            particles[i]->proposal(gene_trees_only, species_joined);
+            particles[i]->proposal(species_joined);
         }
     }
 
@@ -1108,7 +1122,9 @@ namespace proj {
         for (unsigned s=0; s<ngenes+1; s++) {
             
             for (unsigned p=0; p<nparticles; p++) {
-                particles[s][p]->setData(_data, _taxon_map, s);
+                if (s > 0) {
+                    particles[s][p]->setData(_data, _taxon_map, s);
+                }
                 particles[s][p]->mapSpecies(_taxon_map, _species_names, s);
                 particles[s][p]->setParticleGeneration(0);
                 particles[s][p]->setLogLikelihood(0.0);
@@ -1167,18 +1183,13 @@ namespace proj {
         }
     }
 
-    inline void Proj::initializeTrees(vector<Particle::SharedPtr> particles, unsigned i, unsigned ngenes, string a, unsigned gene_number) {
+    inline void Proj::initializeTrees(vector<Particle::SharedPtr> particles, unsigned i, string a, unsigned gene_number) {
         // reset trees for next iteration
-        // TODO: this function may be crashing
         _species_tree_log_marginal_likelihood = 0.0;
         _log_marginal_likelihood = 0.0;
 
-        unsigned nparticles = _nparticles;
-
-//        ps.setNGenes(ngenes); // TODO: not sure if this is necessary
-
         if (i > 0) {
-            for (unsigned p=0; p<nparticles; p++) {
+            for (unsigned p=0; p<_nparticles; p++) {
                 particles[p]->setParticleGeneration(0);
                 if (a == "gene") {
                     particles[p]->mapGeneTrees(_taxon_map, _species_names);
@@ -1311,14 +1322,13 @@ namespace proj {
         assert (my_vec_1_s.size() == _nparticles);
         assert (my_vec_2_s.size() == _nparticles);
         
-        initializeTrees(gene_particles, iteration, ngenes, "gene", gene_number);
+        initializeTrees(gene_particles, iteration, "gene", gene_number);
         
         for (unsigned g=0; g<ntaxa-1; g++) {
             // filter particles within each gene
             
-            bool gene_trees_only = true;
 //            cout << "proposing gene tree particles for gen " << g << " and gene " << gene_number << " on rank " << my_rank << endl;
-            proposeGeneTreeParticles(gene_particles, gene_trees_only, "g", species_tree_particle);
+            proposeGeneTreeParticles(gene_particles, "g", species_tree_particle);
             
 //            cout << "done proposing gene tree particles for gen " << g << " and gene " << gene_number << " on rank " << my_rank << endl;
         
@@ -1398,6 +1408,10 @@ namespace proj {
         string file_name = "gene" + to_string(gene_number)+ ".txt";
         writeGeneTreeFile(file_name, gene_particles);
         
+#endif
+        
+#if defined(USING_SIGNPOSTS)
+os_signpost_event_emit(log_handle, signpost_id, "growGeneTrees", "Step %d of %d", (iteration), _niterations);
 #endif
     }
 
@@ -1493,7 +1507,7 @@ namespace proj {
             }
             
             assert(particles[s].size() == nparticles);
-            Particle chosen_particle;
+            Particle chosen_particle("gene");
             chosen_particle.initGeneForest(newick,s,_taxon_map, _data);
             for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
                 if (p<nparticles) {
@@ -1501,16 +1515,16 @@ namespace proj {
                 }
                 else {
                     // add in null particles first
-                    particles[s].push_back(Particle::SharedPtr(new Particle));
+                    particles[s].push_back(Particle::SharedPtr(new Particle("gene")));
                     *particles[s][p] = chosen_particle;
-                    particles_2[s].push_back(Particle::SharedPtr(new Particle));
+                    particles_2[s].push_back(Particle::SharedPtr(new Particle("gene")));
                 }
             }
         }
         // increase size of species vector
         for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
-            particles[0].push_back(Particle::SharedPtr(new Particle));
-            particles_2[0].push_back(Particle::SharedPtr(new Particle));
+            particles[0].push_back(Particle::SharedPtr(new Particle("species")));
+            particles_2[0].push_back(Particle::SharedPtr(new Particle("species")));
         }
         
         setUpForSpeciesFiltering(particles, ngenes, nparticles);
@@ -1598,8 +1612,24 @@ namespace proj {
             for (unsigned s=0; s<nsubsets+1; s++) {
                 unsigned nparticles = _nparticles;
                 for (unsigned i=0; i<nparticles; i++) {
-                    my_vec_1[s][i] = Particle::SharedPtr(new Particle); // TODO: wasteful that this makes species trees with extra lineages
-                    my_vec_2[s][i] = Particle::SharedPtr(new Particle);
+//                    my_vec_1[s][i] = Particle::SharedPtr(new Particle); // TODO: wasteful that this makes species trees with extra lineages
+//                    my_vec_2[s][i] = Particle::SharedPtr(new Particle);
+                    if (s == 0) {
+                        my_vec_1[s][i] = Particle::SharedPtr(new Particle("species"));
+                        my_vec_2[s][i] = Particle::SharedPtr(new Particle("species"));
+                        
+                        my_vec_1[s][i]->setParticleType("species");
+                        my_vec_2[s][i]->setParticleType("species"); // TODO: need to set an index when creating these particles
+                    }
+                    else {
+                        my_vec_1[s][i] = Particle::SharedPtr(new Particle("gene"));
+                        my_vec_2[s][i] = Particle::SharedPtr(new Particle("gene"));
+                        
+                        string gene_index = to_string(s);
+                        string name = "gene" + gene_index;
+                        my_vec_1[s][i]->setParticleType(name);
+                        my_vec_2[s][i]->setParticleType(name);
+                    }
                 }
             }
             
@@ -1704,13 +1734,7 @@ namespace proj {
                 species_tree_particle->showParticle();
             }
         
-//            char ch;
             for (unsigned i=0; i<_niterations; i++) {
-//                cout << "press any key to continue " << endl;
-//                cin >> ch;
-//                cout << endl;
-//                cout << "start is " << _start << " on rank " << my_rank << endl;
-
                 // my_vec[0] is the species tree particles
                 // my_vec[1] is gene 1 particles
                 // my_vec[2] is gene 2 particles
@@ -1881,7 +1905,7 @@ namespace proj {
                 
                 // reset everything - needs to happen on all processors
                 resetGeneTreeWeights(my_vec, nsubsets); // reset gene tree weights and likelihoods if not at last step
-                initializeTrees(my_vec[0], i+1, nsubsets, "species", -1); // initialize species trees for next round of filtering
+                initializeTrees(my_vec[0], i+1, "species", -1); // initialize species trees for next round of filtering
                 // reset _start for all processors
                 _start = "species";
 #else
@@ -1893,21 +1917,8 @@ namespace proj {
                         }
                         growGeneTrees(my_vec[s], my_vec_1[s], my_vec_2[s], species_tree_particle, ntaxa, nsubsets, s, i);
                     }
-
-//                char ch;
-//                cout << "press any key to continue " << endl;
-//                cin >> ch;
-//                cout << endl;
                 
                     saveSelectedGeneTrees(nsubsets);
-                
-                // TODO: clear gene forests here because we are just saving the newicks at this point
-//                    for (unsigned s=1; s<nsubsets+1; s++) {
-//                        for (int p=0; p<_nparticles; p++) {
-//                            my_vec[s][p]->clearPartials();
-//                            my_vec[s][p]->remakeGeneTrees(_taxon_map);
-//                        }
-//                    }
                 }
                     // build species trees
             
@@ -1925,9 +1936,10 @@ namespace proj {
                         }
 
                         // save species tree variation before removing extra particles
-                        saveSpeciesTrees(my_vec[0]);
+                        saveSpeciesTrees(my_vec[0]); // TODO: to reduce memory, maybe only do this for the last iteration?
 
                         if (i == _niterations - 2) {
+//                            saveSpeciesTrees(my_vec[0]);
                             writeSpeciesTreeLoradFile(my_vec[0], nspecies);
                         }
 
@@ -1935,7 +1947,7 @@ namespace proj {
                         removeExtraParticles(my_vec, my_vec_1, my_vec_2, nparticles, nsubsets);
 
                         resetGeneTreeWeights(my_vec, nsubsets); // reset gene tree weights and likelihoods if not at last step
-                        initializeTrees(my_vec[0], i+1, nsubsets, "species", -1); // initialize species trees for next round of filtering if not at last step
+                        initializeTrees(my_vec[0], i+1, "species", -1); // initialize species trees for next round of filtering if not at last step
                     }
 #endif
             }

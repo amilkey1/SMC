@@ -35,7 +35,7 @@ class Forest {
         friend class Particle;
 
     public:
-                                    Forest();
+                                    Forest(string type);
                                     ~Forest();
         Forest(const Forest & other);
 
@@ -55,9 +55,11 @@ class Forest {
     private:
 
         typedef std::vector <double> partial_array_t;
-        void                        clear();
+//        void                        clear();
+        void                        clearGeneForest();
+        void                        clearSpeciesForest();
+        void                        clearForestForCopying();
         void                        setData(Data::SharedPtr d, int index, map<string, string> &taxon_map);
-        void                        setDataTwo(Data::SharedPtr d, int index, map<string, string> &taxon_map);
         Node *                      findNextPreorder(Node * nd);
         std::string                 makeNewick(unsigned precision, bool use_names);
         std::string                 makePartialNewick(unsigned precision, bool use_names);
@@ -200,25 +202,56 @@ class Forest {
 };
 
 
-    inline Forest::Forest() {
+    inline Forest::Forest(string type) {
         //std::cout << "Constructing a forest" << std::endl;
-        clear();
+        if (type == "species") {
+            clearSpeciesForest();
+        }
+        else if (type == "new") {
+//            // don't need to create nodes because they will be overwritten when particle is copying
+            clearForestForCopying();
+        }
+        else {
+            clearGeneForest();
+        }
     }
 
     inline Forest::~Forest() {
         //std::cout << "Destroying a Forest" << std::endl;
     }
 
-    inline void Forest::clear() {
-        // TODO: trying to add stow partial
-        // Return partials to PartialStore
-//        for (auto & nd : _nodes) {
-//            if (nd._partial) {
-//                ps.stowPartial(nd._partial, _index-1);
-//                nd._partial.reset();
-//            }
-//        }
-        
+    inline void Forest::clearForestForCopying() {
+        _nodes.clear();
+        _lineages.clear();
+        _npatterns = 0;
+        _nstates = 4;
+        _last_edge_length = 0.0;
+        _lineages.clear();
+        _log_joining_prob = 0.0;
+        _extended_increment = 0.0;
+        _species_join_number = 0;
+        _ready_to_join_species = false;
+        _gene_tree_log_likelihood = 0.0;
+        _gene_tree_log_weight = 0.0;
+        _gene_tree_log_coalescent_likelihood = 0.0;
+        _panmictic_coalescent_likelihood = 0.0;
+        _log_weight_vec.clear();
+        _node_choices.clear();
+        _prev_log_likelihood = 0.0;
+        _increment_choices.clear();
+        _extended_increment = 0.0;
+        _species_join_number = 0;
+        _deep_coalescent_increments.clear();
+        _prev_gene_tree_log_likelihood = 0.0;
+        _preorder.clear();
+        _depths.clear();
+        _nleaves=0;
+        _ninternals=0;
+        _topology_prior = 0.0;
+        _index_of_choice = 0;
+    }
+
+    inline void Forest::clearGeneForest() {
         _nodes.clear();
         _lineages.clear();
         _nodes.resize(_ntaxa);
@@ -243,13 +276,17 @@ class Forest {
         _species_join_number = 0;
         _deep_coalescent_increments.clear();
         _prev_gene_tree_log_likelihood = 0.0;
-        _ready_to_join_species = false;
-        _preorder.clear();
         _depths.clear();
-        
+        _topology_prior = 0.0;
+        _index_of_choice = 0;
+
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
             Node* nd = &*next(_nodes.begin(), i);
+//            Node new_nd;
+//            _nodes.push_back(new_nd);
+//            Node* nd = &_nodes.back();
+            
             nd->_right_sib=0;
             nd->_name=" ";
             nd->_left_child=0;
@@ -266,69 +303,76 @@ class Forest {
 
     }
 
+    inline void Forest::clearSpeciesForest() {
+        _nodes.clear();
+        _lineages.clear();
+        _nodes.resize(_nspecies);
+        _npatterns = 0;
+        _nstates = 4;
+        _last_edge_length = 0.0;
+        _lineages.reserve(_nodes.size());
+        _log_joining_prob = 0.0;
+        _extended_increment = 0.0;
+        _species_join_number = 0;
+        _ready_to_join_species = false;
+        _preorder.clear();
+        _gene_tree_log_likelihood = 0.0;
+        _gene_tree_log_weight = 0.0;
+        _gene_tree_log_coalescent_likelihood = 0.0;
+        _panmictic_coalescent_likelihood = 0.0;
+        _log_weight_vec.clear();
+        _node_choices.clear();
+        _prev_log_likelihood = 0.0;
+        _increment_choices.clear();
+        _extended_increment = 0.0;
+        _species_join_number = 0;
+        _deep_coalescent_increments.clear();
+        _prev_gene_tree_log_likelihood = 0.0;
+        _depths.clear();
+        _topology_prior = 0.0;
+        _index_of_choice = 0;
+
+        //create taxa
+        for (unsigned i = 0; i < _nspecies; i++) {
+//            Node new_nd;
+//            _nodes.push_back(new_nd);
+//            Node* nd = &_nodes.back();
+            
+            Node* nd = &*next(_nodes.begin(), i);
+            nd->_right_sib=0;
+            nd->_name=" ";
+            nd->_left_child=0;
+            nd->_right_sib=0;
+            nd->_parent=0;
+            nd->_number=i;
+            nd->_edge_length=0.0;
+            nd->_position_in_lineages=i;
+            _lineages.push_back(nd);
+            }
+        _nleaves=_nspecies;
+        _ninternals=0;
+
+    }
+
     inline Forest::Forest(const Forest & other) {
-        clear();
+        if (_index == 0) {
+            clearSpeciesForest();
+        }
+        else {
+            clearGeneForest();
+        }
         *this = other;
     }
 
-//    inline void Forest::stowForestPartials() {
-//        // TODO: trying to add stow partial
-//        // Return partials to PartialStore
-//        for (auto & nd : _nodes) {
-//            if (nd._partial) {
-//                ps.stowPartial(nd._partial, _index-1);
-//                nd._partial.reset();
-//            }
-//        }
-//    }
-
-    inline void Forest::setDataTwo(Data::SharedPtr d, int index, map<string, string> &taxon_map) {
-        _data = d;
-        _index = index;
-
-        //don't set data for species tree
-        if (index>0) {
-            Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index-1);
-            _first_pattern = gene_begin_end.first;
-            _npatterns = _data->getNumPatternsInSubset(index-1);
-            
-            ps.setNElements(_npatterns, index-1);
-            }
-
-        auto data_matrix=_data->getDataMatrix();
-
-        for (auto &nd:_nodes) { // only need to reset partials for tips since the Felsenstein likelihood will not be calculated for this complete tree again
-            if (!nd._left_child) {
-                if (index>0) {
-                    nd._partial=ps.getPartial(_npatterns*4, index-1);
-                    for (unsigned p=0; p<_npatterns; p++) {
-                        unsigned pp = _first_pattern+p;
-                        for (unsigned s=0; s<_nstates; s++) {
-                            Data::state_t state = (Data::state_t)1 << s;
-                            Data::state_t d = data_matrix[nd._number][pp];
-                            double result = state & d;
-                            (*nd._partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
-                        }
-                    }
-                }
-            }
-        }
-        if (index > 0) {
-            setUpGeneForest(taxon_map);
-        }
-    }
-
     inline void Forest::setData(Data::SharedPtr d, int index, map<string, string> &taxon_map) {
+        assert (index > 0); // don't set data for species tree
         _data = d;
         _index = index;
 
-        //don't set data for species tree
-        if (index>0) {
-            Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index-1);
-            _first_pattern = gene_begin_end.first;
-            _npatterns = _data->getNumPatternsInSubset(index-1);
-            ps.setNElements(_npatterns, index-1);
-            }
+        Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index-1);
+        _first_pattern = gene_begin_end.first;
+        _npatterns = _data->getNumPatternsInSubset(index-1);
+        ps.setNElements(_npatterns, index-1);
 
         const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
         unsigned i = 0;
@@ -356,9 +400,7 @@ class Forest {
                 }
             }
         }
-        if (index > 0) {
-            setUpGeneForest(taxon_map);
-        }
+        setUpGeneForest(taxon_map);
     }
 
     inline unsigned Forest::numLeaves() const {
@@ -619,7 +661,7 @@ class Forest {
         if (_lineages.size() > 1) {
             return makePartialNewick(precision, use_names);
         }
-        
+
         else {
             string newick = "";
             const boost::format tip_node_name_format( boost::str(boost::format("%%s:%%.%df") % precision) );
@@ -1398,7 +1440,13 @@ class Forest {
             renumberInternals();
         }
         catch(XProj &x) {
-            clear();
+            if (_index == 0) {
+                clearSpeciesForest();
+            }
+            else {
+                clearGeneForest();
+            }
+//            clear();
             throw x;
         }
 
@@ -1756,7 +1804,13 @@ class Forest {
             renumberInternals();
         }
         catch(XProj &x) {
-            clear();
+            if (_index == 0) {
+                clearSpeciesForest();
+            }
+            else {
+                clearGeneForest();
+            }
+//            clear();
             throw x;
         }
 
@@ -2418,7 +2472,8 @@ class Forest {
     }
 
     inline void Forest::createDefaultTree() {
-        clear();
+//        clear();
+        clearGeneForest();
         //create taxa
         double edge_length = rng.gamma(1.0, 1.0/_ntaxa);
         _lineages.reserve(_nodes.size());
@@ -2581,24 +2636,27 @@ class Forest {
     inline void Forest::setUpSpeciesForest(vector<string> &species_names) {
 //        assert (_index==0);
         assert (_nspecies == (unsigned) species_names.size());
-        clear();
+//        clear();
+        clearSpeciesForest();
         //create species
-        double edge_length = 0.0;
+//        double edge_length = 0.0;
         for (unsigned i = 0; i < _nspecies; i++) {
             Node* nd = &*next(_nodes.begin(), i);
-            nd->_right_sib=0;
+//            nd->_right_sib=0;
             nd->_name=species_names[i];
-            nd->_left_child=0;
-            nd->_right_sib=0;
-            nd->_parent=0;
-            nd->_number=i;
-            nd->_edge_length = edge_length;
-            nd->_position_in_lineages=i;
+//            nd->_left_child=0;
+//            nd->_right_sib=0;
+//            nd->_parent=0;
+//            nd->_number=i;
+//            nd->_edge_length = edge_length;
+//            nd->_position_in_lineages=i;
             }
         _nleaves=_nspecies;
         _ninternals=0;
-        _nodes.resize(_nspecies);
-        _lineages.resize(_nspecies);
+        assert (_nodes.size() == _nspecies);
+        assert (_lineages.size() == _nspecies);
+//        _nodes.resize(_nspecies);
+//        _lineages.resize(_nspecies);
     }
 
     inline void Forest::chooseSpeciesIncrement(double max_depth) {

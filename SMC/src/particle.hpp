@@ -22,7 +22,7 @@ namespace proj {
 class Particle {
     public:
 
-        Particle();
+        Particle(string type);
         Particle(const Particle & other);
         ~Particle();
         typedef std::shared_ptr<Particle>               SharedPtr;
@@ -30,7 +30,7 @@ class Particle {
 
         void                                    debugParticle(std::string name);
         void                                    showParticle();
-        double                                  proposal(bool gene_trees_only, vector<pair<tuple<string, string, string>, double>> species_joined);
+        double                                  proposal(vector<pair<tuple<string, string, string>, double>> species_joined);
         void                                    setData(Data::SharedPtr d, map<string, string> &taxon_map, int index) {
                                                     _nsubsets = d->getNumSubsets();
                                                     _data = d;
@@ -113,6 +113,8 @@ class Particle {
         void                                            initGeneForest(string newick, unsigned gene_number, map<string, string> taxon_map, Data::SharedPtr d);
         void                                            initSpeciesForest(string newick);
 //        void                                            clearPartials();
+        void                                            clear();
+        void                                            setParticleType(string a) {_name = a;}
     
     private:
 
@@ -130,8 +132,15 @@ class Particle {
         string                                  _name;
 };
 
-    inline Particle::Particle() {
+    inline Particle::Particle(string type) : _forest(type) {
+//        Forest _forest(type);
         //log weight and log likelihood are 0 for first generation
+//        if (type == "species") {
+//            _forest._index = 0;
+//        }
+//        else {
+//            _forest._index = 1; // TODO: check this gets updated later if >1 gene
+//        }
         _log_weight = 0.0;
         _log_likelihood = 0.0;
         _log_coalescent_likelihood = 0.0;
@@ -142,6 +151,27 @@ class Particle {
 
     inline Particle::~Particle() {
 //        cout << "destroying a particle" << endl;
+    }
+
+    inline void Particle::clear() {
+        if (_name == "species") {
+            _forest.clearSpeciesForest();
+        }
+        else {
+            _forest.clearGeneForest();
+        }
+//        _forest.clear();
+        _log_weight = 0.0;
+        _log_likelihood = 0.0;
+//        _data.clear();
+//        _nsubsets = 0;
+        _generation = 0;
+        _t.clear();
+        _log_coalescent_likelihood = 0.0;
+        _species_tree_height = 0.0;
+        _inf = false;
+        _species_log_weight = 0.0;
+//        _name;
     }
 
     inline void Particle::showParticle() {
@@ -206,11 +236,12 @@ class Particle {
 
     inline void Particle::remakeGeneTrees(map<string, string> &taxon_map) {
         assert (_name != "species");
-        _forest.clear();
+//        _forest.clear();
+        _forest.clearGeneForest();
         _forest.remakeGeneTree(taxon_map);
     }
 
-    inline double Particle::proposal(bool gene_trees_only, vector<pair<tuple<string, string, string>, double>> species_joined) {
+    inline double Particle::proposal(vector<pair<tuple<string, string, string>, double>> species_joined) {
         // this function proposes gene trees, not species trees
         string event;
         
@@ -218,9 +249,8 @@ class Particle {
             _forest._nincrements = 0;
             _forest._gene_tree_log_coalescent_likelihood = 0.0;
         }
-        if (gene_trees_only) {
-            geneTreeProposal(species_joined);
-        }
+        
+        geneTreeProposal(species_joined);
         
         if (_run_on_empty) {
             _generation++;
@@ -373,7 +403,7 @@ class Particle {
         _log_weight = _forest._gene_tree_log_weight;
     }
 
-    inline Particle::Particle(const Particle & other) {
+    inline Particle::Particle(const Particle & other):_forest("new") { // TODO: be careful - what is this doing?
         *this = other;
     }
 
@@ -465,8 +495,11 @@ class Particle {
     inline void Particle::initGeneForest(string newick, unsigned gene_number, map<string, string> taxon_map, Data::SharedPtr d) {
         assert (_name != "species");
         assert (my_rank == 0);
-        _forest.clear();
+        string gene_index = to_string(gene_number);
+        _name = "gene" + gene_index;
         _forest._index = gene_number;
+//        _forest.clear();
+        _forest.clearGeneForest();
         _forest.buildFromNewick(newick, true, false);
         _forest.resetLineages();
         _forest.refreshPreorder();
@@ -479,8 +512,6 @@ class Particle {
 //    }
 
     inline void Particle::initSpeciesForest(string newick) {
-        _forest.clear();
-        _t = _forest.buildFromNewickTopology(newick, false);
         _log_weight = 0.0;
         _species_log_weight = 0.0;
         _log_likelihood = 0.0;
@@ -489,6 +520,10 @@ class Particle {
         _species_tree_height = 0.0;
         _inf = false;
         _name = "species";
+        _forest._index = 0;
+//        _forest.clear();
+        _forest.clearSpeciesForest();
+        _t = _forest.buildFromNewickTopology(newick, false);
         if (_t.size() != Forest::_nspecies) {
             cout << "size of _t is " << _t.size() << endl;
             cout << "num species is " << Forest::_nspecies << endl;
@@ -544,10 +579,9 @@ class Particle {
     }
 
     inline void Particle::mapSpecies(map<string, string> &taxon_map, vector<string> &species_names, int n) {
-        _forest.setIndex(n);
-        
         //species tree
         if (n == 0) {
+            _forest.setIndex(n); // this has already been done for the gene trees
             _name = "species";
             _forest.setUpSpeciesForest(species_names);
         }
