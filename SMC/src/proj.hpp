@@ -1275,6 +1275,16 @@ namespace proj {
         }
         
 #else
+#if defined (TEST_COMBO)
+        // save all newicks
+        for (unsigned p=0; p<_nparticles; p++) {
+            string newick = gene_particles[p]->saveForestNewick();
+            _all_gene_newicks[gene_number-1].push_back(newick);
+        }
+        
+        string file_name = "gene" + to_string(gene_number)+ ".txt";
+        writeGeneTreeFile(file_name, gene_particles);
+#else
         // choose one set of gene trees to use
         Particle chosen_gene = *chooseTree(gene_particles, "g");
 
@@ -1284,6 +1294,7 @@ namespace proj {
 
         string file_name = "gene" + to_string(gene_number)+ ".txt";
         writeGeneTreeFile(file_name, gene_particles);
+#endif
         
 #endif
     }
