@@ -121,6 +121,7 @@ namespace proj {
             bool                        _use_first;
             bool                        _gene_first;
             vector<string>              _starting_gene_newicks;
+            vector<vector<string>>          _all_gene_newicks;
             string                      _starting_species_newick;
             bool                        _coal_like_only = false;
         
@@ -807,6 +808,7 @@ namespace proj {
     }
     
     inline void Proj::showFinal(vector<Particle::SharedPtr> species_particles) {
+        assert (my_rank == 0);
         // this function displays the final species trees
         unsigned nparticles = (int) species_particles.size();
         double sum_h = 0.0;
@@ -1393,6 +1395,21 @@ namespace proj {
         }
         
 #else
+#if defined (TEST_COMBO)
+        // save all newicks
+        for (unsigned p=0; p<_nparticles; p++) {
+            string newick = gene_particles[p]->saveForestNewick();
+            _all_gene_newicks[gene_number-1].push_back(newick);
+        }
+        
+        if (iteration == _niterations - 1) {
+            string file_name = "gene" + to_string(gene_number)+ ".log";
+            writeGeneTreeLoradFile(file_name, gene_particles, ntaxa);
+        }
+        
+        string file_name = "gene" + to_string(gene_number)+ ".txt";
+        writeGeneTreeFile(file_name, gene_particles);
+#else
         // choose one set of gene trees to use
         Particle chosen_gene = *chooseTree(gene_particles, "g");
 
@@ -1407,6 +1424,7 @@ namespace proj {
         
         string file_name = "gene" + to_string(gene_number)+ ".txt";
         writeGeneTreeFile(file_name, gene_particles);
+#endif
         
 #endif
         
@@ -1497,7 +1515,59 @@ os_signpost_event_emit(log_handle, signpost_id, "growGeneTrees", "Step %d of %d"
 
         assert (_starting_gene_newicks.size() == ngenes);
         assert (my_rank == 0);
-            
+        
+#if defined (TEST_COMBO)
+        for (unsigned p=0; p<nparticles*_species_particles_per_gene_particle; p++) {
+            if (p<nparticles) {
+                for (unsigned s=1; s<ngenes+1; s++) {
+                    unsigned rand_number = ::rng.randint(0, _nparticles-1);
+                    string newick = _all_gene_newicks[s-1][rand_number];
+                    if (newick == "") {
+                        throw XProj("my rank has 0 newick");
+                    }
+                    Particle chosen_particle("gene");
+                    chosen_particle.initGeneForest(newick,s,_taxon_map, _data);
+                    *particles[s][p] = chosen_particle;
+                }
+            }
+            else {
+                for (unsigned s=1; s<ngenes+1; s++) {
+                // add in null particles first
+                particles[s].push_back(Particle::SharedPtr(new Particle("gene")));
+                unsigned rand_number = ::rng.randint(0, _nparticles-1);
+                string newick = _all_gene_newicks[s-1][rand_number];
+                if (newick == "") {
+                    throw XProj("my rank has 0 newick");
+                }
+                Particle chosen_particle("gene");
+                chosen_particle.initGeneForest(newick,s,_taxon_map, _data);
+                *particles[s][p] = chosen_particle;
+                particles_2[s].push_back(Particle::SharedPtr(new Particle("gene")));
+            }
+            }
+        }
+    // increase size of species vector
+    for (unsigned p=nparticles; p<nparticles*_species_particles_per_gene_particle; p++) {
+        particles[0].push_back(Particle::SharedPtr(new Particle("species")));
+        particles_2[0].push_back(Particle::SharedPtr(new Particle("species")));
+    }
+
+
+
+        // for now, preserve all gene tree variation
+//        for (unsigned s=1; s<ngenes+1; s++) {
+//            for (unsigned p=0; p<_nparticles; p++) {
+//                string newick = _all_gene_newicks[s-1][p];
+//                if (newick == "") {
+//                    throw XProj("my rank has 0 newick");
+//                }
+//                Particle chosen_particle("gene");
+//                chosen_particle.initGeneForest(newick,s,_taxon_map, _data);
+//                *particles[s][p] = chosen_particle;
+//            }
+//        }
+        
+#else
         // initialize chosen gene trees
         for (unsigned s=1; s<ngenes+1; s++) {
             // fill in gene vector with the chosen gene
@@ -1526,6 +1596,7 @@ os_signpost_event_emit(log_handle, signpost_id, "growGeneTrees", "Step %d of %d"
             particles[0].push_back(Particle::SharedPtr(new Particle("species")));
             particles_2[0].push_back(Particle::SharedPtr(new Particle("species")));
         }
+#endif
         
         setUpForSpeciesFiltering(particles, ngenes, nparticles);
         
@@ -1612,14 +1683,12 @@ os_signpost_event_emit(log_handle, signpost_id, "growGeneTrees", "Step %d of %d"
             for (unsigned s=0; s<nsubsets+1; s++) {
                 unsigned nparticles = _nparticles;
                 for (unsigned i=0; i<nparticles; i++) {
-//                    my_vec_1[s][i] = Particle::SharedPtr(new Particle); // TODO: wasteful that this makes species trees with extra lineages
-//                    my_vec_2[s][i] = Particle::SharedPtr(new Particle);
                     if (s == 0) {
                         my_vec_1[s][i] = Particle::SharedPtr(new Particle("species"));
                         my_vec_2[s][i] = Particle::SharedPtr(new Particle("species"));
                         
                         my_vec_1[s][i]->setParticleType("species");
-                        my_vec_2[s][i]->setParticleType("species"); // TODO: need to set an index when creating these particles
+                        my_vec_2[s][i]->setParticleType("species");
                     }
                     else {
                         my_vec_1[s][i] = Particle::SharedPtr(new Particle("gene"));
@@ -1647,9 +1716,12 @@ os_signpost_event_emit(log_handle, signpost_id, "growGeneTrees", "Step %d of %d"
                 _starting_gene_newicks.clear();
                 _starting_gene_newicks.resize(nsubsets);
             }
+#if defined (TEST_COMBO)
+                _all_gene_newicks.resize(nsubsets);
+#endif
             
 #if defined(USING_MPI)
-                mpiSetSchedule(nsubsets); // TODO: need to set this earlier - make sure it works
+                mpiSetSchedule(nsubsets);
 #endif
                 
             if (_sample_from_gene_tree_prior) {
@@ -1745,6 +1817,10 @@ os_signpost_event_emit(log_handle, signpost_id, "growGeneTrees", "Step %d of %d"
                     // if _start == "gene", already sampled from the gene tree prior and saved the output
                     _starting_gene_newicks.clear();
                     _starting_gene_newicks.resize(nsubsets);
+#if defined (TEST_COMBO)
+                    _all_gene_newicks.clear();
+                    _all_gene_newicks.resize(nsubsets);
+#endif
                 }
                 
                 // filter gene trees
@@ -1838,9 +1914,16 @@ os_signpost_event_emit(log_handle, signpost_id, "growGeneTrees", "Step %d of %d"
                     
                    saveSelectedGeneTrees(nsubsets);
                     
+                    for (unsigned s=1; s<nsubsets+1; s++) {
+                        for (unsigned p=0; p<_nparticles; p++) {
+                            my_vec[s][p]->clear();
+                            my_vec_1[s][p]->clear();
+                            my_vec_2[s][p]->clear();
+                        }
+                    }
+                    
                     if (i < _niterations-1) {
                         output("\nGrowing species tree...\n");
-
                         growSpeciesTrees(my_vec, my_vec_1, my_vec_2, nsubsets, nspecies, nparticles); // grow and filter species trees conditional on selected gene trees
                         
                         output("\nChoosing species tree...\n");
@@ -1919,6 +2002,14 @@ os_signpost_event_emit(log_handle, signpost_id, "growGeneTrees", "Step %d of %d"
                     }
                 
                     saveSelectedGeneTrees(nsubsets);
+
+                for (unsigned s=1; s<nsubsets+1; s++) {
+                    for (unsigned p=0; p<_nparticles; p++) {
+                        my_vec[s][p]->clear();
+                        my_vec_1[s][p]->clear();
+                        my_vec_2[s][p]->clear();
+                    }
+                }
                 }
                     // build species trees
             

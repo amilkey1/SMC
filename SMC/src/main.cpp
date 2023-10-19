@@ -112,9 +112,9 @@ assert(signpost_id != OS_SIGNPOST_ID_INVALID);
         std::cerr << "Exception of unknown type!\n";
     }
     
-    ofstream memfile("allocs.txt");
+//    ofstream memfile("allocs.txt");
 //    ps.memoryReport(memfile);
-    memfile.close();
+//    memfile.close();
     
 #if defined(USING_MPI)
     MPI_Finalize();

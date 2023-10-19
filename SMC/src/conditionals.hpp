@@ -10,3 +10,7 @@
 //#define DEBUG_PARTIAL_STORE
 
 //#define USING_SIGNPOSTS
+
+//#define SNAKE
+
+#define TEST_COMBO

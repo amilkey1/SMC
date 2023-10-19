@@ -262,6 +262,54 @@ class Particle {
 
     inline void Particle::geneTreeProposal(vector<pair<tuple<string, string, string>, double>> species_joined) {
         assert(_name != "species");
+#if defined (SNAKE)
+        double prev_theta = Forest::_theta;
+        if (_name == "gene1") {
+            Forest::_theta *= 3.25926;
+        }
+        else if (_name == "gene2") {
+            Forest::_theta *= 0.64160;
+        }
+        else if (_name == "gene3") {
+            Forest::_theta *= 0.75517;
+        }
+        else if (_name == "gene4") {
+            Forest::_theta *= 0.98977;
+        }
+        else if (_name == "gene5") {
+            Forest::_theta *= 0.73621;
+        }
+        else if (_name == "gene6") {
+            Forest::_theta *= 1.45336;
+        }
+        else if (_name == "gene7") {
+            Forest::_theta *= 0.51891;
+        }
+        else if (_name == "gene8") {
+            Forest::_theta *= 1.77001;
+        }
+        else if (_name == "gene9") {
+            Forest::_theta *= 0.57665;
+        }
+        else if (_name == "gene10") {
+            Forest::_theta *= 0.54812;
+        }
+        else if (_name == "gene11") {
+            Forest::_theta *= 0.60184;
+        }
+        else if (_name == "gene12") {
+            Forest::_theta *= 0.54980;
+        }
+        else if (_name == "gene13") {
+            Forest::_theta *= 0.39104;
+        }
+        else if (_name == "gene14") {
+            Forest::_theta *= 0.45743;
+        }
+        else if (_name == "gene15") {
+            Forest::_theta *= 0.521570;
+        }
+#endif
         
         pair<double, string> species_info = _forest.chooseDelta(species_joined);
         _forest.geneTreeProposal(species_info, species_joined);
@@ -284,6 +332,9 @@ class Particle {
                 _generation++;
             }
         }
+#if defined (SNAKE)
+        Forest::_theta = prev_theta;
+#endif
     }
 
     inline double Particle::getLogWeight(string a) {
@@ -498,18 +549,13 @@ class Particle {
         string gene_index = to_string(gene_number);
         _name = "gene" + gene_index;
         _forest._index = gene_number;
-//        _forest.clear();
-        _forest.clearGeneForest();
+//        _forest.clearGeneForest();
         _forest.buildFromNewick(newick, true, false);
         _forest.resetLineages();
         _forest.refreshPreorder();
         _log_likelihood = 0.0;
         _log_weight = 0.0;
     }
-
-//    inline void Particle::clearPartials() {
-//        _forest.stowForestPartials();
-//    }
 
     inline void Particle::initSpeciesForest(string newick) {
         _log_weight = 0.0;
