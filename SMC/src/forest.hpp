@@ -3190,6 +3190,8 @@ class Forest {
         
         _extended_increment = 0.0;
         _deep_coalescent_increments.clear();
+        
+        
     }
 
     inline void Forest::geneTreeProposal(pair<double, string> species_info, vector<pair<tuple<string, string, string>, double>> _t) {

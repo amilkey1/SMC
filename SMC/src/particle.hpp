@@ -130,6 +130,7 @@ class Particle {
         vector<pair<tuple<string, string, string>, double>> _t;
         bool                                    _inf = false;
         string                                  _name;
+        double                                  _phi;
 };
 
     inline Particle::Particle(string type) : _forest(type) {
@@ -147,6 +148,7 @@ class Particle {
         _species_tree_height = 0.0;
         _species_tree_height = 0.0;
         _species_log_weight = 0.0;
+        _phi = 0.0;
     };
 
     inline Particle::~Particle() {
@@ -256,6 +258,7 @@ class Particle {
             _generation++;
             _log_weight = 0.0;
         }
+        
         
         return _log_weight;
     }
@@ -413,17 +416,20 @@ class Particle {
         assert (!_inf);
         
         double max_depth = 0.0;
+        _phi = 0.0;
 
         if (_forest._lineages.size() > 1) {
             max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
             max_depth -= _forest.getTreeHeight();
             // choose a species tree increment
         }
-        
+
         if (_forest._lineages.size() > 1) {
             assert (max_depth > 0.0);
             _forest.chooseSpeciesIncrement(max_depth);
             _species_tree_height += _forest._last_edge_length;
+            
+            _phi = log(1-exp(-1*max_depth*_forest._lineages.size()*Forest::_lambda));
         }
         
         if (_forest._lineages.size() == 1) {
@@ -447,6 +453,7 @@ class Particle {
             }
             assert (!_inf);
         }
+        _species_log_weight += _phi;
     }
 
     inline void Particle::calcParticleWeight() {
@@ -842,5 +849,6 @@ class Particle {
         _inf = other._inf;
         _species_log_weight = other._species_log_weight;
         _name = other._name;
+        _phi = other._phi;
     };
 }
