@@ -143,6 +143,24 @@ class Particle {
     inline double Particle::proposal() {
         string event;
         tuple<string, string, string> t = make_tuple("null", "null", "null");
+        
+        
+        // TODO: choose speciation or coalescent event and increment
+        // TODO: make that proposal
+        // TODO: speciation: choose species to join, calculate Felsenstein likelihood - weights will be 1
+        // TODO: coalescence: choose taxa to join, calculate Felseinstein likelihood
+        // TODO: resample particles
+        
+        double total_rate = 0.0;
+        vector<double> rates;
+        
+        for (int i=0; i<_forests.size(); i++) {
+            double individual_rate = _forests[i]._lineages.size(); // TODO: does this get broken down by species?
+            rates.push_back(individual_rate);
+            total_rate += individual_rate;
+        }
+    
+        
         if (_generation == 0) {
             _forests[0].chooseSpeciesIncrement();
             for (unsigned i=1; i<_forests.size(); i++){
