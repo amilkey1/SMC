@@ -70,13 +70,15 @@ class Particle {
         Data::SharedPtr                         _data;
         double                                  _log_likelihood;
         int                                     _generation = 0;
-    vector<tuple<string, string, string>> _triple;
+        double                                  _particle_coalescent_likelihood;
+        vector<tuple<string, string, string>> _triple;
 };
 
     inline Particle::Particle() {
         //log weight and log likelihood are 0 for first generation
         _log_weight = 0.0;
         _log_likelihood = 0.0;
+        _particle_coalescent_likelihood = 0.0;
     };
 
     inline void Particle::showParticle() {
@@ -88,6 +90,7 @@ class Particle {
         cout << "\n";
         for (auto &_forest:_forests) {
             _forest.showForest();
+            cout << "coalescent likelihood: " << _forest._gene_tree_log_coalescent_likelihood << endl;
         }
     }
 
@@ -126,6 +129,7 @@ class Particle {
             assert(!isnan (log_likelihood));
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
+            log_likelihood += _forests[i]._gene_tree_log_likelihood;
         }
         _generation++;
         
@@ -138,10 +142,12 @@ class Particle {
 
     inline double Particle::proposal() {
         string event;
+        tuple<string, string, string> t = make_tuple("null", "null", "null");
         if (_generation == 0) {
             _forests[0].chooseSpeciesIncrement();
             for (unsigned i=1; i<_forests.size(); i++){
-                _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length);
+                _forests[i]._gene_tree_log_coalescent_likelihood = 0.0;
+                _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length); // TODO: can combine with gene tree proposal
             }
         }
         else if (_forests[0]._lineages.size()==1) {
@@ -158,12 +164,12 @@ class Particle {
                     _forests[0].addSpeciesIncrement();
                 }
                 for (unsigned i=1; i<_forests.size(); i++) {
-                    _forests[i].hybridizeGene(hybridized_nodes, _forests[0]._last_edge_length);
+                    _forests[i].hybridizeGene(hybridized_nodes, _forests[0]._last_edge_length, "");
                 }
                 calculateGamma();
             }
             else if (event == "speciation") {
-                tuple<string, string, string> t = _forests[0].speciesTreeProposal();
+                t = _forests[0].speciesTreeProposal();
                 if (_forests[0]._lineages.size()>1) {
                     _forests[0].addSpeciesIncrement();
                 }
@@ -172,9 +178,22 @@ class Particle {
                 }
             }
         }
-        double prev_log_likelihood = _log_likelihood;
+        
         _log_likelihood = calcLogLikelihood();
-        _log_weight = _log_likelihood - prev_log_likelihood;
+                
+        double prev_log_likelihood = _log_likelihood;
+        if (Forest::_proposal == "prior-prior") {
+            _log_weight = _log_likelihood - prev_log_likelihood;
+        }
+        else {
+            for (int i=1; i<_forests.size(); i++) {
+                _log_weight += _forests[i]._gene_tree_log_weight;
+            }
+            _generation++;
+        }
+        
+        // TODO: check coalescent likelihood is correct
+        // TODO: weights are different for prior-post
         
         return _log_weight;
     }
@@ -298,5 +317,6 @@ class Particle {
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;
         _triple         = other._triple;
+        _particle_coalescent_likelihood = other._particle_coalescent_likelihood;
     };
 }

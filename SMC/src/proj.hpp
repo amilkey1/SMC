@@ -684,6 +684,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         proposeParticles(my_vec);
                         
                         double ess_inverse = 0.0;
+//                        for (auto &p:my_vec) {
+//                            p.showSpeciesTree();
+//                        }
                         normalizeWeights(my_vec);
                         
                         for (auto & p:my_vec) {
@@ -691,8 +694,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         }
                         
                         double ess = 1.0/ess_inverse;
+                        cout << "ESS is : " << ess << endl;
                         
-                        if (ess < 100) {
+//                        if (ess < 100) {
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                             //if use_first is true, my_vec = my_vec_2
                             //if use_first is false, my_vec = my_vec_1
@@ -701,7 +705,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
                             //change use_first from true to false or false to true
                             use_first = !use_first;
-                        }
+//                        }
                         resetWeights(my_vec);
                         _accepted_particle_vec = my_vec;
                         
@@ -709,18 +713,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                             my_vec[0].showParticle();
                         }
                     } // g loop
-                    Forest f;
-                    cout << sizeof(f) << endl;
-                    Data d;
-                    cout << sizeof(d) << endl;
-                    Particle p;
-                    cout << sizeof(p) << endl;
-                    double x = 10.0;
-                    char c;
-                    cout << sizeof(c) << endl;
-                    cout << sizeof(x) << endl;
-                    int j = 1.0;
-                    cout << sizeof(j) << endl;
+                    
                     saveAllHybridNodes(my_vec);
 //                    for (auto &p:my_vec) {
 //                        p.showHybridNodes();
