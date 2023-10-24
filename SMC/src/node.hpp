@@ -1,10 +1,11 @@
-#pragma once    
+#pragma once
 
 #include <string>
 #include <vector>
 #include  <iostream>
 #include "split.hpp"
 #include "partial_store.hpp"
+#include "conditionals.hpp"
 
 namespace proj {
 
@@ -28,12 +29,13 @@ namespace proj {
                     std::string         getName()                   {return _name;}
                     Split               getSplit()                  {return _split;}
 
-                    double              getEdgeLength() const       {return _edge_length;}
+                    double              getEdgeLength()             {return _edge_length;}
                     void                setEdgeLength(double v);
         
                     unsigned            countChildren() const;
+
                     void                clearPointers()             {_left_child = _right_sib = _parent = 0;}
-            void                        resetNode();
+            void                resetNode();
                                         
             static const double _smallest_edge_length;
 
@@ -66,8 +68,7 @@ namespace proj {
             PartialStore::partial_t _partial;
             int                 _position_in_lineages;
             bool                _visited = false;
-            std::string         _hybrid_newick_name;
-            unsigned            _n_descendants;
+        std::string              _hybrid_newick_name;
     };
     
     
@@ -80,15 +81,14 @@ namespace proj {
         //std::cout << "Destroying Node object" << std::endl;
     }
 
-    inline void Node::clear() { 
+    inline void Node::clear() {
         _flags = 0;
-        clearPointers();         
+        clearPointers();
         _number = -1;
         _name = "";
         _edge_length = _smallest_edge_length;
-        _n_descendants = 0;
         _partial.reset();
-    }   
+    }
 
     inline void Node::setEdgeLength(double v) {
         _edge_length = (v < _smallest_edge_length ? _smallest_edge_length : v);
@@ -107,3 +107,4 @@ namespace proj {
         _right_sib=0;
     }
 }
+

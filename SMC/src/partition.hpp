@@ -10,6 +10,7 @@
 #include "genetic_code.hpp"
 #include "datatype.hpp"
 #include "xproj.hpp"
+#include "conditionals.hpp"
 
 namespace proj {
 
@@ -43,7 +44,7 @@ namespace proj {
             subset_sizes_vect_t                         calcSubsetSizes() const;
 
             void                                        defaultPartition(unsigned nsites = std::numeric_limits<unsigned>::max());
-            void                                        parseSubsetDefinition(std::string & s, unsigned rank);
+            void                                        parseSubsetDefinition(std::string & s);
             void                                        finalize(unsigned nsites);
 
             void                                        clear();
@@ -165,7 +166,7 @@ namespace proj {
         _subset_ranges.push_back(std::make_tuple(1, _infinity, 1, 0));
     }    ///end_clear
     
-    inline void Partition::parseSubsetDefinition(std::string & s, unsigned rank) {
+    inline void Partition::parseSubsetDefinition(std::string & s) {
         std::vector<std::string> v;
         
         // first separate part before colon (stored in v[0]) from part after colon (stored in v[1])
@@ -240,9 +241,7 @@ namespace proj {
         _num_subsets = (unsigned)_subset_names.size();
         addSubset(_num_subsets - 1, subset_definition);
 
-        if (rank == 0) {
-            std::cout << boost::str(boost::format("Partition subset %s comprises sites %s and has type %s") % subset_name % subset_definition % datatype) << std::endl;
-        }
+        std::cout << boost::str(boost::format("Partition subset %s comprises sites %s and has type %s") % subset_name % subset_definition % datatype) << std::endl;
     }
     
     inline void Partition::addSubset(unsigned subset_index, std::string subset_definition) {
@@ -291,7 +290,7 @@ namespace proj {
             try {
                 int_value = std::stoi(str_value);
             }
-            catch(std::invalid_argument &) {
+            catch(std::invalid_argument) {
                 throw XProj(boost::format("Could not interpret \"%s\" as a number in partition subset definition") % s.str());
             }
             
@@ -349,3 +348,4 @@ namespace proj {
         return _num_subsets;
     }
 }
+

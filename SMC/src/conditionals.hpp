@@ -1,7 +1,7 @@
 //# define USING_MPI
-#if defined(USING_MPI)
-#   include <mpi.h>
-#endif
+//#if defined(USING_MPI)
+//#   include <mpi.h>
+//#endif
 
 //#define GENE_TREE_COALESCENT_LIKELIHOOD
 
@@ -13,4 +13,4 @@
 
 //#define SNAKE
 
-#define TEST_COMBO
+//#define TEST_COMBO
