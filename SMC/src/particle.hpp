@@ -17,6 +17,7 @@ class Particle {
 
         Particle();
         Particle(const Particle & other);
+        typedef std::shared_ptr<Particle>               SharedPtr;
 
         void                                    debugParticle(std::string name);
         void                                    showParticle();
@@ -40,15 +41,18 @@ class Particle {
         void                                    setLogWeight(double w){_log_weight = w;}
         void                                    operator=(const Particle & other);
         const vector<Forest> &                  getForest() const {return _forests;}
-        std::string                             saveForestNewick() {
-            return _forests[0].makeNewick(8, true);
-        }
-        bool operator<(const Particle & other) const {
-            return _log_weight<other._log_weight;
+        string                             saveForestNewick() {
+            return _forests[0].makeNewick(8, true);}
+            
+            string                             saveGeneNewick(unsigned i) {
+            return _forests[i].makeNewick(8, true);}
+    
+        bool operator<(const Particle::SharedPtr & other) const {
+            return _log_weight<other->_log_weight;
         }
 
-        bool operator>(const Particle & other) const {
-            return _log_weight>other._log_weight;
+        bool operator>(const Particle::SharedPtr & other) const {
+            return _log_weight>other->_log_weight;
         }
 
         static void                                     setNumSubsets(unsigned n);
@@ -61,6 +65,9 @@ class Particle {
         void                                            showGamma();
         string                                          saveGamma();
         void                                            calculateGamma();
+        int                                             selectPair(vector<double> weight_vec);
+        double                                          getTopologyPrior(unsigned i);
+        vector<pair<double, double>>                     getIncrementPriors(unsigned i);
 
     private:
 
@@ -70,15 +77,15 @@ class Particle {
         Data::SharedPtr                         _data;
         double                                  _log_likelihood;
         int                                     _generation = 0;
-        double                                  _particle_coalescent_likelihood;
         vector<tuple<string, string, string>> _triple;
+        unsigned                                _prev_forest_number;
 };
 
     inline Particle::Particle() {
         //log weight and log likelihood are 0 for first generation
         _log_weight = 0.0;
         _log_likelihood = 0.0;
-        _particle_coalescent_likelihood = 0.0;
+        _prev_forest_number = -1;
     };
 
     inline void Particle::showParticle() {
@@ -90,7 +97,6 @@ class Particle {
         cout << "\n";
         for (auto &_forest:_forests) {
             _forest.showForest();
-            cout << "coalescent likelihood: " << _forest._gene_tree_log_coalescent_likelihood << endl;
         }
     }
 
@@ -131,87 +137,123 @@ class Particle {
             log_likelihood += gene_tree_log_likelihood;
             log_likelihood += _forests[i]._gene_tree_log_likelihood;
         }
-        _generation++;
-        
-        // set _generation for each forest
-        for (int i=0; i < (int) _forests.size(); i++ ){
-            _forests[i].setGeneration(_generation);
+        if (_generation == 0) {
+            _log_weight = log_likelihood;
         }
+
         return log_likelihood;
     }
 
     inline double Particle::proposal() {
-        string event;
-        tuple<string, string, string> t = make_tuple("null", "null", "null");
-        
-        
-        // TODO: choose speciation or coalescent event and increment
-        // TODO: make that proposal
-        // TODO: speciation: choose species to join, calculate Felsenstein likelihood - weights will be 1
-        // TODO: coalescence: choose taxa to join, calculate Felseinstein likelihood
-        // TODO: resample particles
-        
-        double total_rate = 0.0;
-        vector<double> rates;
+        vector<double> forest_rates; // this vector contains total rate of species tree, gene 1, etc.
+        vector<vector<double>> gene_forest_rates; // this vector contains rates by species for each gene forest
+        gene_forest_rates.resize(_forests.size()-1);
+        vector<unsigned> event_choice_index;
+        vector<string> event_choice_name;
         
         for (int i=0; i<_forests.size(); i++) {
-            double individual_rate = _forests[i]._lineages.size(); // TODO: does this get broken down by species?
-            rates.push_back(individual_rate);
-            total_rate += individual_rate;
+            if (i > 0) {
+                vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate();
+                double total_gene_rate = 0.0;
+                for (auto &r:rates_by_species) {
+                    gene_forest_rates[i-1].push_back(r.first);
+                    event_choice_name.push_back(r.second);
+                    total_gene_rate += r.first;
+                    event_choice_index.push_back(i);
+                }
+                forest_rates.push_back(total_gene_rate);
+            }
+            else {
+                if (_forests[0]._lineages.size() > 1) {
+                    forest_rates.push_back(Forest::_speciation_rate * _forests[0]._lineages.size()); // TODO: lambda or theta?
+                    event_choice_index.push_back(0);
+                    event_choice_name.push_back("species");
+                }
+            }
         }
     
+        double total_rate = 0.0;
+        for (auto &r:forest_rates) {
+            total_rate += r;
+        }
         
-        if (_generation == 0) {
-            _forests[0].chooseSpeciesIncrement();
-            for (unsigned i=1; i<_forests.size(); i++){
-                _forests[i]._gene_tree_log_coalescent_likelihood = 0.0;
-                _forests[i].firstGeneTreeProposal(_forests[0]._last_edge_length); // TODO: can combine with gene tree proposal
+        // draw an increment
+        double increment = rng.gamma(1.0, 1.0/(total_rate));
+        
+        // add increment to all nodes in all forests
+        for (int i=0; i<_forests.size(); i++) {
+            if (_forests[i]._lineages.size() > 1) {
+                _forests[i].addIncrement(increment); // if forest is finished, don't add another increment
             }
-        }
-        else if (_forests[0]._lineages.size()==1) {
-            for (unsigned i=1; i<_forests.size(); i++) {
-                list<Node*> lineages_list(_forests[i]._lineages.begin(), _forests[i]._lineages.end());
-                _forests[i].fullyCoalesceGeneTree(lineages_list);
-            }
-        }
-        else {
-            event = _forests[0].chooseEvent();
-            if (event == "hybridization") {
-                vector<string> hybridized_nodes = _forests[0].hybridizeSpecies();
-                if (_forests[0]._lineages.size()>1) {
-                    _forests[0].addSpeciesIncrement();
-                }
-                for (unsigned i=1; i<_forests.size(); i++) {
-                    _forests[i].hybridizeGene(hybridized_nodes, _forests[0]._last_edge_length, "");
-                }
-                calculateGamma();
-            }
-            else if (event == "speciation") {
-                t = _forests[0].speciesTreeProposal();
-                if (_forests[0]._lineages.size()>1) {
-                    _forests[0].addSpeciesIncrement();
-                }
-                for (unsigned i=1; i<_forests.size(); i++){
-                    _forests[i].geneTreeProposal(t, _forests[0]._last_edge_length);
-                }
+            else {
+                _forests[i]._done = true;
             }
         }
         
-        _log_likelihood = calcLogLikelihood();
-                
-        double prev_log_likelihood = _log_likelihood;
-        if (Forest::_proposal == "prior-prior") {
-            _log_weight = _log_likelihood - prev_log_likelihood;
+        vector<double> event_choice_rates;
+        if (_forests[0]._lineages.size() > 1) {
+            event_choice_rates.push_back(forest_rates[0]); // push back species tree rate
         }
-        else {
+        for (int i=0; i<gene_forest_rates.size(); i++) {
+            for (auto &r:gene_forest_rates[i]) {
+                event_choice_rates.push_back(r);
+            }
+        }
+        
+        // choose an event
+        for (auto &p:event_choice_rates) {
+             p = log(p/total_rate);
+         }
+        unsigned index = selectPair(event_choice_rates);
+        unsigned forest_number = event_choice_index[index];
+        string species_name = event_choice_name[index];
+        if (species_name == "species") {
+            // species tree proposal, need to update species partition in all gene forests
+            assert (index == 0);
+            assert (forest_number == 0);
+            tuple <string, string, string> species_joined = _forests[0].speciesTreeProposal();
             for (int i=1; i<_forests.size(); i++) {
-                _log_weight += _forests[i]._gene_tree_log_weight;
+                // reset species partitions for all gene forests
+                _forests[i].updateSpeciesPartition(species_joined);
             }
-            _generation++;
+        }
+        else {
+            _forests[forest_number].allowCoalescence(species_name, _log_likelihood, increment);
         }
         
-        // TODO: check coalescent likelihood is correct
-        // TODO: weights are different for prior-post
+        for (int f=0; f<_forests.size(); f++) {
+            bool new_increment = false;
+            bool coalescence = false;
+            bool gene_tree = false;
+            
+            if (f == _prev_forest_number) {
+                // add to existing increment + prior
+                new_increment = true;
+            }
+            if (f == forest_number) {
+                coalescence = true;
+            }
+            if (_generation == 0) {
+                new_increment = true;
+            }
+            if (f > 0) {
+                gene_tree = true;
+            }
+            
+            _forests[f].calcIncrementPrior(increment, species_name, new_increment, coalescence, gene_tree);
+        }
+                
+        if (species_name != "species") {
+            _log_weight = _forests[forest_number]._gene_tree_log_weight;
+//            cout << "log weight is " << _log_weight << endl;
+        }
+        else {
+            // species log weight is always 1
+            _log_weight = 1.0;
+        }
+        
+        _prev_forest_number = forest_number;
+        _generation++;
         
         return _log_weight;
     }
@@ -327,6 +369,30 @@ class Particle {
         }
     }
 
+    inline int Particle::selectPair(vector<double> weight_vec) {
+        // choose a random number [0,1]
+        double u = rng.uniform();
+        double cum_prob = 0.0;
+        int index = 0.0;
+        for (int i=0; i < (int) weight_vec.size(); i++) {
+            cum_prob += exp(weight_vec[i]);
+            if (u <= cum_prob) {
+                index = i;
+                break;
+            }
+        }
+        // return index of choice
+        return index;
+    }
+
+    inline double Particle::getTopologyPrior(unsigned i) {
+        return _forests[i]._log_joining_prob;
+    }
+
+    inline vector<pair<double, double>> Particle::getIncrementPriors(unsigned i) {
+        return _forests[i]._increments_and_priors;
+    }
+
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_likelihood = other._log_likelihood;
@@ -335,7 +401,7 @@ class Particle {
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;
         _triple         = other._triple;
-        _particle_coalescent_likelihood = other._particle_coalescent_likelihood;
+        _prev_forest_number = other._prev_forest_number;
     };
 }
 
