@@ -761,8 +761,6 @@ class Forest {
     }
 
     inline double Forest::calcLogLikelihood() {
-        auto data_matrix=_data->getDataMatrix();
-
         //calc likelihood for each lineage separately
         auto &counts = _data->getPatternCounts();
         _gene_tree_log_likelihood = 0.0;
@@ -785,14 +783,9 @@ class Forest {
     }
 
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, string species_name, double prev_log_likelihood) {
-        
          _node_choices.clear();
          _log_likelihood_choices.clear();
          _gene_tree_log_weight = 0.0;
-        
-//        double other_gene_log_likelihood = prev_particle_likelihood - _gene_tree_log_likelihood;
-//        double prev_log_likelihood = calcLogLikelihood();
-//        double prev_log_likelihood = prev_log_likelihood;
         
          // choose pair of nodes to try
          for (unsigned i = 0; i < node_list.size()-1; i++) {
@@ -1388,7 +1381,8 @@ inline string Forest::chooseEvent() {
         
 //        double prev_log_likelihood = 0.0; // start at 0 if nothing has been joined
 //        if (_lineages.size() != _ntaxa) {
-            double prev_log_likelihood = calcLogLikelihood();
+//            double prev_log_likelihood = calcLogLikelihood();
+        double prev_log_likelihood = _gene_tree_log_likelihood;
 //        }
         
         assert (s > 1);
@@ -1467,47 +1461,9 @@ inline string Forest::chooseEvent() {
         }
         
         if (_proposal == "prior-prior" || one_choice) { // TODO: prior-post one choice - log weight is just log likelihood?
-//            double prev_log_likelihood = prev_particle_likelihood;
-//            double prev_log_likelihood = _gene_tree_log_likelihood;
             _gene_tree_log_likelihood = calcLogLikelihood();
-//            double other_species_log_likelihood = prev_particle_likelihood - prev_log_likelihood;
             _gene_tree_log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
-
-//            vector<double> choice;
-//            choice.push_back(_gene_tree_log_likelihood);
-            // don't need to recalculate this for prior-post with >1 choice
-            
-//            vector<double> log_weight = reweightChoices(choice, prev_log_likelihood);
-//            double log_weight_choices_sum = getRunningSumChoices(log_weight);
-//            _gene_tree_log_weight = log_weight_choices_sum;
         }
-        
-        // calculate increment prior
-//        double log_increment_prior = 0.0;
-//        for (auto &s:_species_partition) {
-//            bool coalescence = false;
-//            if (s.first == species_name) {
-//                coalescence = true;
-//            }
-//            else {
-//                coalescence = false;
-//            }
-//
-//            if (coalescence) {
-//                // if there is coalescence, need to use number of lineages before the join
-//                double coalescence_rate = (s.second.size()+1)*(s.second.size()) / _theta;
-//                assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
-//                double nChooseTwo = (s.second.size()+1)*(s.second.size());
-//                double log_prob_join = log(2/nChooseTwo);
-//                log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate) + log_prob_join;
-//            }
-//            else {
-//                // no coalescence
-//                double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
-//                log_increment_prior -= increment*coalescence_rate;
-//            }
-//        }
-//        _increments_and_priors.push_back(make_pair(increment, log_increment_prior));
     }
 
     inline void Forest::refreshPreorder() {
@@ -1528,28 +1484,28 @@ inline string Forest::chooseEvent() {
     }
 
 
-//    inline void Forest::debugForest() {
-//        cout << "debugging forest" << endl;
-//        for (auto &node : _nodes) {
-//            cout << "   node number " << node._number << " ";
-//            if (node._left_child) {
-//                cout << node._left_child->_number << " ";
-//
-//                if (node._left_child->_right_sib) {
-//                    cout << node._left_child->_right_sib->_number << " ";
-//                }
-//            }
-//            else (cout << " - - ");
-//
-//            if (node._partial!=nullptr) {
-//                cout << " * ";
-//            }
-//            cout << endl;
-//        }
-//        cout << "   _nleaves " << _nleaves << " ";
-//        cout << "   _ninternals " << _ninternals << " ";
-//        cout << endl;
-//    }
+    inline void Forest::debugForest() {
+        cout << "debugging forest" << endl;
+        for (auto &node : _nodes) {
+            cout << "   node number " << node._number << " ";
+            if (node._left_child) {
+                cout << node._left_child->_number << " ";
+
+                if (node._left_child->_right_sib) {
+                    cout << node._left_child->_right_sib->_number << " ";
+                }
+            }
+            else (cout << " - - ");
+
+            if (node._partial!=nullptr) {
+                cout << " * ";
+            }
+            cout << endl;
+        }
+        cout << "   _nleaves " << _nleaves << " ";
+        cout << "   _ninternals " << _ninternals << " ";
+        cout << endl;
+    }
 
     inline void Forest::updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode) {
         // Delete delnode1 from node_vector
