@@ -823,6 +823,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     //run through each generation of particles
                     
                     for (unsigned g=0; g<nspecies-1+(ntaxa-1)*nsubsets; g++){
+                        cout << "starting step " << g << " of " << nspecies-1+(ntaxa-1)*nsubsets-1 << endl;
                         //taxon joining and reweighting step
                         proposeParticles(my_vec);
                         
