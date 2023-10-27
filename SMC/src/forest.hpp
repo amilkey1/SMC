@@ -136,6 +136,7 @@ class Forest {
         double                      _log_joining_prob;
         vector<pair<double, double>> _increments_and_priors;
         bool                        _done;
+        double                      _log_coalescent_likelihood;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -143,7 +144,6 @@ class Forest {
         void                        setNewEdgeLength(double difference, Node* taxon_to_migrate, string key_to_add);
         void                        hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment, string species_name);
         void                        resetToMinor(vector<Node*> minor_nodes, vector<Node*> minor_left_children, vector<Node*> minor_right_children, vector<double> minor_left_edge_lengths, vector<double> minor_right_edge_lengths);
-        double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
         double                      getTreeHeight();
         double                      getLineageHeight(Node* nd);
         int                         _nincrements = 0;
@@ -194,6 +194,7 @@ class Forest {
         _prev_gene_tree_log_likelihood = 0.0;
         _log_joining_prob = 0.0;
         _done = false;
+        _log_coalescent_likelihood = 0.0;
 
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -1045,6 +1046,7 @@ class Forest {
         _log_joining_prob = other._log_joining_prob;
         _increments_and_priors = other._increments_and_priors;
         _done = other._done;
+        _log_coalescent_likelihood = other._log_coalescent_likelihood;
 
         // copy tree itself
 
@@ -1338,6 +1340,7 @@ inline string Forest::chooseEvent() {
                     _increments_and_priors.back().first += increment;
                     _increments_and_priors.back().second += log_increment_prior;
                 }
+                _log_coalescent_likelihood += log_increment_prior;
             }
         
             else {
@@ -1350,7 +1353,7 @@ inline string Forest::chooseEvent() {
                     log_increment_prior = log(rate) - (increment*rate) + log_prob_join;
                 }
                 else {
-                    double rate = _speciation_rate*(_lineages.size()); // need to add 1 since lineages already joined
+                    double rate = _speciation_rate*(_lineages.size());
                     // calculate increment prior
                     log_increment_prior = - (increment*rate);
                 }
@@ -1379,13 +1382,7 @@ inline string Forest::chooseEvent() {
         unsigned s = (unsigned) nodes.size();
         calcTopologyPrior(s);
         
-//        double prev_log_likelihood = 0.0; // start at 0 if nothing has been joined
-//        if (!first) {
-//        if (_lineages.size() != _ntaxa) {
-//            prev_log_likelihood = calcLogLikelihood();
-            double prev_log_likelihood = _gene_tree_log_likelihood;
-//            }
-//        }
+        double prev_log_likelihood = _gene_tree_log_likelihood;
         
         assert (s > 1);
         bool one_choice = false;
@@ -1462,7 +1459,7 @@ inline string Forest::chooseEvent() {
             }
         }
         
-        if (_proposal == "prior-prior" || one_choice) { // TODO: prior-post one choice - log weight is just log likelihood?
+        if (_proposal == "prior-prior" || one_choice) {
             _gene_tree_log_likelihood = calcLogLikelihood();
             _gene_tree_log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
         }
@@ -1484,7 +1481,6 @@ inline string Forest::chooseEvent() {
                break;
        }   // end while loop
     }
-
 
     inline void Forest::debugForest() {
         cout << "debugging forest" << endl;

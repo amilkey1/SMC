@@ -7,6 +7,7 @@ using namespace std;
 using namespace boost;
 
 #include "lot.hpp"
+#include "conditionals.hpp"
 
 extern proj::Lot rng;
 
@@ -68,7 +69,8 @@ class Particle {
         void                                            calculateGamma();
         int                                             selectPair(vector<double> weight_vec);
         double                                          getTopologyPrior(unsigned i);
-        vector<pair<double, double>>                     getIncrementPriors(unsigned i);
+        vector<pair<double, double>>                    getIncrementPriors(unsigned i);
+        double                                          getCoalescentLikelihood(unsigned g);
 
     private:
 
@@ -169,6 +171,53 @@ class Particle {
         
         for (int i=0; i<_forests.size(); i++) {
             if (i > 0) {
+#if defined (SNAKE)
+                if (i == 1) {
+                    Forest::_theta *= 3.25926;
+                }
+                else if (i == 2) {
+                    Forest::_theta *= 0.64160;
+                }
+                else if (i == 3) {
+                    Forest::_theta *= 0.75517;
+                }
+                else if (i == 4) {
+                    Forest::_theta *= 0.98977;
+                }
+                else if (i == 5) {
+                    Forest::_theta *= 0.73621;
+                }
+                else if (i == 6) {
+                    Forest::_theta *= 1.45336;
+                }
+                else if (i == 7) {
+                    Forest::_theta *= 0.51891;
+                }
+                else if (i == 8) {
+                    Forest::_theta *= 1.77001;
+                }
+                else if (i == 9) {
+                    Forest::_theta *= 0.57665;
+                }
+                else if (i == 10) {
+                    Forest::_theta *= 0.54812;
+                }
+                else if (i == 11) {
+                    Forest::_theta *= 0.60184;
+                }
+                else if (i == 12) {
+                    Forest::_theta *= 0.54980;
+                }
+                else if (i == 13) {
+                    Forest::_theta *= 0.39104;
+                }
+                else if (i == 14) {
+                    Forest::_theta *= 0.45743;
+                }
+                else if (i == 15) {
+                    Forest::_theta *= 0.52157;
+                }
+#endif
                 vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate();
                 double total_gene_rate = 0.0;
                 for (auto &r:rates_by_species) {
@@ -178,6 +227,9 @@ class Particle {
                     event_choice_index.push_back(i);
                 }
                 forest_rates.push_back(total_gene_rate);
+#if defined (SNAKE)
+                Forest::_theta = 0.001;
+#endif
             }
             else {
                 if (_forests[0]._lineages.size() > 1) {
@@ -411,6 +463,11 @@ class Particle {
 
     inline vector<pair<double, double>> Particle::getIncrementPriors(unsigned i) {
         return _forests[i]._increments_and_priors;
+    }
+
+    inline double Particle::getCoalescentLikelihood(unsigned g) {
+        assert (g>0); // no coalescent likelihood for species tree
+        return _forests[g]._log_coalescent_likelihood;
     }
 
     inline void Particle::operator=(const Particle & other) {

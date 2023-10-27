@@ -37,6 +37,7 @@ namespace proj {
             void                saveAllForests(vector<Particle::SharedPtr> &v) const ;
             void                saveSpeciesTrees();
             void                saveGeneTrees(unsigned ngenes);
+            void                saveGeneTree(unsigned gene_number);
             void                writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa);
             void                normalizeWeights(vector<Particle::SharedPtr> & particles);
             unsigned            chooseRandomParticle(vector<Particle::SharedPtr> & particles, vector<double> & cum_prob);
@@ -153,6 +154,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 logf << "\t" << "log_gene_increment_prior";
             }
         }
+        logf << "\t" << "coalescent_likelihood";
         logf << endl;
         
         unsigned iter = 0;
@@ -171,8 +173,17 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 //                    increments_and_priors.push_back(b);
                     logf << "\t" << b.first;
                     logf << "\t" << b.second;
+                    // no increment or increment prior should be 0
+                    assert (b.first > 0.0);
+                    assert (b.second != 0.0);
                 }
             }
+            
+            double log_coalescent_likelihood = 0.0;
+            for (unsigned g=1; g<ngenes+1; g++) {
+                log_coalescent_likelihood += p->getCoalescentLikelihood(g);
+            }
+            logf << "\t" << log_coalescent_likelihood;
             
             logf << endl;
         }
@@ -202,6 +213,20 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             treef << endl;
         }
         treef << "end;\n";
+        treef.close();
+    }
+
+    inline void Proj::saveGeneTree (unsigned gene_number) {
+        string name = "gene" + to_string(gene_number) + ".trees";
+        ofstream treef(name);
+        treef << "#nexus\n\n";
+        treef << "begin trees;\n";
+        for (auto &p:_accepted_particle_vec) {
+            treef << "  tree test = [&R] " << p->saveGeneNewick(gene_number)  << ";\n";
+            treef << endl;
+        }
+        treef << "end;\n";
+        
         treef.close();
     }
 
@@ -847,7 +872,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             } // z loop - theta or speciation rate
 //            showFinal(_accepted_particle_vec);
             saveSpeciesTrees();
-            saveGeneTrees(nsubsets);
+//            saveGeneTrees(nsubsets);
+            for (int i=1; i < nsubsets+1; i++) {
+                saveGeneTree(i);
+            }
             writeLoradFile(nsubsets, nspecies, ntaxa);
             
             cout << "marginal likelihood: " << _log_marginal_likelihood << endl;
