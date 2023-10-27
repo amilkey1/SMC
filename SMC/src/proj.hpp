@@ -160,7 +160,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << iter;
             iter++;
             
-            logf << "\t" << p->calcLogLikelihood();
+            logf << "\t" << p->getLogLikelihood();
             
             for (unsigned g=0; g<ngenes+1; g++) {
                 logf << "\t" << p->getTopologyPrior(g);
@@ -717,7 +717,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         cout << "Number of threads: " << _nthreads << endl;
 
         try {
-            // TODO: change particles to sharedptr
             std::cout << "\n*** Reading and storing the data in the file " << _data_file_name << std::endl;
             std::cout << "data file name is " << _data_file_name << std::endl;
             _data = Data::SharedPtr(new Data());
@@ -782,7 +781,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 }
 
                     bool use_first = true;
-                    for (auto & p:my_vec ) { // TODO: particles don't enter constructor? should be initialized with null forests
+                    for (auto & p:my_vec ) {
                         p->setData(_data, _taxon_map);
                         p->mapSpecies(_taxon_map, _species_names);
                     }

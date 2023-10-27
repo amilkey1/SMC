@@ -36,6 +36,7 @@ class Particle {
         void                                    saveForest(std::string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
+        double                                  getLogLikelihood();
         double                                  calcHeight();
         double                                  getLogWeight() const {return _log_weight;}
         void                                    setLogWeight(double w){_log_weight = w;}
@@ -135,7 +136,22 @@ class Particle {
             assert(!isnan (log_likelihood));
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
-            log_likelihood += _forests[i]._gene_tree_log_likelihood;
+        }
+        if (_generation == 0) {
+            _log_weight = log_likelihood;
+        }
+
+        return log_likelihood;
+    }
+
+    inline double Particle::getLogLikelihood() {
+        //retrieve likelihood for each gene tree
+        double log_likelihood = 0.0;
+        for (unsigned i=1; i<_forests.size(); i++) {
+            double gene_tree_log_likelihood = _forests[i]._gene_tree_log_likelihood;
+            assert(!isnan (log_likelihood));
+            //total log likelihood is sum of gene tree log likelihoods
+            log_likelihood += gene_tree_log_likelihood;
         }
         if (_generation == 0) {
             _log_weight = log_likelihood;
@@ -218,7 +234,11 @@ class Particle {
             }
         }
         else {
-            _forests[forest_number].allowCoalescence(species_name, _log_likelihood, increment);
+            bool first = false;
+            if (_generation == 0) {
+                first = true;
+            }
+            _forests[forest_number].allowCoalescence(species_name, _log_likelihood, increment, first);
         }
         
         for (int f=0; f<_forests.size(); f++) {

@@ -89,7 +89,7 @@ class Forest {
         string                      chooseLineage(Node* taxon_to_migrate, string key_to_del);
         void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
         void                        deleteTaxon(string key_to_del, unsigned taxon_choice);
-        void                        allowCoalescence(string species_name, double prev_particle_likelihood, double increment);
+        void                        allowCoalescence(string species_name, double prev_particle_likelihood, double increment, bool first);
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
         vector<string>              hybridizeSpecies();
         void                        moveGene(string new_nd, string parent, string hybrid);
@@ -1366,7 +1366,7 @@ inline string Forest::chooseEvent() {
         }
     }
 
-    inline void Forest::allowCoalescence(string species_name, double prev_particle_likelihood, double increment) {
+    inline void Forest::allowCoalescence(string species_name, double prev_particle_likelihood, double increment, bool first) {
         Node *subtree1 = nullptr;
         Node *subtree2 = nullptr;
         list<Node*> nodes;
@@ -1380,9 +1380,11 @@ inline string Forest::chooseEvent() {
         calcTopologyPrior(s);
         
 //        double prev_log_likelihood = 0.0; // start at 0 if nothing has been joined
+//        if (!first) {
 //        if (_lineages.size() != _ntaxa) {
-//            double prev_log_likelihood = calcLogLikelihood();
-        double prev_log_likelihood = _gene_tree_log_likelihood;
+//            prev_log_likelihood = calcLogLikelihood();
+            double prev_log_likelihood = _gene_tree_log_likelihood;
+//            }
 //        }
         
         assert (s > 1);
