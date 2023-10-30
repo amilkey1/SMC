@@ -359,6 +359,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles) {
         unsigned i = 0;
+//        unsigned gene_particles_proposed = 0;
         vector<double> log_weight_vec(particles.size());
         for (auto & p : particles) {
             log_weight_vec[i++] = p->getLogWeight();
@@ -561,8 +562,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
          
          for (unsigned p=0; p < _nparticles; p++) {
              cum_probs[i].first = from_particles[p]->getLogWeight();
-                 cum_probs[i].second = i;
-                 ++i;
+             cum_probs[i].second = i;
+             ++i;
              }
              
              // Sort cum_probs vector so that largest log weights come first
@@ -588,15 +589,17 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
              int sel_index = -1;
              double u = rng.uniform();
              for(unsigned j = 0; j < _nparticles; j++) {
+//                 if(std::find(species_join_indices.begin(), species_join_indices.end(), i) != species_join_indices.end()) {
+//                     sel_index = i; // if particle proposed a species join, don't resample it // TODO: j or it?
+//                     break;
+//                 }
                  if (u < cum_probs[j].first) {
                      sel_index = cum_probs[j].second;
                      break;
                  }
              }
              assert(sel_index > -1);
-//             Particle p0 = from_particles[sel_index];
-//
-//             to_particles[i]=Particle(*new Particle(p0));
+//             cout << "selected index is: " << sel_index;
              
              Particle::SharedPtr p0 = from_particles[sel_index];
              to_particles[i]=Particle::SharedPtr(new Particle(*p0));
@@ -829,7 +832,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         
                         double ess_inverse = 0.0;
 //                        for (auto &p:my_vec) {
-//                            p.showSpeciesTree();
+//                            p->showSpeciesTree();
 //                        }
                         normalizeWeights(my_vec);
                         
@@ -838,7 +841,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         }
                         
                         double ess = 1.0/ess_inverse;
-                        cout << "ESS is : " << ess << endl;
+                        cout << "\t" << "ESS is : " << ess << endl;
                         
 //                        if (ess < 100) {
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
@@ -850,6 +853,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             //change use_first from true to false or false to true
                             use_first = !use_first;
 //                        }
+//                        for (auto &p:my_vec) {
+//                            if (p->speciesJoinProposed()) {
+//                                p->showSpeciesTree();
+//                            }
+//                        }
                         resetWeights(my_vec);
                         _accepted_particle_vec = my_vec;
                         
@@ -858,6 +866,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     saveAllHybridNodes(my_vec);
 //                    for (auto &p:my_vec) {
 //                        p.showHybridNodes();
+//                    }
+//                    for (auto &p:my_vec) {
+//                        p->showParticle();
 //                    }
                     
                     if (number_of_sampling_loops == 2.0) {

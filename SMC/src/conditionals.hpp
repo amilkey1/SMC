@@ -11,6 +11,6 @@
 
 //#define USING_SIGNPOSTS
 
-#define SNAKE
+//#define SNAKE
 
 //#define TEST_COMBO
