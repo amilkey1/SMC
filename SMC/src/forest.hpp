@@ -85,7 +85,7 @@ class Forest {
         string                      chooseLineage(Node* taxon_to_migrate, string key_to_del);
         void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
         void                        deleteTaxon(string key_to_del, unsigned taxon_choice);
-        void                        allowCoalescence(string species_name, double increment, bool first);
+        void                        allowCoalescence(string species_name, double increment);
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
         vector<string>              hybridizeSpecies();
         void                        moveGene(string new_nd, string parent, string hybrid);
@@ -99,6 +99,7 @@ class Forest {
         void                        updateSpeciesPartition(tuple<string, string, string> species_info);
         double                      calcTopologyPrior(unsigned nlineages);
         void                        calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree);
+        void                        calcIncrementPriorForJoinOnly(double increment, string species_name, bool gene_tree);
 
         std::vector<Node *>         _lineages;
     
@@ -134,6 +135,7 @@ class Forest {
         vector<double>              _log_coalescent_likelihood_options;
         double                      _combined_likelihood;
         double                      _prev_log_coalescent_likelihood;
+        double                      _log_coalescent_likelihood_increment;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -187,6 +189,7 @@ class Forest {
         _log_coalescent_likelihood_options.clear();
         _combined_likelihood = 0.0;
         _prev_log_coalescent_likelihood = 0.0;
+        _log_coalescent_likelihood_increment = 0.0;
 
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -1059,6 +1062,7 @@ class Forest {
         _log_coalescent_likelihood_options = other._log_coalescent_likelihood_options;
         _combined_likelihood = other._combined_likelihood;
         _prev_log_coalescent_likelihood = other._prev_log_coalescent_likelihood;
+        _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
 
         // copy tree itself
 
@@ -1297,6 +1301,53 @@ inline string Forest::chooseEvent() {
         return _log_joining_prob;
     }
 
+    inline void Forest::calcIncrementPriorForJoinOnly(double increment, string species_name, bool gene_tree) {
+        // use this function to calculate increment prior / coalescent likelihood for a join only
+        double log_increment_prior = 0.0;
+        assert (!_done);
+        
+        if (gene_tree) {
+        
+            // calculate increment prior
+            for (auto &s:_species_partition) {
+                bool coalescence = false;
+                if (s.first == species_name) {
+                    coalescence = true;
+                }
+                else {
+                    coalescence = false;
+                }
+
+                if (coalescence) {
+                    // need to add ln (rate) + log_prob_join; increment accounted for in previous step
+                    double coalescence_rate = (s.second.size())*(s.second.size()-1) / _theta;
+                    
+                    assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
+                    double nChooseTwo = (s.second.size())*(s.second.size()-1);
+                    double log_prob_join = log(2/nChooseTwo);
+                    log_increment_prior += log(coalescence_rate) + log_prob_join;
+                }
+                // do not calculate anything for non-coalescing lineages; already dealt with in previous step
+            }
+        
+            _increments_and_priors.back().second += log_increment_prior;
+            _log_coalescent_likelihood += log_increment_prior;
+        }
+        
+        else {
+            // species tree
+            double rate = _speciation_rate*(_lineages.size()); // need to add 1 since lineages already joined
+            // calculate increment prior
+            double nChooseTwo = (_lineages.size())*(_lineages.size()-1);
+            double log_prob_join = log(2/nChooseTwo);
+            log_increment_prior = log(rate) - (increment*rate) + log_prob_join;
+        
+            _increments_and_priors.back().second += log_increment_prior;
+            _log_coalescent_likelihood += log_increment_prior;
+        }
+            _log_coalescent_likelihood_increment = log_increment_prior;
+    }
+
     inline void Forest::calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree) {
         double log_increment_prior = 0.0;
         _prev_log_coalescent_likelihood = _log_coalescent_likelihood;
@@ -1343,6 +1394,7 @@ inline string Forest::chooseEvent() {
                 }
             
                 else if (!new_increment) { // add to existing increment and prior
+                    assert (_increments_and_priors.size() > 0);
                     _increments_and_priors.back().first += increment;
                     _increments_and_priors.back().second += log_increment_prior;
                 }
@@ -1373,10 +1425,11 @@ inline string Forest::chooseEvent() {
                 }
                 _log_coalescent_likelihood += log_increment_prior;
             }
+            _log_coalescent_likelihood_increment = log_increment_prior;
         }
     }
 
-    inline void Forest::allowCoalescence(string species_name, double increment, bool first) {
+    inline void Forest::allowCoalescence(string species_name, double increment) {
         Node *subtree1 = nullptr;
         Node *subtree2 = nullptr;
         list<Node*> nodes;

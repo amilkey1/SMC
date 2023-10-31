@@ -825,7 +825,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     
                     //run through each generation of particles
                     
-                    for (unsigned g=0; g<nspecies-1+(ntaxa-1)*nsubsets; g++){
+                    for (unsigned g=0; g<(ntaxa-1)*nsubsets; g++){ // +nspecies-1
                         cout << "starting step " << g << " of " << nspecies-1+(ntaxa-1)*nsubsets-1 << endl;
                         //taxon joining and reweighting step
                         proposeParticles(my_vec);
@@ -867,9 +867,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 //                    for (auto &p:my_vec) {
 //                        p.showHybridNodes();
 //                    }
-//                    for (auto &p:my_vec) {
-//                        p->showParticle();
-//                    }
+                    for (auto &p:my_vec) {
+                        p->showParticle();
+                    }
                     
                     if (number_of_sampling_loops == 2.0) {
                         if (z == 0) {estimateTheta(my_vec);}
@@ -888,7 +888,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             for (int i=1; i < nsubsets+1; i++) {
                 saveGeneTree(i);
             }
-            writeLoradFile(nsubsets, nspecies, ntaxa);
+//            writeLoradFile(nsubsets, nspecies, ntaxa);
             
             cout << "marginal likelihood: " << _log_marginal_likelihood << endl;
             

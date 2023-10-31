@@ -14,3 +14,5 @@
 //#define SNAKE
 
 //#define TEST_COMBO
+
+//#define JOIN_FIRST
