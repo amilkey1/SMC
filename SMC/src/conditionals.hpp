@@ -16,3 +16,5 @@
 //#define TEST_COMBO
 
 //#define JOIN_FIRST
+
+#define TWO_JOINS
