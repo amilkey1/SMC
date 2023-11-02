@@ -103,6 +103,7 @@ namespace proj {
             void                        estimateTheta(vector<Particle::SharedPtr> &particles);
             void                        estimateSpeciationRate(vector<Particle::SharedPtr> &particles);
             double                      _small_enough;
+            unsigned                    _verbose;
     };
 
     inline Proj::Proj() {
@@ -167,10 +168,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             for (unsigned g=0; g<ngenes+1; g++) {
                 logf << "\t" << p->getTopologyPrior(g);
             }
-//            vector<pair<double, double>> increments_and_priors;
+
             for (unsigned g=0; g<ngenes+1; g++) {
                 for (auto &b:p->getIncrementPriors(g)) {
-//                    increments_and_priors.push_back(b);
                     logf << "\t" << b.first;
                     logf << "\t" << b.second;
                     // no increment or increment prior should be 0
@@ -266,6 +266,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("migration_rate", boost::program_options::value(&Forest::_migration_rate)->default_value(0.0), "migration rate")
         ("hybridization_rate", boost::program_options::value(&Forest::_hybridization_rate)->default_value(0.0), "hybridization rate")
         ("run_on_empty", boost::program_options::value(&Particle::_run_on_empty)->default_value(false), "run program without data")
+        ("verbose", boost::program_options::value(&_verbose)->default_value(0), "set amount of output printed")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -315,7 +316,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             Forest::_base_frequencies.push_back(f);
             sum +=f;
         }
-        cout << sum-1 << endl;
         assert (fabs(sum-1) < 0.000001);
         if (fabs(sum-1)>0.000001) {
             throw XProj(format("base frequencies (%s) don't add to 1")%Forest::_string_base_frequencies);
@@ -325,6 +325,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     inline void Proj::summarizeData(Data::SharedPtr) {
         // Report information about data partition subsets
         unsigned nsubsets = _data->getNumSubsets();
+        
         std::cout << "\nNumber of taxa: " << _data->getNumTaxa() << std::endl;
         std::cout << "Number of partition subsets: " << nsubsets << std::endl;
         std::cout << "Number of particles: " << _nparticles << std::endl;
@@ -370,6 +371,15 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
 
         double log_particle_sum = getRunningSum(log_weight_vec);
+        
+        double max = *max_element(std::begin(log_weight_vec), std::end(log_weight_vec));
+        double min = *min_element(std::begin(log_weight_vec), std::end(log_weight_vec)); // C++11
+        
+        if (_verbose > 0) {
+            cout << "\t" << "max weight = " << max << endl;;
+            cout << "\t" << "min weight = " << min << endl;;
+        }
+
         _log_marginal_likelihood += log_particle_sum - log(_nparticles);
         
 #if defined(SPECIES_TREE_WEIGHT_AVERAGE)
@@ -711,7 +721,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             particles[i]->proposal();
         }
     }
-//
+
 //    inline void Proj::showParticlesByWeight(vector<Particle::SharedPtr> my_vec) {
 //        vector <double> weights;
 //
@@ -755,24 +765,30 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     }
 
     inline void Proj::run() {
-        cout << "Starting..." << endl;
-        cout << "Current working directory: " << boost::filesystem::current_path() << endl;
-        cout << "Random seed: " << _random_seed << endl;
-        cout << "Theta: " << Forest::_theta << endl;
-        cout << "Number of threads: " << _nthreads << endl;
+        if (_verbose > 0) {
+            cout << "Starting..." << endl;
+            cout << "Current working directory: " << boost::filesystem::current_path() << endl;
+            cout << "Random seed: " << _random_seed << endl;
+            cout << "Theta: " << Forest::_theta << endl;
+            cout << "Number of threads: " << _nthreads << endl;
+        }
         
         if (Particle::_run_on_empty) { // if running with no data, choose taxa to join at random
             Forest::_proposal = "prior-prior";
         }
 
         try {
-            std::cout << "\n*** Reading and storing the data in the file " << _data_file_name << std::endl;
-            std::cout << "data file name is " << _data_file_name << std::endl;
+            if (_verbose > 0) {
+                cout << "\n*** Reading and storing the data in the file " << _data_file_name << endl;
+                cout << "data file name is " << _data_file_name << std::endl;
+            }
             _data = Data::SharedPtr(new Data());
             _data->setPartition(_partition);
             _data->getDataFromFile(_data_file_name);
 
-            summarizeData(_data);
+            if (_verbose > 0) {
+                summarizeData(_data);
+            }
             createSpeciesMap(_data);
 
             //set number of species to number in data file
@@ -847,7 +863,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     //run through each generation of particles
                     
                     for (unsigned g=0; g<(ntaxa-1)*nsubsets+nspecies-1; g++){
-                        cout << "starting step " << g << " of " << nspecies-1+(ntaxa-1)*nsubsets-1 << endl;
+                        if (_verbose > 1) {
+                            cout << "starting step " << g << " of " << nspecies-1+(ntaxa-1)*nsubsets-1 << endl;
+                        }
                         //taxon joining and reweighting step
                         proposeParticles(my_vec);
                         
@@ -858,8 +876,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             if (p->speciesJoinProposed()) {
                                 num_species_particles_proposed++;
                             }
-//                            p->showSpeciesTree();
-//                            p->showParticle();
                         }
                         normalizeWeights(my_vec);
                         
@@ -868,7 +884,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         }
                         
                         double ess = 1.0/ess_inverse;
-                        cout << "\t" << "ESS is : " << ess << endl;
+                        if (_verbose > 1) {
+                            cout << "\t" << "ESS is : " << ess << endl;
+                        }
                         
 //                        if (ess < 100) {
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
@@ -882,10 +900,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 //                        }
                         unsigned species_count = 0;
                         
-//                        for (auto &p:my_vec) {
-//                            p->showParticle();
-//                        }
-                        
                         for (auto &p:my_vec) {
                             if (p->speciesJoinProposed()) {
                                 species_count++;
@@ -895,20 +909,17 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 //                                break;
                             }
                         }
-                        cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
-                        cout << "\t" << "number of species join particles accepted = " << species_count << endl;
+                        
+                        if (_verbose > 1) {
+                            cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
+                            cout << "\t" << "number of species join particles accepted = " << species_count << endl;
+                        }
                         resetWeights(my_vec);
                         _accepted_particle_vec = my_vec;
                         
                     } // g loop
                     
                     saveAllHybridNodes(my_vec);
-//                    for (auto &p:my_vec) {
-//                        p.showHybridNodes();
-//                    }
-//                    for (auto &p:my_vec) {
-//                        p->showParticle();
-//                    }
                     
                     if (number_of_sampling_loops == 2.0) {
                         if (z == 0) {estimateTheta(my_vec);}
@@ -923,24 +934,25 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             } // z loop - theta or speciation rate
 //            showFinal(_accepted_particle_vec);
             saveSpeciesTrees();
-//            saveGeneTrees(nsubsets);
             for (int i=1; i < nsubsets+1; i++) {
                 saveGeneTree(i);
             }
             writeLoradFile(nsubsets, nspecies, ntaxa);
             
-            cout << "marginal likelihood: " << _log_marginal_likelihood << endl;
-            
-            if (_estimate_theta) {
-                cout << "number of accepted theta proposals: " << _theta_accepted_number << endl;
-                printThetas();
-                cout << "Theta: " << _theta_vector[_nsamples-1].first << endl;
-            }
-            
-            if (_estimate_speciation_rate) {
-                cout << "number of accepted speciation rate proposals: " << _speciation_rate_accepted_number << endl;
-                printSpeciationRates();
-                cout << "Speciation rate: " << _speciation_rate_vector[_nsamples-1].first << endl;
+            if (_verbose > 0) {
+                cout << "marginal likelihood: " << _log_marginal_likelihood << endl;
+                
+                if (_estimate_theta) {
+                    cout << "number of accepted theta proposals: " << _theta_accepted_number << endl;
+                    printThetas();
+                    cout << "Theta: " << _theta_vector[_nsamples-1].first << endl;
+                }
+                
+                if (_estimate_speciation_rate) {
+                    cout << "number of accepted speciation rate proposals: " << _speciation_rate_accepted_number << endl;
+                    printSpeciationRates();
+                    cout << "Speciation rate: " << _speciation_rate_vector[_nsamples-1].first << endl;
+                }
             }
         }
 
