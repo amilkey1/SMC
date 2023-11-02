@@ -359,19 +359,39 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles) {
         unsigned i = 0;
-//        unsigned gene_particles_proposed = 0;
+        unsigned species_joins = 0;
         vector<double> log_weight_vec(particles.size());
         for (auto & p : particles) {
+            if (p->speciesJoinProposed()) {
+                species_joins++;
+            }
             log_weight_vec[i++] = p->getLogWeight();
         }
 
         double log_particle_sum = getRunningSum(log_weight_vec);
+        _log_marginal_likelihood += log_particle_sum - log(_nparticles);
+        
+#if defined(SPECIES_TREE_WEIGHT_AVERAGE)
+        i = 0;
+        species_joins = 0;
+        double weight_average = log_particle_sum - _nparticles + species_joins;
+        for (auto &p:particles) {
+            if (p->speciesJoinProposed()) {
+//                assert (p->getLogWeight() == 0);
+                p->setLogWeight(weight_average);
+                log_weight_vec[i] = p->getLogWeight();
+            }
+            i++;
+        }
+        
+        log_particle_sum = getRunningSum(log_weight_vec);
+#endif
 
         for (auto & p : particles) {
             p->setLogWeight(p->getLogWeight() - log_particle_sum);
         }
         
-        _log_marginal_likelihood += log_particle_sum - log(_nparticles);
+//        _log_marginal_likelihood += log_particle_sum - log(_nparticles);
 //        sort(particles.begin(), particles.end(), greater<Particle>());
     }
 
@@ -589,10 +609,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
              int sel_index = -1;
              double u = rng.uniform();
              for(unsigned j = 0; j < _nparticles; j++) {
-//                 if(std::find(species_join_indices.begin(), species_join_indices.end(), i) != species_join_indices.end()) {
-//                     sel_index = i; // if particle proposed a species join, don't resample it // TODO: j or it?
-//                     break;
-//                 }
                  if (u < cum_probs[j].first) {
                      sel_index = cum_probs[j].second;
                      break;
@@ -825,17 +841,21 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     
                     //run through each generation of particles
                     
-//                    for (unsigned g=0; g<(ntaxa-1)*nsubsets+nspecies-1; g++){ // +nspecies-1
-                    for (unsigned g=0; g < ((ntaxa-1)*nsubsets+nspecies-1) / 2; g++){ // +nspecies-1
+                    for (unsigned g=0; g<(ntaxa-1)*nsubsets+nspecies-1; g++){
                         cout << "starting step " << g << " of " << nspecies-1+(ntaxa-1)*nsubsets-1 << endl;
                         //taxon joining and reweighting step
                         proposeParticles(my_vec);
                         
+                        unsigned num_species_particles_proposed = 0;
+                        
                         double ess_inverse = 0.0;
-//                        for (auto &p:my_vec) {
+                        for (auto &p:my_vec) {
+                            if (p->speciesJoinProposed()) {
+                                num_species_particles_proposed++;
+                            }
 //                            p->showSpeciesTree();
 //                            p->showParticle();
-//                        }
+                        }
                         normalizeWeights(my_vec);
                         
                         for (auto & p:my_vec) {
@@ -855,11 +875,23 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             //change use_first from true to false or false to true
                             use_first = !use_first;
 //                        }
+                        unsigned species_count = 0;
+                        
 //                        for (auto &p:my_vec) {
-//                            if (p->speciesJoinProposed()) {
-//                                p->showSpeciesTree();
-//                            }
+//                            p->showParticle();
 //                        }
+                        
+                        for (auto &p:my_vec) {
+                            if (p->speciesJoinProposed()) {
+                                species_count++;
+//                                p->showParticle();
+//                                p->showSpeciesTree();
+//                                cout << "ESS for a species join is " << ess << endl;
+//                                break;
+                            }
+                        }
+                        cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
+                        cout << "\t" << "number of species join particles accepted = " << species_count << endl;
                         resetWeights(my_vec);
                         _accepted_particle_vec = my_vec;
                         
@@ -869,9 +901,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 //                    for (auto &p:my_vec) {
 //                        p.showHybridNodes();
 //                    }
-                    for (auto &p:my_vec) {
-                        p->showParticle();
-                    }
+//                    for (auto &p:my_vec) {
+//                        p->showParticle();
+//                    }
                     
                     if (number_of_sampling_loops == 2.0) {
                         if (z == 0) {estimateTheta(my_vec);}
@@ -890,7 +922,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             for (int i=1; i < nsubsets+1; i++) {
                 saveGeneTree(i);
             }
-//            writeLoradFile(nsubsets, nspecies, ntaxa);
+            writeLoradFile(nsubsets, nspecies, ntaxa);
             
             cout << "marginal likelihood: " << _log_marginal_likelihood << endl;
             
