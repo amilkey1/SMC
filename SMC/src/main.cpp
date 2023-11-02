@@ -33,6 +33,7 @@ vector<double> Forest::_base_frequencies;
 string Forest::_string_base_frequencies;
 double Forest::_migration_rate;
 double Forest::_hybridization_rate;
+bool Particle::_run_on_empty;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT

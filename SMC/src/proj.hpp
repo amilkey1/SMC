@@ -265,6 +265,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("nsamples", boost::program_options::value(&_nsamples)->default_value(1.0), "number of samples if parameters are being estimated")
         ("migration_rate", boost::program_options::value(&Forest::_migration_rate)->default_value(0.0), "migration rate")
         ("hybridization_rate", boost::program_options::value(&Forest::_hybridization_rate)->default_value(0.0), "hybridization rate")
+        ("run_on_empty", boost::program_options::value(&Particle::_run_on_empty)->default_value(false), "run program without data")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -759,6 +760,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         cout << "Random seed: " << _random_seed << endl;
         cout << "Theta: " << Forest::_theta << endl;
         cout << "Number of threads: " << _nthreads << endl;
+        
+        if (Particle::_run_on_empty) { // if running with no data, choose taxa to join at random
+            Forest::_proposal = "prior-prior";
+        }
 
         try {
             std::cout << "\n*** Reading and storing the data in the file " << _data_file_name << std::endl;

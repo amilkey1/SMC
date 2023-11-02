@@ -73,6 +73,7 @@ class Particle {
         vector<pair<double, double>>                    getIncrementPriors(unsigned i);
         double                                          getCoalescentLikelihood(unsigned g);
         bool                                            speciesJoinProposed();
+        static bool                                     _run_on_empty;
 
     private:
 
@@ -145,11 +146,8 @@ class Particle {
             assert(!isnan (log_likelihood));
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
-            if (_generation == 0) {
-                _forests[i]._combined_likelihood = gene_tree_log_likelihood; // coalescent likelihood starts at 0
-            }
         }
-        if (_generation == 0) {
+        if (_generation == 0 && !_run_on_empty) {
             _log_weight = log_likelihood;
         }
 
@@ -165,7 +163,7 @@ class Particle {
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
         }
-        if (_generation == 0) {
+        if (_generation == 0 && !_run_on_empty) {
             _log_weight = log_likelihood;
         }
 
@@ -177,12 +175,6 @@ class Particle {
         altProposal();
 #else
         _species_join_proposed = false;
-        bool done = false;
-        
-        while (!done) {
-#if !defined(TWO_JOINS)
-            done = true;
-#endif
     
         vector<double> forest_rates; // this vector contains total rate of species tree, gene 1, etc.
         vector<vector<double>> gene_forest_rates; // this vector contains rates by species for each gene forest
@@ -336,12 +328,12 @@ class Particle {
         
         else {
             _forests[forest_number].allowCoalescence(species_name, increment);
-            done = true;
         }
                     
         if (species_name != "species") {
-            _log_weight = _forests[forest_number]._log_weight;
-//            cout << "log weight is " << _log_weight << endl;
+            if (!_run_on_empty) {
+                _log_weight = _forests[forest_number]._log_weight;
+            }
         }
         
         else {
@@ -351,13 +343,11 @@ class Particle {
         }
             
         _prev_forest_number = forest_number;
-        }
         _generation++;
     #endif
     }
 
     inline void Particle::altProposal() {
-//        showParticle();
         _species_join_proposed = false;
         
         vector<double> forest_rates; // this vector contains total rate of species tree, gene 1, etc.
@@ -409,7 +399,7 @@ class Particle {
                     _forests[i]._done = true;
                 }
             }
-//            _log_weight = 0.0;
+
             for (int f=0; f<_forests.size(); f++) {
                 bool gene_tree = false;
                 if (f > 0) {
@@ -567,7 +557,9 @@ class Particle {
             }
             
             if (species_name != "species") {
-                _log_weight = _forests[forest_number]._log_weight;
+                if (!_run_on_empty) {
+                    _log_weight = _forests[forest_number]._log_weight;
+                }
             }
             else {
                 

@@ -133,7 +133,6 @@ class Forest {
         bool                        _done;
         double                      _log_coalescent_likelihood;
         vector<double>              _log_coalescent_likelihood_options;
-        double                      _combined_likelihood;
         double                      _prev_log_coalescent_likelihood;
         double                      _log_coalescent_likelihood_increment;
     
@@ -176,7 +175,6 @@ class Forest {
         _nodes.clear();
         _lineages.clear();
         _nodes.resize(_ntaxa);
-//        _nodes.resize(3*_ntaxa);
         _npatterns = 0;
         _nstates = 4;
         _last_edge_length = 0.0;
@@ -187,17 +185,12 @@ class Forest {
         _done = false;
         _log_coalescent_likelihood = 0.0;
         _log_coalescent_likelihood_options.clear();
-        _combined_likelihood = 0.0;
         _prev_log_coalescent_likelihood = 0.0;
         _log_coalescent_likelihood_increment = 0.0;
 
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
-//            auto it = _nodes.begin();
             Node* nd = &*next(_nodes.begin(), i);
-//            auto nd = *advance(it, i);
-//            auto it = find(_nodes.begin(), _nodes.end(), i);
-//            Node* nd = &*it;
             nd->_right_sib=0;
             nd->_name=" ";
             nd->_left_child=0;
@@ -210,13 +203,6 @@ class Forest {
             }
         _nleaves=_ntaxa;
         _ninternals=0;
-
-
-//        _lineages.reserve(_nodes.size()); //no root or subroot anymore
-//
-//        for (int i=0; i < (int) _ntaxa; i++) {
-//            _lineages.push_back(&_nodes[i]);
-//        }
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -831,7 +817,6 @@ class Forest {
          Node* subtree1 = _node_choices[_index_of_choice].first;
          Node* subtree2 = _node_choices[_index_of_choice].second;
      
-        _combined_likelihood = _log_likelihood_choices[_index_of_choice];
          _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice] - _log_coalescent_likelihood_options[_index_of_choice];
         
          // erase extra nodes created from node list
@@ -1060,7 +1045,6 @@ class Forest {
         _done = other._done;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _log_coalescent_likelihood_options = other._log_coalescent_likelihood_options;
-        _combined_likelihood = other._combined_likelihood;
         _prev_log_coalescent_likelihood = other._prev_log_coalescent_likelihood;
         _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
 
@@ -1443,7 +1427,6 @@ inline string Forest::chooseEvent() {
         calcTopologyPrior(s);
         
         double prev_log_likelihood = _gene_tree_log_likelihood;
-//        double prev_log_likelihood = _combined_likelihood;
         
         assert (s > 1);
         bool one_choice = false;
@@ -1515,10 +1498,9 @@ inline string Forest::chooseEvent() {
         
         if (_proposal == "prior-prior" || one_choice) {
             _gene_tree_log_likelihood = calcLogLikelihood();
-//            _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
+            _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
         }
         
-#if defined (GENE_TREE_COALESCENT_LIKELIHOOD)
         // update increments and priors
         double log_increment_prior = 0.0;
         for (auto &s:_species_partition) {
@@ -1544,14 +1526,6 @@ inline string Forest::chooseEvent() {
                 double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
                 log_increment_prior -= increment*coalescence_rate;
             }
-        }
-        
-        _combined_likelihood = log_increment_prior + _log_coalescent_likelihood + _gene_tree_log_likelihood; // TODO: double check coalescent likelihood is correct
-#else
-        _combined_likelihood = _gene_tree_log_likelihood;
-#endif
-        if (_proposal == "prior-prior" || one_choice) {
-            _log_weight = _combined_likelihood - prev_log_likelihood;
         }
     }
 
