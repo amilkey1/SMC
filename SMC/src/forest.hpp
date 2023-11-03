@@ -63,7 +63,7 @@ class Forest {
         void                        calcPartialArray(Node* new_nd);
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
-        tuple<string,string, string> speciesTreeProposal(double increment);
+        tuple<string,string, string> speciesTreeProposal();
         void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
         void                        hybridizeNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node* delnode3, Node * addnode1);
@@ -1190,7 +1190,7 @@ inline string Forest::chooseEvent() {
         }
     }
 
-    inline tuple<string,string, string> Forest::speciesTreeProposal(double increment) {
+    inline tuple<string,string, string> Forest::speciesTreeProposal() {
         double prev_log_likelihood = _log_coalescent_likelihood;
         
         // this function creates a new node and joins two species
@@ -1203,7 +1203,6 @@ inline string Forest::chooseEvent() {
         Node nd;
         _nodes.push_back(nd);
         Node* new_nd = &_nodes.back();
-//        Node* new_nd = &_nodes[_nleaves+_ninternals];
         new_nd->_parent=0;
         new_nd->_number=_nleaves+_ninternals;
         new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
@@ -1216,13 +1215,6 @@ inline string Forest::chooseEvent() {
 
         subtree1->_parent=new_nd;
         subtree2->_parent=new_nd;
-        
-        double rate = _speciation_rate*(_lineages.size());
-        // calculate increment prior
-        double nChooseTwo = (_lineages.size())*(_lineages.size()-1);
-        double log_prob_join = log(2/nChooseTwo);
-        double coalescent_likelihood_increment = log(rate) - (increment*rate) + log_prob_join;
-        _log_weight = coalescent_likelihood_increment - prev_log_likelihood;
         
         updateNodeVector (_lineages, subtree1, subtree2, new_nd);
 
@@ -1499,33 +1491,6 @@ inline string Forest::chooseEvent() {
         if (_proposal == "prior-prior" || one_choice) {
             _gene_tree_log_likelihood = calcLogLikelihood();
             _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
-        }
-        
-        // update increments and priors
-        double log_increment_prior = 0.0;
-        for (auto &s:_species_partition) {
-            bool coalescence = false;
-            for (auto &nd:s.second) {
-                if (nd == new_nd) {
-                    coalescence = true;
-                    break;
-                }
-                else {
-                    coalescence = false;
-                }
-            }
-            if (coalescence) {
-                // if there is coalescence, need to use number of lineages before the join
-                double coalescence_rate = (s.second.size()+1)*(s.second.size()) / _theta;
-                assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
-                double nChooseTwo = (s.second.size()+1)*(s.second.size());
-                double log_prob_join = log(2/nChooseTwo);
-                log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate) + log_prob_join;
-            }
-            else {
-                double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
-                log_increment_prior -= increment*coalescence_rate;
-            }
         }
     }
 

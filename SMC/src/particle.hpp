@@ -175,12 +175,15 @@ class Particle {
         altProposal();
 #else
         _species_join_proposed = false;
+        bool done = false;
     
+        while (!done) {
         vector<double> forest_rates; // this vector contains total rate of species tree, gene 1, etc.
         vector<vector<double>> gene_forest_rates; // this vector contains rates by species for each gene forest
         gene_forest_rates.resize(_forests.size()-1);
         vector<unsigned> event_choice_index;
         vector<string> event_choice_name;
+        vector<double> increments;
             
         for (int i=0; i<_forests.size(); i++) {
             if (i > 0) {
@@ -254,25 +257,6 @@ class Particle {
                 }
             }
         }
-        
-        double total_rate = 0.0;
-        for (auto &r:forest_rates) {
-            total_rate += r;
-        }
-        
-        // draw an increment
-        double increment = rng.gamma(1.0, 1.0/(total_rate));
-            _prev_increment = increment;
-            
-        // add increment to all nodes in all forests
-        for (int i=0; i<_forests.size(); i++) {
-            if (_forests[i]._lineages.size() > 1) {
-                _forests[i].addIncrement(increment); // if forest is finished, don't add another increment
-            }
-            else {
-                _forests[i]._done = true;
-            }
-        }
             
         vector<double> event_choice_rates;
         if (_forests[0]._lineages.size() > 1) {
@@ -284,12 +268,74 @@ class Particle {
             }
         }
             
-        // choose an event
+        // choose increments for each event
         for (auto &p:event_choice_rates) {
-             p = log(p/total_rate);
+            increments.push_back(rng.gamma(1.0, 1.0/p));
          }
+        
+        double speciation_time = -1;
+        if (!_forests[0]._done) {
+            speciation_time = increments[0];
+        }
+
+        for (int i = (int) increments.size()-1; i>0; i--) {
+            if (increments[i] < speciation_time || speciation_time == -1) {
+                // do nothing
+            }
+            else {
+                event_choice_index.erase(event_choice_index.begin() + i);
+                event_choice_name.erase(event_choice_name.begin() + i);
+                event_choice_rates.erase(event_choice_rates.begin() + i);
+                increments.erase(increments.begin() + i);
+            }
+        }
+        
+        double total_rate = 0.0; // normalize rates before selecting an event
+        for (auto &r:event_choice_rates) {
+            total_rate += r;
+        }
+        
+        for (auto &p:event_choice_rates) {
+                 p = log(p/total_rate);
+             }
+        
         unsigned index = selectPair(event_choice_rates);
+        
+        double min_coalescence_time = 0.0;
+#if defined (USE_MIN_COALESCENCE_TIME)
+        if (index > 0) {
+            min_coalescence_time = *min_element(std::begin(increments), std::end(increments)); // TODO: use just minimum increment or also switch the event to the minimum?
+//            for (int i=0; i<increments.size(); i++) {
+//                if (increments[i] == min_coalescence_time) {
+//                    index = i;
+//                    break;
+//                }
+//            }
+//            if (!_forests[0]._done) {
+//                assert (index > 0);
+//            }
+        }
+#endif
+        
         unsigned forest_number = event_choice_index[index];
+        
+        // draw an increment
+        double increment = increments[index];
+        if (min_coalescence_time > 0.0) {
+            increment = min_coalescence_time;
+        }
+        _prev_increment = increment;
+            
+        // add increment to all nodes in all forests
+        for (int i=0; i<_forests.size(); i++) {
+            if (_forests[i]._lineages.size() > 1) {
+                _forests[i].addIncrement(increment); // if forest is finished, don't add another increment
+            }
+            else {
+                _forests[i]._done = true;
+            }
+        }
+        
         string species_name = event_choice_name[index];
             
             // need to calculate coalescent likelihood before joining anything or updating species partition
@@ -316,10 +362,11 @@ class Particle {
         }
             
         if (species_name == "species") {
+//            showParticle();
             // species tree proposal, need to update species partition in all gene forests
             assert (index == 0);
             assert (forest_number == 0);
-            tuple <string, string, string> species_joined = _forests[0].speciesTreeProposal(increment);
+            tuple <string, string, string> species_joined = _forests[0].speciesTreeProposal();
             for (int i=1; i<_forests.size(); i++) {
                 // reset species partitions for all gene forests
                 _forests[i].updateSpeciesPartition(species_joined);
@@ -328,6 +375,8 @@ class Particle {
         
         else {
             _forests[forest_number].allowCoalescence(species_name, increment);
+//            showParticle();
+            done = true;
         }
                     
         if (species_name != "species") {
@@ -340,9 +389,11 @@ class Particle {
             // species log weight is always 0
             _species_join_proposed = true;
             _log_weight = 0.0;
+            done = true;
         }
             
         _prev_forest_number = forest_number;
+    }
         _generation++;
     #endif
     }
@@ -475,7 +526,7 @@ class Particle {
                 // species tree proposal, need to update species partition in all gene forests
                 assert (index == 0);
                 assert (forest_number == 0);
-                tuple <string, string, string> species_joined = _forests[0].speciesTreeProposal(_prev_increment);
+                tuple <string, string, string> species_joined = _forests[0].speciesTreeProposal();
                 for (int i=1; i<_forests.size(); i++) {
                     // reset species partitions for all gene forests
                     _forests[i].updateSpeciesPartition(species_joined);

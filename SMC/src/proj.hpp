@@ -375,7 +375,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         double max = *max_element(std::begin(log_weight_vec), std::end(log_weight_vec));
         double min = *min_element(std::begin(log_weight_vec), std::end(log_weight_vec)); // C++11
         
-        if (_verbose > 0) {
+        if (_verbose > 1) {
             cout << "\t" << "max weight = " << max << endl;;
             cout << "\t" << "min weight = " << min << endl;;
         }
@@ -863,7 +863,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     //run through each generation of particles
                     
                     for (unsigned g=0; g<(ntaxa-1)*nsubsets+nspecies-1; g++){
-                        if (_verbose > 1) {
+//                        for (unsigned g=0; g<(ntaxa-1)*nsubsets-1+1; g++){
+
+                        if (_verbose > 0) {
                             cout << "starting step " << g << " of " << nspecies-1+(ntaxa-1)*nsubsets-1 << endl;
                         }
                         //taxon joining and reweighting step
@@ -876,6 +878,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             if (p->speciesJoinProposed()) {
                                 num_species_particles_proposed++;
                             }
+//                            p->showParticle();
                         }
                         normalizeWeights(my_vec);
                         
@@ -920,6 +923,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     } // g loop
                     
                     saveAllHybridNodes(my_vec);
+//                    for (auto &p:my_vec) {
+//                        p->showParticle();
+//                    }
                     
                     if (number_of_sampling_loops == 2.0) {
                         if (z == 0) {estimateTheta(my_vec);}
