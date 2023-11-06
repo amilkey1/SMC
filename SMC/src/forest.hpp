@@ -153,7 +153,7 @@ class Forest {
 
         typedef std::shared_ptr<Forest> SharedPtr;
         static double               _theta;
-        static double               _speciation_rate;
+        static double               _lambda;
         static string               _proposal;
         static string               _model;
         static double               _kappa;
@@ -1207,9 +1207,9 @@ class Forest {
 inline string Forest::chooseEvent() {
     string event;
     // hybridization prior
-    double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
+    double rate = (_lambda+_hybridization_rate)*_lineages.size();
     
-    double hybridization_prob = _hybridization_rate/(_hybridization_rate+_speciation_rate);
+    double hybridization_prob = _hybridization_rate/(_hybridization_rate+_lambda);
     
     double u = rng.uniform();
     if (u<hybridization_prob && _lineages.size()>2) {
@@ -1229,7 +1229,7 @@ inline string Forest::chooseEvent() {
 
     inline void Forest::chooseSpeciesIncrement() {
         // hybridization prior
-        double rate = (_speciation_rate+_hybridization_rate)*_lineages.size();
+        double rate = (_lambda+_hybridization_rate)*_lineages.size();
         
         _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
@@ -1360,7 +1360,7 @@ inline string Forest::chooseEvent() {
         
         else {
             // species tree
-            double rate = _speciation_rate*(_lineages.size()); // need to add 1 since lineages already joined
+            double rate = _lambda*(_lineages.size()); // need to add 1 since lineages already joined
             // calculate increment prior
             double nChooseTwo = (_lineages.size())*(_lineages.size()-1);
             double log_prob_join = log(2/nChooseTwo);
@@ -1428,14 +1428,14 @@ inline string Forest::chooseEvent() {
             else {
                 // species tree
                 if (coalesced_gene) {
-                    double rate = _speciation_rate*(_lineages.size()); // need to add 1 since lineages already joined
+                    double rate = _lambda*(_lineages.size()); // need to add 1 since lineages already joined
                     // calculate increment prior
                     double nChooseTwo = (_lineages.size())*(_lineages.size()-1);
                     double log_prob_join = log(2/nChooseTwo);
                     log_increment_prior = log(rate) - (increment*rate) + log_prob_join;
                 }
                 else {
-                    double rate = _speciation_rate*(_lineages.size());
+                    double rate = _lambda*(_lineages.size());
                     // calculate increment prior
                     log_increment_prior = - (increment*rate);
                 }

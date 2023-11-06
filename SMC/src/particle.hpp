@@ -265,7 +265,7 @@ class Particle {
             }
             else {
                 if (_forests[0]._lineages.size() > 1) {
-                    forest_rates.push_back(Forest::_speciation_rate * _forests[0]._lineages.size());
+                    forest_rates.push_back(Forest::_lambda * _forests[0]._lineages.size());
                     event_choice_index.push_back(0);
                     event_choice_name.push_back("species");
                 }
@@ -451,7 +451,7 @@ class Particle {
                 }
                 else {
                     if (_forests[0]._lineages.size() > 1) {
-                        forest_rates.push_back(Forest::_speciation_rate * _forests[0]._lineages.size());
+                        forest_rates.push_back(Forest::_lambda * _forests[0]._lineages.size());
                         event_choice_index.push_back(0);
                         event_choice_name.push_back("species");
                     }
@@ -504,7 +504,7 @@ class Particle {
                 }
                 else {
                     if (_forests[0]._lineages.size() > 1) {
-                        forest_rates.push_back(Forest::_speciation_rate * _forests[0]._lineages.size());
+                        forest_rates.push_back(Forest::_lambda * _forests[0]._lineages.size());
                         event_choice_index.push_back(0);
                         event_choice_name.push_back("species");
                     }
@@ -583,7 +583,7 @@ class Particle {
                 }
                 else {
                     if (_forests[0]._lineages.size() > 1) {
-                        forest_rates.push_back(Forest::_speciation_rate * _forests[0]._lineages.size());
+                        forest_rates.push_back(Forest::_lambda * _forests[0]._lineages.size());
                         event_choice_index.push_back(0);
                         event_choice_name.push_back("species");
                     }

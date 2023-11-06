@@ -13,10 +13,6 @@
 
 //#define SNAKE
 
-//#define JOIN_FIRST
-
-//#define SPECIES_TREE_WEIGHT_AVERAGE
-
 #define USE_MIN_COALESCENCE_TIME
 
 //#define TWO_JOINS

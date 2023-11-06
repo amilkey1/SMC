@@ -23,7 +23,7 @@ unsigned     Proj::_minor_version       = 0;
 unsigned Forest::_nspecies = 4;
 unsigned Forest::_ntaxa = 12;
 double Forest::_theta = 0.05;
-double Forest::_speciation_rate = 1;
+double Forest::_lambda = 1;
 unsigned Particle::_nsubsets = 1;
 const double Node::_smallest_edge_length=1.0e-12;
 string Forest::_proposal;
