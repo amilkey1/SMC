@@ -589,12 +589,14 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 normalizeWeights(my_vec); // initialize marginal likelihood
                 
                 //run through each generation of particles
+            
+            unsigned nsteps = (ntaxa-1)*nsubsets-1+1;
                 
 //                    for (unsigned g=0; g<(ntaxa-1)*nsubsets+nspecies-1; g++){
-                    for (unsigned g=0; g<(ntaxa-1)*nsubsets-1+1; g++){
+                    for (unsigned g=0; g<nsteps; g++){
 
                     if (_verbose > 0) {
-                        cout << "starting step " << g << " of " << nspecies-1+(ntaxa-1)*nsubsets-1 << endl;
+                        cout << "starting step " << g << " of " << nsteps-1 << endl;
                     }
                     //taxon joining and reweighting step
                     proposeParticles(my_vec);

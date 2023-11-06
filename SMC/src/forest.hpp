@@ -133,8 +133,6 @@ class Forest {
         vector<pair<double, double>> _increments_and_priors;
         bool                        _done;
         double                      _log_coalescent_likelihood;
-//        vector<double>              _log_coalescent_likelihood_options;
-        double                      _prev_log_coalescent_likelihood;
         double                      _log_coalescent_likelihood_increment;
     
         void                        showSpeciesJoined();
@@ -186,8 +184,6 @@ class Forest {
         _log_joining_prob = 0.0;
         _done = false;
         _log_coalescent_likelihood = 0.0;
-//        _log_coalescent_likelihood_options.clear();
-        _prev_log_coalescent_likelihood = 0.0;
         _log_coalescent_likelihood_increment = 0.0;
         _other_log_weight = 0.0;
 
@@ -834,12 +830,6 @@ class Forest {
                  get<2>(t)->clear(); //new_nd
              }
          }
-         
-//        assert (_log_likelihood_choices.size() == _log_coalescent_likelihood_options.size());
-        
-//        for (int i=0; i<_log_likelihood_choices.size(); i++) {
-//            _log_likelihood_choices[i] += _log_coalescent_likelihood_options[i];
-//        }
         
          // reweight each choice of pairs
         vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, prev_log_likelihood);
@@ -863,13 +853,11 @@ class Forest {
          Node* subtree1 = _node_choices[_index_of_choice].first;
          Node* subtree2 = _node_choices[_index_of_choice].second;
      
-//         _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice] - _log_coalescent_likelihood_options[_index_of_choice];
         _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
         
          // erase extra nodes created from node list
         _node_choices.clear();
         _log_likelihood_choices.clear();
-//        _log_coalescent_likelihood_options.clear();
         
          return make_pair(subtree1, subtree2);
      }
@@ -982,37 +970,6 @@ class Forest {
         // don't update the species list
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         
-#if defined(GENE_TREE_COALESCENT_LIKELIHOOD)
-            // update increments and priors // TODO: does the species partition need to get updated too? - double check coal likelihood
-            double log_increment_prior = 0.0;
-            bool coalescence = false;
-            for (auto &s:_species_partition) {
-                if (s.first == species_name) {
-                    coalescence = true;
-                }
-                else {
-                    coalescence = false;
-                }
-                
-                if (coalescence) {
-                    // if there is coalescence, need to use number of lineages before the join
-                    double coalescence_rate = (s.second.size())*(s.second.size()-1) / _theta;
-                    assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
-                    double nChooseTwo = (s.second.size())*(s.second.size()-1);
-                    double log_prob_join = log(2/nChooseTwo);
-                    log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate) + log_prob_join;
-                }
-                else {
-                    double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
-                    log_increment_prior -= increment*coalescence_rate;
-                }
-            }
-        
-//            _log_coalescent_likelihood_options.push_back(log_increment_prior);
-#else
-//        _log_coalescent_likelihood_options.push_back(0.0);
-#endif
-        
         return make_tuple(subtree1, subtree2, new_nd);
     }
 
@@ -1091,8 +1048,6 @@ class Forest {
         _increments_and_priors = other._increments_and_priors;
         _done = other._done;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
-//        _log_coalescent_likelihood_options = other._log_coalescent_likelihood_options;
-        _prev_log_coalescent_likelihood = other._prev_log_coalescent_likelihood;
         _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
         _other_log_weight = other._other_log_weight;
 
@@ -1239,8 +1194,7 @@ inline string Forest::chooseEvent() {
     }
 
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
-        double prev_log_likelihood = _log_coalescent_likelihood;
-        
+
         // this function creates a new node and joins two species
         
         pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
@@ -1374,7 +1328,6 @@ inline string Forest::chooseEvent() {
 
     inline void Forest::calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree) {
         double log_increment_prior = 0.0;
-        _prev_log_coalescent_likelihood = _log_coalescent_likelihood;
         
         if (!_done) {
             if (gene_tree) {
@@ -1557,7 +1510,6 @@ inline string Forest::chooseEvent() {
         }
         
         if (_proposal == "prior-prior" || one_choice) {
-//        if (_proposal == "prior-prior") {
             _gene_tree_log_likelihood = calcLogLikelihood();
             _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
         }

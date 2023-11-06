@@ -3,8 +3,6 @@
 //#   include <mpi.h>
 //#endif
 
-//#define GENE_TREE_COALESCENT_LIKELIHOOD
-
 //#define SIMULATED
 
 //#define DEBUG_PARTIAL_STORE
