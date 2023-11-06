@@ -41,7 +41,9 @@ class Particle {
         double                                  getLogLikelihood();
         double                                  calcHeight();
         double                                  getLogWeight() const {return _log_weight;}
+        double                                  getPrevLogWeight() const {return _prev_log_weight;}
         void                                    setLogWeight(double w){_log_weight = w;}
+        void                                    setPrevLogWeight(double w){_prev_log_weight = w;}
         void                                    operator=(const Particle & other);
         const vector<Forest> &                  getForest() const {return _forests;}
         string                                  saveForestNewick() {
@@ -87,6 +89,8 @@ class Particle {
         bool                                    _species_join_proposed;
         double                                  _prev_log_coal_like;
         double                                  _prev_increment;
+        double                                  _prev_species_tree_likelihood;
+        double                                  _prev_log_weight;
 };
 
     inline Particle::Particle() {
@@ -97,6 +101,7 @@ class Particle {
         _species_join_proposed = false;
         _prev_log_coal_like = 0.0;
         _prev_increment = 0.0;
+        _prev_species_tree_likelihood = 0.0;
     };
 
     inline void Particle::showParticle() {
@@ -149,6 +154,7 @@ class Particle {
         }
         if (_generation == 0 && !_run_on_empty) {
             _log_weight = log_likelihood;
+            _prev_species_tree_likelihood = log_likelihood;
         }
 
         return log_likelihood;
@@ -176,8 +182,16 @@ class Particle {
 #else
         _species_join_proposed = false;
         bool done = false;
-    
+        
+        double log_coal_like = 0.0;
+        for (int i=1; i<_forests.size(); i++) {
+            log_coal_like += _forests[i]._log_coalescent_likelihood;
+        }
+        
+        _prev_log_coal_like = log_coal_like;
+        
         while (!done) {
+    
         vector<double> forest_rates; // this vector contains total rate of species tree, gene 1, etc.
         vector<vector<double>> gene_forest_rates; // this vector contains rates by species for each gene forest
         gene_forest_rates.resize(_forests.size()-1);
@@ -304,16 +318,16 @@ class Particle {
         double min_coalescence_time = 0.0;
 #if defined (USE_MIN_COALESCENCE_TIME)
         if (index > 0) {
-            min_coalescence_time = *min_element(std::begin(increments), std::end(increments)); // TODO: use just minimum increment or also switch the event to the minimum?
-//            for (int i=0; i<increments.size(); i++) {
-//                if (increments[i] == min_coalescence_time) {
-//                    index = i;
-//                    break;
-//                }
-//            }
-//            if (!_forests[0]._done) {
-//                assert (index > 0);
-//            }
+            min_coalescence_time = *min_element(std::begin(increments), std::end(increments));
+            for (int i=0; i<increments.size(); i++) {
+                if (increments[i] == min_coalescence_time) {
+                    index = i;
+                    break;
+                }
+            }
+            if (!_forests[0]._done) {
+                assert (index > 0);
+            }
         }
 #endif
         
@@ -360,9 +374,13 @@ class Particle {
             
             _forests[f].calcIncrementPrior(increment, species_name, new_increment, coalescence, gene_tree);
         }
+        
+        double log_coal_like = 0.0;
+        for (int i=1; i<_forests.size(); i++) {
+            log_coal_like += _forests[i]._log_coalescent_likelihood;
+        }
             
         if (species_name == "species") {
-//            showParticle();
             // species tree proposal, need to update species partition in all gene forests
             assert (index == 0);
             assert (forest_number == 0);
@@ -375,13 +393,13 @@ class Particle {
         
         else {
             _forests[forest_number].allowCoalescence(species_name, increment);
-//            showParticle();
             done = true;
         }
                     
         if (species_name != "species") {
             if (!_run_on_empty) {
                 _log_weight = _forests[forest_number]._log_weight;
+                _prev_log_weight = _log_weight;
             }
         }
         
@@ -389,11 +407,19 @@ class Particle {
             // species log weight is always 0
             _species_join_proposed = true;
             _log_weight = 0.0;
-            done = true;
+//            _log_weight = log_coal_like - _prev_log_coal_like;
+            
+            double current_species_tree_likelihood = 0.0;
+            for (int f=1; f<_forests.size(); f++) {
+                current_species_tree_likelihood += _forests[f]._gene_tree_log_likelihood;
+            }
+            _prev_species_tree_likelihood = current_species_tree_likelihood;
+//            done = true;
         }
             
         _prev_forest_number = forest_number;
-    }
+//            _prev_log_coal_like = log_coal_like;
+        }
         _generation++;
     #endif
     }
@@ -786,6 +812,8 @@ class Particle {
         _species_join_proposed = other._species_join_proposed;
         _prev_log_coal_like = other._prev_log_coal_like;
         _prev_increment = other._prev_increment;
+        _prev_species_tree_likelihood = other._prev_species_tree_likelihood;
+        _prev_log_weight = other._prev_log_weight;
     };
 }
 

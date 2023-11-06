@@ -862,8 +862,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     
                     //run through each generation of particles
                     
-                    for (unsigned g=0; g<(ntaxa-1)*nsubsets+nspecies-1; g++){
-//                        for (unsigned g=0; g<(ntaxa-1)*nsubsets-1+1; g++){
+//                    for (unsigned g=0; g<(ntaxa-1)*nsubsets+nspecies-1; g++){
+                        for (unsigned g=0; g<(ntaxa-1)*nsubsets-1+1; g++){
 
                         if (_verbose > 0) {
                             cout << "starting step " << g << " of " << nspecies-1+(ntaxa-1)*nsubsets-1 << endl;
@@ -892,6 +892,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         }
                         
 //                        if (ess < 100) {
+//                        if (g % 2) { // resample every other generation
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                             //if use_first is true, my_vec = my_vec_2
                             //if use_first is false, my_vec = my_vec_1
@@ -900,23 +901,29 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
                             //change use_first from true to false or false to true
                             use_first = !use_first;
-//                        }
-                        unsigned species_count = 0;
-                        
-                        for (auto &p:my_vec) {
-                            if (p->speciesJoinProposed()) {
-                                species_count++;
-//                                p->showParticle();
-//                                p->showSpeciesTree();
-//                                cout << "ESS for a species join is " << ess << endl;
-//                                break;
+                            
+                            unsigned species_count = 0;
+                            
+                            for (auto &p:my_vec) {
+                                if (p->speciesJoinProposed()) {
+                                    species_count++;
+                                }
                             }
-                        }
-                        
-                        if (_verbose > 1) {
-                            cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
-                            cout << "\t" << "number of species join particles accepted = " << species_count << endl;
-                        }
+                            
+                            if (_verbose > 1) {
+                                cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
+                                cout << "\t" << "number of species join particles accepted = " << species_count << endl;
+                            }
+//                            for (auto &p:my_vec) {
+//                                p->setPrevLogWeight(0.0);
+//                            }
+//                        }
+//                        else {
+//                            for (auto &p:my_vec) {
+//                                double prev_log_weight = p->getPrevLogWeight();
+//                                p->setLogWeight(prev_log_weight);
+//                            }
+//                        }
                         resetWeights(my_vec);
                         _accepted_particle_vec = my_vec;
                         
