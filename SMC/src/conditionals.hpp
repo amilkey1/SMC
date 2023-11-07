@@ -5,14 +5,8 @@
 
 //#define SIMULATED
 
-//#define DEBUG_PARTIAL_STORE
-
-//#define USING_SIGNPOSTS
-
 //#define SNAKE
 
-#define USE_MIN_COALESCENCE_TIME
-
-//#define TWO_JOINS
+//#define PRIOR_POST_ALL_PAIRS
 
 //#define PRIOR_POST_AVERAGE

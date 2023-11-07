@@ -654,6 +654,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             for (int i=1; i < nsubsets+1; i++) {
                 saveGeneTree(i, my_vec);
             }
+            
             writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
             
             if (_verbose > 0) {
