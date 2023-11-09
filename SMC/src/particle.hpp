@@ -91,6 +91,7 @@ class Particle {
         unsigned                                _prev_forest_number;
         bool                                    _species_join_proposed;
         double                                  _prev_increment;
+        double                                  _prev_log_coalescent_likelihood;
 };
 
     inline Particle::Particle() {
@@ -100,6 +101,7 @@ class Particle {
         _prev_forest_number = -1;
         _species_join_proposed = false;
         _prev_increment = 0.0;
+        _prev_log_coalescent_likelihood = 0.0;
     };
 
     inline void Particle::showParticle() {
@@ -123,7 +125,8 @@ class Particle {
         _generation     = 0;
         _prev_forest_number = 0;
         _species_join_proposed = false;
-        _prev_increment = 0;
+        _prev_increment = 0.0;
+        _prev_log_coalescent_likelihood = 0.0;
     }
 
     inline void Particle::showSpeciesTree() {
@@ -188,6 +191,11 @@ class Particle {
     inline void Particle::proposal() {
         _species_join_proposed = false;
         bool done = false;
+        
+        _prev_log_coalescent_likelihood = 0.0;
+        for (int i=1; i<_forests.size(); i++) {
+            _prev_log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood;
+        }
                 
         while (!done) {
     
@@ -225,6 +233,9 @@ class Particle {
                     event_choice_index.push_back(0);
                     event_choice_name.push_back("species");
                 }
+                else {
+                    _forests[0]._done = true;
+                }
             }
         }
             
@@ -256,39 +267,59 @@ class Particle {
                 }
             }
         
+            // if a gene forest coalescence is possible, do not pick a speciation event
+            bool no_speciation = false;
+            if (event_choice_name[0] == "species" && event_choice_name.size() > 1) {
+//                 erase speciation event possibility
+                event_choice_index.erase(event_choice_index.begin() + 0);
+                event_choice_name.erase(event_choice_name.begin() + 0);
+                event_choice_rates.erase(event_choice_rates.begin() + 0);
+                increments.erase(increments.begin() + 0);
+                no_speciation = true;
+            }
+            
             double total_rate = 0.0; // normalize rates before selecting an event
             for (auto &r:event_choice_rates) {
+                assert (r > 0.0);
                 total_rate += r;
             }
-        
+
             for (auto &p:event_choice_rates) {
                  p = log(p/total_rate);
              }
         
+            // choose an event
             unsigned index = selectEvent(event_choice_rates);
+            
+            unsigned forest_number = event_choice_index[index];
+            if (no_speciation) {
+                assert (forest_number != 0);
+            }
         
             double min_coalescence_time = 0.0;
+            double increment = 0.0;
             
-            if (index > 0) {
+            if (forest_number > 0) {
                 min_coalescence_time = *min_element(std::begin(increments), std::end(increments));
+                increment = min_coalescence_time;
+                
+#if defined (USE_MIN_COALESCENCE_EVENT)
                 for (int i=0; i<increments.size(); i++) {
                     if (increments[i] == min_coalescence_time) {
                         index = i;
                         break;
                     }
                 }
-                if (!_forests[0]._done) {
-                    assert (index > 0);
+                forest_number = event_choice_index[index];
+                if (no_speciation) {
+                    assert (forest_number != 0);
                 }
+#endif
             }
-        
-            // choose the minimum increment and event
-            unsigned forest_number = event_choice_index[index];
-        
-            double increment = increments[index];
-            if (min_coalescence_time > 0.0) {
-                assert (increment == min_coalescence_time);
+            else {
+                increment = speciation_time;
             }
+            
             _prev_increment = increment;
                 
             // add increment to all nodes in all forests
@@ -305,26 +336,66 @@ class Particle {
             
             calculateIncrementPriors(increment, species_name, forest_number);
             
+            // remove speciation rate from total rate if it's still included
+            if (!no_speciation) {
+                total_rate -= (_forests[0]._lineages.size() * Forest::_lambda);
+            }
+            assert (total_rate >= 0.0);
+            
+            double log_coalescent_likelihood = 0.0;
+            for (int i=1; i<_forests.size(); i++) {
+                log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood;
+            }
+            
             if (species_name == "species") {
                 assert (index == 0);
                 assert (forest_number == 0);
+                
+                double species_tree_increment = _forests[0].getSpeciesTreeIncrement();
                 speciesProposal();
+                _species_join_proposed = true;
+                assert (increment > 0.0);
+//
+//                double log_prob_no_coalescence = -total_rate*increment;
+////
+                unsigned num_species_lineages = (unsigned)_forests[0]._lineages.size() + 1; // need number of lineages before the join
+//                double log_prob_species_join_posterior = log(num_species_lineages*Forest::_lambda) - (num_species_lineages*Forest::_lambda*increment);
+////
+//                double log_prob_species_join_proposal = log(num_species_lineages*Forest::_lambda) - (num_species_lineages*Forest::_lambda*species_tree_increment); // TODO: unsure about this one
+//                double log_prob_no_coalescence_within_speciation = 0.0;
+//                if (total_rate > 0.0) { // TODO: total rate will always be 0 because choosing a speciation event means no coalescence possible
+//                    log_prob_no_coalescence_within_speciation = (-total_rate*species_tree_increment) - log(1 - exp(-total_rate*species_tree_increment));
+                double test = increment - species_tree_increment;
+                double test2 = Forest::_lambda*test;
+                double test3 = num_species_lineages * test2;
+                double log_test = -1*test3;
+//                _log_weight = log_test;
+
+//                }
+                
+//                _log_weight = log_prob_species_join_posterior - log_prob_species_join_proposal;
             }
         
             else {
-                geneProposal(event_choice_index, forest_number, event_choice_name, increment, species_name);
+                assert (increment > 0.0);
+                double log_conditional_term = 0.0;
+                double log_speciation_term = 0.0;
+                unsigned num_species_lineages = (unsigned)_forests[0]._lineages.size();
+                
+                if (speciation_time != -1) {
+                    assert (!_forests[0]._done);
+//                    log_conditional_term = log(1 - exp(-total_rate*speciation_time));
+//                    log_speciation_term = log(1/(num_species_lineages*Forest::_lambda))-(num_species_lineages*Forest::_lambda*(increment - speciation_time));
+                }
+                    geneProposal(event_choice_index, forest_number, event_choice_name, increment, species_name);
+                double log_likelihood_term = _forests[forest_number]._log_weight;
+                
+//                _log_weight = log_likelihood_term;
+                _log_weight = log_speciation_term + log_likelihood_term + log_conditional_term;
                 done = true;
             }
-                    
-            if (species_name != "species") {
-                if (!_run_on_empty) {
-                    _log_weight = _forests[forest_number]._log_weight;
-                }
-            }
-        
-            else {
-                // species log weight is always 0
-                _species_join_proposed = true;
+                  
+            if (_run_on_empty) {
                 _log_weight = 0.0;
             }
             
@@ -332,6 +403,7 @@ class Particle {
             
             }
         _generation++;
+//        showParticle();
     }
 
     vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {
@@ -341,6 +413,7 @@ class Particle {
         // choose increments for each event
         for (int p=0; p<event_choice_rates.size(); p++) {
             increments[p] = (rng.gamma(1.0, 1.0/event_choice_rates[p]));
+            assert (increments[p] > 0.0);
          }
         return increments;
     }
@@ -596,6 +669,7 @@ class Particle {
         _prev_forest_number = other._prev_forest_number;
         _species_join_proposed = other._species_join_proposed;
         _prev_increment = other._prev_increment;
+        _prev_log_coalescent_likelihood = other._prev_log_coalescent_likelihood;
     };
 }
 

@@ -655,7 +655,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 saveGeneTree(i, my_vec);
             }
             
-            writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
+//            writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
             
             if (_verbose > 0) {
                 cout << "marginal likelihood: " << _log_marginal_likelihood << endl;

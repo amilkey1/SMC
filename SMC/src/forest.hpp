@@ -131,6 +131,7 @@ class Forest {
         bool                        _done;
         double                      _log_coalescent_likelihood;
         double                      _log_coalescent_likelihood_increment;
+        double                      _cum_height;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -139,6 +140,7 @@ class Forest {
         void                        hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment, string species_name);
         void                        resetToMinor(vector<Node*> minor_nodes, vector<Node*> minor_left_children, vector<Node*> minor_right_children, vector<double> minor_left_edge_lengths, vector<double> minor_right_edge_lengths);
         double                      getTreeHeight();
+        double                      getSpeciesTreeIncrement();
         double                      getLineageHeight(Node* nd);
         double                      _log_weight;
         double                      _other_log_weight;
@@ -183,6 +185,7 @@ class Forest {
         _log_coalescent_likelihood = 0.0;
         _log_coalescent_likelihood_increment = 0.0;
         _other_log_weight = 0.0;
+        _cum_height = 0.0;
 
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -1050,6 +1053,7 @@ class Forest {
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
         _other_log_weight = other._other_log_weight;
+        _cum_height = other._cum_height;
 
         // copy tree itself
 
@@ -1194,7 +1198,7 @@ inline string Forest::chooseEvent() {
     }
 
     inline tuple<string,string, string> Forest::speciesTreeProposal() {
-
+        _cum_height = 0.0; // reset cum height for a new lineage
         // this function creates a new node and joins two species
         
         pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
@@ -2101,6 +2105,11 @@ inline string Forest::chooseEvent() {
         return sum_height;
     }
 
+    inline double Forest::getSpeciesTreeIncrement() {
+        assert (_index == 0);
+        return _cum_height;
+    }
+
     inline vector<pair<double, string>> Forest::calcForestRate() {
         vector<pair<double, string>> rates;
         pair<double, string> rate_and_name;
@@ -2122,6 +2131,7 @@ inline string Forest::chooseEvent() {
         }
         if (_index == 0) {
             _last_edge_length = increment;
+            _cum_height += increment;
         }
     }
 
@@ -2129,7 +2139,7 @@ inline string Forest::chooseEvent() {
         if (nd != nullptr) {
             double sum_height = 0.0;
             
-            sum_height += nd->getEdgeLength();
+//            sum_height += nd->getEdgeLength();
             if (nd->_left_child) {
                 for (Node* child = nd->_left_child; child; child=child->_left_child) {
                     sum_height += child->getEdgeLength();
