@@ -602,17 +602,20 @@ class Forest {
         unsigned t2=1;
         //don't use this when there's only one choice (2 subtrees)
         // thread safe random number generator with mutex
-        mtx.lock();
-        if (nsubtrees > 2) {
-            t1 = ::rng.randint(0, nsubtrees-1);
-            t2 = ::rng.randint(0, nsubtrees-1);
-
-            //keep calling t2 until it doesn't equal t1
-            while (t2 == t1) {
+        
+        {
+            // thread safe random number generator with mutex
+            lock_guard<mutex> guard(mtx);
+            if (nsubtrees > 2) {
+                t1 = ::rng.randint(0, nsubtrees-1);
                 t2 = ::rng.randint(0, nsubtrees-1);
+    
+                //keep calling t2 until it doesn't equal t1
+                while (t2 == t1) {
+                    t2 = ::rng.randint(0, nsubtrees-1);
+                }
             }
         }
-        mtx.unlock();
         return make_pair(t1, t2);
     }
 
@@ -1468,9 +1471,9 @@ inline string Forest::chooseEvent() {
         //always calculating partials now
         assert (new_nd->_partial == nullptr);
         new_nd->_partial=ps.getPartial(_npatterns*4);
-        assert(new_nd->_left_child->_right_sib); // TODO: can maintain partial from subtree choice
+        assert(new_nd->_left_child->_right_sib); // TODO: can maintain partial from subtree choice in prior-post
         
-        _new_nodes.push_back(new_nd);
+//        _new_nodes.push_back(new_nd);
         calcPartialArray(new_nd);
 
         //update species list

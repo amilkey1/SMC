@@ -380,17 +380,15 @@ class Particle {
         vector<double> increments;
         increments.resize(event_choice_rates.size());
         
-        // choose increments for each event
-        // thread safe random number generator with mutex
-        mutx.lock();
-        for (int p=0; p<event_choice_rates.size(); p++) {
-            increments[p] = (rng.gamma(1.0, 1.0/event_choice_rates[p]));
-            if (increments[p] <= 0.0) {
-                cout << "chosen increment is " << increments[p] << endl;
-            }
-            assert (increments[p] > 0.0);
-         }
-        mutx.unlock();
+        {
+            // thread safe random number generator with mutex
+            lock_guard<mutex> guard(mutx);
+            // choose an increment
+            for (int p=0; p<event_choice_rates.size(); p++) {
+                increments[p] = (rng.gamma(1.0, 1.0/event_choice_rates[p]));
+                assert (increments[p] > 0.0);
+             }
+        }
         return increments;
     }
 

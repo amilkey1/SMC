@@ -587,10 +587,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 
                 //run through each generation of particles
             
-            unsigned nsteps = (ntaxa-1)*nsubsets-1+1;
+                unsigned nsteps = (ntaxa-1)*nsubsets-1+1;
                 
-//                    for (unsigned g=0; g<(ntaxa-1)*nsubsets+nspecies-1; g++){
-                    for (unsigned g=0; g<nsteps; g++){
+                for (unsigned g=0; g<nsteps; g++){
 
                     if (_verbose > 0) {
                         cout << "starting step " << g << " of " << nsteps-1 << endl;
