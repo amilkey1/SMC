@@ -173,11 +173,11 @@ class Forest {
     inline void Forest::clear() {
         _nodes.clear();
         _lineages.clear();
-        _nodes.resize(_ntaxa);
         _npatterns = 0;
         _nstates = 4;
         _last_edge_length = 0.0;
-        _lineages.reserve(_nodes.size());
+//        _lineages.reserve(_nodes.size());
+        _lineages.clear();
         _log_weight = 0.0;
         _gene_tree_log_likelihood = 0.0;
         _log_joining_prob = 0.0;
@@ -186,7 +186,33 @@ class Forest {
         _log_coalescent_likelihood_increment = 0.0;
         _other_log_weight = 0.0;
         _cum_height = 0.0;
+        _nleaves=_ntaxa;
+        _ninternals=0;
+    }
 
+    inline Forest::Forest(const Forest & other) {
+        clear();
+        *this = other;
+    }
+
+    inline void Forest::setData(Data::SharedPtr d, int index, map<string, string> &taxon_map) {
+        _data = d;
+        _index = index;
+        assert (index > 0);
+
+        //don't set data for species tree
+//        if (index>0) {
+            Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index-1);
+            _first_pattern = gene_begin_end.first;
+            _npatterns = _data->getNumPatternsInSubset(index-1);
+//            }
+
+        const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
+        unsigned i = 0;
+        auto data_matrix=_data->getDataMatrix();
+        
+        _nodes.resize(_ntaxa);
+        _lineages.reserve(_nodes.size());
         //create taxa
         for (unsigned i = 0; i < _ntaxa; i++) {
             Node* nd = &*next(_nodes.begin(), i);
@@ -200,29 +226,6 @@ class Forest {
             nd->_position_in_lineages=i;
             _lineages.push_back(nd);
             }
-        _nleaves=_ntaxa;
-        _ninternals=0;
-    }
-
-    inline Forest::Forest(const Forest & other) {
-        clear();
-        *this = other;
-    }
-
-    inline void Forest::setData(Data::SharedPtr d, int index, map<string, string> &taxon_map) {
-        _data = d;
-        _index = index;
-
-        //don't set data for species tree
-        if (index>0) {
-            Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index-1);
-            _first_pattern = gene_begin_end.first;
-            _npatterns = _data->getNumPatternsInSubset(index-1);
-            }
-
-        const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
-        unsigned i = 0;
-        auto data_matrix=_data->getDataMatrix();
 
         for (auto nd:_lineages) {
             if (!nd->_left_child) {
@@ -232,7 +235,7 @@ class Forest {
                   boost::replace_all(name, " ", "_");
                 nd->_name = name;
 
-                if (index>0) {
+//                if (index>0) {
                     nd->_partial=ps.getPartial(_npatterns*4);
                     for (unsigned p=0; p<_npatterns; p++) {
                         unsigned pp = _first_pattern+p;
@@ -243,7 +246,7 @@ class Forest {
                             (*nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
                         }
                     }
-                }
+//                }
             }
         }
 
@@ -1143,27 +1146,29 @@ class Forest {
     }
 
     inline void Forest::setUpSpeciesForest(vector<string> &species_names) {
-        assert (_index==0);
+        _index = 0;
         assert (_nspecies = (unsigned) species_names.size());
-        clear();
+        
         //create species
-        double edge_length = 0.0;
+        _nodes.resize(_nspecies);
+        _lineages.reserve(_nodes.size());
+        //create taxa
         for (unsigned i = 0; i < _nspecies; i++) {
             Node* nd = &*next(_nodes.begin(), i);
             nd->_right_sib=0;
-            nd->_name=species_names[i];
+            nd->_name=" ";
             nd->_left_child=0;
             nd->_right_sib=0;
             nd->_parent=0;
             nd->_number=i;
-            nd->_edge_length = edge_length;
+            nd->_edge_length=0.0;
             nd->_position_in_lineages=i;
+            nd->_name=species_names[i];
+            _lineages.push_back(nd);
             }
+        
         _nleaves=_nspecies;
         _ninternals=0;
-        _nodes.resize(_nspecies);
-//        _nodes.resize(_nspecies*3);
-        _lineages.resize(_nspecies);
     }
 
 inline string Forest::chooseEvent() {

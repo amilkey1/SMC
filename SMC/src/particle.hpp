@@ -30,9 +30,11 @@ class Particle {
                                                     _nsubsets = d->getNumSubsets();
                                                     _data = d;
                                                     int index = 0;
-                                                    _forests.resize(_nsubsets+1);
+                                                    _forests.resize(_nsubsets+1); // TODO: wasteful this makes extra species lineages and nodes
                                                     for (auto &_forest:_forests) {
-                                                        _forest.setData(d, index, taxon_map);
+                                                        if (index > 0) {// TODO: only do this for the gene trees
+                                                            _forest.setData(d, index, taxon_map);
+                                                        }
                                                         index++;
                                                     }
                                                 }
