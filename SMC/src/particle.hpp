@@ -351,47 +351,26 @@ class Particle {
                 assert (index == 0);
                 assert (forest_number == 0);
                 
-                double species_tree_increment = _forests[0].getSpeciesTreeIncrement();
                 speciesProposal();
                 _species_join_proposed = true;
                 assert (increment > 0.0);
-//
-//                double log_prob_no_coalescence = -total_rate*increment;
-////
-                unsigned num_species_lineages = (unsigned)_forests[0]._lineages.size() + 1; // need number of lineages before the join
-//                double log_prob_species_join_posterior = log(num_species_lineages*Forest::_lambda) - (num_species_lineages*Forest::_lambda*increment);
-////
-//                double log_prob_species_join_proposal = log(num_species_lineages*Forest::_lambda) - (num_species_lineages*Forest::_lambda*species_tree_increment); // TODO: unsure about this one
-//                double log_prob_no_coalescence_within_speciation = 0.0;
-//                if (total_rate > 0.0) { // TODO: total rate will always be 0 because choosing a speciation event means no coalescence possible
-//                    log_prob_no_coalescence_within_speciation = (-total_rate*species_tree_increment) - log(1 - exp(-total_rate*species_tree_increment));
-                double test = increment - species_tree_increment;
-                double test2 = Forest::_lambda*test;
-                double test3 = num_species_lineages * test2;
-                double log_test = -1*test3;
-//                _log_weight = log_test;
-
-//                }
-                
-//                _log_weight = log_prob_species_join_posterior - log_prob_species_join_proposal;
             }
         
             else {
                 assert (increment > 0.0);
-                double log_conditional_term = 0.0;
                 double log_speciation_term = 0.0;
                 unsigned num_species_lineages = (unsigned)_forests[0]._lineages.size();
                 
                 if (speciation_time != -1) {
                     assert (!_forests[0]._done);
-//                    log_conditional_term = log(1 - exp(-total_rate*speciation_time));
-//                    log_speciation_term = log(1/(num_species_lineages*Forest::_lambda))-(num_species_lineages*Forest::_lambda*(increment - speciation_time));
+                    log_speciation_term = log(1/(num_species_lineages*Forest::_lambda))-(num_species_lineages*Forest::_lambda*(increment - speciation_time));
                 }
-                    geneProposal(event_choice_index, forest_number, event_choice_name, increment, species_name);
+                geneProposal(event_choice_index, forest_number, event_choice_name, increment, species_name);
                 double log_likelihood_term = _forests[forest_number]._log_weight;
                 
-//                _log_weight = log_likelihood_term;
-                _log_weight = log_speciation_term + log_likelihood_term + log_conditional_term;
+                _log_weight = log_speciation_term + log_likelihood_term;
+//                _log_weight =  log_likelihood_term;
+
                 done = true;
             }
                   
