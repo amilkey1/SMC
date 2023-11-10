@@ -3,6 +3,8 @@
 #include "forest.hpp"
 #include "boost/format.hpp"
 #include "boost/math/special_functions/gamma.hpp"
+#include <mutex>
+
 using namespace std;
 using namespace boost;
 
@@ -10,6 +12,7 @@ using namespace boost;
 #include "conditionals.hpp"
 
 extern proj::Lot rng;
+std::mutex mutx;
 
 namespace proj {
 
@@ -191,11 +194,6 @@ class Particle {
     inline void Particle::proposal() {
         _species_join_proposed = false;
         bool done = false;
-        
-        _prev_log_coalescent_likelihood = 0.0;
-        for (int i=1; i<_forests.size(); i++) {
-            _prev_log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood;
-        }
                 
         while (!done) {
     
@@ -342,11 +340,6 @@ class Particle {
             }
             assert (total_rate >= 0.0);
             
-            double log_coalescent_likelihood = 0.0;
-            for (int i=1; i<_forests.size(); i++) {
-                log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood;
-            }
-            
             if (species_name == "species") {
                 assert (index == 0);
                 assert (forest_number == 0);
@@ -369,7 +362,6 @@ class Particle {
                 double log_likelihood_term = _forests[forest_number]._log_weight;
                 
                 _log_weight = log_speciation_term + log_likelihood_term;
-//                _log_weight =  log_likelihood_term;
 
                 done = true;
             }
@@ -382,7 +374,6 @@ class Particle {
             
             }
         _generation++;
-//        showParticle();
     }
 
     vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {
@@ -390,10 +381,16 @@ class Particle {
         increments.resize(event_choice_rates.size());
         
         // choose increments for each event
+        // thread safe random number generator with mutex
+        mutx.lock();
         for (int p=0; p<event_choice_rates.size(); p++) {
             increments[p] = (rng.gamma(1.0, 1.0/event_choice_rates[p]));
+            if (increments[p] <= 0.0) {
+                cout << "chosen increment is " << increments[p] << endl;
+            }
             assert (increments[p] > 0.0);
          }
+        mutx.unlock();
         return increments;
     }
 

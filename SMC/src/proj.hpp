@@ -230,11 +230,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("model", boost::program_options::value(&Forest::_model)->default_value("JC"), "a string defining a substitution model")
         ("kappa",  boost::program_options::value(&Forest::_kappa)->default_value(1.0), "value of kappa")
         ("base_frequencies", boost::program_options::value(&Forest::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
-        ("nthreads",  boost::program_options::value(&_nthreads)->default_value(1.0), "number of threads for multi threading")
+        ("nthreads",  boost::program_options::value(&_nthreads)->default_value(1), "number of threads for multi threading")
         ("migration_rate", boost::program_options::value(&Forest::_migration_rate)->default_value(0.0), "migration rate")
         ("hybridization_rate", boost::program_options::value(&Forest::_hybridization_rate)->default_value(0.0), "hybridization rate")
         ("run_on_empty", boost::program_options::value(&Particle::_run_on_empty)->default_value(false), "run program without data")
-        ("verbose", boost::program_options::value(&_verbose)->default_value(0), "set amount of output printed")
+        ("verbose", boost::program_options::value(&_verbose)->default_value(1), "set amount of output printed")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -389,7 +389,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
          
          // Draw new set of particles by sampling with replacement according to cum_probs
-    //        to_particles.resize(_nparticles*_species_particles_per_gene_particle);
          to_particles.resize(_nparticles);
          for(unsigned i = 0; i < _nparticles; i++) {
          
@@ -403,14 +402,14 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                  }
              }
              assert(sel_index > -1);
-//             cout << "selected index is: " << sel_index;
              
              Particle::SharedPtr p0 = from_particles[sel_index];
              to_particles[i]=Particle::SharedPtr(new Particle(*p0));
              
              assert(nparticles == to_particles.size());
-         }
-     }
+             }
+        }
+
     inline void Proj::resetWeights(vector<Particle::SharedPtr> & particles) {
         double logw = -log(particles.size());
         for (auto & p : particles) {
@@ -452,8 +451,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
         cout << "theta = " << Forest::_theta << endl;
         cout << "speciation rate = " << Forest::_lambda << endl;
-
-//        saveAllForests(my_vec);
     }
 
     inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles) {
