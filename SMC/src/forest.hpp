@@ -85,7 +85,7 @@ class Forest {
         string                      chooseLineage(Node* taxon_to_migrate, string key_to_del);
         void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
         void                        deleteTaxon(string key_to_del, unsigned taxon_choice);
-        void                        allowCoalescence(string species_name, double increment, vector<string> eligible_species);
+        void                        allowCoalescence(string species_name, double increment, vector<string> eligible_species, bool chosen);
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
         vector<string>              hybridizeSpecies();
         void                        moveGene(string new_nd, string parent, string hybrid);
@@ -121,7 +121,6 @@ class Forest {
         double                      _gene_tree_log_likelihood;
         vector<pair<Node*, Node*>>  _node_choices;
         vector<double>              _log_likelihood_choices;
-        double                      _prev_log_likelihood;
         int                         _index_of_choice;
         pair<Node*, Node*>          _species_joined;
         tuple<Node*, Node*, Node*>  _hybrid_species_joined;
@@ -176,7 +175,6 @@ class Forest {
         _npatterns = 0;
         _nstates = 4;
         _last_edge_length = 0.0;
-//        _lineages.reserve(_nodes.size());
         _lineages.clear();
         _log_weight = 0.0;
         _gene_tree_log_likelihood = 0.0;
@@ -867,7 +865,7 @@ class Forest {
         
          // erase extra nodes created from node list
         _node_choices.clear();
-        _log_likelihood_choices.clear();
+//        _log_likelihood_choices.clear();
         
          return make_pair(subtree1, subtree2);
      }
@@ -1045,7 +1043,6 @@ class Forest {
         _index_of_choice    = other._index_of_choice;
         _node_choices = other._node_choices;
         _log_likelihood_choices = other._log_likelihood_choices;
-        _prev_log_likelihood = other._prev_log_likelihood;
         _species_joined = other._species_joined;
         _hybrid_species_joined = other._hybrid_species_joined;
         _migration_rate = other._migration_rate;
@@ -1371,16 +1368,30 @@ inline string Forest::chooseEvent() {
         }
     }
 
-    inline void Forest::allowCoalescence(string species_name, double increment, vector<string> eligible_species) {
+    inline void Forest::allowCoalescence(string species_name, double increment, vector<string> eligible_species, bool chosen) {
+        double prev_log_likelihood = _gene_tree_log_likelihood;
+        _log_likelihood_choices.clear();
+        _node_choices.clear();
+        _other_log_weight = 0.0;
+        
+        if (chosen) {
+            
         Node *subtree1 = nullptr;
         Node *subtree2 = nullptr;
         list<Node*> nodes;
         
         vector<list<Node*>> other_nodes;
+            for (int s=0; s<eligible_species.size(); s++) {
+                if (eligible_species[s] == species_name) {
+                    eligible_species.erase(eligible_species.begin()+s);
+                    break;
+                }
+            }
         
         for (auto &s:_species_partition) {
             if (s.first == species_name) {
                 nodes = s.second;
+//                other_nodes.push_back(s.second);
             }
             else {
                 for (int i=0; i<eligible_species.size(); i++) {
@@ -1392,7 +1403,7 @@ inline string Forest::chooseEvent() {
                 }
             }
         }
-        assert (other_nodes.size() == eligible_species.size() - 1);
+        assert (other_nodes.size() == eligible_species.size());
         
         unsigned s = (unsigned) nodes.size();
         calcTopologyPrior(s);
@@ -1402,101 +1413,140 @@ inline string Forest::chooseEvent() {
         assert (s > 1);
         bool one_choice = false;
 
-        // prior-prior proposal
-        if (_proposal == "prior-prior") {
-            pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
-            auto it1 = std::next(nodes.begin(), t.first);
-            subtree1 = *it1;
+            // prior-prior proposal
+            if (_proposal == "prior-prior") {
+                pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+                auto it1 = std::next(nodes.begin(), t.first);
+                subtree1 = *it1;
 
-            auto it2 = std::next(nodes.begin(), t.second);
-            subtree2 = *it2;
-            assert (t.first < nodes.size() && t.second < nodes.size());
-        }
-        else {
-#if defined (PRIOR_POST_ALL_PAIRS)
-            _other_log_weight = 0.0;
-            
-            pair<Node*, Node*> t = chooseAllPairs(nodes, species_name, prev_log_likelihood, increment);
-            subtree1 = t.first;
-            subtree2 = t.second;
-
-            chooseAllOtherPairs(nodes, species_name, prev_log_likelihood, increment);
-            for (int i=0; i<other_nodes.size(); i++) {
-                if (other_nodes[i].size() > 1) {
-                    string species = eligible_species[i];
-                    chooseAllOtherPairs(other_nodes[i], species, prev_log_likelihood, increment);
-                }
+                auto it2 = std::next(nodes.begin(), t.second);
+                subtree2 = *it2;
+                assert (t.first < nodes.size() && t.second < nodes.size());
             }
-            
-            // reweight each choice of pairs
-           vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, prev_log_likelihood);
-
-            // sum unnormalized weights before choosing the pair
-            // must include the likelihoods of all pairs in the final particle weight
-            double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-            _log_weight = log_weight_choices_sum;
-            
-#else
-            if (nodes.size() > 2) {
+            else {
+    #if defined (PRIOR_POST_ALL_PAIRS)
+                _other_log_weight = 0.0;
+                
                 pair<Node*, Node*> t = chooseAllPairs(nodes, species_name, prev_log_likelihood, increment);
+                
+//                _log_likelihood_choices.clear();
                 
                 subtree1 = t.first;
                 subtree2 = t.second;
-            }
-            else {
-                one_choice = true;
-
-                subtree1 = nodes.front();
-                subtree2 = nodes.back();
-            }
-#endif
                 
-        }
-        
-        // if only 1 choice, subtree has already been created in chooseAllPairs function
-        assert (subtree1 != subtree2);
-        
-        //new node is always needed
-        Node nd;
-        _nodes.push_back(nd);
-        Node* new_nd = &_nodes.back();
+                if (other_nodes.size() > 0) {
+                    for (int i=0; i<other_nodes.size(); i++) {
+                        if (other_nodes[i].size() > 0) {
+                            string species = eligible_species[i];
+                            chooseAllOtherPairs(other_nodes[i], species, prev_log_likelihood, increment);
+                        }
+                    }
+                            
+                // reweight each choice of pairs
+                vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, prev_log_likelihood);
 
-        new_nd->_parent=0;
-        new_nd->_number=_nleaves+_ninternals;
-        new_nd->_edge_length=0.0;
-        _ninternals++;
-        new_nd->_right_sib=0;
+                 // sum unnormalized weights before choosing the pair
+                 // must include the likelihoods of all pairs in the final particle weight
+                 double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
+                 _other_log_weight = log_weight_choices_sum;
+                }
+                
+    #else
+                if (nodes.size() > 2) {
+                    pair<Node*, Node*> t = chooseAllPairs(nodes, species_name, prev_log_likelihood, increment);
+                    
+                    subtree1 = t.first;
+                    subtree2 = t.second;
+                }
+                else {
+                    one_choice = true;
 
-        new_nd->_left_child=subtree1;
-        subtree1->_right_sib=subtree2;
-
-        subtree1->_parent=new_nd;
-        subtree2->_parent=new_nd;
-
-        //always calculating partials now
-        assert (new_nd->_partial == nullptr);
-        new_nd->_partial=ps.getPartial(_npatterns*4);
-        assert(new_nd->_left_child->_right_sib); // TODO: can maintain partial from subtree choice in prior-post
-        
-//        _new_nodes.push_back(new_nd);
-        calcPartialArray(new_nd);
-
-        //update species list
-        updateNodeList(nodes, subtree1, subtree2, new_nd);
-        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-        
-        for (auto &s:_species_partition) {
-            if (s.first == species_name) {
-                s.second = nodes; // TODO: this should happen automatically
-                break;
+                    subtree1 = nodes.front();
+                    subtree2 = nodes.back();
+                }
+    #endif
+                    
             }
-        }
         
-#if !defined (PRIOR_POST_ALL_PAIRS)
-        if (_proposal == "prior-prior" || one_choice) {
-            _gene_tree_log_likelihood = calcLogLikelihood();
-            _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
+            // if only 1 choice, subtree has already been created in chooseAllPairs function
+            assert (subtree1 != subtree2);
+            
+            //new node is always needed
+            Node nd;
+            _nodes.push_back(nd);
+            Node* new_nd = &_nodes.back();
+
+            new_nd->_parent=0;
+            new_nd->_number=_nleaves+_ninternals;
+            new_nd->_edge_length=0.0;
+            _ninternals++;
+            new_nd->_right_sib=0;
+
+            new_nd->_left_child=subtree1;
+            subtree1->_right_sib=subtree2;
+
+            subtree1->_parent=new_nd;
+            subtree2->_parent=new_nd;
+
+            //always calculating partials now
+            assert (new_nd->_partial == nullptr);
+            new_nd->_partial=ps.getPartial(_npatterns*4);
+            assert(new_nd->_left_child->_right_sib); // TODO: can maintain partial from subtree choice in prior-post
+            
+            calcPartialArray(new_nd);
+
+            //update species list
+            updateNodeList(nodes, subtree1, subtree2, new_nd);
+            updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+            
+            for (auto &s:_species_partition) {
+                if (s.first == species_name) {
+                    s.second = nodes; // TODO: this should happen automatically
+                    break;
+                }
+            }
+            
+    #if !defined (PRIOR_POST_ALL_PAIRS)
+            if (_proposal == "prior-prior" || one_choice) {
+                _gene_tree_log_likelihood = calcLogLikelihood();
+                _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
+            }
+    #endif
+    }
+        else {
+#if defined (PRIOR_POST_ALL_PAIRS)
+            _other_log_weight = 0.0;
+            vector<list<Node*>> other_nodes;
+            
+            for (auto &s:_species_partition) {
+                for (int i=0; i<eligible_species.size(); i++) {
+                    if (s.first == eligible_species[i]) {
+                        other_nodes.push_back(s.second); // save nodes from other eligible species for prior-post weight update
+                        break;
+                    }
+                }
+            }
+            assert (other_nodes.size() == eligible_species.size());
+            
+            if (other_nodes.size() > 1) {
+                for (int i=0; i<other_nodes.size(); i++) {
+                    if (other_nodes[i].size() > 0) {
+                        string species = eligible_species[i];
+                        chooseAllOtherPairs(other_nodes[i], species, prev_log_likelihood, increment);
+                    }
+                }
+            }
+            vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, prev_log_likelihood);
+
+             // sum unnormalized weights before choosing the pair
+             // must include the likelihoods of all pairs in the final particle weight
+             double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
+             _other_log_weight = log_weight_choices_sum;
+            
+#endif
         }
+#if defined (PRIOR_POST_ALL_PAIRS)
+        _log_weight = _other_log_weight;
 #endif
     }
 

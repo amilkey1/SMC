@@ -84,6 +84,7 @@ class Particle {
         void                                            geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name);
         void                                            calculateIncrementPriors(double increment, string species_name, unsigned forest_number);
         void                                            changeTheta(unsigned i);
+        double                                          getIncrement() {return _prev_increment;}
 
     private:
 
@@ -405,12 +406,23 @@ class Particle {
 
     inline void Particle::geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name) {
         vector<string> eligible_species; // holds all species in the chosen forest that don't exceed the min coalescence time
-        for (int i=0; i<event_choice_index.size(); i++) {
-            if (event_choice_index[i] == forest_number ) {
-                eligible_species.push_back(event_choice_name[i]);
+        
+        for (int a = 1; a < _forests.size(); a++ ) {
+            for (int i=0; i<event_choice_index.size(); i++) {
+                if (event_choice_index[i] == a ) {
+                    eligible_species.push_back(event_choice_name[i]);
+                }
             }
+            if (a == forest_number) {
+                _forests[forest_number].allowCoalescence(species_name, increment, eligible_species, true);
+            }
+            else if (eligible_species.size() > 0) {
+#if defined (PRIOR_POST_ALL_PAIRS)
+//                _forests[a].allowCoalescence(species_name, increment, eligible_species, false);
+#endif
+            }
+            eligible_species.clear();
         }
-        _forests[forest_number].allowCoalescence(species_name, increment, eligible_species);
     }
 
     inline void Particle::changeTheta(unsigned i) {

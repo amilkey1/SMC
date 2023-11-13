@@ -606,6 +606,16 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         }
 //                            p->showParticle();
                     }
+//                    if (num_species_particles_proposed > 0) {
+//                        cout << "stop";
+//                    }
+//                    string name = "increments " + to_string(g) + ".txt";
+//                    ofstream incf(name);
+//                    for (auto &p:my_vec) {
+//                        incf << p->getIncrement() << endl;
+//                    }
+//                    incf.close();
+                    
                     normalizeWeights(my_vec);
                     
                     for (auto & p:my_vec) {
@@ -617,8 +627,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         cout << "\t" << "ESS is : " << ess << endl;
                     }
                     
+                    bool filter = true;
+                    if (filter) {
 //                        if (ess < 100) {
-//                        if (g % 2) { // resample every other generation
+//                        if (g == 35 || g == 74) { // resample every other generation
                         resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                         //if use_first is true, my_vec = my_vec_2
                         //if use_first is false, my_vec = my_vec_1
@@ -641,6 +653,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             cout << "\t" << "number of species join particles accepted = " << species_count << endl;
                         }
                     resetWeights(my_vec);
+                    }
                     
                 } // g loop
                     
@@ -651,7 +664,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 saveGeneTree(i, my_vec);
             }
             
-//            writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
+            writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
             
             if (_verbose > 0) {
                 cout << "marginal likelihood: " << _log_marginal_likelihood << endl;
