@@ -580,8 +580,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 
                 // reset marginal likelihood
                 _log_marginal_likelihood = 0.0;
+                vector<double> starting_log_likelihoods = my_vec[0]->calcGeneTreeLogLikelihoods();
+            
                 for (auto &p:my_vec) {
-                    p->calcLogLikelihood();
+                    p->setLogLikelihood(starting_log_likelihoods);
                 }
                 normalizeWeights(my_vec); // initialize marginal likelihood
                 

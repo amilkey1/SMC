@@ -30,9 +30,9 @@ class Particle {
                                                     _nsubsets = d->getNumSubsets();
                                                     _data = d;
                                                     int index = 0;
-                                                    _forests.resize(_nsubsets+1); // TODO: wasteful this makes extra species lineages and nodes
+                                                    _forests.resize(_nsubsets+1);
                                                     for (auto &_forest:_forests) {
-                                                        if (index > 0) {// TODO: only do this for the gene trees
+                                                        if (index > 0) {
                                                             _forest.setData(d, index, taxon_map);
                                                         }
                                                         index++;
@@ -43,9 +43,11 @@ class Particle {
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
         double                                  getLogLikelihood();
+        vector<double>                          calcGeneTreeLogLikelihoods();
         double                                  calcHeight();
         double                                  getLogWeight() const {return _log_weight;}
         void                                    setLogWeight(double w){_log_weight = w;}
+        void                                    setLogLikelihood(vector<double> forest_likelihoods);
         void                                    operator=(const Particle & other);
         const vector<Forest> &                  getForest() const {return _forests;}
         string                                  saveForestNewick() {
@@ -176,6 +178,32 @@ class Particle {
         }
 
         return log_likelihood;
+    }
+
+    inline vector<double> Particle::calcGeneTreeLogLikelihoods() {
+        vector<double> gene_forest_likelihoods;
+        gene_forest_likelihoods.resize(_forests.size()-1);
+        //calculate likelihood for each gene tree
+        double log_likelihood = 0.0;
+        for (unsigned i=1; i<_forests.size(); i++) {
+            double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
+            assert(!isnan (log_likelihood));
+            //total log likelihood is sum of gene tree log likelihoods
+            gene_forest_likelihoods[i-1] = gene_tree_log_likelihood;
+        }
+
+        return gene_forest_likelihoods;
+    }
+
+    inline void Particle::setLogLikelihood(vector<double> forest_log_likelihoods) {
+        double total_log_likelihood = 0.0;
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i]._gene_tree_log_likelihood = forest_log_likelihoods[i];
+            total_log_likelihood += forest_log_likelihoods[i];
+            _forests[i]._log_weight = forest_log_likelihoods[i];
+        }
+        _log_likelihood = total_log_likelihood;
+        _log_weight = total_log_likelihood;
     }
 
     inline double Particle::getLogLikelihood() {
