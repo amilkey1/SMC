@@ -1497,6 +1497,8 @@ inline string Forest::chooseEvent() {
 
             //update species list
             updateNodeList(nodes, subtree1, subtree2, new_nd);
+            subtree1->_partial->clear();
+            subtree2->_partial->clear();
             updateNodeVector(_lineages, subtree1, subtree2, new_nd);
             
             for (auto &s:_species_partition) {

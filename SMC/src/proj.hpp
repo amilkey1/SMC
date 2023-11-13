@@ -660,6 +660,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 } // g loop
                     
             saveAllHybridNodes(my_vec);
+            my_vec[0]->showParticle();
             
             saveSpeciesTrees(my_vec);
             for (int i=1; i < nsubsets+1; i++) {
