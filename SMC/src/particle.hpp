@@ -198,9 +198,9 @@ class Particle {
     inline void Particle::setLogLikelihood(vector<double> forest_log_likelihoods) {
         double total_log_likelihood = 0.0;
         for (unsigned i=1; i<_forests.size(); i++) {
-            _forests[i]._gene_tree_log_likelihood = forest_log_likelihoods[i];
-            total_log_likelihood += forest_log_likelihoods[i];
-            _forests[i]._log_weight = forest_log_likelihoods[i];
+            _forests[i]._gene_tree_log_likelihood = forest_log_likelihoods[i-1];
+            total_log_likelihood += forest_log_likelihoods[i-1];
+            _forests[i]._log_weight = forest_log_likelihoods[i-1];
         }
         _log_likelihood = total_log_likelihood;
         _log_weight = total_log_likelihood;
