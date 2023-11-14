@@ -54,7 +54,7 @@ class Forest {
 
         typedef std::vector <double> partial_array_t;
         void                        clear();
-        void                        setData(Data::SharedPtr d, int index, map<string, string> &taxon_map);
+        void                        setData(Data::SharedPtr d, int index, map<string, string> &taxon_map, bool partials);
         Node *                      findNextPreorder(Node * nd);
         string                      makeNewick(unsigned precision, bool use_names);
         string                      makePartialNewick(unsigned precision, bool use_names);
@@ -99,6 +99,7 @@ class Forest {
         void                        updateSpeciesPartition(tuple<string, string, string> species_info);
         double                      calcTopologyPrior(unsigned nlineages);
         void                        calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree);
+        void                        clearPartials();
 
         std::vector<Node *>         _lineages;
     
@@ -157,6 +158,7 @@ class Forest {
         static string               _string_base_frequencies;
         static double               _migration_rate;
         static double               _hybridization_rate;
+        static bool                 _save_memory;
 };
 
 
@@ -193,21 +195,18 @@ class Forest {
         *this = other;
     }
 
-    inline void Forest::setData(Data::SharedPtr d, int index, map<string, string> &taxon_map) {
+    inline void Forest::setData(Data::SharedPtr d, int index, map<string, string> &taxon_map, bool partials) {
         _data = d;
         _index = index;
-        assert (index > 0);
+        assert (index > 0);         //don't set data for species tree
 
-        //don't set data for species tree
-//        if (index>0) {
-            Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index-1);
-            _first_pattern = gene_begin_end.first;
-            _npatterns = _data->getNumPatternsInSubset(index-1);
-//            }
+        Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index-1);
+        _first_pattern = gene_begin_end.first;
+        _npatterns = _data->getNumPatternsInSubset(index-1);
 
         const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
         unsigned i = 0;
-        auto data_matrix=_data->getDataMatrix();
+        auto &data_matrix=_data->getDataMatrix();
         
         _nodes.resize(_ntaxa);
         _lineages.reserve(_nodes.size());
@@ -225,7 +224,7 @@ class Forest {
             _lineages.push_back(nd);
             }
 
-        for (auto nd:_lineages) {
+        for (auto &nd:_lineages) {
             if (!nd->_left_child) {
                 // replace all spaces with underscores so that other programs do not have
                   // trouble parsing your tree descriptions
@@ -233,7 +232,7 @@ class Forest {
                   boost::replace_all(name, " ", "_");
                 nd->_name = name;
 
-//                if (index>0) {
+                if (!_save_memory || (_save_memory && partials)) { // if save memory setting, don't set tip partials yet
                     nd->_partial=ps.getPartial(_npatterns*4);
                     for (unsigned p=0; p<_npatterns; p++) {
                         unsigned pp = _first_pattern+p;
@@ -244,7 +243,7 @@ class Forest {
                             (*nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
                         }
                     }
-//                }
+                }
             }
         }
 
@@ -333,7 +332,7 @@ class Forest {
 
             unsigned i = 0;
             unsigned a = 0;
-            for (auto lineage : _lineages) {
+            for (auto &lineage : _lineages) {
                 Node * nd = lineage;
                 while (nd) {
                     bool skip = false;
@@ -472,7 +471,7 @@ class Forest {
 
                     unsigned i = 0;
                     unsigned a = 0;
-                    for (auto lineage : _lineages) {
+                    for (auto &lineage : _lineages) {
                         Node * nd = lineage;
                         while (nd) {
                             bool skip = false;
@@ -647,11 +646,36 @@ class Forest {
     }
 
     inline void Forest::calcPartialArray(Node* new_nd) {
+        assert (_index > 0);
+        
+        if (!new_nd->_left_child) {
+            auto &data_matrix=_data->getDataMatrix();
+            assert (_save_memory);
+            if (!new_nd->_left_child) {
+                new_nd->_partial=ps.getPartial(_npatterns*4);
+                for (unsigned p=0; p<_npatterns; p++) {
+                    unsigned pp = _first_pattern+p;
+                    for (unsigned s=0; s<_nstates; s++) {
+                        Data::state_t state = (Data::state_t)1 << s;
+                        Data::state_t d = data_matrix[new_nd->_number][pp];
+                        double result = state & d;
+                        (*new_nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                    }
+                }
+            }
+        }
+        
         for (auto &nd:_lineages) {
             assert (nd->_right_sib != nd);
         }
         auto & parent_partial_array = *(new_nd->_partial);
         for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
+            
+            if (child->_partial == nullptr) {
+                child->_partial = ps.getPartial(_npatterns*4);
+                calcPartialArray(child);
+            }
+            assert (child->_partial != nullptr);
             auto & child_partial_array = *(child->_partial);
 
             for (unsigned p = 0; p < _npatterns; p++) {
@@ -751,7 +775,7 @@ class Forest {
         auto &counts = _data->getPatternCounts();
         _gene_tree_log_likelihood = 0.0;
 
-        for (auto nd:_lineages) {
+        for (auto &nd:_lineages) {
             double log_like = 0.0;
             for (unsigned p=0; p<_npatterns; p++) {
                 double site_like = 0.0;
@@ -1288,6 +1312,12 @@ inline string Forest::chooseEvent() {
         return _log_joining_prob;
     }
 
+    inline void Forest::clearPartials() {
+        for (auto &nd:_lineages) {
+            nd->_partial = nullptr;
+        }
+    }
+
     inline void Forest::calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree) {
         double log_increment_prior = 0.0;
         
@@ -1493,12 +1523,29 @@ inline string Forest::chooseEvent() {
             new_nd->_partial=ps.getPartial(_npatterns*4);
             assert(new_nd->_left_child->_right_sib); // TODO: can maintain partial from subtree choice in prior-post
             
+            if (_save_memory) {
+//                for (auto &nd:_nodes) {
+//                    if (&nd != new_nd) {
+//                        assert (nd._partial == nullptr);
+//                        nd._partial = ps.getPartial(_npatterns*4);
+//                        calcPartialArray(&nd); // TODO: only need to reset partials for the nodes in _lineages
+//                    }
+//                }
+                for (auto &nd:_lineages) {
+                    if (nd->_partial == nullptr) {
+//                    assert (nd->_partial == nullptr);
+                        nd->_partial = ps.getPartial(_npatterns*4);
+                        calcPartialArray(nd);
+                    }
+                }
+            }
             calcPartialArray(new_nd);
+            
+            subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
+            subtree2->_partial=nullptr;
 
             //update species list
             updateNodeList(nodes, subtree1, subtree2, new_nd);
-            subtree1->_partial->clear();
-            subtree2->_partial->clear();
             updateNodeVector(_lineages, subtree1, subtree2, new_nd);
             
             for (auto &s:_species_partition) {
@@ -1550,6 +1597,11 @@ inline string Forest::chooseEvent() {
 #if defined (PRIOR_POST_ALL_PAIRS)
         _log_weight = _other_log_weight;
 #endif
+//        if (_save_memory) {
+//            for (auto &nd:_nodes) {
+//                nd._partial=nullptr;
+//            }
+//        }
     }
 
     inline void Forest::debugForest() {

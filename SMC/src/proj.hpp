@@ -235,6 +235,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("hybridization_rate", boost::program_options::value(&Forest::_hybridization_rate)->default_value(0.0), "hybridization rate")
         ("run_on_empty", boost::program_options::value(&Particle::_run_on_empty)->default_value(false), "run program without data")
         ("verbose", boost::program_options::value(&_verbose)->default_value(1), "set amount of output printed")
+        ("save_memory", boost::program_options::value(&Forest::_save_memory)->default_value(false), "save memory at the expense of time")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -571,8 +572,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
 
                 bool use_first = true;
+                bool partials = true;
                 for (auto & p:my_vec ) {
-                    p->setData(_data, _taxon_map);
+                    p->setData(_data, _taxon_map, partials);
+                    partials = false;
                     p->mapSpecies(_taxon_map, _species_names);
                 }
                 
@@ -584,6 +587,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             
                 for (auto &p:my_vec) {
                     p->setLogLikelihood(starting_log_likelihoods);
+                    if (Forest::_save_memory) {
+                        p->clearPartials();
+                    }
                 }
                 normalizeWeights(my_vec); // initialize marginal likelihood
                 
@@ -606,7 +612,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         if (p->speciesJoinProposed()) {
                             num_species_particles_proposed++;
                         }
-//                            p->showParticle();
                     }
 //                    if (num_species_particles_proposed > 0) {
 //                        cout << "stop";
@@ -660,7 +665,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 } // g loop
                     
             saveAllHybridNodes(my_vec);
-            my_vec[0]->showParticle();
+//            my_vec[0]->showParticle();
             
             saveSpeciesTrees(my_vec);
             for (int i=1; i < nsubsets+1; i++) {

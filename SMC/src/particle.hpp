@@ -26,14 +26,14 @@ class Particle {
         void                                    debugParticle(std::string name);
         void                                    showParticle();
         void                                    proposal();
-        void                                    setData(Data::SharedPtr d, map<string, string> &taxon_map) {
+        void                                    setData(Data::SharedPtr d, map<string, string> &taxon_map, bool partials) {
                                                     _nsubsets = d->getNumSubsets();
                                                     _data = d;
                                                     int index = 0;
                                                     _forests.resize(_nsubsets+1);
                                                     for (auto &_forest:_forests) {
                                                         if (index > 0) {
-                                                            _forest.setData(d, index, taxon_map);
+                                                            _forest.setData(d, index, taxon_map, partials);
                                                         }
                                                         index++;
                                                     }
@@ -87,6 +87,7 @@ class Particle {
         void                                            calculateIncrementPriors(double increment, string species_name, unsigned forest_number);
         void                                            changeTheta(unsigned i);
         double                                          getIncrement() {return _prev_increment;}
+        void                                            clearPartials();
 
     private:
 
@@ -193,6 +194,12 @@ class Particle {
         }
 
         return gene_forest_likelihoods;
+    }
+
+    inline void Particle::clearPartials() {
+        for (int i=1; i<_forests.size(); i++) {
+            _forests[i].clearPartials();
+        }
     }
 
     inline void Particle::setLogLikelihood(vector<double> forest_log_likelihoods) {
