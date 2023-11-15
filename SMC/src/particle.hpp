@@ -185,7 +185,6 @@ class Particle {
         vector<double> gene_forest_likelihoods;
         gene_forest_likelihoods.resize(_forests.size()-1);
         //calculate likelihood for each gene tree
-        double log_likelihood = 0.0;
         for (unsigned i=1; i<_forests.size(); i++) {
             double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
             assert(!isnan (log_likelihood));
@@ -281,6 +280,7 @@ class Particle {
             }
             for (int i=0; i<gene_forest_rates.size(); i++) {
                 for (auto &r:gene_forest_rates[i]) {
+                    assert (r > 0.0);
                     event_choice_rates.push_back(r);
                 }
             }
@@ -442,6 +442,7 @@ class Particle {
     inline void Particle::geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name) {
         vector<string> eligible_species; // holds all species in the chosen forest that don't exceed the min coalescence time
         
+#if defined (PRIOR_POST_ALL_PAIRS)
         for (int a = 1; a < _forests.size(); a++ ) {
             for (int i=0; i<event_choice_index.size(); i++) {
                 if (event_choice_index[i] == a ) {
@@ -458,6 +459,9 @@ class Particle {
             }
             eligible_species.clear();
         }
+#else
+        _forests[forest_number].allowCoalescence(species_name, increment, eligible_species, true);
+#endif
     }
 
     inline void Particle::changeTheta(unsigned i) {

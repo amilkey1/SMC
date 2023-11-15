@@ -1313,8 +1313,8 @@ inline string Forest::chooseEvent() {
     }
 
     inline void Forest::clearPartials() {
-        for (auto &nd:_lineages) {
-            nd->_partial = nullptr;
+        for (auto &nd:_nodes) {
+            nd._partial = nullptr;
         }
     }
 
@@ -1399,7 +1399,6 @@ inline string Forest::chooseEvent() {
     }
 
     inline void Forest::allowCoalescence(string species_name, double increment, vector<string> eligible_species, bool chosen) {
-        double prev_log_likelihood = _gene_tree_log_likelihood;
         _log_likelihood_choices.clear();
         _node_choices.clear();
         _other_log_weight = 0.0;
@@ -1410,6 +1409,7 @@ inline string Forest::chooseEvent() {
         Node *subtree2 = nullptr;
         list<Node*> nodes;
         
+#if defined (PRIOR_POST_ALL_PAIRS)
         vector<list<Node*>> other_nodes;
             for (int s=0; s<eligible_species.size(); s++) {
                 if (eligible_species[s] == species_name) {
@@ -1421,7 +1421,6 @@ inline string Forest::chooseEvent() {
         for (auto &s:_species_partition) {
             if (s.first == species_name) {
                 nodes = s.second;
-//                other_nodes.push_back(s.second);
             }
             else {
                 for (int i=0; i<eligible_species.size(); i++) {
@@ -1434,6 +1433,13 @@ inline string Forest::chooseEvent() {
             }
         }
         assert (other_nodes.size() == eligible_species.size());
+#else
+        for (auto &s:_species_partition) {
+            if (s.first == species_name) {
+                nodes = s.second;
+            }
+        }
+#endif
         
         unsigned s = (unsigned) nodes.size();
         calcTopologyPrior(s);
@@ -1597,11 +1603,11 @@ inline string Forest::chooseEvent() {
 #if defined (PRIOR_POST_ALL_PAIRS)
         _log_weight = _other_log_weight;
 #endif
-//        if (_save_memory) {
-//            for (auto &nd:_nodes) {
-//                nd._partial=nullptr;
-//            }
-//        }
+        if (_save_memory) {
+            for (auto &nd:_nodes) {
+                nd._partial=nullptr;
+            }
+        }
     }
 
     inline void Forest::debugForest() {

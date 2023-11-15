@@ -330,12 +330,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles) {
         unsigned i = 0;
-        unsigned species_joins = 0;
         vector<double> log_weight_vec(particles.size());
         for (auto & p : particles) {
-            if (p->speciesJoinProposed()) {
-                species_joins++;
-            }
             log_weight_vec[i++] = p->getLogWeight();
         }
 
@@ -358,15 +354,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     }
 
     inline void Proj::resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles) {
-         
-    //        unsigned nparticles = (unsigned)from_particles.size();
-         unsigned nparticles = _nparticles;
-         assert (from_particles.size() == nparticles);
-         assert (to_particles.size() == nparticles);
+         assert (from_particles.size() == _nparticles);
+         assert (to_particles.size() == _nparticles);
          
          vector<pair<double, double>> cum_probs;
              // Create vector of pairs p, with p.first = log weight and p.second = particle index
-         cum_probs.resize(nparticles);
+         cum_probs.resize(_nparticles);
          unsigned i = 0;
          
          for (unsigned p=0; p < _nparticles; p++) {
@@ -407,7 +400,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
              Particle::SharedPtr p0 = from_particles[sel_index];
              to_particles[i]=Particle::SharedPtr(new Particle(*p0));
              
-             assert(nparticles == to_particles.size());
+             assert(_nparticles == to_particles.size());
              }
         }
 
@@ -595,7 +588,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 
                 //run through each generation of particles
             
-                unsigned nsteps = (ntaxa-1)*nsubsets-1+1;
+                unsigned nsteps = (ntaxa-1)*nsubsets;
                 
                 for (unsigned g=0; g<nsteps; g++){
 
