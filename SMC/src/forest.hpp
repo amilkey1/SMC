@@ -63,7 +63,7 @@ class Forest {
         void                        calcPartialArray(Node* new_nd);
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
-        tuple<string,string, string> speciesTreeProposal();
+        tuple<string,string, string> speciesTreeProposal(Lot::SharedPtr lot);
         void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
         void                        hybridizeNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node* delnode3, Node * addnode1);
@@ -1192,28 +1192,28 @@ class Forest {
         _ninternals=0;
     }
 
-inline string Forest::chooseEvent() {
-    string event;
-    // hybridization prior
-    double rate = (_lambda+_hybridization_rate)*_lineages.size();
-    
-    double hybridization_prob = _hybridization_rate/(_hybridization_rate+_lambda);
-    
-    double u = rng.uniform();
-    if (u<hybridization_prob && _lineages.size()>2) {
-        event = "hybridization";
+    inline string Forest::chooseEvent() {
+        string event;
+        // hybridization prior
+        double rate = (_lambda+_hybridization_rate)*_lineages.size();
+        
+        double hybridization_prob = _hybridization_rate/(_hybridization_rate+_lambda);
+        
+        double u = rng.uniform();
+        if (u<hybridization_prob && _lineages.size()>2) {
+            event = "hybridization";
+        }
+        else if (_lineages.size() == 1) {
+            event = "null";
+        }
+        else {
+            event = "speciation";
+        }
+        // choose edge length but don't add it yet
+        _last_edge_length = rng.gamma(1.0, 1.0/rate);
+        
+        return event;
     }
-    else if (_lineages.size() == 1) {
-        event = "null";
-    }
-    else {
-        event = "speciation";
-    }
-    // choose edge length but don't add it yet
-    _last_edge_length = rng.gamma(1.0, 1.0/rate);
-    
-    return event;
-}
 
     inline void Forest::chooseSpeciesIncrement() {
         // hybridization prior
@@ -1226,13 +1226,18 @@ inline string Forest::chooseEvent() {
         }
     }
 
-    inline tuple<string,string, string> Forest::speciesTreeProposal() {
+    inline tuple<string,string, string> Forest::speciesTreeProposal(Lot::SharedPtr lot) {
         _cum_height = 0.0; // reset cum height for a new lineage
         // this function creates a new node and joins two species
         
         pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
+        assert (lot != nullptr);
+//        pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size()); // TODO: this fails sometimes
+        assert (t.first != t.second);
         Node *subtree1=_lineages[t.first];
         Node *subtree2=_lineages[t.second];
+        assert (t.first < _lineages.size());
+        assert (t.second < _lineages.size());
         assert(!subtree1->_parent && !subtree2->_parent);
         
         Node nd;

@@ -88,6 +88,8 @@ class Particle {
         void                                            changeTheta(unsigned i);
         double                                          getIncrement() {return _prev_increment;}
         void                                            clearPartials();
+        Lot::SharedPtr getLot() const {return _lot;}
+        void setSeed(unsigned seed) const {_lot->setSeed(seed);}
 
     private:
 
@@ -101,16 +103,12 @@ class Particle {
         bool                                    _species_join_proposed;
         double                                  _prev_increment;
         double                                  _prev_log_coalescent_likelihood;
+        mutable                                 Lot::SharedPtr _lot;
 };
 
     inline Particle::Particle() {
-        //log weight and log likelihood are 0 for first generation
-        _log_weight = 0.0;
-        _log_likelihood = 0.0;
-        _prev_forest_number = -1;
-        _species_join_proposed = false;
-        _prev_increment = 0.0;
-        _prev_log_coalescent_likelihood = 0.0;
+        _lot.reset(new Lot());
+        clear();
     };
 
     inline void Particle::showParticle() {
@@ -187,7 +185,7 @@ class Particle {
         //calculate likelihood for each gene tree
         for (unsigned i=1; i<_forests.size(); i++) {
             double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
-            assert(!isnan (log_likelihood));
+            assert(!isnan (gene_tree_log_likelihood));
             //total log likelihood is sum of gene tree log likelihoods
             gene_forest_likelihoods[i-1] = gene_tree_log_likelihood;
         }
@@ -324,36 +322,34 @@ class Particle {
                  p = log(p/total_rate);
              }
         
-            // choose an event
-            unsigned index = selectEvent(event_choice_rates);
-            
-            unsigned forest_number = event_choice_index[index];
-            if (no_speciation) {
-                assert (forest_number != 0);
-            }
-        
+            // choose the minimum coalescence time
             double min_coalescence_time = 0.0;
+            unsigned index = 0;
+            unsigned forest_number = 0;
             double increment = 0.0;
             
-            if (forest_number > 0) {
+            if (event_choice_name.size() == 1 && event_choice_name[0] == "species") {
+                // choose the speciation event
+                increment = speciation_time;
+                assert (speciation_time == increments[0]);
+            }
+            else {
+                // choose the minimum event
                 min_coalescence_time = *min_element(std::begin(increments), std::end(increments));
                 increment = min_coalescence_time;
-                
-#if defined (USE_MIN_COALESCENCE_EVENT)
+                bool entered = false;
                 for (int i=0; i<increments.size(); i++) {
                     if (increments[i] == min_coalescence_time) {
                         index = i;
+                        entered = true;
                         break;
                     }
                 }
+                assert (entered);
                 forest_number = event_choice_index[index];
                 if (no_speciation) {
                     assert (forest_number != 0);
                 }
-#endif
-            }
-            else {
-                increment = speciation_time;
             }
             
             _prev_increment = increment;
@@ -418,21 +414,26 @@ class Particle {
         vector<double> increments;
         increments.resize(event_choice_rates.size());
         
-        {
-            // thread safe random number generator with mutex
-            lock_guard<mutex> guard(mutx);
-            // choose an increment
-            for (int p=0; p<event_choice_rates.size(); p++) {
-                increments[p] = (rng.gamma(1.0, 1.0/event_choice_rates[p]));
-                assert (increments[p] > 0.0);
-             }
+//        {
+//            // thread safe random number generator with mutex
+//            lock_guard<mutex> guard(mutx);
+//            // choose an increment
+//            for (int p=0; p<event_choice_rates.size(); p++) {
+//                increments[p] = (rng.gamma(1.0, 1.0/event_choice_rates[p]));
+//                assert (increments[p] > 0.0);
+//             }
+//        }
+        
+        for (int p=0; p<event_choice_rates.size(); p++) {
+            increments[p] = -log(1.0 - _lot->uniform())/event_choice_rates[p];
         }
         return increments;
     }
 
     inline void Particle::speciesProposal() {
         // species tree proposal, need to update species partition in all gene forests
-        tuple <string, string, string> species_joined = _forests[0].speciesTreeProposal();
+        assert (_lot != nullptr);
+        tuple <string, string, string> species_joined = _forests[0].speciesTreeProposal(_lot);
         for (int i=1; i<_forests.size(); i++) {
             // reset species partitions for all gene forests
             _forests[i].updateSpeciesPartition(species_joined);
@@ -650,7 +651,10 @@ class Particle {
 
     inline int Particle::selectEvent(vector<double> weight_vec) {
         // choose a random number [0,1]
-        double u = rng.uniform();
+//        double u = rng.uniform();
+        double u =  _lot->uniform();
+        assert (u > 0.0);
+        assert (u < 1.0);
         double cum_prob = 0.0;
         unsigned index = 0;
         for (int i=0; i < (int) weight_vec.size(); i++) {
@@ -697,6 +701,7 @@ class Particle {
         _species_join_proposed = other._species_join_proposed;
         _prev_increment = other._prev_increment;
         _prev_log_coalescent_likelihood = other._prev_log_coalescent_likelihood;
+        _lot = other._lot;
     };
 }
 

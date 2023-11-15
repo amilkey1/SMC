@@ -595,8 +595,15 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     if (_verbose > 0) {
                         cout << "starting step " << g << " of " << nsteps-1 << endl;
                     }
+                    // set particle randon number seeds
+                    unsigned psuffix = 1;
+                    for (auto &p:my_vec) {
+                        p->setSeed(rng.randint(1,9999) + psuffix);
+                        psuffix += 2;
+                    }
+                    
                     //taxon joining and reweighting step
-                    proposeParticles(my_vec);
+                    proposeParticles(my_vec); // TODO: set particle random number seeds here
                     
                     unsigned num_species_particles_proposed = 0;
                     
@@ -606,15 +613,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             num_species_particles_proposed++;
                         }
                     }
-//                    if (num_species_particles_proposed > 0) {
-//                        cout << "stop";
-//                    }
-//                    string name = "increments " + to_string(g) + ".txt";
-//                    ofstream incf(name);
-//                    for (auto &p:my_vec) {
-//                        incf << p->getIncrement() << endl;
-//                    }
-//                    incf.close();
                     
                     normalizeWeights(my_vec);
                     

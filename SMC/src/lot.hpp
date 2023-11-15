@@ -7,6 +7,9 @@
 #include <boost/random/gamma_distribution.hpp>
 #include <boost/random/variate_generator.hpp>
 
+using namespace std;
+using namespace boost;
+
 namespace proj {
 
     class Lot {
@@ -17,6 +20,7 @@ namespace proj {
             void                            setSeed(unsigned seed);
             double                          uniform();
             int                             randint(int low, int high);
+            pair<unsigned, unsigned>        nchoose2(unsigned n);
             double                          normal();
             double                          gamma(double shape, double scale);
             double                          logUniform();
@@ -101,4 +105,37 @@ namespace proj {
         }
         return (*_uniform_int_generator)();
     }
-}
+
+    inline pair<unsigned, unsigned> Lot::nchoose2(unsigned n) {
+        assert (n>1);
+        unsigned t1=0;
+        unsigned t2=1;
+        //don't use this when there's only one choice (2 subtrees)
+        // thread safe random number generator with mutex
+        
+            // thread safe random number generator with mutex
+        if (n > 2) {
+            t1 = randint(0, n-1);
+            t2 = randint(0, n-1);
+
+            //keep calling t2 until it doesn't equal t1
+            while (t2 == t1) {
+                t2 = randint(0, n-1);
+            }
+        }
+        return make_pair(t1, t2);
+        
+//        if (n < 2)
+//            throw XProj(format("nchoose2 called with n = %d") % n);
+//        int i = 0;
+//        int j = 1;
+//        if (n > 2) {
+//            i = randint(1, n);
+//            j = i + randint(1, n-1) - 1;
+//            i = i - 1;
+//            j = j % n;
+//        }
+//
+//        return make_pair(i, j);
+    }
+    }
