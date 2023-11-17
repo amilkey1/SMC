@@ -283,9 +283,66 @@ class Particle {
                 }
             }
             
+            bool no_speciation = false;
+            double speciation_time = -1;
+            unsigned index = 0;
+            double increment = 0.0;
+            
+#if defined (USE_TOTAL_RATE)
+            unsigned forest_number = 0;
+            string species_name = "species";
+            double total_rate = 0.0;
+            
+            for (auto &r:event_choice_rates) {
+                total_rate += r;
+            }
+            
+            if (event_choice_name[0] == "species") {
+                total_rate -= event_choice_rates[0]; // remove speciation rate from total rate
+                speciation_time = -log(1.0 - _lot->uniform() / event_choice_rates[0]);
+            }
+            if (total_rate > 0.0) {
+                double gene_increment = -log(1.0 - _lot->uniform())/total_rate;
+                
+                if (gene_increment < speciation_time || speciation_time == -1) {
+                    // choose a coalescent event if coalescent increment < speciation increment or if species tree is finished
+                    increment = gene_increment;
+                    if (event_choice_name[0] == "species") { // remove the speciation event from consideration
+                        event_choice_index.erase(event_choice_index.begin() + 0);
+                        event_choice_name.erase(event_choice_name.begin() + 0);
+                        event_choice_rates.erase(event_choice_rates.begin() + 0);
+                    }
+                    
+                    for (auto &p:event_choice_rates) {
+                         p = log(p/total_rate);
+                     }
+                    
+                    index = selectEvent(event_choice_rates);
+                                
+                    forest_number = event_choice_index[index];
+                    species_name = event_choice_name[index];
+                    assert (species_name != "species");
+                    assert (forest_number != 0);
+                    
+                }
+                else {
+                    forest_number = 0;
+                    increment = speciation_time;
+                    assert (increment != -1.0);
+                    no_speciation = false;
+                }
+            }
+            else {
+                forest_number = 0;
+                increment = speciation_time;
+                assert (increment != -1.0);
+                no_speciation = false;
+            }
+            
+#else
             vector<double> increments = chooseIncrements(event_choice_rates);
         
-            double speciation_time = -1;
+//            double speciation_time = -1;
             if (!_forests[0]._done) {
                 speciation_time = increments[0];
             }
@@ -302,7 +359,7 @@ class Particle {
             }
         
             // if a gene forest coalescence is possible, do not pick a speciation event
-            bool no_speciation = false;
+//            bool no_speciation = false;
             if (event_choice_name[0] == "species" && event_choice_name.size() > 1) {
 //                 erase speciation event possibility
                 event_choice_index.erase(event_choice_index.begin() + 0);
@@ -317,16 +374,17 @@ class Particle {
                 assert (r > 0.0);
                 total_rate += r;
             }
+            
 
-            for (auto &p:event_choice_rates) {
-                 p = log(p/total_rate);
-             }
+//            for (auto &p:event_choice_rates) {
+//                 p = log(p/total_rate); // TODO: not necessary?
+//             }
         
             // choose the minimum coalescence time
             double min_coalescence_time = 0.0;
-            unsigned index = 0;
+            index = 0;
             unsigned forest_number = 0;
-            double increment = 0.0;
+//            double increment = 0.0;
             
             if (event_choice_name.size() == 1 && event_choice_name[0] == "species") {
                 // choose the speciation event
@@ -352,6 +410,20 @@ class Particle {
                 }
             }
             
+//            _prev_increment = increment;
+//
+//            // add increment to all nodes in all forests
+//            for (int i=0; i<_forests.size(); i++) {
+//                if (_forests[i]._lineages.size() > 1) {
+//                    _forests[i].addIncrement(increment); // if forest is finished, don't add another increment
+//                }
+//                else {
+//                    _forests[i]._done = true;
+//                }
+//            }
+        
+            string species_name = event_choice_name[index];
+#endif
             _prev_increment = increment;
                 
             // add increment to all nodes in all forests
@@ -363,15 +435,13 @@ class Particle {
                     _forests[i]._done = true;
                 }
             }
-        
-            string species_name = event_choice_name[index];
             
             calculateIncrementPriors(increment, species_name, forest_number);
             
             // remove speciation rate from total rate if it's still included
-            if (!no_speciation) {
-                total_rate -= (_forests[0]._lineages.size() * Forest::_lambda);
-            }
+//            if (!no_speciation) {
+//                total_rate -= (_forests[0]._lineages.size() * Forest::_lambda); // TODO: not correct?
+//            }
             assert (total_rate >= 0.0);
             
             if (species_name == "species") {
@@ -451,7 +521,7 @@ class Particle {
                 }
             }
             if (a == forest_number) {
-                _forests[forest_number].allowCoalescence(species_name, increment, eligible_species, true);
+                _forests[forest_number].allowCoalescence(species_name, increment, eligible_species, true, _lot);
             }
             else if (eligible_species.size() > 0) {
 #if defined (PRIOR_POST_ALL_PAIRS)
@@ -461,7 +531,7 @@ class Particle {
             eligible_species.clear();
         }
 #else
-        _forests[forest_number].allowCoalescence(species_name, increment, eligible_species, true);
+        _forests[forest_number].allowCoalescence(species_name, increment, eligible_species, true, _lot);
 #endif
     }
 

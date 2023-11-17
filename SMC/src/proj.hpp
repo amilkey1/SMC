@@ -18,6 +18,7 @@ using namespace boost::algorithm;
 
 #include "partial_store.hpp"
 extern proj::PartialStore ps;
+extern proj::Lot rng;
 
 namespace proj {
 
@@ -591,6 +592,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 unsigned nsteps = (ntaxa-1)*nsubsets;
                 
                 for (unsigned g=0; g<nsteps; g++){
+                    if (g == 954) {
+                        cout << "stop"; // TODO: why are weights 0 at the end?
+                    }
 
                     if (_verbose > 0) {
                         cout << "starting step " << g << " of " << nsteps-1 << endl;

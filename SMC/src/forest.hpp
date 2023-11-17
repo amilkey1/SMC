@@ -58,7 +58,7 @@ class Forest {
         Node *                      findNextPreorder(Node * nd);
         string                      makeNewick(unsigned precision, bool use_names);
         string                      makePartialNewick(unsigned precision, bool use_names);
-        pair<unsigned, unsigned>    chooseTaxaToJoin(double s);
+        pair<unsigned, unsigned>    chooseTaxaToJoin(double s, Lot::SharedPtr lot);
         tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> p, list<Node*> node_list, string species_name, double increment);
         void                        calcPartialArray(Node* new_nd);
         void                        setUpGeneForest(map<string, string> &taxon_map);
@@ -85,7 +85,7 @@ class Forest {
         string                      chooseLineage(Node* taxon_to_migrate, string key_to_del);
         void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
         void                        deleteTaxon(string key_to_del, unsigned taxon_choice);
-        void                        allowCoalescence(string species_name, double increment, vector<string> eligible_species, bool chosen);
+        void                        allowCoalescence(string species_name, double increment, vector<string> eligible_species, bool chosen, Lot::SharedPtr lot);
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
         vector<string>              hybridizeSpecies();
         void                        moveGene(string new_nd, string parent, string hybrid);
@@ -595,7 +595,7 @@ class Forest {
         _nspecies=n;
     }
 
-    inline pair<unsigned, unsigned> Forest::chooseTaxaToJoin(double s){
+    inline pair<unsigned, unsigned> Forest::chooseTaxaToJoin(double s, Lot::SharedPtr lot){
         assert (s>1);
         double nsubtrees = s;
         unsigned t1=0;
@@ -609,13 +609,32 @@ class Forest {
             if (nsubtrees > 2) {
                 t1 = ::rng.randint(0, nsubtrees-1);
                 t2 = ::rng.randint(0, nsubtrees-1);
-    
+
                 //keep calling t2 until it doesn't equal t1
                 while (t2 == t1) {
                     t2 = ::rng.randint(0, nsubtrees-1);
                 }
             }
         }
+        
+//        if (nsubtrees > 2) {
+//            t1 = lot->randint(0, nsubtrees-1);
+//            if (t1 >= nsubtrees) {
+//                cout << "stop";
+//            }
+//            t2 = lot->randint(0, nsubtrees-1);
+//            if (t2 >= nsubtrees) {
+//                cout << "stop";
+//            }
+//
+//            //keep calling t2 until it doesn't equal t1
+//            while (t2 == t1) {
+//                t2 = lot->randint(0, nsubtrees-1);
+//            }
+//        }
+        assert(t1 < nsubtrees);
+        assert (t2 < nsubtrees);
+
         return make_pair(t1, t2);
     }
 
@@ -1230,7 +1249,7 @@ class Forest {
         _cum_height = 0.0; // reset cum height for a new lineage
         // this function creates a new node and joins two species
         
-        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size());
+        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
         assert (lot != nullptr);
 //        pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size()); // TODO: this fails sometimes
         assert (t.first != t.second);
@@ -1403,10 +1422,11 @@ class Forest {
         }
     }
 
-    inline void Forest::allowCoalescence(string species_name, double increment, vector<string> eligible_species, bool chosen) {
+    inline void Forest::allowCoalescence(string species_name, double increment, vector<string> eligible_species, bool chosen, Lot::SharedPtr lot) {
         _log_likelihood_choices.clear();
         _node_choices.clear();
         _other_log_weight = 0.0;
+        double prev_log_likelihood = _gene_tree_log_likelihood;
         
         if (chosen) {
             
@@ -1456,13 +1476,14 @@ class Forest {
 
             // prior-prior proposal
             if (_proposal == "prior-prior") {
-                pair<unsigned, unsigned> t = chooseTaxaToJoin(s);
+                pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
                 auto it1 = std::next(nodes.begin(), t.first);
                 subtree1 = *it1;
 
                 auto it2 = std::next(nodes.begin(), t.second);
                 subtree2 = *it2;
-                assert (t.first < nodes.size() && t.second < nodes.size());
+                assert (t.first < nodes.size());
+                assert (t.second < nodes.size());
             }
             else {
     #if defined (PRIOR_POST_ALL_PAIRS)
@@ -1575,6 +1596,7 @@ class Forest {
     }
         else {
 #if defined (PRIOR_POST_ALL_PAIRS)
+            double prev_log_likelihood = _gene_tree_log_likelihood;
             _other_log_weight = 0.0;
             vector<list<Node*>> other_nodes;
             
@@ -1613,6 +1635,7 @@ class Forest {
                 nd._partial=nullptr;
             }
         }
+//        _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
     }
 
     inline void Forest::debugForest() {

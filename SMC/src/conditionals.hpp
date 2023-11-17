@@ -9,6 +9,6 @@
 
 //#define PRIOR_POST_AVERAGE
 
-#define USE_MIN_COALESCENCE_EVENT
-
 //#define NDEBUG // disable asserts for efficiency / memory improvement
+
+#define USE_TOTAL_RATE
