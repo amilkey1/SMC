@@ -1,0 +1,26 @@
+SRCDIR		= .
+O		    = o
+CC		    = g++
+CLINKER		= g++
+CFLAGS		= -pthread -std=c++11 -DUSING_MULTITHREADING 
+INCLUDES    = -I/home/aam21005/Documents/libraries/boost_1_77_0 -I/home/aam21005/Documents/libraries/ncl-2.1.18
+LIBDIR      = /home/aam21005/lib/static
+LIBS        = $(LIBDIR)/libboost_filesystem.a $(LIBDIR)/libboost_system.a $(LIBDIR)/libboost_program_options.a $(LIBDIR)/libncl.a
+OPTF		= -O3
+MATHLIB		= -lm
+EXECS		= single-smc
+OBJS		= main.o
+
+default: single-smc
+
+all: $(EXECS)
+
+single-smc: main.o proj.hpp
+	$(CLINKER) $(CFLAGS) -L$(LIBDIR) -o single-smc $(OBJS) -lm $(LIBS)
+	rm main.o
+	mv single-smc ../../../../test-new-smc
+
+main.o: $(SRCDIR)/main.cpp
+	$(CC) $(CFLAGS) $(INCLUDES) $(OPTF) -c $(SRCDIR)/main.cpp
+
+FORCE:
