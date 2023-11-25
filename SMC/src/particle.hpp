@@ -299,7 +299,7 @@ class Particle {
             
             if (event_choice_name[0] == "species") {
                 total_rate -= event_choice_rates[0]; // remove speciation rate from total rate
-                speciation_time = -log(1.0 - _lot->uniform() / event_choice_rates[0]);
+                speciation_time = -log(1.0 - _lot->uniform() / event_choice_rates[0]); // TODO: I don't think this is actually working - may be using wrong total rate from a different particle - check how _lot is created
             }
             if (total_rate > 0.0) {
                 double gene_increment = -log(1.0 - _lot->uniform())/total_rate;
@@ -374,17 +374,11 @@ class Particle {
                 assert (r > 0.0);
                 total_rate += r;
             }
-            
-
-//            for (auto &p:event_choice_rates) {
-//                 p = log(p/total_rate); // TODO: not necessary?
-//             }
         
             // choose the minimum coalescence time
             double min_coalescence_time = 0.0;
             index = 0;
             unsigned forest_number = 0;
-//            double increment = 0.0;
             
             if (event_choice_name.size() == 1 && event_choice_name[0] == "species") {
                 // choose the speciation event
@@ -409,18 +403,6 @@ class Particle {
                     assert (forest_number != 0);
                 }
             }
-            
-//            _prev_increment = increment;
-//
-//            // add increment to all nodes in all forests
-//            for (int i=0; i<_forests.size(); i++) {
-//                if (_forests[i]._lineages.size() > 1) {
-//                    _forests[i].addIncrement(increment); // if forest is finished, don't add another increment
-//                }
-//                else {
-//                    _forests[i]._done = true;
-//                }
-//            }
         
             string species_name = event_choice_name[index];
 #endif
@@ -465,6 +447,9 @@ class Particle {
                 geneProposal(event_choice_index, forest_number, event_choice_name, increment, species_name);
                 double log_likelihood_term = _forests[forest_number]._log_weight;
                 
+//                if (Forest::_proposal == "prior-post") {
+//                    log_speciation_term = 0.0;
+//                }
                 _log_weight = log_speciation_term + log_likelihood_term;
 
                 done = true;
@@ -495,7 +480,7 @@ class Particle {
 //        }
         
         for (int p=0; p<event_choice_rates.size(); p++) {
-            increments[p] = -log(1.0 - _lot->uniform())/event_choice_rates[p];
+            increments[p] = -log(1.0 - _lot->uniform())/event_choice_rates[p]; // TODO: I don't think this is actually working - may be choosing increments from wrong rates
         }
         return increments;
     }
@@ -511,28 +496,7 @@ class Particle {
     }
 
     inline void Particle::geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name) {
-        vector<string> eligible_species; // holds all species in the chosen forest that don't exceed the min coalescence time
-        
-#if defined (PRIOR_POST_ALL_PAIRS)
-        for (int a = 1; a < _forests.size(); a++ ) {
-            for (int i=0; i<event_choice_index.size(); i++) {
-                if (event_choice_index[i] == a ) {
-                    eligible_species.push_back(event_choice_name[i]);
-                }
-            }
-            if (a == forest_number) {
-                _forests[forest_number].allowCoalescence(species_name, increment, eligible_species, true, _lot);
-            }
-            else if (eligible_species.size() > 0) {
-#if defined (PRIOR_POST_ALL_PAIRS)
-//                _forests[a].allowCoalescence(species_name, increment, eligible_species, false);
-#endif
-            }
-            eligible_species.clear();
-        }
-#else
-        _forests[forest_number].allowCoalescence(species_name, increment, eligible_species, true, _lot);
-#endif
+        _forests[forest_number].allowCoalescence(species_name, increment, _lot); // TODO: include all forests or just chosen one?
     }
 
     inline void Particle::changeTheta(unsigned i) {
@@ -609,6 +573,7 @@ class Particle {
     }
 
     inline Particle::Particle(const Particle & other) {
+        _lot.reset(new Lot());
         *this = other;
     }
 
@@ -771,7 +736,7 @@ class Particle {
         _species_join_proposed = other._species_join_proposed;
         _prev_increment = other._prev_increment;
         _prev_log_coalescent_likelihood = other._prev_log_coalescent_likelihood;
-        _lot = other._lot;
+//        _lot = other._lot; // TODO: shouldn't need to copy this since it's reset each time
     };
 }
 

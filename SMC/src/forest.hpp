@@ -45,7 +45,7 @@ class Forest {
         static void                 setNumSpecies(unsigned n);
         static void                 setNumTaxa(unsigned n);
         double                      calcLogLikelihood();
-        void                        createDefaultTree();
+        void                        createDefaultTree(Lot::SharedPtr lot);
         void operator=(const Forest & other);
         void                        debugForest();
         void                        debugLogLikelihood(Node* nd, double log_like);
@@ -71,11 +71,11 @@ class Forest {
         double                      getRunningSumChoices(vector<double> &log_weight_choices);
         double                      getRunningSumHybridChoices(vector<double> &log_weight_choices);
         vector<double>              reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
-        pair<Node*, Node*>          chooseAllPairs(list<Node *> &node_list, string species_name, double prev_log_likelihood, double increment);
+        pair<Node*, Node*>          chooseAllPairs(list<Node *> &node_list, string species_name, double prev_log_likelihood, double increment, Lot::SharedPtr lot);
         void                        chooseAllOtherPairs(list<Node *> &node_list, string species_name, double prev_log_likelihood, double increment);
         pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
-        int                         selectPair(vector<double> weight_vec);
-        void                        chooseSpeciesIncrement();
+        int                         selectPair(vector<double> weight_vec, Lot::SharedPtr lot);
+        void                        chooseSpeciesIncrement(Lot::SharedPtr lot);
         void                        addSpeciesIncrement();
         string                      chooseEvent();
         void                        allowMigration(list<Node*> &nodes);
@@ -85,7 +85,7 @@ class Forest {
         string                      chooseLineage(Node* taxon_to_migrate, string key_to_del);
         void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
         void                        deleteTaxon(string key_to_del, unsigned taxon_choice);
-        void                        allowCoalescence(string species_name, double increment, vector<string> eligible_species, bool chosen, Lot::SharedPtr lot);
+        void                        allowCoalescence(string species_name, double increment, Lot::SharedPtr lot);
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
         vector<string>              hybridizeSpecies();
         void                        moveGene(string new_nd, string parent, string hybrid);
@@ -93,7 +93,7 @@ class Forest {
         void                        switchParents(string parent, string parent2);
         void                        resetLineages(vector<double> branch_lengths);
         vector<double>              saveBranchLengths();
-        int                         chooseDirectionOfHybridization(vector<double> likelihood_vec);
+        int                         chooseDirectionOfHybridization(vector<double> likelihood_vec, Lot::SharedPtr lot);
         void                        hybridGeneTreeProposal(double species_tree_increment, string species_name);
         vector<pair<double, string>>      calcForestRate();
         void                        updateSpeciesPartition(tuple<string, string, string> species_info);
@@ -137,7 +137,7 @@ class Forest {
         double                      calcTransitionProbability(Node* child, double s, double s_child);
         double                      calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
         void                        setNewEdgeLength(double difference, Node* taxon_to_migrate, string key_to_add);
-        void                        hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment, string species_name);
+        void                        hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment, string species_name, Lot::SharedPtr lot);
         void                        resetToMinor(vector<Node*> minor_nodes, vector<Node*> minor_left_children, vector<Node*> minor_right_children, vector<double> minor_left_edge_lengths, vector<double> minor_right_edge_lengths);
         double                      getTreeHeight();
         double                      getSpeciesTreeIncrement();
@@ -601,37 +601,22 @@ class Forest {
         unsigned t1=0;
         unsigned t2=1;
         //don't use this when there's only one choice (2 subtrees)
-        // thread safe random number generator with mutex
         
-        {
-            // thread safe random number generator with mutex
-            lock_guard<mutex> guard(mtx);
-            if (nsubtrees > 2) {
-                t1 = ::rng.randint(0, nsubtrees-1);
-                t2 = ::rng.randint(0, nsubtrees-1);
+        if (nsubtrees > 2) {
+            t1 = lot->randint(0, nsubtrees-1);
+            if (t1 >= nsubtrees) {
+                cout << "stop";
+            }
+            t2 = lot->randint(0, nsubtrees-1);
+            if (t2 >= nsubtrees) {
+                cout << "stop";
+            }
 
-                //keep calling t2 until it doesn't equal t1
-                while (t2 == t1) {
-                    t2 = ::rng.randint(0, nsubtrees-1);
-                }
+            //keep calling t2 until it doesn't equal t1
+            while (t2 == t1) {
+                t2 = lot->randint(0, nsubtrees-1);
             }
         }
-        
-//        if (nsubtrees > 2) {
-//            t1 = lot->randint(0, nsubtrees-1);
-//            if (t1 >= nsubtrees) {
-//                cout << "stop";
-//            }
-//            t2 = lot->randint(0, nsubtrees-1);
-//            if (t2 >= nsubtrees) {
-//                cout << "stop";
-//            }
-//
-//            //keep calling t2 until it doesn't equal t1
-//            while (t2 == t1) {
-//                t2 = lot->randint(0, nsubtrees-1);
-//            }
-//        }
         assert(t1 < nsubtrees);
         assert (t2 < nsubtrees);
 
@@ -815,7 +800,7 @@ class Forest {
 //        _node_choices.clear();
 //        _log_likelihood_choices.clear();
 //        assert (_log_likelihood_choices.size() == 0);
-        assert (_node_choices.size() == 0);
+//        assert (_node_choices.size() == 0);
         
         // choose pair of nodes to try
         for (unsigned i = 0; i < node_list.size()-1; i++) {
@@ -845,12 +830,12 @@ class Forest {
 //        double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
 //        _other_log_weight += log_weight_choices_sum;
         
-        _node_choices.clear();
+//        _node_choices.clear();
 //        _log_likelihood_choices.clear();
     }
 
 
-    inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, string species_name, double prev_log_likelihood, double increment) {
+    inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, string species_name, double prev_log_likelihood, double increment, Lot::SharedPtr lot) {
         _log_likelihood_choices.clear();
         _node_choices.clear();
         assert (_node_choices.size() == 0);
@@ -898,7 +883,7 @@ class Forest {
          }
         
          // randomly select a pair
-         _index_of_choice = selectPair(log_weight_choices);
+         _index_of_choice = selectPair(log_weight_choices, lot);
 
          // find nodes to join in node_list
          Node* subtree1 = _node_choices[_index_of_choice].first;
@@ -913,9 +898,11 @@ class Forest {
          return make_pair(subtree1, subtree2);
      }
 
-    inline int Forest::selectPair(vector<double> weight_vec) {
+    inline int Forest::selectPair(vector<double> weight_vec, Lot::SharedPtr lot) {
         // choose a random number [0,1]
-        double u = rng.uniform();
+        assert (lot != nullptr);
+        double u = lot->uniform();
+        
         double cum_prob = 0.0;
         int index = 0.0;
         for (int i=0; i < (int) weight_vec.size(); i++) {
@@ -1045,10 +1032,12 @@ class Forest {
         cout << endl;
     }
 
-    inline void Forest::createDefaultTree() {
+    inline void Forest::createDefaultTree(Lot::SharedPtr lot) {
         clear();
         //create taxa
-        double edge_length = rng.gamma(1.0, 1.0/_ntaxa);
+        assert (lot != nullptr);
+        double edge_length = lot->gamma(1.0, 1.0/_ntaxa);
+        
         _lineages.reserve(_nodes.size());
         
         for (unsigned i = 0; i < _ntaxa; i++) {
@@ -1234,11 +1223,12 @@ class Forest {
         return event;
     }
 
-    inline void Forest::chooseSpeciesIncrement() {
+    inline void Forest::chooseSpeciesIncrement(Lot::SharedPtr lot) {
         // hybridization prior
         double rate = (_lambda+_hybridization_rate)*_lineages.size();
         
-        _last_edge_length = rng.gamma(1.0, 1.0/rate);
+        assert (lot != nullptr);
+        _last_edge_length = lot->gamma(1.0, 1.0/rate);
 
         for (auto nd:_lineages) {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
@@ -1249,9 +1239,9 @@ class Forest {
         _cum_height = 0.0; // reset cum height for a new lineage
         // this function creates a new node and joins two species
         
-        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
+//        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
         assert (lot != nullptr);
-//        pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size()); // TODO: this fails sometimes
+        pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size()); // TODO: this fails sometimes - I think only at a stage where particles have different numbers of lineages to pass in - threads are communicating when they shouldn't and using the wrong number of lineages?
         assert (t.first != t.second);
         Node *subtree1=_lineages[t.first];
         Node *subtree2=_lineages[t.second];
@@ -1422,88 +1412,56 @@ class Forest {
         }
     }
 
-    inline void Forest::allowCoalescence(string species_name, double increment, vector<string> eligible_species, bool chosen, Lot::SharedPtr lot) {
+    inline void Forest::allowCoalescence(string species_name, double increment, Lot::SharedPtr lot) {
+#if defined (PRIOR_POST_ALL_PAIRS)
         _log_likelihood_choices.clear();
         _node_choices.clear();
         _other_log_weight = 0.0;
         double prev_log_likelihood = _gene_tree_log_likelihood;
-        
-        if (chosen) {
             
         Node *subtree1 = nullptr;
         Node *subtree2 = nullptr;
         list<Node*> nodes;
         
-#if defined (PRIOR_POST_ALL_PAIRS)
         vector<list<Node*>> other_nodes;
-            for (int s=0; s<eligible_species.size(); s++) {
-                if (eligible_species[s] == species_name) {
-                    eligible_species.erase(eligible_species.begin()+s);
-                    break;
-                }
-            }
+        vector<string> other_species;
         
         for (auto &s:_species_partition) {
-            if (s.first == species_name) {
-                nodes = s.second;
-            }
-            else {
-                for (int i=0; i<eligible_species.size(); i++) {
-                    if (s.first == eligible_species[i]) {
-                        other_nodes.push_back(s.second); // save nodes from other eligible species for prior-post weight update
-                        assert (s.first != species_name);
-                        break;
-                    }
-                }
-            }
+            other_nodes.push_back(s.second);
+            other_species.push_back(s.first);
         }
-        assert (other_nodes.size() == eligible_species.size());
-#else
-        for (auto &s:_species_partition) {
-            if (s.first == species_name) {
-                nodes = s.second;
-            }
-        }
-#endif
+            
+//            for (auto &s:_species_partition) {
+//                if (s.first != species_name) {
+//                    other_nodes.push_back(s.second);
+//                    other_species.push_back(s.first);
+//                }
+//                else {
+//                    nodes = s.second;
+//                }
+//            }
         
-        unsigned s = (unsigned) nodes.size();
-        calcTopologyPrior(s);
+//        unsigned s = (unsigned) nodes.size();
+//        calcTopologyPrior(s);
         
-        double prev_log_likelihood = _gene_tree_log_likelihood;
-        
-        assert (s > 1);
-        bool one_choice = false;
-
-            // prior-prior proposal
-            if (_proposal == "prior-prior") {
-                pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
-                auto it1 = std::next(nodes.begin(), t.first);
-                subtree1 = *it1;
-
-                auto it2 = std::next(nodes.begin(), t.second);
-                subtree2 = *it2;
-                assert (t.first < nodes.size());
-                assert (t.second < nodes.size());
-            }
-            else {
-    #if defined (PRIOR_POST_ALL_PAIRS)
+//        assert (s > 1);
                 _other_log_weight = 0.0;
                 
-                pair<Node*, Node*> t = chooseAllPairs(nodes, species_name, prev_log_likelihood, increment);
+//                pair<Node*, Node*> t = chooseAllPairs(nodes, species_name, prev_log_likelihood, increment);
                 
 //                _log_likelihood_choices.clear();
                 
-                subtree1 = t.first;
-                subtree2 = t.second;
+//                subtree1 = t.first;
+//                subtree2 = t.second;
                 
                 if (other_nodes.size() > 0) {
                     for (int i=0; i<other_nodes.size(); i++) {
                         if (other_nodes[i].size() > 0) {
-                            string species = eligible_species[i];
+                            string species = other_species[i];
                             chooseAllOtherPairs(other_nodes[i], species, prev_log_likelihood, increment);
                         }
                     }
-                            
+                    
                 // reweight each choice of pairs
                 vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, prev_log_likelihood);
 
@@ -1511,23 +1469,34 @@ class Forest {
                  // must include the likelihoods of all pairs in the final particle weight
                  double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
                  _other_log_weight = log_weight_choices_sum;
-                }
-                
-    #else
-                if (nodes.size() > 2) {
-                    pair<Node*, Node*> t = chooseAllPairs(nodes, species_name, prev_log_likelihood, increment);
                     
-                    subtree1 = t.first;
-                    subtree2 = t.second;
+                for (unsigned b=0; b < log_weight_choices.size(); b++) {
+                    log_weight_choices[b] -= log_weight_choices_sum;
                 }
-                else {
-                    one_choice = true;
+               
+                // randomly select a pair
+                _index_of_choice = selectPair(log_weight_choices);
 
-                    subtree1 = nodes.front();
-                    subtree2 = nodes.back();
-                }
-    #endif
+                // find nodes to join in node_list
+                subtree1 = _node_choices[_index_of_choice].first;
+                subtree2 = _node_choices[_index_of_choice].second;
                     
+                for (auto &s:_species_partition) {
+                    for (auto &n:s.second) {
+                        if (subtree1 == n) {
+                            nodes = s.second;
+                            species_name = s.first;
+                            break;
+                        }
+                    }
+                }
+                    assert (nodes.size() > 0);
+                
+               _gene_tree_log_likelihood = _log_likelihood_choices[_index_of_choice];
+               
+                // erase extra nodes created from node list
+               _node_choices.clear();
+                
             }
         
             // if only 1 choice, subtree has already been created in chooseAllPairs function
@@ -1556,16 +1525,111 @@ class Forest {
             assert(new_nd->_left_child->_right_sib); // TODO: can maintain partial from subtree choice in prior-post
             
             if (_save_memory) {
-//                for (auto &nd:_nodes) {
-//                    if (&nd != new_nd) {
-//                        assert (nd._partial == nullptr);
-//                        nd._partial = ps.getPartial(_npatterns*4);
-//                        calcPartialArray(&nd); // TODO: only need to reset partials for the nodes in _lineages
-//                    }
-//                }
                 for (auto &nd:_lineages) {
                     if (nd->_partial == nullptr) {
-//                    assert (nd->_partial == nullptr);
+                        nd->_partial = ps.getPartial(_npatterns*4);
+                        calcPartialArray(nd);
+                    }
+                }
+            }
+            calcPartialArray(new_nd);
+            
+            subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
+            subtree2->_partial=nullptr;
+
+            //update species list
+            updateNodeList(nodes, subtree1, subtree2, new_nd);
+            updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+            
+            for (auto &s:_species_partition) {
+                if (s.first == species_name) {
+                    s.second = nodes; // TODO: this should happen automatically
+                    break;
+                }
+            }
+        
+        _log_weight = _other_log_weight;
+        if (_save_memory) {
+            for (auto &nd:_nodes) {
+                nd._partial=nullptr;
+            }
+    }
+#else
+        _log_likelihood_choices.clear();
+        _node_choices.clear();
+        _other_log_weight = 0.0;
+        double prev_log_likelihood = _gene_tree_log_likelihood;
+            
+        Node *subtree1 = nullptr;
+        Node *subtree2 = nullptr;
+        list<Node*> nodes;
+        
+        for (auto &s:_species_partition) {
+            if (s.first == species_name) {
+                nodes = s.second;
+                break;
+            }
+        }
+        
+        unsigned s = (unsigned) nodes.size();
+        calcTopologyPrior(s);
+        
+        assert (s > 1);
+        bool one_choice = false;
+
+            // prior-prior proposal
+            if (_proposal == "prior-prior") {
+                pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
+                auto it1 = std::next(nodes.begin(), t.first);
+                subtree1 = *it1;
+
+                auto it2 = std::next(nodes.begin(), t.second);
+                subtree2 = *it2;
+                assert (t.first < nodes.size());
+                assert (t.second < nodes.size());
+            }
+            else {
+                if (nodes.size() > 2) {
+                    pair<Node*, Node*> t = chooseAllPairs(nodes, species_name, prev_log_likelihood, increment, lot);
+                    
+                    subtree1 = t.first;
+                    subtree2 = t.second;
+                }
+                else {
+                    one_choice = true;
+
+                    subtree1 = nodes.front();
+                    subtree2 = nodes.back();
+                }
+            }
+        
+            assert (subtree1 != subtree2);
+            
+            //new node is always needed
+            Node nd;
+            _nodes.push_back(nd);
+            Node* new_nd = &_nodes.back();
+
+            new_nd->_parent=0;
+            new_nd->_number=_nleaves+_ninternals;
+            new_nd->_edge_length=0.0;
+            _ninternals++;
+            new_nd->_right_sib=0;
+
+            new_nd->_left_child=subtree1;
+            subtree1->_right_sib=subtree2;
+
+            subtree1->_parent=new_nd;
+            subtree2->_parent=new_nd;
+
+            //always calculating partials now
+            assert (new_nd->_partial == nullptr);
+            new_nd->_partial=ps.getPartial(_npatterns*4);
+            assert(new_nd->_left_child->_right_sib); // TODO: can maintain partial from subtree choice in prior-post
+            
+            if (_save_memory) {
+                for (auto &nd:_lineages) {
+                    if (nd->_partial == nullptr) {
                         nd->_partial = ps.getPartial(_npatterns*4);
                         calcPartialArray(nd);
                     }
@@ -1587,56 +1651,17 @@ class Forest {
                 }
             }
             
-    #if !defined (PRIOR_POST_ALL_PAIRS)
             if (_proposal == "prior-prior" || one_choice) {
                 _gene_tree_log_likelihood = calcLogLikelihood();
                 _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
             }
-    #endif
-    }
-        else {
-#if defined (PRIOR_POST_ALL_PAIRS)
-            double prev_log_likelihood = _gene_tree_log_likelihood;
-            _other_log_weight = 0.0;
-            vector<list<Node*>> other_nodes;
-            
-            for (auto &s:_species_partition) {
-                for (int i=0; i<eligible_species.size(); i++) {
-                    if (s.first == eligible_species[i]) {
-                        other_nodes.push_back(s.second); // save nodes from other eligible species for prior-post weight update
-                        break;
-                    }
-                }
-            }
-            assert (other_nodes.size() == eligible_species.size());
-            
-            if (other_nodes.size() > 1) {
-                for (int i=0; i<other_nodes.size(); i++) {
-                    if (other_nodes[i].size() > 0) {
-                        string species = eligible_species[i];
-                        chooseAllOtherPairs(other_nodes[i], species, prev_log_likelihood, increment);
-                    }
-                }
-            }
-            vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, prev_log_likelihood);
-
-             // sum unnormalized weights before choosing the pair
-             // must include the likelihoods of all pairs in the final particle weight
-             double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-             _other_log_weight = log_weight_choices_sum;
-            
-#endif
-        }
-#if defined (PRIOR_POST_ALL_PAIRS)
-        _log_weight = _other_log_weight;
-#endif
         if (_save_memory) {
             for (auto &nd:_nodes) {
                 nd._partial=nullptr;
             }
-        }
-//        _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
     }
+#endif
+}
 
     inline void Forest::debugForest() {
         cout << "debugging forest" << endl;
@@ -1910,7 +1935,7 @@ class Forest {
         }
     }
 
-    inline void Forest::hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment, string species_name) {
+    inline void Forest::hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment, string species_name, Lot::SharedPtr lot) {
         // parent, parent2, hybrid_node, new_nd
         string parent = hybridized_nodes[0];
         string parent2 = hybridized_nodes[1];
@@ -2008,7 +2033,7 @@ class Forest {
         likelihood_vec.push_back(calcLogLikelihood());
         
         // choose major or minor path
-        int index_of_choice = chooseDirectionOfHybridization(likelihood_vec);
+        int index_of_choice = chooseDirectionOfHybridization(likelihood_vec, lot);
         if (index_of_choice == 0) {
             // minor choice
             _last_direction = "minor";
@@ -2125,7 +2150,7 @@ class Forest {
         }
     }
 
-    inline int Forest::chooseDirectionOfHybridization(vector<double> likelihood_vec) {
+    inline int Forest::chooseDirectionOfHybridization(vector<double> likelihood_vec, Lot::SharedPtr lot) {
         // choose a direction
         vector<double> log_weight_choices;
         log_weight_choices.reserve(2);
@@ -2141,7 +2166,7 @@ class Forest {
         }
         
         // select a direction
-        int index_of_choice = selectPair(log_weight_choices);
+        int index_of_choice = selectPair(log_weight_choices, lot);
         return index_of_choice;
     }
 

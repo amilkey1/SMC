@@ -592,22 +592,18 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 unsigned nsteps = (ntaxa-1)*nsubsets;
                 
                 for (unsigned g=0; g<nsteps; g++){
-                    if (g == 954) {
-                        cout << "stop"; // TODO: why are weights 0 at the end?
-                    }
-
                     if (_verbose > 0) {
                         cout << "starting step " << g << " of " << nsteps-1 << endl;
                     }
                     // set particle randon number seeds
                     unsigned psuffix = 1;
                     for (auto &p:my_vec) {
-                        p->setSeed(rng.randint(1,9999) + psuffix);
+                        p->setSeed(rng.randint(1,9999) + psuffix); // TODO: something about this is not working - where is lot created?
                         psuffix += 2;
                     }
                     
                     //taxon joining and reweighting step
-                    proposeParticles(my_vec); // TODO: set particle random number seeds here
+                    proposeParticles(my_vec);
                     
                     unsigned num_species_particles_proposed = 0;
                     
@@ -617,6 +613,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             num_species_particles_proposed++;
                         }
                     }
+                    
+//                    cout << "num speciation events proposed = " << num_species_particles_proposed << endl;
+//                    for (auto &p:my_vec) {
+//                        p->showParticle();
+//                    }
                     
                     normalizeWeights(my_vec);
                     
@@ -667,7 +668,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 saveGeneTree(i, my_vec);
             }
             
-            writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
+//            writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
             
             if (_verbose > 0) {
                 cout << "marginal likelihood: " << _log_marginal_likelihood << endl;

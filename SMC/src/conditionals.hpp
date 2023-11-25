@@ -7,8 +7,6 @@
 
 //#define PRIOR_POST_ALL_PAIRS
 
-//#define PRIOR_POST_AVERAGE
-
 //#define NDEBUG // disable asserts for efficiency / memory improvement
 
 #define USE_TOTAL_RATE
