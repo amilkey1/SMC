@@ -111,9 +111,6 @@ namespace proj {
         unsigned t1=0;
         unsigned t2=1;
         //don't use this when there's only one choice (2 subtrees)
-        // thread safe random number generator with mutex
-        
-            // thread safe random number generator with mutex
         if (n > 2) {
             t1 = randint(0, n-1);
             t2 = randint(0, n-1);
@@ -123,19 +120,9 @@ namespace proj {
                 t2 = randint(0, n-1);
             }
         }
+        assert (t1 < n);
+        assert (t2 < n);
+
         return make_pair(t1, t2);
-        
-//        if (n < 2)
-//            throw XProj(format("nchoose2 called with n = %d") % n);
-//        int i = 0;
-//        int j = 1;
-//        if (n > 2) {
-//            i = randint(1, n);
-//            j = i + randint(1, n-1) - 1;
-//            i = i - 1;
-//            j = j % n;
-//        }
-//
-//        return make_pair(i, j);
     }
     }
