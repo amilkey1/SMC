@@ -164,6 +164,28 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     }
 
     inline void Proj::saveSpeciesTrees(vector<Particle::SharedPtr> &v) const {
+#if defined (SAVE_UNIQUE_SPECIES_TREES)
+        // save only unique species trees
+        vector<double> unique_log_likelihoods;
+        
+        ofstream treef("species_trees.trees");
+        treef << "#nexus\n\n";
+        treef << "begin trees;\n";
+        for (auto &p:v) {
+            double particle_likelihood = p->getLogLikelihood();
+            bool found = false;
+            if(std::find(unique_log_likelihoods.begin(), unique_log_likelihoods.end(), particle_likelihood) != unique_log_likelihoods.end()) {
+                found = true;
+            }
+            if (!found) {
+                unique_log_likelihoods.push_back(particle_likelihood);
+                treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
+            }
+        }
+        treef << "end;\n";
+        treef.close();
+        
+#else
             ofstream treef("species_trees.trees");
             treef << "#nexus\n\n";
             treef << "begin trees;\n";
@@ -172,6 +194,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
             treef << "end;\n";
             treef.close();
+#endif
         }
 
     inline void Proj::saveGeneTrees(unsigned ngenes, vector<Particle::SharedPtr> &v) const {
@@ -598,7 +621,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     // set particle randon number seeds
                     unsigned psuffix = 1;
                     for (auto &p:my_vec) {
-                        p->setSeed(rng.randint(1,9999) + psuffix); // TODO: something about this is not working - where is lot created?
+                        p->setSeed(rng.randint(1,9999) + psuffix);
                         psuffix += 2;
                     }
                     

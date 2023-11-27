@@ -10,3 +10,5 @@
 //#define NDEBUG // disable asserts for efficiency / memory improvement
 
 #define USE_TOTAL_RATE
+
+#define SAVE_UNIQUE_SPECIES_TREES
