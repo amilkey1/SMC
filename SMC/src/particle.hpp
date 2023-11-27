@@ -77,6 +77,7 @@ class Particle {
         int                                             selectEvent(vector<double> weight_vec);
         double                                          getTopologyPrior(unsigned i);
         vector<pair<double, double>>                    getIncrementPriors(unsigned i);
+        vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
         double                                          getCoalescentLikelihood(unsigned g);
         bool                                            speciesJoinProposed();
         static bool                                     _run_on_empty;
@@ -709,6 +710,10 @@ class Particle {
 
     inline vector<pair<double, double>> Particle::getIncrementPriors(unsigned i) {
         return _forests[i]._increments_and_priors;
+    }
+
+    inline vector<pair<double, double>> Particle::getSpeciesTreeIncrementPriors() {
+        return _forests[0]._increments_and_priors;
     }
 
     inline double Particle::getCoalescentLikelihood(unsigned g) {
