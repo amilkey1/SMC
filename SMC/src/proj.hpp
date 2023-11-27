@@ -167,18 +167,24 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 #if defined (SAVE_UNIQUE_SPECIES_TREES)
         // save only unique species trees
         vector<double> unique_log_likelihoods;
+        vector<vector<pair<double, double>>> unique_increments_and_priors;
         
         ofstream treef("species_trees.trees");
         treef << "#nexus\n\n";
         treef << "begin trees;\n";
         for (auto &p:v) {
-            double particle_likelihood = p->getLogLikelihood();
+//            double particle_likelihood = p->getLogLikelihood();
+            vector<pair<double, double>> increments_and_priors = p->getSpeciesTreeIncrementPriors();
             bool found = false;
-            if(std::find(unique_log_likelihoods.begin(), unique_log_likelihoods.end(), particle_likelihood) != unique_log_likelihoods.end()) {
+            if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
                 found = true;
             }
+//            if(std::find(unique_log_likelihoods.begin(), unique_log_likelihoods.end(), particle_likelihood) != unique_log_likelihoods.end()) {
+//                found = true;
+//            }
             if (!found) {
-                unique_log_likelihoods.push_back(particle_likelihood);
+//                unique_log_likelihoods.push_back(particle_likelihood);
+                unique_increments_and_priors.push_back(increments_and_priors);
                 treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
             }
         }
