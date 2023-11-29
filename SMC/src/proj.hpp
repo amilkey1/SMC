@@ -46,6 +46,8 @@ namespace proj {
             void                showFinal(vector<Particle::SharedPtr>);
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
             void                proposeParticles(vector<Particle::SharedPtr> &particles);
+            void                proposeParticleRangePriorPost(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
+            void                proposeParticlesPriorPost(vector<Particle::SharedPtr> &particles);
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
 
         private:
@@ -166,24 +168,18 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     inline void Proj::saveSpeciesTrees(vector<Particle::SharedPtr> &v) const {
 #if defined (SAVE_UNIQUE_SPECIES_TREES)
         // save only unique species trees
-        vector<double> unique_log_likelihoods;
         vector<vector<pair<double, double>>> unique_increments_and_priors;
         
         ofstream treef("species_trees.trees");
         treef << "#nexus\n\n";
         treef << "begin trees;\n";
         for (auto &p:v) {
-//            double particle_likelihood = p->getLogLikelihood();
             vector<pair<double, double>> increments_and_priors = p->getSpeciesTreeIncrementPriors();
             bool found = false;
             if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
                 found = true;
             }
-//            if(std::find(unique_log_likelihoods.begin(), unique_log_likelihoods.end(), particle_likelihood) != unique_log_likelihoods.end()) {
-//                found = true;
-//            }
             if (!found) {
-//                unique_log_likelihoods.push_back(particle_likelihood);
                 unique_increments_and_priors.push_back(increments_and_priors);
                 treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
             }
@@ -514,6 +510,49 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
     }
 
+    inline void Proj::proposeParticlesPriorPost(vector<Particle::SharedPtr> &particles) {
+        assert(_nthreads > 0);
+        if (_nthreads == 1) {
+          for (auto & p : particles) {
+              p->proposalPriorPost();
+          }
+        }
+        else {
+          // divide up the particles as evenly as possible across threads
+          unsigned first = 0;
+          unsigned incr = _nparticles/_nthreads + (_nparticles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
+          unsigned last = incr;
+
+          // need a vector of threads because we have to wait for each one to finish
+          vector<thread> threads;
+
+            while (true) {
+            // create a thread to handle particles first through last - 1
+              threads.push_back(thread(&Proj::proposeParticleRangePriorPost, this, first, last, std::ref(particles)));
+            // update first and last
+            first = last;
+            last += incr;
+            if (last > _nparticles) {
+              last = _nparticles;
+              }
+            if (first>=_nparticles) {
+                break;
+            }
+          }
+
+          // the join function causes this loop to pause until the ith thread finishes
+          for (unsigned i = 0; i < threads.size(); i++) {
+            threads[i].join();
+          }
+        }
+    }
+
+    inline void Proj::proposeParticleRangePriorPost(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles) {
+        for (unsigned i=first; i<last; i++){
+            particles[i]->proposalPriorPost();
+        }
+    }
+
     inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles) {
         for (unsigned i=first; i<last; i++){
             particles[i]->proposal();
@@ -632,7 +671,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     }
                     
                     //taxon joining and reweighting step
-                    proposeParticles(my_vec);
+                    if (Forest::_proposal == "prior-prior") {
+                        proposeParticles(my_vec);
+                    }
+                    else {
+                        proposeParticlesPriorPost(my_vec);
+                    }
                     
                     unsigned num_species_particles_proposed = 0;
                     
@@ -644,9 +688,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     }
                     
 //                    cout << "num speciation events proposed = " << num_species_particles_proposed << endl;
-//                    for (auto &p:my_vec) {
-//                        p->showParticle();
-//                    }
+                    if (num_species_particles_proposed > 0) {
+                        cout << "stop";
+                    }
+                    for (auto &p:my_vec) {
+                        p->showParticle();
+                    }
                     
                     normalizeWeights(my_vec);
                     
@@ -687,9 +734,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     resetWeights(my_vec);
                     }
                     
+                    for (auto &p:my_vec) {
+                        p->showParticle();
+                    }
                 } // g loop
                     
-            saveAllHybridNodes(my_vec);
+//            saveAllHybridNodes(my_vec);
 //            my_vec[0]->showParticle();
             
             saveSpeciesTrees(my_vec);
