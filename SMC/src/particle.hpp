@@ -93,6 +93,12 @@ class Particle {
         Lot::SharedPtr getLot() const {return _lot;}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
         double                                          getRunningSumChoices(vector<double> choices);
+        double                                          getSpeciesTreeHeight();
+        vector<double>                                  getGeneTreeHeights();
+        vector<double>                                  getGeneTreeLogLikelihoods();
+        vector<double>                                  getGeneTreePriors();
+        double                                          getSpeciesTreePrior();
+        double                                          getAllPriors();
 
     private:
 
@@ -222,6 +228,61 @@ class Particle {
         }
         log_weight_choices_sum = log(running_sum) + log_max_weight;
         return log_weight_choices_sum;
+    }
+
+    inline double Particle::getSpeciesTreeHeight() {
+        return _forests[0].getTreeHeight();
+    }
+
+    inline vector<double> Particle::getGeneTreeHeights() {
+        vector<double> gene_tree_heights;
+        for (int i=1; i<_forests.size(); i++) {
+            gene_tree_heights.push_back(_forests[i].getTreeHeight());
+        }
+        return gene_tree_heights;
+    }
+
+    inline vector<double> Particle::getGeneTreeLogLikelihoods() {
+        vector<double> gene_tree_log_likelihoods;
+        for (int i=1; i<_forests.size(); i++) {
+            gene_tree_log_likelihoods.push_back(_forests[i]._gene_tree_log_likelihood);
+        }
+        return gene_tree_log_likelihoods;
+    }
+
+    inline vector<double> Particle::getGeneTreePriors() {
+        vector<double> gene_tree_priors;
+        for (int i=1; i<_forests.size(); i++) {
+            double prior = 0.0;
+            for (auto &p:_forests[i]._increments_and_priors) {
+                prior += p.second;
+            }
+            prior += _forests[i]._log_joining_prob;
+            
+            gene_tree_priors.push_back(prior);
+        }
+        return gene_tree_priors;
+    }
+
+    inline double Particle::getSpeciesTreePrior() {
+        double prior = 0.0;
+        for (auto &p:_forests[0]._increments_and_priors) {
+            prior += p.second;
+        }
+        prior += _forests[0]._log_joining_prob;
+        
+        return prior;
+    }
+
+    inline double Particle::getAllPriors() {
+        vector<double> gene_tree_priors = getGeneTreePriors();
+        double species_tree_prior = getSpeciesTreePrior();
+        double total_prior = 0.0;
+        for (auto &g:gene_tree_priors) {
+            total_prior += g;
+        }
+        total_prior += species_tree_prior;
+        return total_prior;
     }
 
     inline double Particle::getLogLikelihood() {

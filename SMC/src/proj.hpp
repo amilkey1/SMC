@@ -37,6 +37,7 @@ namespace proj {
             void                saveGeneTrees(unsigned ngenes, vector<Particle::SharedPtr> &v) const;
             void                saveGeneTree(unsigned gene_number, vector<Particle::SharedPtr> &v) const;
             void                writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
+            void writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                normalizeWeights(vector<Particle::SharedPtr> & particles);
             void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                resetWeights(vector<Particle::SharedPtr> & particles);
@@ -109,6 +110,80 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
         treef << "end;\n";
         treef.close();
+    }
+
+    inline void Proj::writeParamsFileForBeastComparison(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const {
+        // this function creates a params file that is comparable to output from *BEAST
+        ofstream logf("params-beast-comparison.log");
+        logf << "iter ";
+        logf << "\t" << "posterior ";
+        logf << "\t" << "likelihood ";
+        logf << "\t" << "prior ";
+        logf << "\t" << "speciescoalescent ";
+        logf << "\t" << "birthRate ";
+        logf << "\t" << "YuleModel ";
+        logf << "\t" << "popMean ";
+        logf << "\t" << "TreeHeight.species ";
+        
+        for (int i=1; i<ngenes+1; i++) {
+            logf << "\t" << "TreeHeight:gene" + to_string(i);
+        }
+        for (int i=1; i<ngenes+1; i++) {
+            logf << "\t" << "treeLikelihood:gene" + to_string(i);
+        }
+        for (int i=1; i<ngenes+1; i++) {
+            logf << "\t" << "treePrior:gene" + to_string(i);
+        }
+        logf << endl;
+        
+        int iter = 0;
+        for (auto &p:v) {
+            logf << iter;
+            iter++;
+            
+            double log_likelihood = p->getLogLikelihood();
+            double log_prior = p->getAllPriors();
+            
+            double log_posterior = log_likelihood + log_prior;
+            
+            logf << "\t" << log_posterior;
+            
+            logf << "\t" << log_likelihood;
+            
+            logf << "\t" << p->getSpeciesTreePrior();
+            
+            double log_coalescent_likelihood = 0.0;
+            for (unsigned g=1; g<ngenes+1; g++) {
+                log_coalescent_likelihood += p->getCoalescentLikelihood(g);
+            }
+            logf << "\t" << log_coalescent_likelihood;
+            
+            logf << "\t" << Forest::_lambda;
+            
+            double yule_model = 0.0;
+            logf << "\t" << yule_model;
+            
+            logf << "\t" << Forest::_theta;
+            
+            double species_tree_height = p->getSpeciesTreeHeight();
+            logf << "\t" << species_tree_height;
+            
+            for (auto &h:p->getGeneTreeHeights()) {
+                logf << "\t" << h;
+            }
+            
+            for (auto &l:p->getGeneTreeLogLikelihoods()) {
+                logf << "\t" << l;
+            }
+            
+            for (auto &r:p->getGeneTreePriors()) {
+                logf << "\t" << r;
+            }
+            
+            logf << endl;
+        }
+        
+        logf.close();
     }
 
     inline void Proj::writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const {
@@ -688,12 +763,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     }
                     
 //                    cout << "num speciation events proposed = " << num_species_particles_proposed << endl;
-                    if (num_species_particles_proposed > 0) {
-                        cout << "stop";
-                    }
-                    for (auto &p:my_vec) {
-                        p->showParticle();
-                    }
+//                    if (num_species_particles_proposed > 0) {
+//                        cout << "stop";
+//                    }
+//                    for (auto &p:my_vec) {
+//                        p->showParticle();
+//                    }
                     
                     normalizeWeights(my_vec);
                     
@@ -734,9 +809,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     resetWeights(my_vec);
                     }
                     
-                    for (auto &p:my_vec) {
-                        p->showParticle();
-                    }
+//                    for (auto &p:my_vec) {
+//                        p->showParticle();
+//                    }
                 } // g loop
                     
 //            saveAllHybridNodes(my_vec);
@@ -747,7 +822,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 saveGeneTree(i, my_vec);
             }
             
-//            writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
+            writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
+            writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
             
             if (_verbose > 0) {
                 cout << "marginal likelihood: " << _log_marginal_likelihood << endl;
