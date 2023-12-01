@@ -1366,6 +1366,7 @@ class Forest {
                         }
 
                         if (coalescence) {
+                            assert (s.second.size() > 1);
                             // if there is coalescence, need to use number of lineages before the join
                             double coalescence_rate = (s.second.size())*(s.second.size()-1) / _theta;
                             assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
@@ -1404,7 +1405,7 @@ class Forest {
             else {
                 // species tree
                 if (coalesced_gene) {
-                    double rate = _lambda*(_lineages.size()); // need to add 1 since lineages already joined
+                    double rate = _lambda*(_lineages.size());
                     // calculate increment prior
                     double nChooseTwo = (_lineages.size())*(_lineages.size()-1);
                     double log_prob_join = log(2/nChooseTwo);

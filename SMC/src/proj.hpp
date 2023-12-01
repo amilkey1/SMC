@@ -57,7 +57,6 @@ namespace proj {
             Partition::SharedPtr        _partition;
             Data::SharedPtr             _data;
             double                      _log_marginal_likelihood = 0.0;
-            double                      _prev_log_marginal_likelihood = 0.0;
             bool                        _use_gpu;
             bool                        _ambig_missing;
             unsigned                    _nparticles;
@@ -150,7 +149,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             
             logf << "\t" << log_likelihood;
             
-            logf << "\t" << p->getSpeciesTreePrior();
+//            logf << "\t" << p->getSpeciesTreePrior();
+            logf << "\t" << 0.0;
             
             double log_coalescent_likelihood = 0.0;
             for (unsigned g=1; g<ngenes+1; g++) {
@@ -160,7 +160,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             
             logf << "\t" << Forest::_lambda;
             
-            double yule_model = 0.0;
+            double yule_model = p->getSpeciesTreePrior();
             logf << "\t" << yule_model;
             
             logf << "\t" << Forest::_theta;
@@ -716,8 +716,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     p->mapSpecies(_taxon_map, _species_names);
                 }
                 
-                _prev_log_marginal_likelihood = _log_marginal_likelihood;
-                
                 // reset marginal likelihood
                 _log_marginal_likelihood = 0.0;
                 vector<double> starting_log_likelihoods = my_vec[0]->calcGeneTreeLogLikelihoods();
@@ -782,6 +780,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     }
                     
                     bool filter = true;
+                    if (Particle::_run_on_empty) {
+                        filter = false;
+                    }
                     if (filter) {
 //                        if (ess < 100) {
 //                        if (g == 35 || g == 74) { // resample every other generation
@@ -820,6 +821,17 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             saveSpeciesTrees(my_vec);
             for (int i=1; i < nsubsets+1; i++) {
                 saveGeneTree(i, my_vec);
+            }
+            
+            if (Particle::_run_on_empty) { // make sure all gene tree log likelihoods are 0.0
+                vector<double> gene_tree_log_likelihoods;
+                gene_tree_log_likelihoods.resize(nsubsets);
+                for (int i=0; i<nsubsets; i++) {
+                    gene_tree_log_likelihoods[i] = 0.0;
+                }
+                for (auto &p:my_vec) {
+                    p->setLogLikelihood(gene_tree_log_likelihoods);
+                }
             }
             
             writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);

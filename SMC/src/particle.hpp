@@ -86,7 +86,7 @@ class Particle {
         vector<double>                                  chooseIncrements(vector<double> event_choice_rates);
         void                                            speciesProposal();
         void                                            geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name);
-        void                                            calculateIncrementPriors(double increment, string species_name, unsigned forest_number);
+        void                                            calculateIncrementPriors(double increment, string species_name, unsigned forest_number, bool speciation);
         void                                            changeTheta(unsigned i);
         double                                          getIncrement() {return _prev_increment;}
         void                                            clearPartials();
@@ -191,11 +191,14 @@ class Particle {
     inline vector<double> Particle::calcGeneTreeLogLikelihoods() {
         vector<double> gene_forest_likelihoods;
         gene_forest_likelihoods.resize(_forests.size()-1);
+        
         //calculate likelihood for each gene tree
         for (unsigned i=1; i<_forests.size(); i++) {
-            double gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
-            assert(!isnan (gene_tree_log_likelihood));
-            //total log likelihood is sum of gene tree log likelihoods
+            double gene_tree_log_likelihood  = 0.0;
+            if (!_run_on_empty) {
+                gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
+                assert(!isnan (gene_tree_log_likelihood));
+            }
             gene_forest_likelihoods[i-1] = gene_tree_log_likelihood;
         }
 
@@ -306,6 +309,8 @@ class Particle {
         bool done = false;
                 
         while (!done) {
+            
+            bool speciation = false;
     
         vector<double> forest_rates; // this vector contains total rate of species tree, gene 1, etc.
         vector<vector<double>> gene_forest_rates; // this vector contains rates by species for each gene forest
@@ -393,7 +398,12 @@ class Particle {
                         }
                     }
                     
-                    calculateIncrementPriors(increment, species_name, forest_number);
+                    
+                    if (forest_number == 0) {
+                        speciation = true;
+                    }
+                    
+                    calculateIncrementPriors(increment, species_name, forest_number, speciation);
 
                     
                     vector<vector<double>> event_choice_weights;
@@ -515,6 +525,8 @@ class Particle {
                 
         while (!done) {
     
+            bool speciation = false;
+            
         vector<double> forest_rates; // this vector contains total rate of species tree, gene 1, etc.
         vector<vector<double>> gene_forest_rates; // this vector contains rates by species for each gene forest
         gene_forest_rates.resize(_forests.size()-1);
@@ -701,7 +713,11 @@ class Particle {
                 }
             }
             
-            calculateIncrementPriors(increment, species_name, forest_number);
+            if (forest_number == 0) {
+                speciation = true;
+            }
+            
+            calculateIncrementPriors(increment, species_name, forest_number, speciation);
             
             if (species_name == "species") {
                 assert (index == 0);
@@ -733,7 +749,10 @@ class Particle {
                 _log_weight = 0.0;
             }
             
-            _prev_forest_number = forest_number;
+            
+            if (forest_number != 0) {
+                _prev_forest_number = forest_number;
+            }
             
             }
         _generation++;
@@ -811,22 +830,19 @@ class Particle {
         }
     }
 
-    inline void Particle::calculateIncrementPriors(double increment, string species_name, unsigned forest_number) {
+    inline void Particle::calculateIncrementPriors(double increment, string species_name, unsigned forest_number, bool speciation) {
         // need to calculate coalescent likelihood before joining anything or updating species partition
         for (int f=0; f<_forests.size(); f++) {
             bool new_increment = false;
             bool coalescence = false;
             bool gene_tree = false;
             
-            if (f == _prev_forest_number) {
+            if ((f == _prev_forest_number || _generation == 0) && !speciation) { // if previous join was a species join, new increment is false
                 // add to existing increment + prior
                 new_increment = true;
             }
             if (f == forest_number) {
                 coalescence = true;
-            }
-            if (_generation == 0) {
-                new_increment = true;
             }
             if (f > 0) {
                 gene_tree = true;
