@@ -847,6 +847,9 @@ class Particle {
             if (f > 0) {
                 gene_tree = true;
             }
+            if (_generation == 0) {
+                new_increment = true;
+            }
             
             _forests[f].calcIncrementPrior(increment, species_name, new_increment, coalescence, gene_tree);
         }
