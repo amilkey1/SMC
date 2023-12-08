@@ -1407,9 +1407,10 @@ class Forest {
                 if (coalesced_gene) {
                     double rate = _lambda*(_lineages.size());
                     // calculate increment prior
-                    double nChooseTwo = (_lineages.size())*(_lineages.size()-1);
-                    double log_prob_join = log(2/nChooseTwo);
-                    log_increment_prior = log(rate) - (increment*rate) + log_prob_join;
+//                    double nChooseTwo = (_lineages.size())*(_lineages.size()-1);
+//                    double log_prob_join = log(2/nChooseTwo);
+                    log_increment_prior = log(_lambda) - (increment * rate);
+//                    log_increment_prior = log(rate) - (increment*rate) + log_prob_join;
                 }
                 else {
                     double rate = _lambda*(_lineages.size());

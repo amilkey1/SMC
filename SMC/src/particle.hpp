@@ -284,7 +284,7 @@ class Particle {
         for (auto &g:gene_tree_priors) {
             total_prior += g;
         }
-        total_prior += species_tree_prior;
+//        total_prior += species_tree_prior; // TODO: removing this for now because I don't think BEAST includes it?
         return total_prior;
     }
 
