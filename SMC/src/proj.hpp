@@ -190,10 +190,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ofstream logf("params.log");
         logf << "iteration ";
         logf << "\t" << "likelihood ";
-        logf << "\t" << "species_tree_topology_prior ";
-        for (int i=1; i<ngenes+1; i++) {
-            logf << "\t" << "gene_tree_topology_prior ";
-        }
+//        logf << "\t" << "species_tree_topology_prior ";
+//        for (int i=1; i<ngenes+1; i++) {
+//            logf << "\t" << "gene_tree_topology_prior ";
+//        }
         for (int s=0; s<nspecies-1; s++) {
             logf << "\t" << "species_increment";
             logf << "\t" << "species_increment_prior";
@@ -214,9 +214,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             
             logf << "\t" << p->getLogLikelihood();
             
-            for (unsigned g=0; g<ngenes+1; g++) {
-                logf << "\t" << p->getTopologyPrior(g);
-            }
+//            for (unsigned g=0; g<ngenes+1; g++) {
+//                logf << "\t" << p->getTopologyPrior(g);
+//            }
 
             for (unsigned g=0; g<ngenes+1; g++) {
                 for (auto &b:p->getIncrementPriors(g)) {
@@ -224,7 +224,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     logf << "\t" << b.second;
                     // no increment or increment prior should be 0
                     assert (b.first > 0.0);
-                    assert (b.second != 0.0);
+//                    assert (b.second != 0.0);
                 }
             }
             

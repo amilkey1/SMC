@@ -86,7 +86,7 @@ class Particle {
         vector<double>                                  chooseIncrements(vector<double> event_choice_rates);
         void                                            speciesProposal();
         void                                            geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name);
-        void                                            calculateIncrementPriors(double increment, string species_name, unsigned forest_number, bool speciation);
+        void                                            calculateIncrementPriors(double increment, string species_name, unsigned forest_number, bool speciation, bool first_step);
         void                                            changeTheta(unsigned i);
         double                                          getIncrement() {return _prev_increment;}
         void                                            clearPartials();
@@ -403,7 +403,19 @@ class Particle {
                         speciation = true;
                     }
                     
-                    calculateIncrementPriors(increment, species_name, forest_number, speciation);
+                    bool first_step = true;
+                    if (_forests[0]._lineages.size() != Forest::_nspecies) {
+                        first_step = false;
+                    }
+                    if (first_step) {
+                        for (int i=1; i<_forests.size(); i++) {
+                            if (_forests[i]._lineages.size() != Forest::_ntaxa) {
+                                first_step = false;
+                            }
+                        }
+                    }
+                    
+                    calculateIncrementPriors(increment, species_name, forest_number, speciation, first_step);
 
                     
                     vector<vector<double>> event_choice_weights;
@@ -717,9 +729,22 @@ class Particle {
                 speciation = true;
             }
             
-            calculateIncrementPriors(increment, species_name, forest_number, speciation);
+            bool first_step = true;
+            if (_forests[0]._lineages.size() != Forest::_nspecies) {
+                first_step = false;
+            }
+            if (first_step) {
+                for (int i=1; i<_forests.size(); i++) {
+                    if (_forests[i]._lineages.size() != Forest::_ntaxa) {
+                        first_step = false;
+                    }
+                }
+            }
+            calculateIncrementPriors(increment, species_name, forest_number, speciation, first_step);
             
             if (species_name == "species") {
+                unsigned n = (unsigned) _forests[0]._lineages.size();
+                assert (n > 1);
                 assert (index == 0);
                 assert (forest_number == 0);
                 
@@ -733,10 +758,11 @@ class Particle {
                 double log_speciation_term = 0.0;
                 unsigned num_species_lineages = (unsigned)_forests[0]._lineages.size();
                 
-                if (speciation_time != -1) {
-                    assert (!_forests[0]._done);
-                    log_speciation_term = log(1/(num_species_lineages*Forest::_lambda))-(num_species_lineages*Forest::_lambda*(increment - speciation_time));
-                }
+//                if (speciation_time != -1) {
+//                    assert (speciation_time > increment);
+//                    assert (!_forests[0]._done);
+//                    log_speciation_term = log(1/(num_species_lineages*Forest::_lambda))-(num_species_lineages*Forest::_lambda*(increment - speciation_time));
+//                }
                 geneProposal(event_choice_index, forest_number, event_choice_name, increment, species_name);
                 double log_likelihood_term = _forests[forest_number]._log_weight;
 
@@ -750,9 +776,9 @@ class Particle {
             }
             
             
-            if (forest_number != 0) {
+//            if (forest_number != 0) {
                 _prev_forest_number = forest_number;
-            }
+//            } // TODO: testing
             
             }
         _generation++;
@@ -830,14 +856,18 @@ class Particle {
         }
     }
 
-    inline void Particle::calculateIncrementPriors(double increment, string species_name, unsigned forest_number, bool speciation) {
+    inline void Particle::calculateIncrementPriors(double increment, string species_name, unsigned forest_number, bool speciation, bool first_step) {
         // need to calculate coalescent likelihood before joining anything or updating species partition
         for (int f=0; f<_forests.size(); f++) {
             bool new_increment = false;
             bool coalescence = false;
             bool gene_tree = false;
             
-            if ((f == _prev_forest_number || _generation == 0) && !speciation) { // if previous join was a species join, new increment is false
+            if (first_step) {
+                new_increment = true;
+            }
+//            if ((f == _prev_forest_number || _generation == 0) && !speciation) { // if previous join was a species join, new increment is false
+            if (f == _prev_forest_number) {
                 // add to existing increment + prior
                 new_increment = true;
             }
@@ -847,11 +877,27 @@ class Particle {
             if (f > 0) {
                 gene_tree = true;
             }
-            if (_generation == 0) {
+//            if (_generation == 0) {
+//                new_increment = true;
+//            }
+#if defined (SIM_TEST)
+            if (_species_join_proposed) {
+                new_increment = false;
+            }
+#endif
+#if defined (SIM_TES3T)
+            if (_species_join_proposed) {
+                new_increment = false;
+            }
+            if (f == 0) {
                 new_increment = true;
             }
-            
+#endif
+//            new_increment = true;
             _forests[f].calcIncrementPrior(increment, species_name, new_increment, coalescence, gene_tree);
+#if defined (SIM_TEST3)
+            _species_join_proposed = false;
+#endif
         }
     }
 
