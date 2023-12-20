@@ -196,12 +196,13 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 //        }
         for (int s=0; s<nspecies-1; s++) {
             logf << "\t" << "species_increment";
-            logf << "\t" << "species_increment_prior";
+//            logf << "\t" << "species_increment_prior";
         }
+        logf << "\t" << "species_tree_prior";
         for (int g=1; g<ngenes+1; g++) {
             for (int i=1; i<ntaxa; i++) {
                 logf << "\t" << "gene_increment";
-                logf << "\t" << "log_gene_increment_prior";
+//                logf << "\t" << "log_gene_increment_prior";
             }
         }
         logf << "\t" << "coalescent_likelihood";
@@ -218,13 +219,23 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 //                logf << "\t" << p->getTopologyPrior(g);
 //            }
 
+            double species_tree_prior = 0.0;
+            
             for (unsigned g=0; g<ngenes+1; g++) {
                 for (auto &b:p->getIncrementPriors(g)) {
                     logf << "\t" << b.first;
-                    logf << "\t" << b.second;
+                    if (g == 0) { // species tree prior
+                        species_tree_prior += b.second;
+//                        logf << "\t" << b.second;
+                    }
                     // no increment or increment prior should be 0
                     assert (b.first > 0.0);
 //                    assert (b.second != 0.0);
+                }
+                assert (species_tree_prior != 0.0);
+                
+                if (g == 0) {
+                    logf << "\t" << species_tree_prior;
                 }
             }
             
@@ -819,9 +830,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 //            my_vec[0]->showParticle();
             
             saveSpeciesTrees(my_vec);
-            for (int i=1; i < nsubsets+1; i++) {
-                saveGeneTree(i, my_vec);
-            }
+//            for (int i=1; i < nsubsets+1; i++) {
+//                saveGeneTree(i, my_vec);
+//            }
             
             if (Particle::_run_on_empty) { // make sure all gene tree log likelihoods are 0.0
                 vector<double> gene_tree_log_likelihoods;
