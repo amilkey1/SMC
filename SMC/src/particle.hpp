@@ -767,7 +767,6 @@ class Particle {
                 double log_likelihood_term = _forests[forest_number]._log_weight;
 
                 _log_weight = log_speciation_term + log_likelihood_term;
-
                 done = true;
             }
                   
@@ -776,9 +775,7 @@ class Particle {
             }
             
             
-//            if (forest_number != 0) {
-                _prev_forest_number = forest_number;
-//            } // TODO: testing
+            _prev_forest_number = forest_number;
             
             }
         _generation++;

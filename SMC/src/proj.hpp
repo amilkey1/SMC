@@ -39,6 +39,8 @@ namespace proj {
             void                writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                normalizeWeights(vector<Particle::SharedPtr> & particles);
+            void                modifyWeights(vector<Particle::SharedPtr> & particles);
+            void                correctWeights(vector<Particle::SharedPtr> & particles);
             void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                resetWeights(vector<Particle::SharedPtr> & particles);
             double              getWeightAverage(vector<double> log_weight_vec);
@@ -78,6 +80,7 @@ namespace proj {
             void                        estimateSpeciationRate(vector<Particle::SharedPtr> &particles);
             double                      _small_enough;
             unsigned                    _verbose;
+            double                      _phi;
     };
 
     inline Proj::Proj() {
@@ -97,6 +100,7 @@ namespace proj {
         _nparticles = 50000;
         _data = nullptr;
         _small_enough = 0.0000001;
+        _phi = 1.0;
     }
 
 //    inline void Proj::saveAllForests(const vector<Particle> &v) const {
@@ -213,7 +217,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << iter;
             iter++;
             
+#if defined (WEIGHT_CORRECTION)
+            logf << "\t" << p->getLogLikelihood()*_phi;
+#else
             logf << "\t" << p->getLogLikelihood();
+#endif
             
 //            for (unsigned g=0; g<ngenes+1; g++) {
 //                logf << "\t" << p->getTopologyPrior(g);
@@ -226,11 +234,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     logf << "\t" << b.first;
                     if (g == 0) { // species tree prior
                         species_tree_prior += b.second;
-//                        logf << "\t" << b.second;
                     }
-                    // no increment or increment prior should be 0
+                    // no increment should be 0
                     assert (b.first > 0.0);
-//                    assert (b.second != 0.0);
                 }
                 assert (species_tree_prior != 0.0);
                 
@@ -348,6 +354,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("run_on_empty", boost::program_options::value(&Particle::_run_on_empty)->default_value(false), "run program without data")
         ("verbose", boost::program_options::value(&_verbose)->default_value(1), "set amount of output printed")
         ("save_memory", boost::program_options::value(&Forest::_save_memory)->default_value(false), "save memory at the expense of time")
+        ("phi", boost::program_options::value(&_phi)->default_value(1.0), "correct weights by this number")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -439,6 +446,18 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
         return log_particle_sum;
     }
+
+    inline void Proj::modifyWeights(vector<Particle::SharedPtr> & particles) {
+        for (auto &p:particles) {
+            p->setLogWeight(p->getLogWeight()*_phi);
+        }
+    }
+
+//    inline void Proj::correctWeights(vector<Particle::SharedPtr> & particles) {
+//        for (auto &p:particles) {
+//            p->setLogWeight(p->getLogWeight()*(1-_phi));
+//        }
+//    }
 
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles) {
         unsigned i = 0;
@@ -737,6 +756,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         p->clearPartials();
                     }
                 }
+            
+#if defined (WEIGHT_CORRECTION)
+                    modifyWeights(my_vec);
+#endif
                 normalizeWeights(my_vec); // initialize marginal likelihood
                 
                 //run through each generation of particles
@@ -779,6 +802,14 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 //                        p->showParticle();
 //                    }
                     
+#if defined (WEIGHT_CORRECTION)
+//                    if (g < nsteps-1) {
+                        modifyWeights(my_vec);
+//                    }
+//                    else {
+//                        correctWeights(my_vec);
+//                    }
+#endif
                     normalizeWeights(my_vec);
                     
                     for (auto & p:my_vec) {
@@ -830,9 +861,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 //            my_vec[0]->showParticle();
             
             saveSpeciesTrees(my_vec);
-//            for (int i=1; i < nsubsets+1; i++) {
-//                saveGeneTree(i, my_vec);
-//            }
+            for (int i=1; i < nsubsets+1; i++) {
+                saveGeneTree(i, my_vec);
+            }
             
             if (Particle::_run_on_empty) { // make sure all gene tree log likelihoods are 0.0
                 vector<double> gene_tree_log_likelihoods;
