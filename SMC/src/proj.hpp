@@ -453,11 +453,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
     }
 
-//    inline void Proj::correctWeights(vector<Particle::SharedPtr> & particles) {
-//        for (auto &p:particles) {
-//            p->setLogWeight(p->getLogWeight()*(1-_phi));
-//        }
-//    }
+    inline void Proj::correctWeights(vector<Particle::SharedPtr> & particles) {
+        for (auto &p:particles) {
+            p->setLogWeight(p->getLogWeight()*(1 / _phi));
+        }
+    }
 
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles) {
         unsigned i = 0;
