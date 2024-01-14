@@ -208,6 +208,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             
             for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
                 logf << "\t" << gene_tree_log_likelihoods[i];
+            }
+            
+            for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
                 logf << "\t" << gene_tree_priors[i];
             }
             

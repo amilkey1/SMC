@@ -263,6 +263,7 @@ class Particle {
         vector<double> gene_tree_log_likelihoods;
         for (int i=1; i<_forests.size(); i++) {
             gene_tree_log_likelihoods.push_back(_forests[i]._gene_tree_log_likelihood);
+            assert (_forests[i]._gene_tree_log_likelihood <= 0.0);
         }
         return gene_tree_log_likelihoods;
     }
