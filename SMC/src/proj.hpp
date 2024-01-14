@@ -116,21 +116,31 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     }
 
     inline void Proj::writeParamsFileForBeastComparison(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const {
-        // this function creates a params file that is comparable to output from *BEAST
+        // this function creates a params file that is comparable to output from starbeast3
         ofstream logf("params-beast-comparison.log");
         logf << "iter ";
         logf << "\t" << "posterior ";
         logf << "\t" << "likelihood ";
         logf << "\t" << "prior ";
+        logf << "\t" << "vectorPrior "; // log joint prior on population sizes (vectorPrior)
         logf << "\t" << "speciescoalescent ";
-        logf << "\t" << "birthRate ";
-        logf << "\t" << "YuleModel ";
-        logf << "\t" << "popMean ";
-        logf << "\t" << "TreeHeight.species ";
+        logf << "\t" << "Tree.t:Species.height ";
+        logf << "\t" << "Tree.t:Species.treeLength ";
         
         for (int i=1; i<ngenes+1; i++) {
-            logf << "\t" << "TreeHeight:gene" + to_string(i);
+            logf << "\t" << "Tree.t:gene" + to_string(i) + "height";
+            logf << "\t" << "Tree.t:gene" + to_string(i) + "treeLength";
         }
+        
+        logf << "\t" << "YuleModel.t:Species "; // this is the log probability of the species tree (multiply by log(3!) to get increment log prob)
+        logf << "\t" << "popMean "; // this is psi in the InverseGamma(2,psi) distribution of popSize
+        
+        for (int i=0; i<(nspecies*2-1); i++) {
+            logf << "\t" << "popSize." + to_string(i+1);
+        }
+        
+        logf << "\t" << "speciationRate.t:Species ";
+        
         for (int i=1; i<ngenes+1; i++) {
             logf << "\t" << "treeLikelihood:gene" + to_string(i);
         }
@@ -149,39 +159,56 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             
             double log_posterior = log_likelihood + log_prior;
             
-            logf << "\t" << log_posterior;
-            
-            logf << "\t" << log_likelihood;
-            
-//            logf << "\t" << p->getSpeciesTreePrior();
-            logf << "\t" << 0.0;
-            
             double log_coalescent_likelihood = 0.0;
             for (unsigned g=1; g<ngenes+1; g++) {
                 log_coalescent_likelihood += p->getCoalescentLikelihood(g);
             }
+            
+            logf << "\t" << log_posterior;
+            
+            logf << "\t" << log_likelihood;
+            
+            logf << "\t" << log_prior - log_coalescent_likelihood; // starbeast3 does not include coalescent likelihood in this prior
+            
+            double vector_prior = 0.0;
+            logf << "\t" << vector_prior; // log joint prior on population sizes (vectorPrior) - 0.0 for now since pop size is not a parameter
+            
             logf << "\t" << log_coalescent_likelihood;
-            
-            logf << "\t" << Forest::_lambda;
-            
-            double yule_model = p->getSpeciesTreePrior();
-            logf << "\t" << yule_model;
-            
-            logf << "\t" << Forest::_theta;
             
             double species_tree_height = p->getSpeciesTreeHeight();
             logf << "\t" << species_tree_height;
             
-            for (auto &h:p->getGeneTreeHeights()) {
-                logf << "\t" << h;
+            double species_tree_length = p->getSpeciesTreeLength();
+            logf << "\t" << species_tree_length;
+            
+            vector<double> gene_tree_heights = p->getGeneTreeHeights();
+            vector<double> gene_tree_lengths = p->getGeneTreeLengths();
+            assert (gene_tree_heights.size() == gene_tree_lengths.size());
+            
+            for (int i=0; i<gene_tree_heights.size(); i++) {
+                logf << "\t" << gene_tree_heights[i];
+                logf << "\t" << gene_tree_lengths[i];
             }
             
-            for (auto &l:p->getGeneTreeLogLikelihoods()) {
-                logf << "\t" << l;
+            double yule_model = p->getSpeciesTreePrior(); // TODO: unsure if this is correct
+            logf << "\t" << yule_model;
+            
+            double pop_mean = 0.0; // setting this to 0.0 for now since pop size is not a parameter
+            logf << "\t" << pop_mean;
+            
+            for (int i=0; i<(nspecies*2-1); i++) {
+                logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
             }
             
-            for (auto &r:p->getGeneTreePriors()) {
-                logf << "\t" << r;
+            logf << "\t" << Forest::_lambda;
+            
+            vector<double> gene_tree_log_likelihoods = p->getGeneTreeLogLikelihoods();
+            vector<double> gene_tree_priors = p->getGeneTreePriors();
+            assert (gene_tree_log_likelihoods.size() == gene_tree_priors.size());
+            
+            for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
+                logf << "\t" << gene_tree_log_likelihoods[i];
+                logf << "\t" << gene_tree_priors[i];
             }
             
             logf << endl;

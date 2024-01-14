@@ -94,7 +94,9 @@ class Particle {
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
         double                                          getRunningSumChoices(vector<double> choices);
         double                                          getSpeciesTreeHeight();
+        double                                          getSpeciesTreeLength();
         vector<double>                                  getGeneTreeHeights();
+        vector<double>                                  getGeneTreeLengths();
         vector<double>                                  getGeneTreeLogLikelihoods();
         vector<double>                                  getGeneTreePriors();
         double                                          getSpeciesTreePrior();
@@ -237,10 +239,22 @@ class Particle {
         return _forests[0].getTreeHeight();
     }
 
+    inline double Particle::getSpeciesTreeLength() {
+        return _forests[0].getTreeLength();
+    }
+
     inline vector<double> Particle::getGeneTreeHeights() {
         vector<double> gene_tree_heights;
         for (int i=1; i<_forests.size(); i++) {
             gene_tree_heights.push_back(_forests[i].getTreeHeight());
+        }
+        return gene_tree_heights;
+    }
+
+    inline vector<double> Particle::getGeneTreeLengths() {
+        vector<double> gene_tree_heights;
+        for (int i=1; i<_forests.size(); i++) {
+            gene_tree_heights.push_back(_forests[i].getTreeLength());
         }
         return gene_tree_heights;
     }
@@ -260,7 +274,7 @@ class Particle {
             for (auto &p:_forests[i]._increments_and_priors) {
                 prior += p.second;
             }
-            prior += _forests[i]._log_joining_prob;
+//            prior += _forests[i]._log_joining_prob; // TODO: coalescent likelihood should include this already
             
             gene_tree_priors.push_back(prior);
         }
@@ -284,7 +298,7 @@ class Particle {
         for (auto &g:gene_tree_priors) {
             total_prior += g;
         }
-//        total_prior += species_tree_prior; // TODO: removing this for now because I don't think BEAST includes it?
+        total_prior += species_tree_prior; // TODO: does starbeast3 include this?
         return total_prior;
     }
 
