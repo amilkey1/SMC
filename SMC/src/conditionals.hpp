@@ -12,3 +12,8 @@
 #define USE_TOTAL_RATE
 
 #define SAVE_UNIQUE_SPECIES_TREES
+
+//#define SIM_TEST // simulated example with 2 taxa, 2 species - 1 taxon per species
+//#define SIM_TEST3 // simulated example with 3 species, 3 taxa
+
+#define WEIGHT_CORRECTION

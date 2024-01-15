@@ -143,6 +143,7 @@ class Forest {
         void                        hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment, string species_name, Lot::SharedPtr lot);
         void                        resetToMinor(vector<Node*> minor_nodes, vector<Node*> minor_left_children, vector<Node*> minor_right_children, vector<double> minor_left_edge_lengths, vector<double> minor_right_edge_lengths);
         double                      getTreeHeight();
+        double                      getTreeLength();
         double                      getSpeciesTreeIncrement();
         double                      getLineageHeight(Node* nd);
         double                      _log_weight;
@@ -1366,6 +1367,7 @@ class Forest {
                         }
 
                         if (coalescence) {
+                            assert (s.second.size() > 1);
                             // if there is coalescence, need to use number of lineages before the join
                             double coalescence_rate = (s.second.size())*(s.second.size()-1) / _theta;
                             assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
@@ -1404,10 +1406,12 @@ class Forest {
             else {
                 // species tree
                 if (coalesced_gene) {
-                    double rate = _lambda*(_lineages.size()); // need to add 1 since lineages already joined
+                    double rate = _lambda*(_lineages.size());
                     // calculate increment prior
                     double nChooseTwo = (_lineages.size())*(_lineages.size()-1);
                     double log_prob_join = log(2/nChooseTwo);
+//                    log_increment_prior = log(_lambda) - (increment * rate) + log_prob_join;
+//                    log_increment_prior = log(_lambda) - (increment * rate);
                     log_increment_prior = log(rate) - (increment*rate) + log_prob_join;
                 }
                 else {
@@ -2368,6 +2372,17 @@ class Forest {
         sum_height += base_node->getEdgeLength();
         for (Node* child=base_node->_left_child; child; child=child->_left_child) {
             sum_height += child->getEdgeLength();
+        }
+        return sum_height;
+    }
+
+    inline double Forest::getTreeLength() {
+        // sum of all edge lengths in tree
+        double sum_height = 0.0;
+        
+        for (auto &nd:_nodes) {
+            // sum edge lengths from all nodes
+            sum_height += nd._edge_length;
         }
         return sum_height;
     }
