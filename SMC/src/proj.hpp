@@ -385,6 +385,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("verbose", boost::program_options::value(&_verbose)->default_value(1), "set amount of output printed")
         ("save_memory", boost::program_options::value(&Forest::_save_memory)->default_value(false), "save memory at the expense of time")
         ("phi", boost::program_options::value(&_phi)->default_value(1.0), "correct weights by this number")
+        ("outgroup", boost::program_options::value(&Forest::_outgroup)->default_value("none"), "a string defining the outgroup")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -907,6 +908,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
             
             writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
+            saveGeneTrees(nsubsets, my_vec);
             writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
             
             if (_verbose > 0) {
