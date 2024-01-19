@@ -289,13 +289,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     }
 
     inline void Proj::saveSpeciesTrees(vector<Particle::SharedPtr> &v) const {
-#if defined (SAVE_UNIQUE_SPECIES_TREES)
         // save only unique species trees
         vector<vector<pair<double, double>>> unique_increments_and_priors;
         
-        ofstream treef("species_trees.trees");
-        treef << "#nexus\n\n";
-        treef << "begin trees;\n";
+        ofstream unique_treef("unique_species_trees.trees");
+        unique_treef << "#nexus\n\n";
+        unique_treef << "begin trees;\n";
         for (auto &p:v) {
             vector<pair<double, double>> increments_and_priors = p->getSpeciesTreeIncrementPriors();
             bool found = false;
@@ -304,22 +303,21 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
             if (!found) {
                 unique_increments_and_priors.push_back(increments_and_priors);
-                treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
+                unique_treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
             }
+        }
+        unique_treef << "end;\n";
+        unique_treef.close();
+        
+        // save all species trees
+        ofstream treef("species_trees.trees");
+        treef << "#nexus\n\n";
+        treef << "begin trees;\n";
+        for (auto &p:v) {
+            treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
         }
         treef << "end;\n";
         treef.close();
-        
-#else
-            ofstream treef("species_trees.trees");
-            treef << "#nexus\n\n";
-            treef << "begin trees;\n";
-            for (auto &p:v) {
-                treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
-            }
-            treef << "end;\n";
-            treef.close();
-#endif
         }
 
     inline void Proj::saveGeneTrees(unsigned ngenes, vector<Particle::SharedPtr> &v) const {
