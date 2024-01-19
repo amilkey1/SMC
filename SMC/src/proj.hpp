@@ -75,6 +75,7 @@ namespace proj {
             map<string, string>         _taxon_map;
             unsigned                    _nthreads;
             void                        handleBaseFrequencies();
+            void                        checkOutgroupName();
             void                        debugSpeciesTree(vector<Particle::SharedPtr> &particles);
             void                        estimateTheta(vector<Particle::SharedPtr> &particles);
             void                        estimateSpeciationRate(vector<Particle::SharedPtr> &particles);
@@ -425,6 +426,18 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
     }
 
+    inline void Proj::checkOutgroupName() {
+        bool found = false;
+        for (auto &s:_taxon_map) {
+            if (Forest::_outgroup == s.second) {
+                found = true;
+            }
+        }
+        if (!found) {
+            throw XProj(format("outgroup name does not match any species name"));
+        }
+    }
+
     inline void Proj::handleBaseFrequencies() {
         vector <string> temp;
         split(temp, Forest::_string_base_frequencies, is_any_of(","));
@@ -747,6 +760,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 summarizeData(_data);
             }
             createSpeciesMap(_data);
+            
+            // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
+            if (Forest::_outgroup != "none") {
+                checkOutgroupName();
+            }
 
             //set number of species to number in data file
             unsigned ntaxa = setNumberTaxa(_data);
