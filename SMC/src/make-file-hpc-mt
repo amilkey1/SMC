@@ -18,7 +18,7 @@ all: $(EXECS)
 single-smc: main.o proj.hpp
 	$(CLINKER) $(CFLAGS) -L$(LIBDIR) -o single-smc $(OBJS) -lm $(LIBS)
 	rm main.o
-	mv single-smc ../../../../test-new-smc
+	mv single-smc ~/bin
 
 main.o: $(SRCDIR)/main.cpp
 	$(CC) $(CFLAGS) $(INCLUDES) $(OPTF) -c $(SRCDIR)/main.cpp
