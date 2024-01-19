@@ -163,6 +163,7 @@ class Forest {
         static double               _migration_rate;
         static double               _hybridization_rate;
         static bool                 _save_memory;
+        static string               _outgroup;
 };
 
 
@@ -1107,6 +1108,7 @@ class Forest {
         _other_log_weight = other._other_log_weight;
         _cum_height = other._cum_height;
         _species_for_coalescent_events = other. _species_for_coalescent_events;
+        _outgroup = other._outgroup;
 
         // copy tree itself
 
@@ -1257,15 +1259,37 @@ class Forest {
         _cum_height = 0.0; // reset cum height for a new lineage
         // this function creates a new node and joins two species
         
-//        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
-        assert (lot != nullptr);
-        pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
-        assert (t.first != t.second);
-        Node *subtree1=_lineages[t.first];
-        Node *subtree2=_lineages[t.second];
-        assert (t.first < _lineages.size());
-        assert (t.second < _lineages.size());
-        assert(!subtree1->_parent && !subtree2->_parent);
+        bool done = false;
+        Node* subtree1 = nullptr;
+        Node* subtree2 = nullptr;
+        
+        while (!done) {
+        
+    //        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
+            assert (lot != nullptr);
+            pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
+            assert (t.first != t.second);
+            subtree1=_lineages[t.first];
+            subtree2=_lineages[t.second];
+            assert (t.first < _lineages.size());
+            assert (t.second < _lineages.size());
+            assert(!subtree1->_parent && !subtree2->_parent);
+            
+            if (_outgroup != "none") {
+                if (subtree1->_name != _outgroup && subtree2->_name != _outgroup && _lineages.size() > 2) { // outgroup can only be chosen on the last step
+                    done = true;
+                }
+                else if (_lineages.size() == 2) {
+                    done = true;
+                }
+            }
+            else {
+                done = true;
+            }
+            if (_outgroup == "none") {
+                assert (done == true);
+            }
+        }
         
         Node nd;
         _nodes.push_back(nd);

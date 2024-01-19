@@ -75,6 +75,7 @@ namespace proj {
             map<string, string>         _taxon_map;
             unsigned                    _nthreads;
             void                        handleBaseFrequencies();
+            void                        checkOutgroupName();
             void                        debugSpeciesTree(vector<Particle::SharedPtr> &particles);
             void                        estimateTheta(vector<Particle::SharedPtr> &particles);
             void                        estimateSpeciationRate(vector<Particle::SharedPtr> &particles);
@@ -385,6 +386,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("verbose", boost::program_options::value(&_verbose)->default_value(1), "set amount of output printed")
         ("save_memory", boost::program_options::value(&Forest::_save_memory)->default_value(false), "save memory at the expense of time")
         ("phi", boost::program_options::value(&_phi)->default_value(1.0), "correct weights by this number")
+        ("outgroup", boost::program_options::value(&Forest::_outgroup)->default_value("none"), "a string defining the outgroup")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -421,6 +423,18 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         // If user specified "base_frequencies" in conf file, convert them to a vector<double>
         if (vm.count("base_frequencies") > 0) {
             handleBaseFrequencies();
+        }
+    }
+
+    inline void Proj::checkOutgroupName() {
+        bool found = false;
+        for (auto &s:_taxon_map) {
+            if (Forest::_outgroup == s.second) {
+                found = true;
+            }
+        }
+        if (!found) {
+            throw XProj(format("outgroup name does not match any species name"));
         }
     }
 
@@ -746,6 +760,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 summarizeData(_data);
             }
             createSpeciesMap(_data);
+            
+            // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
+            if (Forest::_outgroup != "none") {
+                checkOutgroupName();
+            }
 
             //set number of species to number in data file
             unsigned ntaxa = setNumberTaxa(_data);
@@ -907,6 +926,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
             
             writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
+            saveGeneTrees(nsubsets, my_vec);
             writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
             
             if (_verbose > 0) {
