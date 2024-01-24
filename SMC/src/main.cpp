@@ -19,6 +19,7 @@ using namespace std;
 std::string  Proj::_program_name        = "proj";
 unsigned     Proj::_major_version       = 1;
 unsigned     Proj::_minor_version       = 0;
+string       Proj::_start_mode          = "smc";
 
 unsigned Forest::_nspecies = 4;
 unsigned Forest::_ntaxa = 12;
@@ -35,6 +36,7 @@ string Forest::_string_base_frequencies;
 double Forest::_migration_rate;
 double Forest::_hybridization_rate;
 bool Particle::_run_on_empty;
+bool Forest::_run_on_empty;
 bool Forest::_save_memory;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {

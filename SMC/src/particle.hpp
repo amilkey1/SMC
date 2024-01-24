@@ -39,6 +39,18 @@ class Particle {
                                                         index++;
                                                     }
                                                 }
+        void                                    setSimData(Data::SharedPtr d, map<string, string> &taxon_map, unsigned nsubsets, unsigned ntaxa) {
+                                                    _nsubsets = nsubsets;
+                                                    int index = 0;
+                                                    _forests.resize(_nsubsets+1);
+                                                    for (auto &_forest:_forests) {
+                                                        _forest.setStartMode("sim");
+                                                        if (index > 0) {
+                                                            _forest.setSimData(d, index, taxon_map, ntaxa);
+                                                        }
+                                                        index++;
+                                                    }
+                                                }
         void                                    mapSpecies(map<string, string> &taxon_map, vector<string> &species_names);
         void                                    saveForest(std::string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
@@ -101,6 +113,7 @@ class Particle {
         vector<double>                                  getGeneTreePriors();
         double                                          getSpeciesTreePrior();
         double                                          getAllPriors();
+        void                                            simulateData(Lot::SharedPtr lot, vector<unsigned> sites_vector);
 
     private:
 
@@ -128,6 +141,7 @@ class Particle {
         cout << "  _log_weight: " << _log_weight << "\n" ;
         cout << " _log_likelihood: " << _log_likelihood << "\n";
         cout << "  _forest: " << "\n";
+//        cout << " _theta: " << _forests[0]._new_theta << "\n";
         cout << "\n";
         for (auto &_forest:_forests) {
             _forest.showForest();
@@ -972,6 +986,21 @@ class Particle {
         _nsubsets = n;
     }
 
+//    inline void Particle::drawNewTheta() {
+//        // draw new theta from exponential? distribution
+////        double new_theta = rng.gamma(1.0, 1.0/Forest::_theta);
+////        double u = _lot->uniform();
+//        double u = rng.uniform();
+//        double new_theta = u*Forest::_theta;
+//        for (auto &f:_forests) {
+//            f._new_theta = new_theta;
+//        }
+//    }
+
+//    inline double Particle::getNewTheta() {
+//        return _forests[0]._new_theta;
+//    }
+
     inline void Particle::mapSpecies(map<string, string> &taxon_map, vector<string> &species_names) {
         //species tree
         _forests[0].setUpSpeciesForest(species_names);
@@ -1067,6 +1096,22 @@ class Particle {
         }
         else {
             return false;
+        }
+    }
+
+    inline void Particle::simulateData(Lot::SharedPtr lot, vector<unsigned> sites_vector) {
+    // Simulate sequence data
+//        unsigned starting_site = 0;
+//        for (unsigned g = 0; g < SMCGlobal::_ngenes; ++g) {
+//            ps.setNElements(4*SMCGlobal::_nsites_per_gene[g], g);
+//            gene_forests[g].simulateData(particle.getLot(), _data, starting_site, SMCGlobal::_nsites_per_gene[g]);
+//            starting_site += SMCGlobal::_nsites_per_gene[g];
+//        }
+        unsigned starting_site = 0;
+        for (int i=1; i<_forests.size(); i++) {
+            unsigned nsites = sites_vector[i-1];
+            _forests[i].simulateData(lot, starting_site, nsites);
+            starting_site += sites_vector[i-1];
         }
     }
 
