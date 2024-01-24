@@ -55,6 +55,7 @@ class Forest {
         typedef std::vector <double> partial_array_t;
         void                        clear();
         void                        setData(Data::SharedPtr d, int index, map<string, string> &taxon_map, bool partials);
+        void                        setSimData(Data::SharedPtr d, int index, map<string, string> &taxon_map, unsigned ntaxa);
         Node *                      findNextPreorder(Node * nd);
         string                      makeNewick(unsigned precision, bool use_names);
         string                      makePartialNewick(unsigned precision, bool use_names);
@@ -102,6 +103,7 @@ class Forest {
         double                      calcTopologyPrior(unsigned nlineages);
         void                        calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree);
         void                        clearPartials();
+        void                        setStartMode(string mode) {_start_mode = mode;}
 
         std::vector<Node *>         _lineages;
     
@@ -135,9 +137,12 @@ class Forest {
         double                      _log_coalescent_likelihood_increment;
         double                      _cum_height;
         vector<string>              _species_for_coalescent_events;
+//        double                      _new_theta;
+        string                      _start_mode;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
+        double                      calcSimTransitionProbability(unsigned from, unsigned to, double edge_length);
         double                      calculateNewEdgeLength(string key_to_add, Node* taxon_to_migrate);
         void                        setNewEdgeLength(double difference, Node* taxon_to_migrate, string key_to_add);
         void                        hybridizeGene(vector<string> hybridized_nodes, double species_tree_increment, string species_name, Lot::SharedPtr lot);
@@ -149,6 +154,7 @@ class Forest {
         double                      _log_weight;
         double                      _other_log_weight;
         void                        addIncrement(double increment);
+        void                        simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
 
     public:
 
@@ -164,6 +170,7 @@ class Forest {
         static double               _hybridization_rate;
         static bool                 _save_memory;
         static string               _outgroup;
+        static bool                 _run_on_empty;
 };
 
 
@@ -200,6 +207,67 @@ class Forest {
         *this = other;
     }
 
+    inline void Forest::setSimData(Data::SharedPtr d, int index, map<string, string> &taxon_map, unsigned ntaxa) {
+        _index = index;
+        assert (index > 0);         //don't set data for species tree, though it doesn't really matter for simulations
+//        const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
+        _ntaxa = ntaxa;
+        _nleaves = ntaxa;
+        
+        _data = d;
+
+//        Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index-1);
+//        _first_pattern = gene_begin_end.first;
+//        _npatterns = _data->getNumPatternsInSubset(index-1);
+        
+        _nodes.resize(_ntaxa);
+        _lineages.reserve(_nodes.size());
+        unsigned i= 0;
+        
+        //create taxa
+        for (unsigned i = 0; i < _ntaxa; i++) {
+            Node* nd = &*next(_nodes.begin(), i);
+            nd->_right_sib=0;
+            nd->_name=" ";
+            nd->_left_child=0;
+            nd->_right_sib=0;
+            nd->_parent=0;
+            nd->_number=i;
+            nd->_edge_length=0.0;
+            nd->_position_in_lineages=i;
+            _lineages.push_back(nd);
+        }
+        
+        vector<string> taxon_names;
+        for (auto &t:taxon_map) {
+            taxon_names.push_back(t.first);
+        }
+
+//        if (!_save_memory || (_save_memory && partials)) { // if save memory setting, don't set tip partials yet
+//            nd->_partial=ps.getPartial(_npatterns*4);
+//            for (unsigned p=0; p<_npatterns; p++) {
+//                unsigned pp = _first_pattern+p;
+//                for (unsigned s=0; s<_nstates; s++) {
+//                    Data::state_t state = (Data::state_t)1 << s;
+//                    Data::state_t d = data_matrix[nd->_number][pp];
+//                    double result = state & d;
+//                    (*nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+//                }
+//            }
+//        }
+        
+        for (auto &nd:_lineages) {
+            if (!nd->_left_child) {
+                // replace all spaces with underscores so that other programs do not have
+                  // trouble parsing your tree descriptions
+                  std::string name = taxon_names[i++];
+                  boost::replace_all(name, " ", "_");
+                nd->_name = name;
+                // TODO: set tip partials?
+            }
+        }
+    }
+
     inline void Forest::setData(Data::SharedPtr d, int index, map<string, string> &taxon_map, bool partials) {
         _data = d;
         _index = index;
@@ -227,7 +295,7 @@ class Forest {
             nd->_edge_length=0.0;
             nd->_position_in_lineages=i;
             _lineages.push_back(nd);
-            }
+        }
 
         for (auto &nd:_lineages) {
             if (!nd->_left_child) {
@@ -609,13 +677,7 @@ class Forest {
         
         if (nsubtrees > 2) {
             t1 = lot->randint(0, nsubtrees-1);
-            if (t1 >= nsubtrees) {
-                cout << "stop";
-            }
             t2 = lot->randint(0, nsubtrees-1);
-            if (t2 >= nsubtrees) {
-                cout << "stop";
-            }
 
             //keep calling t2 until it doesn't equal t1
             while (t2 == t1) {
@@ -659,7 +721,7 @@ class Forest {
         
         if (!new_nd->_left_child) {
             auto &data_matrix=_data->getDataMatrix();
-            assert (_save_memory);
+            assert (_save_memory || _start_mode == "sim");
             if (!new_nd->_left_child) {
                 new_nd->_partial=ps.getPartial(_npatterns*4);
                 for (unsigned p=0; p<_npatterns; p++) {
@@ -703,6 +765,19 @@ class Forest {
             }   // pattern loop
         }   // child loop
     }
+
+        inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, double edge_length) {
+            double transition_prob = 0.0;
+            assert (_model == "JC");
+            if (from == to) {
+                transition_prob = 0.25 + 0.75*exp(-4.0*edge_length/3.0);
+            }
+
+            else {
+                transition_prob = 0.25 - 0.25*exp(-4.0*edge_length/3.0);
+            }
+            return transition_prob;
+        }
 
     inline double Forest::calcTransitionProbability(Node* child, double s, double s_child) {
         double child_transition_prob = 0.0;
@@ -1109,6 +1184,9 @@ class Forest {
         _cum_height = other._cum_height;
         _species_for_coalescent_events = other. _species_for_coalescent_events;
         _outgroup = other._outgroup;
+//        _new_theta = other._new_theta;
+        _run_on_empty = other._run_on_empty;
+        _start_mode = other._start_mode;
 
         // copy tree itself
 
@@ -1394,6 +1472,7 @@ class Forest {
                             assert (s.second.size() > 1);
                             // if there is coalescence, need to use number of lineages before the join
                             double coalescence_rate = (s.second.size())*(s.second.size()-1) / _theta;
+//                            double coalescence_rate = (s.second.size())*(s.second.size()-1) / _new_theta; // TODO: test
                             assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
                             double nChooseTwo = (s.second.size())*(s.second.size()-1);
                             double log_prob_join = log(2/nChooseTwo);
@@ -1402,6 +1481,7 @@ class Forest {
                         else {
                             // no coalescence
                             double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
+//                            double coalescence_rate = s.second.size()*(s.second.size() - 1) / _new_theta; // TODO: test
                             log_increment_prior -= increment*coalescence_rate;
                         }
                     }
@@ -1410,7 +1490,8 @@ class Forest {
                 else if (!coalesced_gene) {
                     // no coalescence
                     for (auto &s:_species_partition) {
-                        double coalescence_rate = s.second.size() * (s.second.size() - 1) / _theta;
+                        double coalescence_rate = s.second.size() * (s.second.size() - 1) / _theta; // TODO: test
+//                        double coalescence_rate = s.second.size() * (s.second.size() - 1) / _new_theta;
                         log_increment_prior -= increment*coalescence_rate;
                     }
                 }
@@ -1746,23 +1827,25 @@ class Forest {
             subtree1->_parent=new_nd;
             subtree2->_parent=new_nd;
 
-            //always calculating partials now
-            assert (new_nd->_partial == nullptr);
-            new_nd->_partial=ps.getPartial(_npatterns*4);
-            assert(new_nd->_left_child->_right_sib); // TODO: can maintain partial from subtree choice in prior-post
-            
-            if (_save_memory) {
-                for (auto &nd:_lineages) {
-                    if (nd->_partial == nullptr) {
-                        nd->_partial = ps.getPartial(_npatterns*4);
-                        calcPartialArray(nd);
+        if (!_run_on_empty) {
+                //always calculating partials now
+                assert (new_nd->_partial == nullptr);
+                new_nd->_partial=ps.getPartial(_npatterns*4);
+                assert(new_nd->_left_child->_right_sib); // TODO: can maintain partial from subtree choice in prior-post
+                
+                if (_save_memory) {
+                    for (auto &nd:_lineages) {
+                        if (nd->_partial == nullptr) {
+                            nd->_partial = ps.getPartial(_npatterns*4);
+                            calcPartialArray(nd);
+                        }
                     }
                 }
-            }
-            calcPartialArray(new_nd);
-            
-            subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
-            subtree2->_partial=nullptr;
+                calcPartialArray(new_nd);
+                
+                subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
+                subtree2->_partial=nullptr;
+        }
 
             //update species list
             updateNodeList(nodes, subtree1, subtree2, new_nd);
@@ -2422,7 +2505,8 @@ class Forest {
 
         for (auto &s:_species_partition) {
             if (s.second.size() > 1) { // if size == 0, no possibility of coalescence and rate is 0
-                double population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta;
+                double population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta; // TODO: _theta
+//                double population_coalescence_rate = s.second.size()*(s.second.size()-1)/_new_theta;
                 string name = s.first;
                 rate_and_name = make_pair(population_coalescence_rate, name);
                 rates.push_back(rate_and_name);
@@ -2455,6 +2539,96 @@ class Forest {
         }
         else {
             return 0.0;
+        }
+    }
+
+    inline void Forest::simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites) {
+        if (_model != "JC") {
+            throw XProj("must use JC model for data simulations");
+        }
+        
+        // Create vector of states for each node in the tree
+        unsigned nnodes = (unsigned)_nodes.size();
+        vector< vector<unsigned> > sequences(nnodes);
+        for (unsigned i = 0; i < nnodes; i++) {
+            sequences[i].resize(nsites, 4);
+        }
+        
+        // Walk through tree in preorder sequence, simulating all sites as we go
+        //    DNA   state      state
+        //         (binary)  (decimal)
+        //    A      0001        1
+        //    C      0010        2
+        //    G      0100        4
+        //    T      1000        8
+        //    ?      1111       15
+        //    R      0101        5
+        //    Y      1010       10
+        
+        // Simulate starting sequence at the root node
+
+//        for (auto &nd:_nodes) {
+//            calcPartialArray(&nd);
+//        }
+        Node * nd = *(_lineages.begin());
+        unsigned ndnum = nd->_number;
+        assert(ndnum < nnodes);
+        for (unsigned i = 0; i < nsites; i++) {
+            sequences[ndnum][i] = lot->randint(0,3);
+        }
+        
+        nd = findNextPreorder(nd);
+        while (nd) {
+            ndnum = nd->_number;
+            assert(ndnum < nnodes);
+
+            // Get reference to parent sequence
+            assert(nd->_parent);
+            unsigned parnum = nd->_parent->_number;
+            assert(parnum < nnodes);
+
+            // Evolve nd's sequence given parent's sequence and edge length
+            for (unsigned i = 0; i < nsites; i++) {
+                unsigned from_state = sequences[parnum][i];
+                double cum_prob = 0.0;
+                double u = lot->uniform();
+                for (unsigned to_state = 0; to_state < 4; to_state++) {
+//                    calcTransitionProbability(Node* child, double s, double s_child);
+//                    calcPartialArray(nd);
+                    cum_prob += calcSimTransitionProbability(from_state, to_state, nd->_edge_length);
+                    if (u < cum_prob) {
+                        sequences[ndnum][i] = to_state;
+                        break;
+                    }
+                }
+                assert(sequences[ndnum][i] < 4);
+            }
+
+            // Move to next node in preorder sequence
+            nd = findNextPreorder(nd);
+        }
+
+        assert(_data);
+        Data::data_matrix_t & dm = _data->getDataMatrixNonConst();
+
+        // Copy sequences to data object
+//        for (unsigned t = 0; t < _ntaxa; t++) {
+        unsigned t = 0;
+        for (auto &nd:_nodes) {
+            if (t < _ntaxa) {
+                // Allocate row t of _data's _data_matrix data member
+                dm[t].resize(starting_site + nsites);
+
+                // Get reference to nd's sequence
+//                unsigned ndnum = _nodes[t]._number;
+                unsigned ndnum = nd._number;
+
+                // Translate to state codes and copy
+                for (unsigned i = 0; i < nsites; i++) {
+                    dm[t][starting_site + i] = (Data::state_t)1 << sequences[ndnum][i];
+                }
+            }
+            t++;
         }
     }
 

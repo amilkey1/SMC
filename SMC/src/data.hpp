@@ -15,6 +15,8 @@
 #include "ncl/nxsmultiformat.h"
 #include <boost/algorithm/string/join.hpp>
 
+using namespace std;
+
 namespace proj {
 
     class Data {
@@ -49,6 +51,7 @@ namespace proj {
 
             unsigned                                    getNumTaxa() const;
             const taxon_names_t &                       getTaxonNames() const;
+            unsigned                                    setTaxonNames(const vector<string> & names);
 
             unsigned                                    getNumPatterns() const;
             npatterns_vect_t                            calcNumPatternsVect() const;
@@ -63,6 +66,8 @@ namespace proj {
             const partition_key_t &                     getPartitionKey() const;
 
             void                                        clear();
+            void                                        compressPatterns();
+            void                                        writeDataToFile(const string filename);
 
         private:
 
@@ -70,7 +75,7 @@ namespace proj {
             unsigned                                    storeData(unsigned ntax, unsigned nchar, NxsCharactersBlock * charBlock, NxsCharactersBlock::DataTypesEnum datatype);
             unsigned                                    buildSubsetSpecificMaps(unsigned ntaxa, unsigned seqlen, unsigned nsubsets);
             void                                        updatePatternMap(Data::pattern_vect_t & pattern, unsigned subset);
-            void                                        compressPatterns();
+            data_matrix_t &                             getDataMatrixNonConst();
 
             Partition::SharedPtr                        _partition;
             pattern_counts_t                            _pattern_counts;
@@ -455,6 +460,101 @@ namespace proj {
         else {
             compressPatterns();
         }
+    }
+
+    inline unsigned Data::setTaxonNames(const vector<string> & names) {
+        _taxon_names.resize(names.size());
+        copy(names.begin(), names.end(), _taxon_names.begin());
+        unsigned ntax = (unsigned)_taxon_names.size();
+        _data_matrix.resize(ntax);
+        return ntax;
+    }
+
+    inline void Data::writeDataToFile(const string filename) {
+        // Creates NEXUS data file with specified filename
+        
+        // Gather information
+        unsigned ntax = (unsigned)_taxon_names.size();
+        unsigned nchar = (unsigned)accumulate(_pattern_counts.begin(), _pattern_counts.end(), 0);
+        unsigned longest_taxon_name = 0;
+        for (auto nm : _taxon_names) {
+            if (nm.size() > longest_taxon_name)
+                longest_taxon_name = (unsigned)nm.size();
+        }
+        const boost::format name_format( str(boost::format("    %%%ds ") % longest_taxon_name) );
+        
+        ofstream nexf(filename);
+        
+        nexf << "#NEXUS\n\n";
+        
+        nexf << "begin data;\n";
+        nexf << "  dimensions ntax=" << ntax << " nchar=" << nchar << ";\n";
+        nexf << "  format datatype=dna gap=- missing=?;\n";
+        nexf << "  matrix\n";
+        
+        for (unsigned t = 0; t < _taxon_names.size(); t++) {
+            nexf << str(boost::format(name_format) % _taxon_names[t]);
+            unsigned pattern = 0;
+            for (unsigned g = 0; g < _partition->getNumSubsets(); g++) {
+                unsigned npatterns = getNumPatternsInSubset(g);
+                for (unsigned j = 0; j < npatterns; j++) {
+                    state_t s = _data_matrix[t][pattern];
+                    bool is_A = ((state_t)1 << 0 == s);
+                    bool is_C = ((state_t)1 << 1 == s);
+                    bool is_G = ((state_t)1 << 2 == s);
+                    bool is_T = ((state_t)1 << 3 == s);
+                    
+                    char dna_letter = '?';
+                    if (is_A && is_C && is_G && is_T)
+                        dna_letter = 'N';
+                    else if (is_A && is_C && is_T)
+                        dna_letter = 'H';
+                    else if (is_C && is_G && is_T)
+                        dna_letter = 'B';
+                    else if (is_A && is_C && is_G)
+                        dna_letter = 'V';
+                    else if (is_A && is_G && is_T)
+                        dna_letter = 'D';
+                    else if (is_A && is_G)
+                        dna_letter = 'R';
+                    else if (is_C && is_T)
+                        dna_letter = 'Y';
+                    else if (is_A && is_C)
+                        dna_letter = 'M';
+                    else if (is_G && is_T)
+                        dna_letter = 'K';
+                    else if (is_C && is_G)
+                        dna_letter = 'S';
+                    else if (is_A && is_T)
+                        dna_letter = 'W';
+                    else if (is_A)
+                        dna_letter = 'A';
+                    else if (is_C)
+                        dna_letter = 'C';
+                    else if (is_G)
+                        dna_letter = 'G';
+                    else if (is_T)
+                        dna_letter = 'T';
+                    assert(dna_letter != '?');
+                    
+                    unsigned pattern_count = _pattern_counts[pattern];
+                    for (unsigned k = 0; k < pattern_count; k++) {
+                        nexf << dna_letter;
+                    }
+                    pattern++;
+                }
+            }
+            nexf << endl;
+        }
+        
+        nexf << "  ;\n";
+        nexf << "end;\n";
+        
+        nexf.close();
+    }
+
+    inline Data::data_matrix_t & Data::getDataMatrixNonConst() {
+        return _data_matrix;
     }
     
 }
