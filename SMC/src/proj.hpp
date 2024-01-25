@@ -601,17 +601,59 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
     }
 
+//    inline void Proj::simSpeciesMap() {
+//        int n = 62;
+//        char c = static_cast<char>(n);
+//        cout << "c is  " << c;
+//        unsigned i = 1;
+//        char c = static_cast<char>('A' - 1 + i);
+//                cout << "c is  " << c;
+        // nspecies is _sim_nspecies
+        // ntaxa vector is _ntaxaperspecies
+//        for (int s=0; s<_sim_nspecies+1; s++) {
+//            _species_names.push_back("s" + to_string(s));
+//            for (int t=0; t<_ntaxaperspecies[s]; t++) {
+//                char test = static_cast<char>('A' + s);
+//                string species_name;
+//                species_name += test;
+//                string species_name = to_string(static_cast<char>('A' - 1 + s));
+//                string species_name = "s" + to_string(s);
+//                string taxon_name = "t" + to_string(t) + "s" + to_string(s) + "^" + species_name;
+//                char test2 = static_cast<char>('a' + s);
+//                string taxon_name;
+//                taxon_name += test2;
+//                taxon_name += "^";
+//                taxon_name += species_name;
+//                string taxon_name = "t" + to_string(t) + "s" + to_string(s);
+//                _taxon_map.insert({taxon_name, species_name});
+//            }
+//        }
+//    }
+
     inline void Proj::simSpeciesMap() {
         // nspecies is _sim_nspecies
         // ntaxa vector is _ntaxaperspecies
+        unsigned c = 0;
         for (int s=0; s<_sim_nspecies; s++) {
-            _species_names.push_back("s" + to_string(s));
+            string species_name;
+//            _species_names.push_back("s" + to_string(s));
             for (int t=0; t<_ntaxaperspecies[s]; t++) {
-                string species_name = "s" + to_string(s);
-                string taxon_name = "t" + to_string(t) + "s" + to_string(s) + "^" + species_name;
-//                string taxon_name = "t" + to_string(t) + "s" + to_string(s);
+                species_name = "";
+                string taxon_name;
+//                string species_name = "s" + to_string(s);
+                char test = static_cast<char>('A' + s);
+                species_name += test;
+//                char test2 = static_cast<char>('a' + t + c);
+                char test2 = static_cast<char>('a' + c);
+                taxon_name += test2;
+                taxon_name += "^" + species_name;
+//                string taxon_name = "t" + to_string(t) + species_name + "^" + species_name;
+//                string taxon_name = "t" + to_string(t) + "s" + to_string(s) + "^" + species_name;
+    //                string taxon_name = "t" + to_string(t) + "s" + to_string(s);
                 _taxon_map.insert({taxon_name, species_name});
+                c++;
             }
+            _species_names.push_back(species_name);
         }
     }
     

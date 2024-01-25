@@ -263,7 +263,6 @@ class Forest {
                   std::string name = taxon_names[i++];
                   boost::replace_all(name, " ", "_");
                 nd->_name = name;
-                // TODO: set tip partials?
             }
         }
     }
@@ -2567,9 +2566,6 @@ class Forest {
         
         // Simulate starting sequence at the root node
 
-//        for (auto &nd:_nodes) {
-//            calcPartialArray(&nd);
-//        }
         Node * nd = *(_lineages.begin());
         unsigned ndnum = nd->_number;
         assert(ndnum < nnodes);
@@ -2593,8 +2589,6 @@ class Forest {
                 double cum_prob = 0.0;
                 double u = lot->uniform();
                 for (unsigned to_state = 0; to_state < 4; to_state++) {
-//                    calcTransitionProbability(Node* child, double s, double s_child);
-//                    calcPartialArray(nd);
                     cum_prob += calcSimTransitionProbability(from_state, to_state, nd->_edge_length);
                     if (u < cum_prob) {
                         sequences[ndnum][i] = to_state;
