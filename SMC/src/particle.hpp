@@ -113,7 +113,7 @@ class Particle {
         vector<double>                                  getGeneTreePriors();
         double                                          getSpeciesTreePrior();
         double                                          getAllPriors();
-        void                                            simulateData(Lot::SharedPtr lot, vector<unsigned> sites_vector);
+        void                                            simulateData(vector<unsigned> sites_vector);
 
     private:
 
@@ -986,21 +986,6 @@ class Particle {
         _nsubsets = n;
     }
 
-//    inline void Particle::drawNewTheta() {
-//        // draw new theta from exponential? distribution
-////        double new_theta = rng.gamma(1.0, 1.0/Forest::_theta);
-////        double u = _lot->uniform();
-//        double u = rng.uniform();
-//        double new_theta = u*Forest::_theta;
-//        for (auto &f:_forests) {
-//            f._new_theta = new_theta;
-//        }
-//    }
-
-//    inline double Particle::getNewTheta() {
-//        return _forests[0]._new_theta;
-//    }
-
     inline void Particle::mapSpecies(map<string, string> &taxon_map, vector<string> &species_names) {
         //species tree
         _forests[0].setUpSpeciesForest(species_names);
@@ -1099,7 +1084,7 @@ class Particle {
         }
     }
 
-    inline void Particle::simulateData(Lot::SharedPtr lot, vector<unsigned> sites_vector) {
+    inline void Particle::simulateData(vector<unsigned> sites_vector) {
     // Simulate sequence data
 //        unsigned starting_site = 0;
 //        for (unsigned g = 0; g < SMCGlobal::_ngenes; ++g) {
@@ -1110,7 +1095,7 @@ class Particle {
         unsigned starting_site = 0;
         for (int i=1; i<_forests.size(); i++) {
             unsigned nsites = sites_vector[i-1];
-            _forests[i].simulateData(lot, starting_site, nsites);
+            _forests[i].simulateData(_lot, starting_site, nsites);
             starting_site += sites_vector[i-1];
         }
     }

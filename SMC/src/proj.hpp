@@ -806,6 +806,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
     inline void Proj::simulateData() {
         cout << "\nSimulating data under multispecies coalescent model...\n" << endl;
+        rng.setSeed(_random_seed);
+        
         if (_ntaxaperspecies.size() == 1) {
             unsigned ntaxa = _ntaxaperspecies[0];
             for (int i=0; i<_sim_nspecies-1; i++) {
@@ -815,6 +817,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         
         vector<Particle::SharedPtr> sim_vec(1);
         sim_vec[0] = Particle::SharedPtr(new Particle);
+        
+        // set particle randon number seed
+        unsigned psuffix = 1;
+        sim_vec[0]->setSeed(rng.randint(1,9999) + psuffix);
+        psuffix += 2;
 
         Particle::_run_on_empty = true;
         Forest::_run_on_empty = true;
@@ -865,7 +872,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             sites_vector.push_back(get<1>(s) - get<0>(s) + 1);
         }
         
-        sim_vec[0]->simulateData(sim_vec[0]->getLot(),sites_vector);
+        sim_vec[0]->simulateData(sites_vector);
 
         _data->compressPatterns();
         _data->writeDataToFile(_sim_file_name);
