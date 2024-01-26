@@ -46,6 +46,7 @@ namespace proj {
             double              getWeightAverage(vector<double> log_weight_vec);
             void                createSpeciesMap(Data::SharedPtr);
             void                simSpeciesMap();
+            string              inventName(unsigned k, bool lower_case);
             void                showFinal(vector<Particle::SharedPtr>);
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
             void                proposeParticles(vector<Particle::SharedPtr> &particles);
@@ -54,6 +55,7 @@ namespace proj {
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
             void                simulateData();
             void                writePaupFile(vector<Particle::SharedPtr> particles, vector<string> taxpartition);
+            void                sanityChecks();
 
         private:
 
@@ -632,22 +634,47 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
     }
 
+    inline string Proj::inventName(unsigned k, bool lower_case) {
+        // If   0 <= k < 26, returns A, B, ..., Z,
+        // If  26 <= k < 702, returns AA, AB, ..., ZZ,
+        // If 702 <= k < 18278, returns AAA, AAB, ..., ZZZ, and so on.
+        //
+        // For example, k = 19009 yields ABCD:
+        // ABCD 19009 = 26 + 26*26 + 26*26*26 + 0*26*26*26 + 1*26*26 + 2*26 + 3
+        //              <------- base ------>   ^first       ^second   ^third ^fourth
+        // base = (26^4 - 1)/25 - 1 = 18278
+        //   26^1 + 26^2 + 26^3 = 26^0 + 26^1 + 26^2 + 26^3 - 1 = (q^n - 1)/(q - 1) - 1, where q = 26, n = 4
+        //   n = 1 + floor(log(19009)/log(26))
+        // fourth = ((19009 - 18278                           )/26^0) % 26 = 3
+        // third  = ((19009 - 18278 - 3*26^0                  )/26^1) % 26 = 2
+        // second = ((19009 - 18278 - 3*26^0 - 2*26^1         )/26^2) % 26 = 1
+        // first  = ((19009 - 18278 - 3*26^0 - 2*26^1 - 1*26^2)/26^3) % 26 = 0
+                
+        // Find how long a species name string must be
+        double logibase26 = log(k)/log(26);
+        unsigned n = 1 + (unsigned)floor(logibase26);
+        vector<char> letters;
+        unsigned base = (unsigned)((pow(26,n) - 1)/25.0 - 1);
+        unsigned cum = 0;
+        int ordA = (unsigned)(lower_case ? 'a' : 'A');
+        for (unsigned i = 0; i < n; ++i) {
+            unsigned ordi = (unsigned)((k - base - cum)/pow(26,i)) % 26;
+            letters.push_back(char(ordA + ordi));
+            cum += (unsigned)(ordi*pow(26,i));
+        }
+        string species_name(letters.rbegin(), letters.rend());
+        return species_name;
+    }
+
     inline void Proj::simSpeciesMap() {
         // nspecies is _sim_nspecies
         // ntaxa vector is _ntaxaperspecies
-        unsigned c = 0;
         for (int s=0; s<_sim_nspecies; s++) {
             string species_name;
+            species_name = inventName(s, false);
             for (int t=0; t<_ntaxaperspecies[s]; t++) {
-                species_name = "";
-                string taxon_name;
-                char test = static_cast<char>('A' + s);
-                species_name += test;
-                char test2 = static_cast<char>('a' + c);
-                taxon_name += test2;
-                taxon_name += "^" + species_name;
+                string taxon_name = inventName(t, true) + "^" + species_name;
                 _taxon_map.insert({taxon_name, species_name});
-                c++;
             }
             _species_names.push_back(species_name);
         }
@@ -883,12 +910,33 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         writePaupFile(sim_vec, taxpartition);
     }
 
+    inline void Proj::sanityChecks() {
+        if (Forest::_model == "JC") {
+            cout << "Setting kappa to 1.0 under JC model\n";
+            cout << "Setting base frequencies equal under JC model\n";
+            if (Forest::_kappa != 1.0) {
+                cout << "\nIgnoring kappa under JC model\n";
+            }
+        }
+        if (_start_mode == "sim") {
+            if (_data_file_name != "") {
+                cout << "\nIgnoring data file name for simulation\n";
+            }
+            if (_ntaxaperspecies.size() != 1 && _ntaxaperspecies.size() != _sim_nspecies) {
+                throw XProj("must specify number of taxa per species or one number if equal number of taxa per species");
+            }
+        }
+        else {
+            if (_data_file_name == "") {
+                throw XProj("must specify name of data file if smc option is chosen");
+            }
+        }
+    }
+
     inline void Proj::run() {
+        sanityChecks();
         if (_start_mode == "sim") {
             try {
-                if (_ntaxaperspecies.size() != 1 && _ntaxaperspecies.size() != _sim_nspecies) {
-                    throw XProj("must specify number of taxa per species or one number if equal number of taxa per species");
-                }
                 simulateData();
             }
             catch (XProj & x) {
@@ -896,9 +944,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
         }
         else {
-            if (_data_file_name == "") {
-                throw XProj("must specify name of data file if smc option is chosen");
-            }
             if (_verbose > 0) {
                 cout << "Starting..." << endl;
                 cout << "Current working directory: " << boost::filesystem::current_path() << endl;

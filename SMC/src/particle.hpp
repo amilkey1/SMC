@@ -1086,12 +1086,6 @@ class Particle {
 
     inline void Particle::simulateData(vector<unsigned> sites_vector) {
     // Simulate sequence data
-//        unsigned starting_site = 0;
-//        for (unsigned g = 0; g < SMCGlobal::_ngenes; ++g) {
-//            ps.setNElements(4*SMCGlobal::_nsites_per_gene[g], g);
-//            gene_forests[g].simulateData(particle.getLot(), _data, starting_site, SMCGlobal::_nsites_per_gene[g]);
-//            starting_site += SMCGlobal::_nsites_per_gene[g];
-//        }
         unsigned starting_site = 0;
         for (int i=1; i<_forests.size(); i++) {
             unsigned nsites = sites_vector[i-1];
