@@ -669,12 +669,14 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     inline void Proj::simSpeciesMap() {
         // nspecies is _sim_nspecies
         // ntaxa vector is _ntaxaperspecies
+        unsigned count = 0;
         for (int s=0; s<_sim_nspecies; s++) {
             string species_name;
             species_name = inventName(s, false);
             for (int t=0; t<_ntaxaperspecies[s]; t++) {
-                string taxon_name = inventName(t, true) + "^" + species_name;
+                string taxon_name = inventName(count, true) + "^" + species_name;
                 _taxon_map.insert({taxon_name, species_name});
+                count++;
             }
             _species_names.push_back(species_name);
         }
