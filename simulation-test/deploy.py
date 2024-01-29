@@ -2,23 +2,31 @@ import sys, os, re, random, subprocess as sub, shutil
 from math import log
 
 # Settings you can change
+<<<<<<< HEAD
 ntax           = [2,2] # number of taxa in each species
 lamda          = 1.0         # speciation rate (note: lambda is a python keyword)
 theta          = 0.1        # 4 Nm mu (same for all species and constant within species)
 nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100        # number of sites in each gene
+=======
+ntax           = [2,2,2,2,2] # number of taxa in each species
+lamda          = 1.0         # speciation rate (note: lambda is a python keyword)
+theta          = 0.05        # 4 Nm mu (same for all species and constant within species)
+nloci          = 10          # number of loci (conditionally independent given species tree)
+seqlen         = 1000        # number of sites in each gene
+>>>>>>> ce1742139ba31a0ce14e1f08a5b53a1cb792cf2f
 nreps          = 10          # number of simulation replicates
 nparticles     = 10000       # number of particles to use for SMC
-simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
-smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
+simprogname    = 'dubser'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
+smcprogname    = 'dubser'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
-smctreefname   = 'species_trees.trees' # name of species tree file for SMC
+smctreefname   = 'final-species-trees.tre' # name of species tree file for SMC
 beasttreefname = 'species.trees'           # name of species tree file for BEAST
-username       = 'aam21005'  # name of user on UConn HPC cluster
-#nodechoices    = [('general','skylake'), ('priority', 'epyc128')]   # specifies partition to use for HPC: either 'general' or 'priority'
-#nodechoices     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
-partition = 'general'
-constraint = 'epyc128'
+username       = 'pol02003'  # name of user on UConn HPC cluster
+nodechoices    = [('general', 'skylake'), ('priority','epyc128')]
+nodechoice     = 0           # 0-offset index into nodechoices
+#partition      = 'general'   # specifies partition to use for HPC: either 'general' or 'priority'
+#constraint     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
 rnseed         = 13579       # overall pseudorandom number seed
 mcmciter       = 500000      # chain length for Beast MCMC
@@ -51,7 +59,7 @@ def inventName(k, lower_case):
     # third  = ((19009 - 18278 - 3*26^0                  )/26^1) % 26 = 2
     # second = ((19009 - 18278 - 3*26^0 - 2*26^1         )/26^2) % 26 = 1
     # first  = ((19009 - 18278 - 3*26^0 - 2*26^1 - 1*26^2)/26^3) % 26 = 0
-
+                
     # Find how long a name string must be
     logibase26 = 0
     if k > 0:
@@ -90,13 +98,13 @@ def writeNexusFile(fn, ntax, nchar, mask, taxa, sequences):
     f.write('  ;\n')
     f.write('end;\n')
     f.close()
-
+    
 def createMainDir():
     if os.path.exists(dirname):
         sys.exit('dirname "%s" already exists; please move or rename it and try again' % dirname)
     else:
         os.mkdir(dirname)
-
+        
 def createRepDirName(rep_index):
     j = rep_index + 1
     repdirpath = 'rep%d' % j
@@ -126,26 +134,26 @@ def createBeastDirPath(rep_index):
 def createRepDir(rep_index):
     repdirpath = createRepDirPath(rep_index)
     os.mkdir(repdirpath)
-
+    
 def createSimDir(rep_index):
     simdirpath = createSimDirPath(rep_index)
     os.mkdir(simdirpath)
-
+    
 def createSMCDir(rep_index):
     smcdirpath = createSMCDirPath(rep_index)
     os.mkdir(smcdirpath)
-
+    
 def createBeastDir(rep_index):
     beastdirpath = createBeastDirPath(rep_index)
     os.mkdir(beastdirpath)
-
+    
 def createSimConf(rep_index):
     simdirpath = createSimDirPath(rep_index)
     fn = os.path.join(simdirpath, 'proj.conf')
     s  = ''
-    s += 'filename  = sim.nex\n'
+    s += 'datafile  = sim.nex\n'
     s += 'startmode = sim\n'
-    s += 'seed    = %d\n' % rnseeds[rep_index]
+    s += 'rnseed    = %d\n' % rnseeds[rep_index]
     s += '\n'
     cum = 0
     for g in range(nloci):
@@ -155,47 +163,50 @@ def createSimConf(rep_index):
     s += '\n'
     s += 'theta  = %.2f\n' % theta
     s += 'lambda = %.2f\n' % lamda
-    s += '\n'
+    s += '\n'    
     s += 'nspecies = %d\n' % nspecies
-    s += 'ntaxaperspecies ='
     for spp in range(nspecies):
-        s += str(ntax[spp])
-        if spp != nspecies-1:
-            s += ','
+        s += 'ntaxaperspecies = %d\n' % ntax[spp]
     s += '\n'
-    s += 'verbose = 0\n'
+    s += 'verbosity = 0\n'
     outf = open(fn, 'w')
     outf.write(s)
     outf.close()
+<<<<<<< HEAD
+=======
+    
+>>>>>>> ce1742139ba31a0ce14e1f08a5b53a1cb792cf2f
 def createSMCConf(rep_index):
     smcdirpath = createSMCDirPath(rep_index)
     smcconffn = os.path.join(smcdirpath, 'proj.conf')
 
     s  = ''
-    s += 'startmode = smc\n'
     s += 'datafile  = ../sim/sim.nex\n'
-    s += 'seed    = %d\n' % rnseeds[rep_index]
-    s += '\n'
+    s += 'startmode = smc\n'
+    s += 'rnseed    = %d\n' % rnseeds[rep_index]
     s += '\n'
     cum = 0
     for g in range(nloci):
         locus = g + 1
         s += 'subset = locus%d[nucleotide]:%d-%d\n' % (locus, cum + 1, cum + seqlen)
         cum += seqlen
+    s += '\n'
     s += 'theta  = %.2f\n' % theta
     s += 'lambda = %.2f\n' % lamda
-    s += '\n'
+    s += '\n'    
+    s += 'nspecies = %d\n' % nspecies
+    for spp in range(nspecies):
+        s += 'ntaxaperspecies = %d\n' % ntax[spp]
     s += '\n'
     s += 'nparticles = %d\n' % nparticles
-    s += 'nthreads = 34\n'
+    s += 'nthreads = 1\n'
     s += '\n'
-    s += 'phi = 1.0\n'
-    s += 'verbose = 2\n'
-
+    s += 'verbosity = 2\n'
+    
     smcconff = open(smcconffn, 'w')
     smcconff.write(s)
     smcconff.close()
-
+    
 def createBeastXML(rep_index):
     beastdirpath = createBeastDirPath(rep_index)
     beastxmlfn = os.path.join(beastdirpath, 'starbeast.xml')
@@ -254,7 +265,7 @@ def createBeastXML(rep_index):
         s += '                </taxonset>\n'
         s += '            </tree>\n'
     s += '        </state>\n'
-
+    
     s += '        <init id="SBI" spec="starbeast3.core.StarBeastStartState" estimate="false" popMean="@popMean" speciesTree="@Tree.t:Species">\n'
     for gene in range(1,nloci+1):
         s += '            <gene idref="Tree.t:gene%d"/>\n' % gene
@@ -269,15 +280,15 @@ def createBeastXML(rep_index):
     s += '                </branchRateModel>\n'
     s += '            </sharedRateModel>\n'
     s += '        </init>\n'
-
+    
     s += '        <distribution id="posterior" spec="CompoundDistribution">\n'
     s += '            <distribution id="speciescoalescent" spec="CompoundDistribution">\n'
     for gene in range(1,nloci+1):
         s += '                <distribution id="treePrior.t:gene%d" spec="starbeast3.evolution.speciation.GeneTreeForSpeciesTreeDistribution" populationModel="@speciesTreePopulationModel" speciesTree="@Tree.t:Species" speciesTreePrior="@SpeciesTreePopSize.Species" tree="@Tree.t:gene%d"/>\n' % (gene,gene)
     s += '            </distribution>\n'
-
+    
     s += '            <distribution idref="SpeciesTreePopSize.Species"/>\n'
-
+    
     s += '            <distribution id="prior" spec="CompoundDistribution">\n'
     s += '                <distribution idref="YuleModel.t:Species"/>\n'
     s += '                <prior id="popMean.prior" name="distribution" x="@popMean">\n'
@@ -286,7 +297,7 @@ def createBeastXML(rep_index):
     s += '                    </Exponential>\n'
     s += '                </prior>\n'
     s += '            </distribution>\n'
-
+    
     s += '            <distribution id="vectorPrior" spec="CompoundDistribution">\n'
     s += '                <prior id="constPopSizesPrior.Species" name="distribution" x="@popSize">\n'
     s += '                    <InverseGamma id="popPriorDistr.InverseGamma" beta="@popMean" name="distr">\n'
@@ -294,7 +305,7 @@ def createBeastXML(rep_index):
     s += '                    </InverseGamma>\n'
     s += '                </prior>\n'
     s += '            </distribution>\n'
-
+    
     s += '            <distribution id="likelihood" spec="CompoundDistribution" useThreads="true">\n'
     for gene in range(1,nloci+1):
         s += '                <distribution id="treeLikelihood.gene%d" spec="TreeLikelihood" data="@gene%d" tree="@Tree.t:gene%d">\n' % (gene, gene, gene)
@@ -315,12 +326,12 @@ def createBeastXML(rep_index):
     for gene in range(1,nloci+1):
         s += '            <gene idref="treePrior.t:gene%d"/>\n' % gene
     s += '        </operator>\n'
-
+    
     s += '        <operator id="CoordinatedExponential.t:Species" spec="starbeast3.operators.CoordinatedExponential" speciesTree="@Tree.t:Species" weight="15.0">\n'
     for gene in range(1,nloci+1):
         s += '            <gene idref="treePrior.t:gene%d"/>\n' % gene
     s += '        </operator>\n'
-
+    
     s += '        <operator id="CoordinatedUniform.t:Species" spec="starbeast3.operators.CoordinatedUniform" speciesTree="@Tree.t:Species" weight="30.0">\n'
     for gene in range(1,nloci+1):
         s += '            <gene idref="treePrior.t:gene%d"/>\n' % gene
@@ -342,19 +353,19 @@ def createBeastXML(rep_index):
         s += '                <down idref="Tree.t:gene%d"/>\n' % gene
     s += '            </operator>\n'
     s += '        </operator>\n'
-
+    
     s += '        <operator id="PopSizeGibbsSampler.Species" spec="starbeast3.operators.PopSizeGibbsSampler" gammaprior="@popPriorDistr.InverseGamma" popSizes="@popSize" weight="50.0">\n'
     for gene in range(1,nloci+1):
         s += '            <gene idref="treePrior.t:gene%d"/>\n' % gene
     s += '        </operator>\n'
-
+    
     s += '        <operator id="AdaptableOperatorSampler.popmean:Species" spec="AdaptableOperatorSampler" weight="5.0">\n'
     s += '            <parameter idref="popMean"/>\n'
     s += '            <operator id="Scale.popmean" spec="kernel.BactrianScaleOperator" parameter="@popMean" upper="10.0" weight="1.0"/>\n'
     s += '            <operator idref="updown.all"/>\n'
     s += '            <operator id="SampleFromPriorOperator.popmean" spec="orc.operators.SampleFromPriorOperator" parameter="@popMean" prior2="@popMean.prior" weight="1.0"/>\n'
     s += '        </operator>\n'
-
+    
     s += '        <operator id="ParallelMCMCTreeOperator" spec="starbeast3.operators.ParallelMCMCTreeOperator" chainCoverage="1.0" learning="false" nregression="50" otherState="@state" runtime="1000.0" speciesTree="@Tree.t:Species" targetCPU="0.0" weight="1.0">\n'
     for gene in range(1,nloci+1):
         s += '            <distribution id="ParallelMCMCTreeOperatorLikelihood.gene%d" spec="starbeast3.operators.ParallelMCMCTreeOperatorTreeDistribution" geneprior="@treePrior.t:gene%d" tree="@Tree.t:gene%d" treelikelihood="@treeLikelihood.gene%d"/>\n' % (gene, gene, gene, gene)
@@ -362,7 +373,7 @@ def createBeastXML(rep_index):
     s += '                <subschedule id="operatorSubschedule" spec="OperatorSchedule" operatorPattern="^ParallelMCMCTreeOperator$" weight="1.0" weightIsPercentage="true"/>\n'
     s += '            </schedule>\n'
     s += '        </operator>\n'
-
+        
     s += '        <logger id="tracelog" spec="Logger" fileName="starbeast3.log" logEvery="10000" model="@posterior" sort="smart">\n'
     s += '            <log idref="posterior"/>\n'
     s += '            <log idref="likelihood"/>\n'
@@ -373,7 +384,7 @@ def createBeastXML(rep_index):
     s += '            <log idref="YuleModel.t:Species"/>\n'
     s += '            <log idref="popMean"/>\n'
     s += '            <log idref="popSize"/>\n'
-
+    
     clustertree_id = 2
     for gene in range(1,nloci+1):
         s += '            <log idref="treeLikelihood.gene%d"/>\n' % gene
@@ -387,7 +398,7 @@ def createBeastXML(rep_index):
         s += '            </log>\n'
         clustertree_id += 2
     s += '        </logger>\n'
-
+    
     s += '        <logger id="speciesTreeLogger" spec="Logger" fileName="species.trees" logEvery="%d" mode="tree">\n' % spptreeevery
     s += '            <log id="SpeciesTreeLoggerX" spec="starbeast3.core.SpeciesTreeLogger" popSize="@popSize" speciesTreePrior="@SpeciesTreePopSize.Species" tree="@Tree.t:Species">\n'
     s += '                <treetop id="treeTopFinder" spec="beast.base.evolution.speciation.TreeTopFinder">\n'
@@ -405,21 +416,21 @@ def createBeastXML(rep_index):
     for gene in range(1,nloci+1):
         s += '        <logger id="treelog.t:gene%d" spec="Logger" fileName="$(tree).trees" logEvery="%d" mode="tree">\n' % (gene, genetreeevery)
         s += '            <log id="TreeWithMetaDataLogger.t:gene%d" spec="beast.base.evolution.TreeWithMetaDataLogger" tree="@Tree.t:gene%d"/>\n' % (gene, gene)
-        s += '        </logger>\n'
+        s += '        </logger>\n' 
     s += '        <operatorschedule idref="operatorSchedule"/>\n'
     s += '    </run>\n'
     s += '\n'
     s += '</beast>\n'
-
+    
     beastxmlf = open(beastxmlfn, 'w')
     beastxmlf.write(s)
     beastxmlf.close()
-
+    
 def createREADME():
     readmefn = os.path.join(dirname, 'README')
-
+    
     readme  = ''
-
+    
     readme += 'Installing SMC on the remote cluster\n'
     readme += '------------------------------------\n'
     readme += '\n'
@@ -432,7 +443,7 @@ def createREADME():
     readme += '2. Ensure that the name of your executable is stored in the variable\n'
     readme += '   "smcprogname" in the "deploy.py" script.\n'
     readme += '\n'
-
+    
     readme += 'Installing BEAST on the remote cluster\n'
     readme += '--------------------------------------\n'
     readme += '\n'
@@ -493,7 +504,7 @@ def createREADME():
     readme += '\n'
     readme += 'cd g\n'
     readme += '\n'
-
+    
     readme += 'Running the simulation experiment on the remote cluster\n'
     readme += '-------------------------------------------------------\n'
     readme += '1. Simulate data:\n'
@@ -519,22 +530,32 @@ def createREADME():
     readme += '-----------------------------------------\n'
     readme += '1. Use PAUP* to compute distances to true species tree for SMC and BEAST runs\n'
     readme += '\n'
+<<<<<<< HEAD
 
+=======
+>>>>>>> ce1742139ba31a0ce14e1f08a5b53a1cb792cf2f
     readme += 'paup smcpaup.nex\n'
     readme += 'paup beastpaup.nex\n'
     readme += 'python3 crunch.py\n'
     readme += '\n'
+<<<<<<< HEAD
 
+=======
+>>>>>>> ce1742139ba31a0ce14e1f08a5b53a1cb792cf2f
     readme += '2. Carry out repeated-measures ANOVA on remote cluster\n'
     readme += '\n'
     readme += 'python3 anova-means.py  # ignores variation within runs, using the run mean as the data point\n'
     readme += 'python3 anova-full.py   # takes account of variation within runs, every posterior sample is used\n'
     readme += '\n'
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> ce1742139ba31a0ce14e1f08a5b53a1cb792cf2f
     readmef = open(readmefn, 'w')
     readmef.write(readme)
     readmef.close()
-
+    
 def createSimBash():
     simfn = os.path.join(dirname, 'simulate.sh')
     simbash = '#!/bin/bash\n'
@@ -545,19 +566,19 @@ def createSimBash():
         simbash += 'cd %s\n' % os.path.join(repdirpath, 'sim')
         simbash += '%s\n' % simprogname
         simbash += 'cd ~-\n'
-
+    
     simf = open(simfn, 'w')
     simf.write(simbash)
     simf.close()
-
+        
 def createSMCSlurm():
     # see https://blog.ronin.cloud/slurm-job-arrays/
     smcslurmfn = os.path.join(dirname, 'smcslurm.sh')
     s  = ''
     s += '#!/bin/bash\n'
     s += '\n'
-#    partition = nodechoices[nodechoice][0]
-#    constraint = nodechoices[nodechoice][1]
+    partition  = nodechoices[nodechoice][0]
+    constraint = nodechoices[nodechoice][1]
     if partition == 'general':
         s += '#SBATCH -p general\n'
     else:
@@ -566,7 +587,6 @@ def createSMCSlurm():
     s += '#SBATCH -C \'%s\'\n' % constraint
     s += '#SBATCH -A pol02003\n'
     s += '#SBATCH --nodes=1\n'
-    s += '#SBATCH --ntasks=34\n'
     if maxsimult is None:
         s += '#SBATCH --array=1-%d\n' % (nreps,)
     else:
@@ -574,7 +594,6 @@ def createSMCSlurm():
     s += '#SBATCH --job-name=smc\n'
     s += '#SBATCH -o smc-%a.out\n'
     s += '#SBATCH -e smc-%a.err\n'
-    s += '#SBATCH --mem=50G\n'
     s += '\n'
     s += 'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$HOME/lib"\n'
     s += 'export TIMEFORMAT="user-seconds %3U"\n'
@@ -584,15 +603,15 @@ def createSMCSlurm():
     smcslurmf = open(smcslurmfn, 'w')
     smcslurmf.write(s)
     smcslurmf.close()
-
+    
 def createBeastSlurm():
     # see https://blog.ronin.cloud/slurm-job-arrays/
     beastslurmfn = os.path.join(dirname, 'beastslurm.sh')
     s  = ''
     s += '#!/bin/bash\n'
     s += '\n'
- #   partition = nodechoices[nodechoice][0]
- #   constraint = nodechoices[nodechoice][1]
+    partition  = nodechoices[nodechoice][0]
+    constraint = nodechoices[nodechoice][1]
     if partition == 'general':
         s += '#SBATCH -p general\n'
     else:
@@ -617,12 +636,13 @@ def createBeastSlurm():
     beastslurmf = open(beastslurmfn, 'w')
     beastslurmf.write(s)
     beastslurmf.close()
-
+    
 def createCopyDataPy():
     copydatafn =  os.path.join(dirname, 'copydata.py')
     shutil.copyfile('copydata_template.py', copydatafn)
     stuff = open(copydatafn, 'r').read()
     stuff, n = re.subn('__NLOCI__', '%d' % nloci, stuff, re.M | re.S)
+    assert n == 1
     stuff, n = re.subn('__SEQLEN__', '%d' % seqlen, stuff, re.M | re.S)
     assert n == 1
     copydataf = open(copydatafn, 'w')
@@ -751,15 +771,15 @@ if __name__ == '__main__':
     createMainDir()
     for rep in range(nreps):
         createRepDir(rep)
-
+        
         createSimDir(rep)
         createSMCDir(rep)
         createBeastDir(rep)
-
+        
         createSimConf(rep)
         createSMCConf(rep)
         createBeastXML(rep)
-
+        
     createREADME()
     createSimBash()
     createSMCSlurm()
@@ -769,3 +789,4 @@ if __name__ == '__main__':
     createPAUP('smc', smctreefname, 1)
     createPAUP('beast', beasttreefname, 2)
     createANOVAPy()
+    
