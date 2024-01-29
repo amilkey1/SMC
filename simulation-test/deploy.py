@@ -2,10 +2,10 @@ import sys, os, re, random, subprocess as sub, shutil
 from math import log
 
 # Settings you can change
-ntax           = [2,2,2] # number of taxa in each species
-lamda          = 50.0         # speciation rate (note: lambda is a python keyword)
+ntax           = [2,2] # number of taxa in each species
+lamda          = 1.0         # speciation rate (note: lambda is a python keyword)
 theta          = 0.1        # 4 Nm mu (same for all species and constant within species)
-nloci          = 8          # number of loci (conditionally independent given species tree)
+nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100        # number of sites in each gene
 nreps          = 10          # number of simulation replicates
 nparticles     = 10000       # number of particles to use for SMC
@@ -167,7 +167,6 @@ def createSimConf(rep_index):
     outf = open(fn, 'w')
     outf.write(s)
     outf.close()
-
 def createSMCConf(rep_index):
     smcdirpath = createSMCDirPath(rep_index)
     smcconffn = os.path.join(smcdirpath, 'proj.conf')
@@ -515,9 +514,21 @@ def createREADME():
     readme += '\n'
     readme += '5. Summarize results:\n'
     readme += '\n'
+    
+    readme += 'Summarizing results on the remote cluster\n'
+    readme += '-----------------------------------------\n'
+    readme += '1. Use PAUP* to compute distances to true species tree for SMC and BEAST runs\n'
+    readme += '\n'
+
     readme += 'paup smcpaup.nex\n'
     readme += 'paup beastpaup.nex\n'
     readme += 'python3 crunch.py\n'
+    readme += '\n'
+
+    readme += '2. Carry out repeated-measures ANOVA on remote cluster\n'
+    readme += '\n'
+    readme += 'python3 anova-means.py  # ignores variation within runs, using the run mean as the data point\n'
+    readme += 'python3 anova-full.py   # takes account of variation within runs, every posterior sample is used\n'
     readme += '\n'
 
     readmef = open(readmefn, 'w')
@@ -619,8 +630,8 @@ def createCopyDataPy():
     copydataf.close()
 
 def createANOVAPy():
-    anovafn =  os.path.join(dirname, 'anova.py')
-    shutil.copyfile('anova_template.py', anovafn)
+    anovafn =  os.path.join(dirname, 'anova-means.py')
+    shutil.copyfile('anova-means-template.py', anovafn)
     stuff = open(anovafn, 'r').read()
     stuff, n = re.subn('__NLOCI__', '%d' % nloci, stuff, re.M | re.S)
     assert n == 1
@@ -629,7 +640,17 @@ def createANOVAPy():
     anovaf = open(anovafn, 'w')
     anovaf.write(stuff)
     anovaf.close()
-
+    
+    anovafn =  os.path.join(dirname, 'anova-full.py')
+    shutil.copyfile('anova-full-template.py', anovafn)
+    stuff = open(anovafn, 'r').read()
+    stuff, n = re.subn('__NLOCI__', '%d' % nloci, stuff, re.M | re.S)
+    assert n == 1
+    stuff, n = re.subn('__SAMPLESIZE__', '%d' % nparticles, stuff, re.M | re.S)
+    assert n == 1
+    anovaf = open(anovafn, 'w')
+    anovaf.write(stuff)
+    anovaf.close()
 
 def createCrunch():
     # see https://blog.ronin.cloud/slurm-job-arrays/
