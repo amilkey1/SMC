@@ -2,13 +2,13 @@ import sys, os, re, random, subprocess as sub, shutil
 from math import log
 
 # Settings you can change
-ntax           = [2,2] # number of taxa in each species
-lamda          = 1.0         # speciation rate (note: lambda is a python keyword)
+ntax           = [2,2,2,2,2] # number of taxa in each species
+lamda          = 50.0         # speciation rate (note: lambda is a python keyword)
 theta          = 0.1        # 4 Nm mu (same for all species and constant within species)
 nloci          = 10          # number of loci (conditionally independent given species tree)
-seqlen         = 100        # number of sites in each gene
-nreps          = 10          # number of simulation replicates
-nparticles     = 10000       # number of particles to use for SMC
+seqlen         = 100       # number of sites in each gene
+nreps          = 5          # number of simulation replicates
+nparticles     = 1000       # number of particles to use for SMC
 simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
@@ -20,13 +20,14 @@ username       = 'aam21005'  # name of user on UConn HPC cluster
 partition = 'general'
 constraint = 'epyc128'
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
-rnseed         = 13579       # overall pseudorandom number seed
-mcmciter       = 500000      # chain length for Beast MCMC
-saveevery      = 500         # MCMC storeevery modulus
-storeevery     = 1000        # state storeevery modulus
-screenevery    = 1000        # screen print modulus
-genetreeevery  = 500         # gene tree save modulus
-spptreeevery   = 50          # species tree save modulus (mcmciter/spptreeevery should equal nparticles)
+rnseed         = 135791       # overall pseudorandom number seed
+mcmciter       = 1000      # chain length for Beast MCMC
+saveevery      = 100         # MCMC storeevery modulus
+preburnin      = 0        # MCMC burn in
+storeevery     = 100        # state storeevery modulus
+screenevery    = 100        # screen print modulus
+genetreeevery  = 100         # gene tree save modulus
+spptreeevery   = 1          # species tree save modulus (mcmciter/spptreeevery should equal nparticles
 
 # Settings you can change but probably shouldn't
 maxsimult   = None        # maximum number of jobs to run simultaneously (set to None if there is no maximum)
@@ -229,7 +230,7 @@ def createBeastXML(rep_index):
     s += '    <map name="prior" >beast.base.inference.distribution.Prior</map>\n\n'
     s += '    <map name="InverseGamma" >beast.base.inference.distribution.InverseGamma</map>\n\n'
     s += '    <map name="OneOnX" >beast.base.inference.distribution.OneOnX</map>\n\n'
-    s += '    <run id="mcmc" spec="MCMC" chainLength="%d" storeEvery="%d">\n' % (mcmciter, saveevery)
+    s += '    <run id="mcmc" spec="MCMC" chainLength="%d" preBurnin="%d" storeEvery="%d">\n' % (mcmciter, preburnin, saveevery)
     s += '        <state id="state" spec="State" storeEvery="%d">\n' % storeevery
     s += '            <stateNode id="Tree.t:Species" spec="starbeast3.tree.SpeciesTree">\n'
     s += '                <taxonset id="taxonsuperset" spec="starbeast3.tree.StarBeast3TaxonSet">\n'
@@ -633,7 +634,7 @@ def createANOVAPy():
     anovafn =  os.path.join(dirname, 'anova-means.py')
     shutil.copyfile('anova-means-template.py', anovafn)
     stuff = open(anovafn, 'r').read()
-    stuff, n = re.subn('__NLOCI__', '%d' % nloci, stuff, re.M | re.S)
+    stuff, n = re.subn('__NREPS__', '%d' % nreps, stuff, re.M | re.S)
     assert n == 1
     stuff, n = re.subn('__SAMPLESIZE__', '%d' % nparticles, stuff, re.M | re.S)
     assert n == 1
@@ -644,7 +645,7 @@ def createANOVAPy():
     anovafn =  os.path.join(dirname, 'anova-full.py')
     shutil.copyfile('anova-full-template.py', anovafn)
     stuff = open(anovafn, 'r').read()
-    stuff, n = re.subn('__NLOCI__', '%d' % nloci, stuff, re.M | re.S)
+    stuff, n = re.subn('__NREPS__', '%d' % nreps, stuff, re.M | re.S)
     assert n == 1
     stuff, n = re.subn('__SAMPLESIZE__', '%d' % nparticles, stuff, re.M | re.S)
     assert n == 1
@@ -688,7 +689,7 @@ def createCrunch():
     s  += '\n'
     s  += 'def getDistances(fnprefix):\n'
     s  += '    d = DistSummary()\n'
-    s  += '    for rep in range(10):\n'
+    s  += '    for rep in range(%d):\n' % nreps
     s  += '        d.zero(rep)\n'
     s  += '        lines = open("%s%d.txt" % (fnprefix, rep+1,), "r").readlines()\n'
     s  += '        for line in lines[1:]:\n'
@@ -716,7 +717,7 @@ def createCrunch():
     s  += 'dbeast = getDistances("beastdists")\n'
     s  += 'print("%12s %38s %38s" % ("replicate", "----------------- SMC ----------------", "---------------- BEAST ---------------"))\n'
     s  += 'print("%12s %12s %12s %12s %12s %12s %12s" % ("replicate", "count", "mean", "stdev", "count", "mean", "stdev"))\n'
-    s  += 'for rep in range(10):\n'
+    s  += 'for rep in range(%d):\n' % nreps
     s  += '    print("%12d %12d %12.5f %12.5f %12d %12.5f %12.5f" % (rep+1, dsmc.count[rep], dsmc.mean[rep], dsmc.stdev[rep], dbeast.count[rep], dbeast.mean[rep], dbeast.stdev[rep]))\n'
     s  += 'print(" ")\n'
 

@@ -16,7 +16,7 @@ else:
 
 # Dimensions
 a = 2
-n = __NLOCI__
+n = __NREPS__
 p = __SAMPLESIZE__
 
 def getDistances(fnprefix):
