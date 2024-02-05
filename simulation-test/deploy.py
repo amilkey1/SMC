@@ -3,31 +3,31 @@ from math import log
 
 # Settings you can change
 ntax           = [2,2,2,2,2] # number of taxa in each species
-lamda          = 50.0         # speciation rate (note: lambda is a python keyword)
+lamda          = 1.0         # speciation rate (note: lambda is a python keyword)
 theta          = 0.1        # 4 Nm mu (same for all species and constant within species)
 nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100       # number of sites in each gene
-nreps          = 5          # number of simulation replicates
-nparticles     = 1000       # number of particles to use for SMC
+nreps          = 30          # number of simulation replicates
+nparticles     = 5000       # number of particles to use for SMC
 simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 smctreefname   = 'species_trees.trees' # name of species tree file for SMC
 beasttreefname = 'species.trees'           # name of species tree file for BEAST
 username       = 'aam21005'  # name of user on UConn HPC cluster
-#nodechoices    = [('general','skylake'), ('priority', 'epyc128')]   # specifies partition to use for HPC: either 'general' or 'priority'
-#nodechoices     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
-partition = 'general'
-constraint = 'epyc128'
+nodechoices    = [('general', 'epyc128'), ('priority','skylake')]
+nodechoice     = 0           # 0-offset index into nodechoices
+#partition      = 'general'   # specifies partition to use for HPC: either 'general' or 'priority'
+#constraint     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
-rnseed         = 135791       # overall pseudorandom number seed
-mcmciter       = 1000      # chain length for Beast MCMC
+rnseed         = 387515      # overall pseudorandom number seed
+mcmciter       = 500000      # chain length for Beast MCMC
 saveevery      = 100         # MCMC storeevery modulus
-preburnin      = 0        # MCMC burn in
+preburnin      = 50000        # MCMC burn in
 storeevery     = 100        # state storeevery modulus
 screenevery    = 100        # screen print modulus
 genetreeevery  = 100         # gene tree save modulus
-spptreeevery   = 1          # species tree save modulus (mcmciter/spptreeevery should equal nparticles
+spptreeevery   = 100          # species tree save modulus (mcmciter/spptreeevery should equal nparticles
 
 # Settings you can change but probably shouldn't
 maxsimult   = None        # maximum number of jobs to run simultaneously (set to None if there is no maximum)
@@ -183,7 +183,7 @@ def createSMCConf(rep_index):
         locus = g + 1
         s += 'subset = locus%d[nucleotide]:%d-%d\n' % (locus, cum + 1, cum + seqlen)
         cum += seqlen
-    s += 'theta  = %.2f\n' % theta
+    s += 'theta  = 0.5\n'
     s += 'lambda = %.2f\n' % lamda
     s += '\n'
     s += '\n'
@@ -518,11 +518,10 @@ def createREADME():
     
     readme += 'Summarizing results on the remote cluster\n'
     readme += '-----------------------------------------\n'
-    readme += '1. Use PAUP* to compute distances to true species tree for SMC and BEAST runs\n'
+    readme += '1. Use td ("treedist") to compute KF  distances to true species tree for SMC and BEAST runs\n'
     readme += '\n'
-
-    readme += 'paup smcpaup.nex\n'
-    readme += 'paup beastpaup.nex\n'
+    readme += '. smctd.sh\n'
+    readme += '. beasttd.sh\n'
     readme += 'python3 crunch.py\n'
     readme += '\n'
 
@@ -557,8 +556,8 @@ def createSMCSlurm():
     s  = ''
     s += '#!/bin/bash\n'
     s += '\n'
-#    partition = nodechoices[nodechoice][0]
-#    constraint = nodechoices[nodechoice][1]
+    partition  = nodechoices[nodechoice][0]
+    constraint = nodechoices[nodechoice][1]
     if partition == 'general':
         s += '#SBATCH -p general\n'
     else:
@@ -592,8 +591,8 @@ def createBeastSlurm():
     s  = ''
     s += '#!/bin/bash\n'
     s += '\n'
- #   partition = nodechoices[nodechoice][0]
- #   constraint = nodechoices[nodechoice][1]
+    partition = nodechoices[nodechoice][0]
+    constraint = nodechoices[nodechoice][1]
     if partition == 'general':
         s += '#SBATCH -p general\n'
     else:
@@ -744,29 +743,44 @@ def createPAUP(pathname, fn, startat):
     s  += '    quit;\n'
     s  += 'end;\n'
 
-    paupfn = open(paupfn, 'w')
-    paupfn.write(s)
-    paupfn.close()
+    paupf = open(paupfn, 'w')
+    paupf.write(s)
+    paupf.close()
+
+def createTreeDist(pathname, fn, startat):
+    # see https://blog.ronin.cloud/slurm-job-arrays/
+    tdfn = os.path.join(dirname, '%std.sh' % pathname)
+
+    s   = '#!/bin/bash\n'
+    for rep in range(nreps):
+        s  += '\n\n### rep%d ###\n' % (rep+1,)
+        s  += 'td --reffile rep%d/sim/true-species-tree.tre --treefile rep%d/%s/%s --skip %d --reftree 1 --outfile %sdists%d.txt\n' % (rep+1,rep+1, pathname, fn, startat, pathname, rep+1)
+
+    tdf = open(tdfn, 'w')
+    tdf.write(s)
+    tdf.close()
 
 if __name__ == '__main__':
     createMainDir()
     for rep in range(nreps):
         createRepDir(rep)
-
+        
         createSimDir(rep)
         createSMCDir(rep)
         createBeastDir(rep)
-
+        
         createSimConf(rep)
         createSMCConf(rep)
         createBeastXML(rep)
-
+        
     createREADME()
     createSimBash()
     createSMCSlurm()
     createBeastSlurm()
     createCopyDataPy()
     createCrunch()
-    createPAUP('smc', smctreefname, 1)
-    createPAUP('beast', beasttreefname, 2)
+    #createPAUP('smc', smctreefname, 1)
+    #createPAUP('beast', beasttreefname, 2)
+    createTreeDist('smc', smctreefname, 1)
+    createTreeDist('beast', beasttreefname, 2)
     createANOVAPy()
