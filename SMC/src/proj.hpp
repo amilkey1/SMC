@@ -37,6 +37,7 @@ namespace proj {
             void                saveGeneTrees(unsigned ngenes, vector<Particle::SharedPtr> &v) const;
             void                saveGeneTree(unsigned gene_number, vector<Particle::SharedPtr> &v) const;
             void                writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
+            void                writeDeepCoalescenceFile(vector<Particle::SharedPtr> &v);
             void writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                normalizeWeights(vector<Particle::SharedPtr> & particles);
             void                modifyWeights(vector<Particle::SharedPtr> & particles);
@@ -228,6 +229,18 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
         
         logf.close();
+    }
+
+    inline void Proj::writeDeepCoalescenceFile(vector<Particle::SharedPtr> &v) {
+        ofstream logf("deep_coalescences.txt");
+        logf << "particle ";
+        logf << "\t" << "num deep coalescences ";
+        unsigned count = 0;
+        for (auto &p:v) {
+            logf << "\n" << count;
+            logf << "\t" << p->getNumDeepCoalescences();
+            count++;
+        }
     }
 
     inline void Proj::writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const {
@@ -910,6 +923,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         saveSpeciesTrees(sim_vec);
         
         writePaupFile(sim_vec, taxpartition);
+        writeDeepCoalescenceFile(sim_vec);
     }
 
     inline void Proj::sanityChecks() {

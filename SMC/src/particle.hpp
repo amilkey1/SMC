@@ -114,6 +114,7 @@ class Particle {
         double                                          getSpeciesTreePrior();
         double                                          getAllPriors();
         void                                            simulateData(vector<unsigned> sites_vector);
+        unsigned                                        getNumDeepCoalescences() {return _num_deep_coalescences;}
 
     private:
 
@@ -128,6 +129,7 @@ class Particle {
         double                                  _prev_increment;
         double                                  _prev_log_coalescent_likelihood;
         mutable                                 Lot::SharedPtr _lot;
+        unsigned                                _num_deep_coalescences;
 };
 
     inline Particle::Particle() {
@@ -159,6 +161,7 @@ class Particle {
         _species_join_proposed = false;
         _prev_increment = 0.0;
         _prev_log_coalescent_likelihood = 0.0;
+        _num_deep_coalescences = 0.0;
     }
 
     inline void Particle::showSpeciesTree() {
@@ -640,6 +643,10 @@ class Particle {
             if (total_rate > 0.0) {
                 double gene_increment = -log(1.0 - _lot->uniform())/total_rate;
                 
+                if (gene_increment > speciation_time && speciation_time != -1) {
+                    _num_deep_coalescences++;
+                }
+                
                 if (gene_increment < speciation_time || speciation_time == -1) {
                     // choose a coalescent event if coalescent increment < speciation increment or if species tree is finished
                     increment = gene_increment;
@@ -1105,6 +1112,7 @@ class Particle {
         _species_join_proposed = other._species_join_proposed;
         _prev_increment = other._prev_increment;
         _prev_log_coalescent_likelihood = other._prev_log_coalescent_likelihood;
+        _num_deep_coalescences = other._num_deep_coalescences;
     };
 }
 
