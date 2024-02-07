@@ -8,9 +8,9 @@ Tmean          = 1.0         # mean tree height (T)
 Tsd            = 0.7         # standard deviation of tree height
 Rmean          = 0.2         # mean ratio of theta to T
 Rsd            = 0.2         # standard deviation of theta/T ratios
-nloci          = 2          # number of loci (conditionally independent given species tree)
+nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100       # number of sites in each gene
-nreps          = 2          # number of simulation replicates
+nreps          = 30          # number of simulation replicates
 nparticles     = 5000       # number of particles to use for SMC
 simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
@@ -867,6 +867,7 @@ if __name__ == '__main__':
         createBeastXML(rep)
         
     createREADME()
+    createRplot()
     createSimBash()
     createSMCSlurm()
     createBeastSlurm()
