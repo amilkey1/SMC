@@ -77,3 +77,14 @@ for i in range(nrows):
        	f2.write("cd " + directory + "\n")
        	f2.write("python3 copydata.py\n")
        	f2.write("cd .. \n")
+
+# create treedist master file
+f3 = open("tree-dist.sh", "x")
+f3.write("#!/bin/bash\n")
+
+for i in range(nrows):
+	directory = "g" + str(i)
+	f3.write("cd" + directory + "\n")
+	f3.write(". smctd.sh\n")
+	f3.write(". beastd.sh\n")
+	f3.write("cd.. \n")
