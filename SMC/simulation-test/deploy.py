@@ -10,7 +10,7 @@ Rmean          = 0.2         # mean ratio of theta to T
 Rsd            = 0.2         # standard deviation of theta/T ratios
 nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100       # number of sites in each gene
-nreps          = 30          # number of simulation replicates
+nreps          = 2          # number of simulation replicates
 nparticles     = 5000       # number of particles to use for SMC
 simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
@@ -853,6 +853,39 @@ def createTreeDist(pathname, fn, startat):
     tdf.write(s)
     tdf.close()
 
+def writeTimeFile():
+	timefn = os.path.join(dirname, 'get-times.py')
+	s = "import os\n"
+	s += "import numpy\n"
+	s += "import shutil\n"
+	s +=  "nreps = %12d \n" % nreps
+	s += "timef = open ('times.txt', 'x')\n"
+	s += "smc_time_list = []\n"
+	s += "beast_time_list = []\n"
+	s += "for i in range(nreps):\n"
+	s += "	smc_file_name = 'smc-' + str(i+1) + '.err'\n"
+	s += "	with open (smc_file_name, mode = 'r') as file:\n"
+	s += "		for line in file:\n"
+	s += "			pass\n"
+	s += "		last_line = line\n"
+	s += "	smc_time_list.append(float(last_line[13:]))\n"
+	s +=  "	beast_file_name = 'beast-' + str(i+1) + '.err'\n"
+	s += "	with open (beast_file_name, mode='r') as file:\n"
+	s += "		for line in file:\n"
+	s += "			pass\n"
+	s += "		last_line = line\n"
+	s += "	beast_time_list.append(float(last_line[13:]))\n"
+	s += "smc_average = sum(smc_time_list) / len(smc_time_list)\n"
+	s += "timef.write('smc average time: ' + str(smc_average))\n"
+	s += "print('smc average time: ' + str(smc_average))\n"
+	s += "beast_average = sum(beast_time_list) / len(beast_time_list)\n"
+	s += "timef.write('beast average time: ' + str(beast_average))\n"
+	s += "print('beast average time: ' + str(beast_average))\n"
+
+	timef = open(timefn, 'w')
+	timef.write(s)
+	timef.close()
+
 if __name__ == '__main__':
     createMainDir()
     for rep in range(nreps):
@@ -878,3 +911,4 @@ if __name__ == '__main__':
     createTreeDist('smc', smctreefname, 1)
     createTreeDist('beast', beasttreefname, 2)
     createANOVAPy()
+    writeTimeFile()
