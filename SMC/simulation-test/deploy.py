@@ -1,16 +1,26 @@
 import sys, os, re, subprocess as sub, shutil, numpy as np
-from scipy.stats import randint,lognorm,describe
+from scipy.stats import randint,uniform,lognorm,describe
 from math import log,exp,sqrt,pow
 
 # Settings you can change
+method           = 'uniform' # should be either 'uniform' or 'lognorm'
 ntax           = [2,2,2,2,2] # number of taxa in each species
-Tmean          = 1.0         # mean tree height (T)
-Tsd            = 0.7         # standard deviation of tree height
-Rmean          = 0.2         # mean ratio of theta to T
-Rsd            = 0.2         # standard deviation of theta/T ratios
+
+# These used only if method == 'uniform' 
+T_low            = 0.1       # smallest tree height (T) value 
+T_high           = 1.0       # largest tree height (T) value
+half_theta_low   = 0.1       # smallest theta/2 value
+half_theta_high  = 1.0       # largest theta/2 value
+
+# These used only if method == 'lornorm' 
+Tmean            = 1.0       # mean tree height (T)
+Tsd              = 0.7       # standard deviation of T
+Rmean            = 0.2       # mean ratio of theta to T
+Rsd              = 0.2       # standard deviation of theta/T ratios
+
 nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100       # number of sites in each gene
-nreps          = 2          # number of simulation replicates
+nreps          = 100          # number of simulation replicates
 nparticles     = 5000       # number of particles to use for SMC
 simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
@@ -23,7 +33,7 @@ nodechoice     = 0           # 0-offset index into nodechoices
 #partition      = 'general'   # specifies partition to use for HPC: either 'general' or 'priority'
 #constraint     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
-rnseed         = 387515      # overall pseudorandom number seed
+rnseed         = 977515      # overall pseudorandom number seed
 mcmciter       = 500000      # chain length for Beast MCMC
 saveevery      = 100         # MCMC storeevery modulus
 preburnin      = 50000        # MCMC burn in
@@ -42,33 +52,46 @@ nspecies = len(ntax)
 # Set up random variable for choosing seeds for each replicate
 rnseeds = randint.rvs(1, 1000000, size=nreps)
 
-# Set up "standardized" scipy lognormal distribution for T
-Tsigsq = log(1. + pow(Tsd/Tmean,2.))
-Tsigma = sqrt(Tsigsq)
-Tmu = log(Tmean) - 0.5*Tsigsq
-Tshape = Tsigma
-Tscale = exp(Tmu)
-Trv = lognorm(Tshape, scale=Tscale)
-Tvect = Trv.rvs(size=nreps)
-Td = describe(Tvect, 0, 1)  # 0 = axis, 1 = df used in correcting variance)
+if method == 'lognorm':
+    # Set up "standardized" scipy lognormal distribution for T
+    Tsigsq = log(1. + pow(Tsd/Tmean,2.))
+    Tsigma = sqrt(Tsigsq)
+    Tmu = log(Tmean) - 0.5*Tsigsq
+    Tshape = Tsigma
+    Tscale = exp(Tmu)
+    Trv = lognorm(Tshape, scale=Tscale)
+    Tvect = Trv.rvs(size=nreps)
+    Td = describe(Tvect, 0, 1)  # 0 = axis, 1 = df used in correcting variance)
 
-# Set up "standardized" scipy lognormal distribution for theta/T ratio
-Rsigsq = log(1. + pow(Rsd/Rmean,2.))
-Rsigma = sqrt(Rsigsq)
-Rmu = log(Rmean) - 0.5*Rsigsq
-Rshape = Rsigma
-Rscale = exp(Rmu)
-Rrv = lognorm(Rshape, scale=Rscale)
-Rvect = Rrv.rvs(size=nreps)
-Rd = describe(Rvect, 0, 1)  # 0 = axis, 1 = df used in correcting variance)
+    # Set up "standardized" scipy lognormal distribution for theta/T ratio
+    Rsigsq = log(1. + pow(Rsd/Rmean,2.))
+    Rsigma = sqrt(Rsigsq)
+    Rmu = log(Rmean) - 0.5*Rsigsq
+    Rshape = Rsigma
+    Rscale = exp(Rmu)
+    Rrv = lognorm(Rshape, scale=Rscale)
+    Rvect = Rrv.rvs(size=nreps)
+    Rd = describe(Rvect, 0, 1)  # 0 = axis, 1 = df used in correcting variance)
 
-thetas = [r*t for r,t in zip(Rvect, Tvect)]
-thetad = describe(thetas, 0, 1)
+    thetas = [r*t for r,t in zip(Rvect, Tvect)]
+    thetad = describe(thetas, 0, 1)
 
-nspp = len(ntax)
-phi = sum([1./k for k in range(2, nspp + 1)])
-lambdas = [phi/t for t in Tvect]
-lambdad = describe(lambdas, 0, 1)
+    nspp = len(ntax)
+    phi = sum([1./k for k in range(2, nspp + 1)])
+    lambdas = [phi/t for t in Tvect]
+    lambdad = describe(lambdas, 0, 1)
+elif method == 'uniform':
+    thetas = [2.*q for q in uniform.rvs(loc=half_theta_low, scale=half_theta_high-half_theta_low, size=nreps)]
+    thetad = describe(thetas, 0, 1)
+
+    Tvect = uniform.rvs(loc=T_low, scale=T_high-T_low, size=nreps)
+    Td = describe(Tvect, 0, 1)  # 0 = axis, 1 = df used in correcting variance)
+    nspp = len(ntax)
+    phi = sum([1./k for k in range(2, nspp + 1)])
+    lambdas = [phi/t for t in Tvect]
+    lambdad = describe(lambdas, 0, 1)
+else:
+    assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
 
 def inventName(k, lower_case):
     # If   0 <= k < 26, returns A, B, ..., Z,
@@ -459,35 +482,53 @@ def createREADME():
     
     readme  = 'Summary of parameters used in simulations\n'
     readme += '-----------------------------------------\n'
-    readme += 'T (tree height):\n'
-    readme += '  nobs = %d\n' % Td.nobs
-    readme += '  mean = %.5f (expected value = %.5f)\n' % (Td.mean, Tmean)
-    readme += '  s.d. = %.5f (expected value = %.5f)\n' % (sqrt(Td.variance),Tsd)
-    readme += '  min  = %.5f\n' % (min(Tvect),)
-    readme += '  max  = %.5f\n' % (max(Tvect),)
-    readme += '\n'
-    readme += 'R (theta/T ratio):\n'
-    readme += '  nobs = %d\n' % Rd.nobs
-    readme += '  mean = %.5f (expected value = %.5f)\n' % (Rd.mean, Rmean)
-    readme += '  s.d. = %.5f (expected value = %.5f)\n' % (sqrt(Rd.variance),Rsd)
-    readme += '  min  = %.5f\n' % (min(Rvect),)
-    readme += '  max  = %.5f\n' % (max(Rvect),)
-    readme += '\n'
-    readme += 'theta:\n'
-    readme += '  nobs = %d\n' % thetad.nobs
-    readme += '  mean = %.5f\n' % thetad.mean
-    readme += '  s.d. = %.5f\n' % (sqrt(thetad.variance),)
-    readme += '  min  = %.5f\n' % (min(thetas),)
-    readme += '  max  = %.5f\n' % (max(thetas),)
-    readme += '\n'
-    readme += 'lambda:\n'
-    readme += '  nobs = %d\n' % lambdad.nobs
-    readme += '  mean = %.5f\n' % lambdad.mean
-    readme += '  s.d. = %.5f\n' % (sqrt(lambdad.variance),)
-    readme += '  min  = %.5f\n' % (min(lambdas),)
-    readme += '  max  = %.5f\n' % (max(lambdas),)
-    readme += '\n'
-    
+    if method == 'lognorm':
+        readme += 'T (tree height):\n'
+        readme += '  nobs = %d\n' % Td.nobs
+        readme += '  mean = %.5f (expected value = %.5f)\n' % (Td.mean, Tmean)
+        readme += '  s.d. = %.5f (expected value = %.5f)\n' % (sqrt(Td.variance),Tsd)
+        readme += '  min  = %.5f\n' % (min(Tvect),)
+        readme += '  max  = %.5f\n' % (max(Tvect),)
+        readme += '\n'
+        readme += 'R (theta/T ratio):\n'
+        readme += '  nobs = %d\n' % Rd.nobs
+        readme += '  mean = %.5f (expected value = %.5f)\n' % (Rd.mean, Rmean)
+        readme += '  s.d. = %.5f (expected value = %.5f)\n' % (sqrt(Rd.variance),Rsd)
+        readme += '  min  = %.5f\n' % (min(Rvect),)
+        readme += '  max  = %.5f\n' % (max(Rvect),)
+        readme += '\n'
+        readme += 'theta:\n'
+        readme += '  nobs = %d\n' % thetad.nobs
+        readme += '  mean = %.5f\n' % thetad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(thetad.variance),)
+        readme += '  min  = %.5f\n' % (min(thetas),)
+        readme += '  max  = %.5f\n' % (max(thetas),)
+        readme += '\n'
+        readme += 'lambda:\n'
+        readme += '  nobs = %d\n' % lambdad.nobs
+        readme += '  mean = %.5f\n' % lambdad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(lambdad.variance),)
+        readme += '  min  = %.5f\n' % (min(lambdas),)
+        readme += '  max  = %.5f\n' % (max(lambdas),)
+        readme += '\n'
+    elif method == 'uniform':
+        readme += 'theta:\n'
+        readme += '  nobs = %d\n' % thetad.nobs
+        readme += '  mean = %.5f\n' % thetad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(thetad.variance),)
+        readme += '  min  = %.5f\n' % (min(thetas),)
+        readme += '  max  = %.5f\n' % (max(thetas),)
+        readme += '\n'
+        readme += 'lambda:\n'
+        readme += '  nobs = %d\n' % lambdad.nobs
+        readme += '  mean = %.5f\n' % lambdad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(lambdad.variance),)
+        readme += '  min  = %.5f\n' % (min(lambdas),)
+        readme += '  max  = %.5f\n' % (max(lambdas),)
+        readme += '\n'
+    else:
+        assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
+
     readme += 'Installing SMC on the remote cluster\n'
     readme += '------------------------------------\n'
     readme += '\n'
@@ -602,27 +643,77 @@ def createREADME():
     readmef.close()
 
 def createRplot():
-    plotfn = os.path.join(dirname, 'theta-lambda.R')
+    plotfn = os.path.join(dirname, 'simcond.R')
 
     plotstuff  = 'cwd = system(\'cd "$( dirname "$0" )" && pwd\', intern = TRUE)\n'
     plotstuff += 'setwd(cwd)\n'
-    plotstuff += 'pdf("theta-lambda.pdf")\n'
+    plotstuff += 'pdf("simcond.pdf")\n'
 
-    Tstr = ['%g' % t for t in Tvect]
-    plotstuff += 'T = c(%s)\n' % ','.join(Tstr)
+    if method == 'lognorm':
+        Tstr = ['%g' % t for t in Tvect]
+        plotstuff += 'T = c(%s)\n' % ','.join(Tstr)
 
-    Rstr = ['%g' % r for r in Rvect]
-    plotstuff += 'R = c(%s)\n' % ','.join(Rstr)
+        Rstr = ['%g' % r for r in Rvect]
+        plotstuff += 'R = c(%s)\n' % ','.join(Rstr)
 
-    thetastr = ['%g' % q for q in thetas]
-    plotstuff += 'theta = c(%s)\n' % ','.join(thetastr)
+        thetastr = ['%g' % q for q in thetas]
+        plotstuff += 'theta = c(%s)\n' % ','.join(thetastr)
 
-    lambdastr = ['%g' % l for l in lambdas]
-    plotstuff += 'lambda = c(%s)\n' % ','.join(lambdastr)
+        lambdastr = ['%g' % l for l in lambdas]
+        plotstuff += 'lambda = c(%s)\n' % ','.join(lambdastr)
 
-    plotstuff += 'plot(theta, lambda, type="p", pch=19, main="Simulation conditions", xlab="theta", ylab="lambda")\n'
+        plotstuff += 'plot(theta, lambda, type="p", pch=19, main="Simulation conditions", xlab="theta", ylab="lambda")\n'
+    elif method == 'uniform':
+        Tstr = ['%g' % t for t in Tvect]
+        plotstuff += 'T = c(%s)\n' % ','.join(Tstr)
+
+        thetastr = ['%g' % q for q in thetas]
+        plotstuff += 'theta = c(%s)\n' % ','.join(thetastr)
+
+        plotstuff += 'plot(theta/2, T, type="p", pch=19, main="Simulation conditions", xlab="theta/2", ylab="T")\n'
+    else:
+        assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
+
     plotstuff += 'dev.off()\n'
-    
+
+    plotstuff += 'rf <- read.table(file="rf-summary.txt")\n'
+    plotstuff += 'rf_smc <- rf$V3\n'
+    plotstuff += 'rf_beast <- rf$V6\n'
+    plotstuff += '\n'
+    plotstuff += 'kf <- read.table(file="kf-summary.txt")\n'
+    plotstuff += 'kf_smc <- kf$V3\n'
+    plotstuff += 'kf_beast <- kf$V6\n'
+    plotstuff += 'kf_smc_beast <- kf_smc - kf_beast\n'
+    plotstuff += '\n'
+    plotstuff += '# make more plots\n'
+    plotstuff += 'library(ggplot2)\n'
+    plotstuff += 'df <- data.frame(T, theta)\n'
+    plotstuff += '\n'
+    plotstuff += '# color smc by kf distances\n'
+    plotstuff += 'pdf("smc_kf_distances.pdf")\n'
+    plotstuff += 'p_kf_smc <- ggplot(df, aes(theta/2, T, color=kf_smc))\n'
+    plotstuff += 'p_kf_smc + geom_point()\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# color beast by kf distances\n'
+    plotstuff += 'pdf("beast_kf_distances.pdf")\n'
+    plotstuff += 'p_kf_beast <- ggplot(df, aes(theta/2, T, color=kf_beast))\n'
+    plotstuff += 'p_kf_beast + geom_point()\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# color smc by rf distances\n'
+    plotstuff += 'pdf("smc_rf_distances.pdf")\n'
+    plotstuff += 'p_rf_smc <- ggplot(df, aes(theta/2, T, color=rf_smc))\n'
+    plotstuff += 'p_rf_smc + geom_point()\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# color beast by rf distances\n'
+    plotstuff += 'pdf("beast_rf_distances.pdf")\n'
+    plotstuff += 'p_rf_beast <- ggplot(df, aes(theta/2, T, color=rf_beast))\n'
+    plotstuff += 'p_kf_beast + geom_point()\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff == '\n'
+
     plotf = open(plotfn, 'w')
     plotf.write(plotstuff)
     plotf.close()
@@ -831,6 +922,8 @@ def createCrunch():
     s  += '        d.group_mean[rep] = d.mean[rep]\n'
     s  += '        d.group_n[rep] = d.count[rep]\n'
     s  += '    return d\n'
+    s  += 'kf = open("kf-summary.txt", "x")\n'
+    s  += 'rf = open("rf-summary.txt", "x")\n'
     s  += 'dsmc_kf = getKFDistances("smcdists")\n'
     s  += 'dbeast_kf = getKFDistances("beastdists")\n'
     s  += 'dsmc_rf = getRFDistances("smcdists")\n'
@@ -839,8 +932,12 @@ def createCrunch():
     s  += 'print("%12s %12s %12s %12s %12s %12s %12s" % ("replicate", "count", "mean", "stdev", "count", "mean", "stdev"))\n'
     s  += 'for rep in range(%d):\n' % nreps
     s  += '    print("kf: %12d %12d %12.5f %12.5f %12d %12.5f %12.5f" % (rep+1, dsmc_kf.count[rep], dsmc_kf.mean[rep], dsmc_kf.stdev[rep], dbeast_kf.count[rep], dbeast_kf.mean[rep], dbeast_kf.stdev[rep]))\n'
+    s +=  '    kf.write("%12d %12d %12.5f %12.5f %12d %12.5f %12.5f \\n" % (rep+1, dsmc_kf.count[rep], dsmc_kf.mean[rep], dsmc_kf.stdev[rep], dbeast_kf.count[rep], dbeast_kf.mean[rep], dbeast_kf.stdev[rep]))\n'
+    s +=  '    kf.close\n'
     s  += 'for rep in range(%d):\n' % nreps
     s  += '    print("rf: %12d %12d %12.5f %12.5f %12d %12.5f %12.5f" % (rep+1, dsmc_rf.count[rep], dsmc_rf.mean[rep], dsmc_rf.stdev[rep], dbeast_rf.count[rep], dbeast_rf.mean[rep], dbeast_rf.stdev[rep]))\n'
+    s  += '    rf.write("%12d %12d %12.5f %12.5f %12d %12.5f %12.5f \\n" % (rep+1, dsmc_rf.count[rep], dsmc_rf.mean[rep], dsmc_rf.stdev[rep], dbeast_rf.count[rep], dbeast_rf.mean[rep], dbeast_rf.stdev[rep]))\n'
+    s  += '    rf.close\n'
     s  += 'print(" ")\n'
 
     crunchf = open(crunchfn, 'w')
