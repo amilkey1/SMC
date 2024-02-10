@@ -104,6 +104,7 @@ class Forest {
         void                        calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree);
         void                        clearPartials();
         void                        setStartMode(string mode) {_start_mode = mode;}
+        unsigned                    getDeepCoal(tuple <string, string, string> species_joined);
 
         std::vector<Node *>         _lineages;
     
@@ -1069,6 +1070,57 @@ class Forest {
         return s;
     }
 
+    inline unsigned Forest::getDeepCoal(tuple <string, string, string> species_joined) {
+        unsigned num_deep_coal = 0;
+        unsigned count1 = 0;
+        unsigned count2 = 0;
+        
+        // first lineage
+        for (auto &nd:_species_partition[get<0>(species_joined)]) {
+            if (nd->_deep_coalescence_counted) {
+                count1 = 1; // avoid double counting
+                break;
+            }
+            else {
+                count1 += 1;
+                nd->_deep_coalescence_counted = true;
+            }
+        }
+        
+        // ensure all nodes are accounted for
+        for (auto &nd:_species_partition[get<0>(species_joined)]) {
+            nd->_deep_coalescence_counted = true;
+        }
+        
+        // second lineage
+        for (auto &nd:_species_partition[get<1>(species_joined)]) {
+            if (nd->_deep_coalescence_counted) {
+                count2 = 1; // avoid double counting
+                break;
+            }
+            else {
+                count2 += 1;
+                nd->_deep_coalescence_counted = true;
+            }
+        }
+        
+        // ensure all nodes are accounted for
+        for (auto &nd:_species_partition[get<1>(species_joined)]) {
+            nd->_deep_coalescence_counted = true;
+        }
+        
+        num_deep_coal = (count1 + count2) - 1;
+        
+//        for (auto &nd:_species_partition[new_spp]) {
+//            if (!nd->_deep_coalescence_counted) {
+//                num_deep_coal += 1;
+//                nd->_deep_coalescence_counted = true;
+//            }
+//        }
+        //                _num_deep_coalescences += _forests[i]._species_partition[new_spp].size() - 1;
+        return num_deep_coal;
+    }
+
     inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, string species_name, double increment) {
         pair<Node*, Node*> p = getSubtreeAt(t, node_list);
 
@@ -1258,6 +1310,7 @@ class Forest {
                 nd->_partial = othernd._partial;
                 nd->_visited = othernd._visited;
                 nd->_hybrid_newick_name = othernd._hybrid_newick_name;
+                nd->_deep_coalescence_counted = othernd._deep_coalescence_counted;
             }
         }
 

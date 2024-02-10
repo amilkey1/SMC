@@ -836,14 +836,16 @@ class Particle {
 //        showParticle();
         assert (_lot != nullptr);
         tuple <string, string, string> species_joined = _forests[0].speciesTreeProposal(_lot);
+//        showParticle();
         for (int i=1; i<_forests.size(); i++) {
             // reset species partitions for all gene forests
-            _forests[i].updateSpeciesPartition(species_joined);
             if (_deep_coal) {
                 // number of deep coalescences is (n-1) where n is the total number of lineages in the joining species
-                string new_spp = get<2>(species_joined);
-                _num_deep_coalescences += _forests[i]._species_partition[new_spp].size() - 1;
+//                string new_spp = get<2>(species_joined);
+                _num_deep_coalescences += _forests[i].getDeepCoal(species_joined);
+//                _num_deep_coalescences += _forests[i]._species_partition[new_spp].size() - 1;
             }
+            _forests[i].updateSpeciesPartition(species_joined);
         }
         _deep_coal = false;
     }
