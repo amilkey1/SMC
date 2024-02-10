@@ -1072,52 +1072,54 @@ class Forest {
 
     inline unsigned Forest::getDeepCoal(tuple <string, string, string> species_joined) {
         unsigned num_deep_coal = 0;
-        unsigned count1 = 0;
-        unsigned count2 = 0;
-        
-        // first lineage
-        for (auto &nd:_species_partition[get<0>(species_joined)]) {
-            if (nd->_deep_coalescence_counted) {
-                count1 = 1; // avoid double counting
-                break;
+        if (_species_partition.size() > 2) {
+            unsigned count1 = 0;
+            unsigned count2 = 0;
+            
+            // first lineage
+            for (auto &nd:_species_partition[get<0>(species_joined)]) {
+    //            if (nd->_deep_coalescence_counted) {
+    //                count1 = 1; // avoid double counting
+    //                break;
+    //            }
+    //            else {
+                    count1 += 1;
+                    nd->_deep_coalescence_counted = true;
+    //            }
             }
-            else {
-                count1 += 1;
+            
+            // ensure all nodes are accounted for
+            for (auto &nd:_species_partition[get<0>(species_joined)]) {
                 nd->_deep_coalescence_counted = true;
             }
-        }
-        
-        // ensure all nodes are accounted for
-        for (auto &nd:_species_partition[get<0>(species_joined)]) {
-            nd->_deep_coalescence_counted = true;
-        }
-        
-        // second lineage
-        for (auto &nd:_species_partition[get<1>(species_joined)]) {
-            if (nd->_deep_coalescence_counted) {
-                count2 = 1; // avoid double counting
-                break;
+            
+            // second lineage
+            for (auto &nd:_species_partition[get<1>(species_joined)]) {
+    //            if (nd->_deep_coalescence_counted) {
+    //                count2 = 1; // avoid double counting
+    //                break;
+    //            }
+    //            else {
+                    count2 += 1;
+                    nd->_deep_coalescence_counted = true;
+    //            }
             }
-            else {
-                count2 += 1;
+            
+            // ensure all nodes are accounted for
+            for (auto &nd:_species_partition[get<1>(species_joined)]) {
                 nd->_deep_coalescence_counted = true;
             }
+            
+            num_deep_coal = (count1 + count2) - 1;
+            
+    //        for (auto &nd:_species_partition[new_spp]) {
+    //            if (!nd->_deep_coalescence_counted) {
+    //                num_deep_coal += 1;
+    //                nd->_deep_coalescence_counted = true;
+    //            }
+    //        }
+            //                _num_deep_coalescences += _forests[i]._species_partition[new_spp].size() - 1;
         }
-        
-        // ensure all nodes are accounted for
-        for (auto &nd:_species_partition[get<1>(species_joined)]) {
-            nd->_deep_coalescence_counted = true;
-        }
-        
-        num_deep_coal = (count1 + count2) - 1;
-        
-//        for (auto &nd:_species_partition[new_spp]) {
-//            if (!nd->_deep_coalescence_counted) {
-//                num_deep_coal += 1;
-//                nd->_deep_coalescence_counted = true;
-//            }
-//        }
-        //                _num_deep_coalescences += _forests[i]._species_partition[new_spp].size() - 1;
         return num_deep_coal;
     }
 
