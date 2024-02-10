@@ -130,6 +130,7 @@ class Particle {
         double                                  _prev_log_coalescent_likelihood;
         mutable                                 Lot::SharedPtr _lot;
         unsigned                                _num_deep_coalescences;
+        bool                                    _deep_coal;
 };
 
     inline Particle::Particle() {
@@ -640,11 +641,14 @@ class Particle {
                 total_rate -= event_choice_rates[0]; // remove speciation rate from total rate used for choosing increment
                 speciation_time = -log(1.0 - _lot->uniform()) / event_choice_rates[0];
             }
+            
             if (total_rate > 0.0) {
                 double gene_increment = -log(1.0 - _lot->uniform())/total_rate;
                 
                 if (gene_increment > speciation_time && speciation_time != -1) {
-                    _num_deep_coalescences++;
+                    _deep_coal = true;
+                    // num deep coalescences += (n-1), where n is number of lineages in each affected species lineage for all genes
+                    // need to know which species joined to calculate this
                 }
                 
                 if (gene_increment < speciation_time || speciation_time == -1) {
@@ -829,12 +833,19 @@ class Particle {
 
     inline void Particle::speciesProposal() {
         // species tree proposal, need to update species partition in all gene forests
+//        showParticle();
         assert (_lot != nullptr);
         tuple <string, string, string> species_joined = _forests[0].speciesTreeProposal(_lot);
         for (int i=1; i<_forests.size(); i++) {
             // reset species partitions for all gene forests
             _forests[i].updateSpeciesPartition(species_joined);
+            if (_deep_coal) {
+                // number of deep coalescences is (n-1) where n is the total number of lineages in the joining species
+                string new_spp = get<2>(species_joined);
+                _num_deep_coalescences += _forests[i]._species_partition[new_spp].size() - 1;
+            }
         }
+        _deep_coal = false;
     }
 
     inline void Particle::geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name) {
@@ -1113,6 +1124,7 @@ class Particle {
         _prev_increment = other._prev_increment;
         _prev_log_coalescent_likelihood = other._prev_log_coalescent_likelihood;
         _num_deep_coalescences = other._num_deep_coalescences;
+        _deep_coal = other._deep_coal;
     };
 }
 
