@@ -1072,7 +1072,7 @@ class Forest {
 
     inline unsigned Forest::getDeepCoal(tuple <string, string, string> species_joined) {
         unsigned num_deep_coal = 0;
-        if (_species_partition.size() > 2) {
+//        if (_species_partition.size() > 2) { // don't count ancestral population as deep coalescence
             unsigned count1 = 0;
             unsigned count2 = 0;
             
@@ -1119,7 +1119,7 @@ class Forest {
     //            }
     //        }
             //                _num_deep_coalescences += _forests[i]._species_partition[new_spp].size() - 1;
-        }
+//        }
         return num_deep_coal;
     }
 
