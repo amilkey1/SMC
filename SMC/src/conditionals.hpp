@@ -17,3 +17,5 @@
 //#define SIM_TEST3 // simulated example with 3 species, 3 taxa
 
 #define WEIGHT_CORRECTION
+
+#define EXTRA_SPECIES_SAMPLING

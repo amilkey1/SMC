@@ -60,11 +60,13 @@ class Forest {
         string                      makeNewick(unsigned precision, bool use_names);
         string                      makePartialNewick(unsigned precision, bool use_names);
         pair<unsigned, unsigned>    chooseTaxaToJoin(double s, Lot::SharedPtr lot);
+        pair<unsigned, unsigned>    chooseTaxaToJoinOld(double s);
         tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> p, list<Node*> node_list, string species_name, double increment);
         void                        calcPartialArray(Node* new_nd);
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
         tuple<string,string, string> speciesTreeProposal(Lot::SharedPtr lot);
+        tuple<string,string, string> speciesTreeProposalTest();
         void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
         void                        hybridizeNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node* delnode3, Node * addnode1);
@@ -77,6 +79,7 @@ class Forest {
         pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
         int                         selectPair(vector<double> weight_vec, Lot::SharedPtr lot);
         void                        chooseSpeciesIncrement(Lot::SharedPtr lot);
+        void                        chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth);
         void                        addSpeciesIncrement();
         string                      chooseEvent();
         void                        allowMigration(list<Node*> &nodes);
@@ -105,6 +108,11 @@ class Forest {
         void                        clearPartials();
         void                        setStartMode(string mode) {_start_mode = mode;}
         unsigned                    getDeepCoal(tuple <string, string, string> species_joined);
+        void                        resetDepthVector(tuple<string, string, string> species_joined);
+        vector<pair<double, pair<string, string>>>             getMinDepths();
+        void                        calcMinDepth();
+        vector< pair<double, Node *>>      sortPreorder();
+        void                        refreshPreorder();
 
         std::vector<Node *>         _lineages;
     
@@ -140,6 +148,10 @@ class Forest {
         vector<string>              _species_for_coalescent_events;
 //        double                      _new_theta;
         string                      _start_mode;
+        vector<pair<double, double>>         _increments;
+        vector<pair<double, pair<string, string>>>              _depths;
+        unsigned                    _nincrements = 0;
+        vector<Node*>               _preorder;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -152,10 +164,12 @@ class Forest {
         double                      getTreeLength();
         double                      getSpeciesTreeIncrement();
         double                      getLineageHeight(Node* nd);
+        double                      getTotalLineageHeight(Node* nd);
         double                      _log_weight;
         double                      _other_log_weight;
         void                        addIncrement(double increment);
         void                        simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
+        double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
 
     public:
 
@@ -201,6 +215,10 @@ class Forest {
         _cum_height = 0.0;
         _nleaves=_ntaxa;
         _ninternals=0;
+        _increments.clear();
+        _depths.clear();
+        _nincrements = 0;
+        _preorder.clear();
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -689,7 +707,29 @@ class Forest {
 
         return make_pair(t1, t2);
     }
+                                                        
+    inline pair<unsigned, unsigned> Forest::chooseTaxaToJoinOld(double s){
+            // save random numbers
+            assert (s>1);
+            double nsubtrees = s;
+            unsigned t1=0;
+            unsigned t2=1;
+            //don't use this when there's only one choice (2 subtrees)
+            // thread safe random number generator with mutex
+            mtx.lock();
+            if (nsubtrees > 2) {
+                t1 = ::rng.randint(0, nsubtrees-1);
+                t2 = ::rng.randint(0, nsubtrees-1);
 
+                //keep calling t2 until it doesn't equal t1
+                while (t2 == t1) {
+                    t2 = ::rng.randint(0, nsubtrees-1);
+                }
+            }
+            mtx.unlock();
+            return make_pair(t1, t2);
+        }
+                                                        
     inline tuple<unsigned, unsigned, unsigned> Forest::chooseTaxaToHybridize(){
         double nsubtrees = _lineages.size();
         unsigned t1;
@@ -1240,6 +1280,10 @@ class Forest {
 //        _new_theta = other._new_theta;
         _run_on_empty = other._run_on_empty;
         _start_mode = other._start_mode;
+        _increments = other._increments;
+        _depths = other._depths;
+        _nincrements = other._nincrements;
+        _preorder.resize(other._preorder.size());
 
         // copy tree itself
 
@@ -1324,6 +1368,16 @@ class Forest {
             j++;
         }
         
+        if (other._preorder.size() > 0) {
+            unsigned m = 0;
+            for (auto othernd : other._preorder) {
+                unsigned n = othernd->_number;
+                Node* nd = &*next(_nodes.begin(), n);
+                _preorder[m] = nd;
+                m++;
+            }
+        }
+        
     }
 
     inline void Forest::setUpSpeciesForest(vector<string> &species_names) {
@@ -1375,6 +1429,43 @@ class Forest {
         return event;
     }
 
+    inline void Forest::chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth) {
+        assert (max_depth >= 0.0);
+        if (max_depth > 0.0) {
+            // hybridization prior
+            double rate = (_lambda)*_lineages.size();
+            
+            double u = rng.uniform();
+            double inner_term = 1-exp(-rate*max_depth);
+    //        double exp = rng.gamma(1.0, 1.0/(rate*max_depth));
+            _last_edge_length = -log(1-u*inner_term)/rate;
+            assert (_last_edge_length < max_depth);
+
+    //        _last_edge_length = rng.gamma(1.0, 1.0/rate);
+
+            for (auto nd:_lineages) {
+                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
+            }
+            double nChooseTwo = _lineages.size()*_lineages.size();
+            double log_prob_join = log(2/nChooseTwo);
+            double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
+            
+            _increments.push_back(make_pair(_last_edge_length, increment_prior));
+        }
+        else {
+            // hybridization prior
+            double rate = (_lambda)*_lineages.size();
+
+            _last_edge_length = rng.gamma(1.0, 1.0/rate);
+
+            for (auto nd:_lineages) {
+                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
+            }
+            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+        }
+    }
+
+
     inline void Forest::chooseSpeciesIncrement(Lot::SharedPtr lot) {
         // hybridization prior
         double rate = (_lambda+_hybridization_rate)*_lineages.size();
@@ -1386,6 +1477,68 @@ class Forest {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
         }
     }
+
+    inline tuple<string,string, string> Forest::speciesTreeProposalTest() {
+        _cum_height = 0.0; // reset cum height for a new lineage
+        // this function creates a new node and joins two species
+        
+        bool done = false;
+        Node* subtree1 = nullptr;
+        Node* subtree2 = nullptr;
+        
+        while (!done) {
+        
+    //        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
+//            pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
+            pair<unsigned, unsigned> t = chooseTaxaToJoinOld(_lineages.size());
+            assert (t.first != t.second);
+            subtree1=_lineages[t.first];
+            subtree2=_lineages[t.second];
+            assert (t.first < _lineages.size());
+            assert (t.second < _lineages.size());
+            assert(!subtree1->_parent && !subtree2->_parent);
+            
+            if (_outgroup != "none") {
+                if (subtree1->_name != _outgroup && subtree2->_name != _outgroup && _lineages.size() > 2) { // outgroup can only be chosen on the last step
+                    done = true;
+                }
+                else if (_lineages.size() == 2) {
+                    done = true;
+                }
+            }
+            else {
+                done = true;
+            }
+            if (_outgroup == "none") {
+                assert (done == true);
+            }
+        }
+        
+        Node nd;
+        _nodes.push_back(nd);
+        Node* new_nd = &_nodes.back();
+        new_nd->_parent=0;
+        new_nd->_number=_nleaves+_ninternals;
+        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+        new_nd->_right_sib=0;
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+        
+        updateNodeVector (_lineages, subtree1, subtree2, new_nd);
+
+        _species_joined = make_pair(subtree1, subtree2);
+        
+        calcTopologyPrior((int) _lineages.size()+1);
+
+        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
+    }
+
 
     inline tuple<string,string, string> Forest::speciesTreeProposal(Lot::SharedPtr lot) {
         _cum_height = 0.0; // reset cum height for a new lineage
@@ -2579,11 +2732,265 @@ class Forest {
         }
     }
 
+    inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {
+        double neg_inf = -1*numeric_limits<double>::infinity();
+        vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
+        double log_coalescent_likelihood = 0.0;
+        double cum_time = 0.0;
+        int a = 0;
+
+        if (species_increment > 0) {
+            for (int i=_nincrements; i<heights_and_nodes.size(); i++) {
+                Node* node;
+                if (heights_and_nodes[i].first < species_tree_height) {
+                    // calc coalescent prob and update species partition
+                    double increment = heights_and_nodes[i].first - (species_tree_height - species_increment) - cum_time;
+                    cum_time += increment;
+                    assert (increment > 0.0);
+                    // find node in species partition and calculate nlineages
+                    string species;
+                    for (auto &s:_species_partition) {
+                        for (auto &nd:s.second) {
+                            if (nd == heights_and_nodes[i].second->_left_child) {
+                                species = s.first;
+                                node = nd;
+                            }
+                        }
+                    }
+                    for (auto &s:_species_partition) {
+                        if (s.first == species) {
+                            // coalescence
+                            int nlineages = (int) s.second.size();
+                            
+                            double coalescence_rate = nlineages*(nlineages-1) / _theta;
+                            double nChooseTwo = nlineages*(nlineages-1);
+                            double log_prob_join = log(2/nChooseTwo);
+                            log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
+                            
+                            bool found = (find(s.second.begin(), s.second.end(), node->_right_sib) != s.second.end());
+
+                            if (found) {
+                                updateNodeList(s.second, node, node->_right_sib, node->_parent); // update the species lineage
+                            }
+                            else {
+                                log_coalescent_likelihood = neg_inf;
+                            }
+                            a++;
+                        }
+                        else {
+                            // no coalescence
+                            int nlineages = (int) s.second.size();
+                            
+                            double coalescence_rate = nlineages*(nlineages-1) / _theta;
+                            log_coalescent_likelihood -= increment * coalescence_rate;
+                        }
+                    }
+                    
+                }
+            }
+            double remaining_chunk_of_branch = species_increment - cum_time;
+            // no coalescence
+            for (auto &s:_species_partition) {
+                int nlineages = (int) s.second.size();
+                double coalescence_rate = nlineages*(nlineages-1) / _theta;
+                log_coalescent_likelihood -= remaining_chunk_of_branch * coalescence_rate;
+            }
+            _nincrements += a;
+        }
+        else {
+            // final step; no deep coalescence; one species
+            assert (species_increment == 0.0);
+            assert (_species_partition.size() == 1);
+            for (int i=_nincrements; i<heights_and_nodes.size(); i++) {
+                // there must be coalescence at this point
+                Node* node;
+                string species;
+                for (auto &s:_species_partition) {
+                    for (auto &nd:s.second) {
+                        if (nd == heights_and_nodes[i].second->_left_child) {
+                            node = nd;
+                        }
+                    }
+                    for (auto &s:_species_partition) {
+                        // coalescence
+                        int nlineages = (int) s.second.size();
+                        
+                        double coalescence_rate = nlineages*(nlineages-1) / _theta;
+                        double nChooseTwo = nlineages*(nlineages-1);
+                        double log_prob_join = log(2/nChooseTwo);
+                        double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
+                        log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
+
+                        updateNodeList(s.second, node, node->_right_sib, node->_parent); // update the species lineage
+                        a++;
+                        cum_time += increment;
+                    }
+                        // no deep coalescence
+                    }
+                }
+        }
+        return log_coalescent_likelihood;
+    }
+
+    inline void Forest::resetDepthVector(tuple<string, string, string> species_joined) {
+        // this function replaces species names with new species name after a join
+        for (auto &d:_depths) {
+            bool match1 = false;
+            bool match2 = false;
+            if (d.second.first == get<0>(species_joined) || d.second.first == get<1>(species_joined)) {
+                match1 = true;
+            }
+            if (d.second.second == get<0>(species_joined) || d.second.second == get<1>(species_joined)) {
+                match2 = true;
+            }
+            if (match1) {
+                d.second.first = get<2>(species_joined);
+            }
+            if (match2) {
+                d.second.second = get<2>(species_joined);
+            }
+        }
+        for (int i=0; i<_depths.size(); i++) {
+            if (_depths[i].second.first == _depths[i].second.second) {
+                // species have already been joined in the species tree, so they are no longer a constraint
+                _depths.erase(_depths.begin()+i);
+            }
+        }
+        assert (_depths.size() > 0);
+    }
+
+    inline vector<pair<double, pair<string, string>>> Forest::getMinDepths() {
+        return _depths;
+    }
+
+    inline void Forest::calcMinDepth() {
+        assert (_index != 0);
+        _depths.clear();
+        // walk through nodes
+        // find children of node and determine if children are in the same species
+        // if children are in different species, calculate the node height
+        vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
+    //        vector<double> depths;
+    // post order traversal is the reverse of pre order, now sorted by node heights
+        string spp_left_child;
+        string spp_right_child;
+        bool done = false;
+    //        while (spp_left_child == "" || spp_right_child == "") {
+        for (int i=0; i<heights_and_nodes.size(); i++) {
+            Node* nd = heights_and_nodes[i].second;
+            done = false;
+                // figure out if descendants of internal node are in the same species
+    //                if (nd->_left_child && !nd->_visited) {
+            if (nd->_left_child) {
+                while (!done) {
+                    Node* left_child = nd->_left_child;
+                    Node* right_child = nd->_left_child->_right_sib;
+                    while (spp_left_child == "" || spp_right_child == "") {
+                        for (auto &s:_species_partition) {
+                            for (auto &nd:s.second) {
+                                if (nd == left_child) {
+                                    spp_left_child = s.first;
+                                }
+                                else if (nd == right_child) {
+                                    spp_right_child = s.first;
+                                }
+                            }
+                        }
+                        if (spp_left_child == "") {
+                            if (left_child->_left_child) {
+                                left_child = left_child->_left_child; // TODO: not sure about these; will the parent get accounted for later?
+                                // this is saying if the species of the node is not found, the parent will be dealt with later & ignore the node for now
+                                done = true;
+                            }
+                        }
+                        if (spp_right_child == "") {
+                            if (right_child->_left_child) {
+                                right_child = right_child->_left_child;
+                                done = true;
+                            }
+                        }
+                    }
+    //                    nd->_visited = true;
+                    if (spp_left_child != "" && spp_right_child != "") {
+                        left_child->_parent->_visited = true;
+                        done = true;
+                    }
+                    if (spp_left_child != spp_right_child) {
+                        double height = getTotalLineageHeight(nd->_left_child);
+                        _depths.push_back(make_pair(height, make_pair(spp_left_child, spp_right_child)));
+    //                        _depths.push_back(height);
+                    }
+                    spp_left_child = "";
+                    spp_right_child = "";
+                }
+            }
+        }
+        assert (_depths.size() > 0);
+    //        return depths[0];
+    }
+
+    inline void Forest::refreshPreorder() {
+       // Create vector of node pointers in preorder sequence
+        Node *nd = &_nodes.back();
+       _preorder.clear();
+       _preorder.reserve(_nodes.size()); // _preorder must include root node
+
+        _preorder.push_back(nd);
+        
+       while (true) {
+           nd = findNextPreorder(nd);
+           if (nd)
+               _preorder.push_back(nd);
+           else
+               break;
+       }   // end while loop
+    }
+
+    inline vector< pair<double, Node *>> Forest::sortPreorder() {
+        vector< pair<double, Node *>> heights_and_nodes;
+        for (auto it = _preorder.rbegin(); it != _preorder.rend(); it++) {
+            Node * nd = *it;
+            if (nd->_left_child) {
+                // if internal node, store cumulative height in _height
+                double height = getTotalLineageHeight(nd->_left_child); //
+                heights_and_nodes.push_back(make_pair(height, nd));
+//                nd->_height = nd->_left_child->_height + nd->_left_child->_edge_length;
+//                heights_and_nodes.push_back(make_pair(nd->_height, nd));
+            }
+            else {
+                // if leaf node, initialize _height to zero
+//                nd->_height = 0.0;
+            }
+        }
+         
+        // sort heights_and_nodes so that smallest heights will be first
+        sort(heights_and_nodes.begin(), heights_and_nodes.end());
+        return(heights_and_nodes);
+    }
+
+
     inline double Forest::getLineageHeight(Node* nd) {
         if (nd != nullptr) {
             double sum_height = 0.0;
             
 //            sum_height += nd->getEdgeLength();
+            if (nd->_left_child) {
+                for (Node* child = nd->_left_child; child; child=child->_left_child) {
+                    sum_height += child->getEdgeLength();
+                }
+            }
+            return sum_height;
+        }
+        else {
+            return 0.0;
+        }
+    }
+
+    inline double Forest::getTotalLineageHeight(Node* nd) {
+        if (nd != nullptr) {
+            double sum_height = 0.0;
+            
+            sum_height += nd->getEdgeLength();
             if (nd->_left_child) {
                 for (Node* child = nd->_left_child; child; child=child->_left_child) {
                     sum_height += child->getEdgeLength();

@@ -40,15 +40,20 @@ namespace proj {
             void                writeDeepCoalescenceFile(vector<Particle::SharedPtr> &v);
             void writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                normalizeWeights(vector<Particle::SharedPtr> & particles);
+            void                normalizeSpeciesWeights(vector<Particle::SharedPtr> & particles);
             void                modifyWeights(vector<Particle::SharedPtr> & particles);
             void                correctWeights(vector<Particle::SharedPtr> & particles);
             void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
+            void                resampleSpeciesParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                resetWeights(vector<Particle::SharedPtr> & particles);
+            void                resetSpeciesWeights(vector<Particle::SharedPtr> & particles);
             double              getWeightAverage(vector<double> log_weight_vec);
             void                createSpeciesMap(Data::SharedPtr);
             void                simSpeciesMap();
             string              inventName(unsigned k, bool lower_case);
             void                showFinal(vector<Particle::SharedPtr>);
+            void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
+            void                proposeSpeciesParticles(vector<Particle::SharedPtr> &particles);
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
             void                proposeParticles(vector<Particle::SharedPtr> &particles);
             void                proposeParticleRangePriorPost(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
@@ -564,6 +569,33 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
     }
 
+    inline void Proj::normalizeSpeciesWeights(vector<Particle::SharedPtr> & particles) {
+        unsigned i = 0;
+        vector<double> log_weight_vec(particles.size());
+        for (auto & p : particles) {
+            log_weight_vec[i++] = p->getSpeciesLogWeight();
+        }
+
+        double log_particle_sum = getRunningSum(log_weight_vec);
+        
+        double max = *max_element(std::begin(log_weight_vec), std::end(log_weight_vec));
+        double min = *min_element(std::begin(log_weight_vec), std::end(log_weight_vec)); // C++11
+        
+        if (_verbose > 1) {
+            cout << "\t" << "max weight = " << max << endl;;
+            cout << "\t" << "min weight = " << min << endl;;
+        }
+//        for (auto &p:particles) {
+//            p->showParticle();
+//        }
+
+        for (auto & p : particles) {
+            p->setLogSpeciesWeight(p->getSpeciesLogWeight() - log_particle_sum);
+        }
+        
+//        _log_marginal_likelihood += log_particle_sum - log(_nparticles);
+    }
+
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles) {
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
@@ -586,7 +618,57 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
         
         _log_marginal_likelihood += log_particle_sum - log(_nparticles);
-//        sort(particles.begin(), particles.end(), greater<Particle>());
+    }
+
+    inline void Proj::resampleSpeciesParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles) {
+        assert (from_particles.size() == _nparticles);
+        assert (to_particles.size() == _nparticles);
+        
+        vector<pair<double, double>> cum_probs;
+            // Create vector of pairs p, with p.first = log weight and p.second = particle index
+        cum_probs.resize(_nparticles);
+        unsigned i = 0;
+        
+        for (unsigned p=0; p < _nparticles; p++) {
+            cum_probs[i].first = from_particles[p]->getSpeciesLogWeight();
+            cum_probs[i].second = i;
+            ++i;
+            }
+            
+            // Sort cum_probs vector so that largest log weights come first
+            sort(cum_probs.begin(), cum_probs.end(), greater< pair<double,unsigned> >());
+
+            // Convert vector from storing log weights to storing cumulative weights
+            double cumpr = 0.0;
+            for (auto & w : cum_probs) {
+                cumpr += exp(w.first);
+                w.first = cumpr;
+            }
+            
+            // Last element in cum_probs should hold 1.0 if weights were indeed normalized coming in
+            assert( fabs( 1.0 - cum_probs[_nparticles-1].first ) < Proj::_small_enough);
+
+        
+        // Draw new set of particles by sampling with replacement according to cum_probs
+        to_particles.resize(_nparticles);
+        for(unsigned i = 0; i < _nparticles; i++) {
+        
+            // Select a particle to copy to the ith slot in to_particles
+            int sel_index = -1;
+            double u = rng.uniform();
+            for(unsigned j = 0; j < _nparticles; j++) {
+                if (u < cum_probs[j].first) {
+                    sel_index = cum_probs[j].second;
+                    break;
+                }
+            }
+            assert(sel_index > -1);
+            
+            Particle::SharedPtr p0 = from_particles[sel_index];
+            to_particles[i]=Particle::SharedPtr(new Particle(*p0));
+            
+            assert(_nparticles == to_particles.size());
+            }
     }
 
     inline void Proj::resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles) {
@@ -644,6 +726,13 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         double logw = -log(particles.size());
         for (auto & p : particles) {
             p->setLogWeight(logw);
+        }
+    }
+
+    inline void Proj::resetSpeciesWeights(vector<Particle::SharedPtr> & particles) {
+        double logw = -log(particles.size());
+        for (auto & p : particles) {
+            p->setLogSpeciesWeight(logw);
         }
     }
 
@@ -731,6 +820,43 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         cout << "speciation rate = " << Forest::_lambda << endl;
     }
 
+    inline void Proj::proposeSpeciesParticles(vector<Particle::SharedPtr> &particles) {
+        assert(_nthreads > 0);
+        if (_nthreads == 1) {
+          for (auto & p : particles) {
+              p->speciesOnlyProposal();
+          }
+        }
+        else {
+          // divide up the particles as evenly as possible across threads
+          unsigned first = 0;
+          unsigned incr = _nparticles/_nthreads + (_nparticles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
+          unsigned last = incr;
+
+          // need a vector of threads because we have to wait for each one to finish
+          vector<thread> threads;
+
+            while (true) {
+            // create a thread to handle particles first through last - 1
+              threads.push_back(thread(&Proj::proposeSpeciesParticleRange, this, first, last, std::ref(particles)));
+            // update first and last
+            first = last;
+            last += incr;
+            if (last > _nparticles) {
+              last = _nparticles;
+              }
+            if (first>=_nparticles) {
+                break;
+            }
+          }
+
+          // the join function causes this loop to pause until the ith thread finishes
+          for (unsigned i = 0; i < threads.size(); i++) {
+            threads[i].join();
+          }
+        }
+    }
+
     inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles) {
         assert(_nthreads > 0);
         if (_nthreads == 1) {
@@ -814,6 +940,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles) {
         for (unsigned i=first; i<last; i++){
             particles[i]->proposal();
+        }
+    }
+
+    inline void Proj::proposeSpeciesParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles) {
+        for (unsigned i=first; i<last; i++){
+            particles[i]->speciesOnlyProposal();
         }
     }
 
@@ -1083,6 +1215,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             }
                             
                             bool filter = true;
+//                            if (ess < 2.0) {
+//                                filter = false; // TODO: trying this
+//                            }
                             if (Particle::_run_on_empty) {
                                 filter = false;
                             }
@@ -1133,6 +1268,51 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
                 saveGeneTrees(nsubsets, my_vec);
                 writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
+                
+#if defined (EXTRA_SPECIES_SAMPLING)
+                
+                // TODO: do another round of species tree sampling
+                for (auto &p:my_vec) {
+                    // reset forest species partitions
+                    p->resetSpecies();
+                    p->mapSpecies(_taxon_map, _species_names);
+//                    p->showParticle();
+                }
+                use_first = true;
+                
+                for (unsigned s=0; s<nspecies; s++){
+                    cout << "beginning species tree proposals" << endl;
+                    //taxon joining and reweighting step
+                    
+                    proposeSpeciesParticles(my_vec);
+                    
+                    normalizeSpeciesWeights(my_vec);
+                    
+                    double ess_inverse = 0.0;
+                    
+                    for (auto & p:my_vec) {
+                        ess_inverse += exp(2.0*p->getSpeciesLogWeight());
+                    }
+
+                    double ess = 1.0/ess_inverse;
+                    cout << "   " << "ESS = " << ess << endl;
+                 
+                    resampleSpeciesParticles(my_vec, use_first ? my_vec_2:my_vec_1);
+                    //if use_first is true, my_vec = my_vec_2
+                    //if use_first is false, my_vec = my_vec_1
+                    
+                    my_vec = use_first ? my_vec_2:my_vec_1;
+
+                    //change use_first from true to false or false to true
+                    use_first = !use_first;
+
+                    resetSpeciesWeights(my_vec);
+                } // s loop
+                saveSpeciesTrees(my_vec);
+//                for (auto &p:my_vec) {
+//                    p->showParticle();
+//                }
+#endif
                 
                 if (_verbose > 0) {
                     cout << "marginal likelihood: " << _log_marginal_likelihood << endl;
