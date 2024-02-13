@@ -1451,6 +1451,7 @@ class Forest {
             double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
             
             _increments.push_back(make_pair(_last_edge_length, increment_prior));
+            _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior));
         }
         else {
             // hybridization prior

@@ -96,6 +96,7 @@ namespace proj {
             vector<unsigned>            _ntaxaperspecies;
             string                      _string_ntaxaperspecies;
             string                      _sim_file_name;
+            unsigned                    _particle_increase;
     };
 
     inline Proj::Proj() {
@@ -439,6 +440,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("nspecies", boost::program_options::value(&_sim_nspecies)->default_value(1), "number of species to simulate")
         ("ntaxaperspecies", boost::program_options::value(&_string_ntaxaperspecies)->default_value("1"), "number of taxa per species to simulate")
         ("filename", boost::program_options::value(&_sim_file_name), "name of file to write simulated data to")
+        ("particle_increase", boost::program_options::value(&_particle_increase), "how much to increase particles for species filtering")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -1271,13 +1273,31 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 
 #if defined (EXTRA_SPECIES_SAMPLING)
                 
-                // TODO: do another round of species tree sampling
+                // TODO: increase the number of particles for species filtering - copy each particle x times
                 for (auto &p:my_vec) {
                     // reset forest species partitions
                     p->resetSpecies();
                     p->mapSpecies(_taxon_map, _species_names);
 //                    p->showParticle();
                 }
+                
+                // increase size of particle vector and copy each existing particle x times
+//                unsigned particle_increase = 49;
+                unsigned count = _nparticles;
+                for (unsigned p=0; p<_nparticles; p++) {
+                    for (unsigned a=0; a<_particle_increase; a++) {
+                        my_vec_1.push_back(Particle::SharedPtr(new Particle()));
+                        my_vec_2.push_back(Particle::SharedPtr(new Particle()));
+                        Particle::SharedPtr chosen_particle = my_vec_1[p];
+                        my_vec_1[count] = Particle::SharedPtr(new Particle(*chosen_particle));
+//                        to_particles[i]=Particle::SharedPtr(new Particle(*p0));
+                        my_vec_2[count] = Particle::SharedPtr(new Particle(*chosen_particle));
+                        count++;
+                    }
+                }
+                _nparticles = (_nparticles*_particle_increase) + _nparticles;
+                assert (_nparticles == my_vec_1.size());
+                
                 use_first = true;
                 
                 for (unsigned s=0; s<nspecies; s++){
@@ -1305,6 +1325,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
                     //change use_first from true to false or false to true
                     use_first = !use_first;
+                    
+//                    saveSpeciesTrees(my_vec); // TODO: unique trees not saved properly
 
                     resetSpeciesWeights(my_vec);
                 } // s loop
