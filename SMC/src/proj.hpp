@@ -1272,31 +1272,32 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
                 
 #if defined (EXTRA_SPECIES_SAMPLING)
-                
-                // TODO: increase the number of particles for species filtering - copy each particle x times
+                // TODO: need to choose one combination of gene trees and condition everything on that? or choose a new combination for each species tree?
+                // TODO: can reduce memory by just using gene tree increments here?
                 for (auto &p:my_vec) {
                     // reset forest species partitions
                     p->resetSpecies();
                     p->mapSpecies(_taxon_map, _species_names);
-//                    p->showParticle();
+                    p->clearPartials(); // no more likelihood calculatinos
                 }
                 
                 // increase size of particle vector and copy each existing particle x times
-//                unsigned particle_increase = 49;
                 unsigned count = _nparticles;
-                for (unsigned p=0; p<_nparticles; p++) {
-                    for (unsigned a=0; a<_particle_increase; a++) {
-                        my_vec_1.push_back(Particle::SharedPtr(new Particle()));
-                        my_vec_2.push_back(Particle::SharedPtr(new Particle()));
-                        Particle::SharedPtr chosen_particle = my_vec_1[p];
-                        my_vec_1[count] = Particle::SharedPtr(new Particle(*chosen_particle));
-//                        to_particles[i]=Particle::SharedPtr(new Particle(*p0));
-                        my_vec_2[count] = Particle::SharedPtr(new Particle(*chosen_particle));
-                        count++;
+                
+                if (_particle_increase > 1) {
+                    for (unsigned p=0; p<_nparticles; p++) {
+                        for (unsigned a=0; a<_particle_increase-1; a++) { // use x-1 to increase by x
+                            my_vec_1.push_back(Particle::SharedPtr(new Particle()));
+                            my_vec_2.push_back(Particle::SharedPtr(new Particle()));
+                            Particle::SharedPtr chosen_particle = my_vec_1[p];
+                            my_vec_1[count] = Particle::SharedPtr(new Particle(*chosen_particle));
+                            my_vec_2[count] = Particle::SharedPtr(new Particle(*chosen_particle));
+                            count++;
+                        }
                     }
+                    _nparticles = (_nparticles*(_particle_increase-1)) + _nparticles;
+                    assert (_nparticles == my_vec_1.size());
                 }
-                _nparticles = (_nparticles*_particle_increase) + _nparticles;
-                assert (_nparticles == my_vec_1.size());
                 
                 use_first = true;
                 
