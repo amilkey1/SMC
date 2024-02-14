@@ -440,7 +440,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("nspecies", boost::program_options::value(&_sim_nspecies)->default_value(1), "number of species to simulate")
         ("ntaxaperspecies", boost::program_options::value(&_string_ntaxaperspecies)->default_value("1"), "number of taxa per species to simulate")
         ("filename", boost::program_options::value(&_sim_file_name), "name of file to write simulated data to")
-        ("particle_increase", boost::program_options::value(&_particle_increase), "how much to increase particles for species filtering")
+        ("particle_increase", boost::program_options::value(&_particle_increase)->default_value(1), "how much to increase particles for species filtering")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -1300,6 +1300,13 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 }
                 
                 use_first = true;
+                
+                // set particle random number seeds
+                unsigned psuffix = 1;
+                for (auto &p:my_vec) {
+                    p->setSeed(rng.randint(1,9999) + psuffix);
+                    psuffix += 2;
+                }
                 
                 for (unsigned s=0; s<nspecies; s++){
                     cout << "beginning species tree proposals" << endl;
