@@ -877,8 +877,8 @@ class Particle {
         
         if (_forests[0]._last_edge_length > 0.0) {
         // choose species to join if past the first species generation for each forest vector
-//            species_joined = _forests[0].speciesTreeProposalTest();
-            species_joined = _forests[0].speciesTreeProposal(_lot);
+            species_joined = _forests[0].speciesTreeProposalTest();
+//            species_joined = _forests[0].speciesTreeProposal(_lot);
         }
             vector<double> max_depth_vector;
             double max_depth = 0.0;
