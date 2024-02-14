@@ -135,6 +135,7 @@ class Particle {
         bool                                    _species_join_proposed;
         double                                  _prev_increment;
         double                                  _log_coalescent_likelihood;
+        double                                  _total_panmictic_coalescent_likelihood;
         mutable                                 Lot::SharedPtr _lot;
         unsigned                                _num_deep_coalescences;
         bool                                    _deep_coal;
@@ -175,6 +176,7 @@ class Particle {
         _num_deep_coalescences = 0.0;
         _species_tree_height = 0.0;
         _t.clear();
+        _total_panmictic_coalescent_likelihood = 0.0;
     }
 
     inline void Particle::showSpeciesTree() {
@@ -912,10 +914,14 @@ class Particle {
                     
             _t.push_back(make_pair(species_joined, _forests[0]._last_edge_length));
             
+//        double total_panmictic_coalescent_likelihood = 0.0;
+//        _total_panmictic_coalescent_likelihood = 0.0;
+        
             for (int i = 1; i<_forests.size(); i++) {
                 double coal_like_increment = _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
                 _log_coalescent_likelihood += coal_like_increment;
                 _forests[i]._log_coalescent_likelihood += coal_like_increment;
+//                _total_panmictic_coalescent_likelihood += _forests[i]._panmictic_coalescent_likelihood;
             }
         
             _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood;
@@ -1223,6 +1229,7 @@ class Particle {
         _deep_coal = other._deep_coal;
         _species_tree_height = other._species_tree_height;
         _t = other._t;
+        _total_panmictic_coalescent_likelihood = other._total_panmictic_coalescent_likelihood;
     };
 }
 

@@ -1333,10 +1333,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
                     //change use_first from true to false or false to true
                     use_first = !use_first;
-                    
-//                    saveSpeciesTrees(my_vec); // TODO: unique trees not saved properly
 
                     resetSpeciesWeights(my_vec);
+                    
                 } // s loop
                 saveSpeciesTrees(my_vec);
 //                for (auto &p:my_vec) {
