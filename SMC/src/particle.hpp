@@ -121,6 +121,8 @@ class Particle {
         void                                            resetSpecies();
 //        void                                            resetSpeciesInfo(){_t.clear();}
 //        void                                            resetSpeciesTreeHeight(){ _species_tree_height = 0.0;}
+        void                                            setForest(Forest f, unsigned forest_number);
+        Forest                                          getForest(unsigned i) {return _forests[i];} // TODO: should return a pointer?
 
     private:
 
@@ -1211,6 +1213,10 @@ class Particle {
         }
         _t.clear();
         _forests[0]._last_edge_length = 0.0;
+    }
+
+    inline void Particle::setForest(Forest f, unsigned forest_number) {
+        _forests[forest_number] = f;
     }
 
     inline void Particle::operator=(const Particle & other) {

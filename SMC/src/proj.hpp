@@ -41,6 +41,7 @@ namespace proj {
             void writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                normalizeWeights(vector<Particle::SharedPtr> & particles);
             void                normalizeSpeciesWeights(vector<Particle::SharedPtr> & particles);
+            vector<double>      normalizeGeneWeights(vector<double> likelihoods);
             void                modifyWeights(vector<Particle::SharedPtr> & particles);
             void                correctWeights(vector<Particle::SharedPtr> & particles);
             void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
@@ -62,6 +63,7 @@ namespace proj {
             void                simulateData();
             void                writePaupFile(vector<Particle::SharedPtr> particles, vector<string> taxpartition);
             void                sanityChecks();
+            unsigned            selectGene(vector<double> likelihood_vec);
 
         private:
 
@@ -587,15 +589,23 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             cout << "\t" << "max weight = " << max << endl;;
             cout << "\t" << "min weight = " << min << endl;;
         }
-//        for (auto &p:particles) {
-//            p->showParticle();
-//        }
 
         for (auto & p : particles) {
             p->setLogSpeciesWeight(p->getSpeciesLogWeight() - log_particle_sum);
         }
         
 //        _log_marginal_likelihood += log_particle_sum - log(_nparticles);
+    }
+
+    inline vector<double> Proj::normalizeGeneWeights(vector<double> likelihoods) {
+        double log_sum = getRunningSum(likelihoods);
+        
+        vector<double> normalized_likelihoods;
+        normalized_likelihoods.resize(likelihoods.size());
+        for (int n=0; n < normalized_likelihoods.size(); n++) {
+            normalized_likelihoods[n] = likelihoods[n] - log_sum;
+        }
+        return normalized_likelihoods;
     }
 
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles) {
@@ -1083,6 +1093,25 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
     }
 
+    inline unsigned Proj::selectGene(vector<double> likelihood_vec) {
+        // choose a random number [0,1]
+            double u = rng.uniform(); // TODO: change to lot
+//        double u =  _lot->uniform();
+        assert (u > 0.0);
+        assert (u < 1.0);
+        double cum_prob = 0.0;
+        unsigned index = 0;
+        for (int i=0; i < (int) likelihood_vec.size(); i++) {
+            cum_prob += exp(likelihood_vec[i]);
+            if (u <= cum_prob) {
+                index = i;
+                break;
+            }
+        }
+        // return index of choice
+        return index;
+    }
+
     inline void Proj::run() {
         sanityChecks();
         if (_start_mode == "sim") {
@@ -1252,9 +1281,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     //            saveAllHybridNodes(my_vec);
                 
                 saveSpeciesTrees(my_vec);
-                for (int i=1; i < nsubsets+1; i++) {
-                    saveGeneTree(i, my_vec);
-                }
                 
                 if (Particle::_run_on_empty) { // make sure all gene tree log likelihoods are 0.0
                     vector<double> gene_tree_log_likelihoods;
@@ -1268,36 +1294,75 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 }
                 
                 writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
-                saveGeneTrees(nsubsets, my_vec);
+                for (int i=1; i<nsubsets+1; i++) {
+                    saveGeneTree(i, my_vec);
+                }
                 writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
                 
 #if defined (EXTRA_SPECIES_SAMPLING)
                 // TODO: need to choose one combination of gene trees and condition everything on that? or choose a new combination for each species tree?
                 // TODO: can reduce memory by just using gene tree increments here?
+                
+                
+                vector<vector<double>> likelihood_list;
+                likelihood_list.resize(nsubsets);
                 for (auto &p:my_vec) {
-                    // reset forest species partitions
-                    p->resetSpecies();
-                    p->mapSpecies(_taxon_map, _species_names);
-                    p->clearPartials(); // no more likelihood calculatinos
-                }
-                
-                // increase size of particle vector and copy each existing particle x times
-                unsigned count = _nparticles;
-                
-                if (_particle_increase > 1) {
-                    for (unsigned p=0; p<_nparticles; p++) {
-                        for (unsigned a=0; a<_particle_increase-1; a++) { // use x-1 to increase by x
-                            my_vec_1.push_back(Particle::SharedPtr(new Particle()));
-                            my_vec_2.push_back(Particle::SharedPtr(new Particle()));
-                            Particle::SharedPtr chosen_particle = my_vec_1[p];
-                            my_vec_1[count] = Particle::SharedPtr(new Particle(*chosen_particle));
-                            my_vec_2[count] = Particle::SharedPtr(new Particle(*chosen_particle));
-                            count++;
+                    unsigned gene_number = 0;
+                    for (auto &g:p->getGeneTreeLogLikelihoods()) {
+                            likelihood_list[gene_number].push_back(g);
+                            gene_number++;
                         }
                     }
-                    _nparticles = (_nparticles*(_particle_increase-1)) + _nparticles;
-                    assert (_nparticles == my_vec_1.size());
+                
+                vector<unsigned> gene_choices;
+                for (auto &l:likelihood_list) {
+                    vector<double> normalized_likelihoods = normalizeGeneWeights(l);
+                    gene_choices.push_back(selectGene(normalized_likelihoods));
                 }
+                
+                Particle::SharedPtr chosen_particle = my_vec_1[0]; // choose an arbitrary particle to copy to
+                
+                for (int i=0; i<nsubsets; i++) {
+                    // copy gene forests to this particle
+                    Forest f = my_vec[gene_choices[i]]->getForest(i);
+                    chosen_particle->setForest(f, i);
+                }
+                
+                chosen_particle->resetSpecies();
+                chosen_particle->mapSpecies(_taxon_map, _species_names);
+                chosen_particle->clearPartials(); // no more likelihood calculations
+                
+                // increase size of particle vector and copy each existing particle x times
+                
+                
+                for (unsigned a=0; a < _nparticles*_particle_increase; a++) {
+                    if (a < _nparticles) {
+                        my_vec_1[a] = Particle::SharedPtr(new Particle (*chosen_particle));
+                        my_vec_2[a] = Particle::SharedPtr(new Particle (*chosen_particle));
+                    }
+                    else { // need to add blank particles first
+                        my_vec_1.push_back(Particle::SharedPtr(new Particle()));
+                        my_vec_2.push_back(Particle::SharedPtr(new Particle()));
+                        my_vec_1[a] = Particle::SharedPtr(new Particle (*chosen_particle));
+                        my_vec_2[a] = Particle::SharedPtr(new Particle (*chosen_particle));
+                    }
+                }
+                
+            _nparticles *= _particle_increase;
+//                if (_particle_increase > 1) {
+//                    for (unsigned p=0; p<_nparticles; p++) {
+//                        for (unsigned a=0; a<_particle_increase-1; a++) {
+//                            my_vec_1.push_back(Particle::SharedPtr(new Particle()));
+//                            my_vec_2.push_back(Particle::SharedPtr(new Particle()));
+//                            Particle::SharedPtr chosen_particle = my_vec_1[p];
+//                            my_vec_1[count] = Particle::SharedPtr(new Particle(*chosen_particle));
+//                            my_vec_2[count] = Particle::SharedPtr(new Particle(*chosen_particle));
+//                            count++;
+//                        }
+//                    }
+//                    _nparticles = (_nparticles*(_particle_increase-1)) + _nparticles;
+//                    assert (_nparticles == my_vec_1.size());
+//                }
                 
                 use_first = true;
                 
@@ -1338,6 +1403,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     
                 } // s loop
                 saveSpeciesTrees(my_vec);
+//                for (int i=1; i < nsubsets+1; i++) {
+//                    saveGeneTree(i, my_vec);
+//                }
+//                saveGeneTrees(nsubsets, my_vec); // sanity check to ensure all particles have same gene combination
 //                for (auto &p:my_vec) {
 //                    p->showParticle();
 //                }
