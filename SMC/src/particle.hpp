@@ -25,6 +25,7 @@ class Particle {
 
         void                                    debugParticle(std::string name);
         void                                    showParticle();
+        void                                    showSpeciesParticle();
         void                                    proposal();
         void                                    proposalPriorPost();
         void                                    setData(Data::SharedPtr d, map<string, string> &taxon_map, bool partials) {
@@ -161,6 +162,15 @@ class Particle {
         for (auto &_forest:_forests) {
             _forest.showForest();
         }
+    }
+
+    inline void Particle::showSpeciesParticle() {
+        //print out weight of each species forest part of the particle
+        cout << "\nParticle:\n";
+        cout << " _log_species_weight: " << _log_species_weight << "\n";
+        cout << "  _forest: " << "\n";
+        cout << "\n";
+        _forests[0].showForest();
     }
 
     inline void Particle::clear() {
@@ -890,6 +900,7 @@ class Particle {
             for (int i=1; i<_forests.size(); i++) {
                 
                 _forests[i].updateSpeciesPartition(species_joined);
+                
                 string species1 = get<0>(species_joined);
                 string species2 = get<1>(species_joined);
                     
@@ -918,11 +929,13 @@ class Particle {
             
 //        double total_panmictic_coalescent_likelihood = 0.0;
 //        _total_panmictic_coalescent_likelihood = 0.0;
+        _log_coalescent_likelihood = 0.0;
         
             for (int i = 1; i<_forests.size(); i++) {
                 double coal_like_increment = _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
-                _log_coalescent_likelihood += coal_like_increment;
-                _forests[i]._log_coalescent_likelihood += coal_like_increment;
+                _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood - _forests[i]._panmictic_coalescent_likelihood;
+//                _log_coalescent_likelihood += coal_like_increment - _forests[i]._panmictic_coalescent_likelihood;
+//                _forests[i]._log_coalescent_likelihood += coal_like_increment;
 //                _total_panmictic_coalescent_likelihood += _forests[i]._panmictic_coalescent_likelihood;
             }
         

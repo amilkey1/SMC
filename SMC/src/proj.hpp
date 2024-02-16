@@ -1246,9 +1246,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             }
                             
                             bool filter = true;
-//                            if (ess < 2.0) {
-//                                filter = false; // TODO: trying this
-//                            }
+                            
                             if (Particle::_run_on_empty) {
                                 filter = false;
                             }
@@ -1300,10 +1298,106 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
                 
 #if defined (EXTRA_SPECIES_SAMPLING)
-                // TODO: need to choose one combination of gene trees and condition everything on that? or choose a new combination for each species tree?
                 // TODO: can reduce memory by just using gene tree increments here?
                 
+#if defined (HIERARCHICAL_FILTERING)
+                // TODO: try also hierarchical filtering
+                for (auto &p:my_vec) {
+                    // reset forest species partitions
+                    p->resetSpecies();
+                    p->mapSpecies(_taxon_map, _species_names);
+                    p->clearPartials(); // no more likelihood calculatinos
+                } // TODO: need to reset this for all particles?
                 
+                // increase size of particle vector and copy each existing particle x times
+                unsigned count = _nparticles;
+                
+                if (_particle_increase > 1) {
+                    for (unsigned p=0; p<_nparticles; p++) {
+                        for (unsigned a=0; a<_particle_increase-1; a++) { // use x-1 to increase by x
+                            my_vec_1.push_back(Particle::SharedPtr(new Particle()));
+                            my_vec_2.push_back(Particle::SharedPtr(new Particle()));
+                            Particle::SharedPtr chosen_particle = my_vec_1[p];
+                            my_vec_1[count] = Particle::SharedPtr(new Particle(*chosen_particle));
+                            my_vec_2[count] = Particle::SharedPtr(new Particle(*chosen_particle));
+                            count++;
+                        }
+                    }
+//                    _nparticles = (_nparticles*(_particle_increase-1)) + _nparticles;
+//                    assert (_nparticles == my_vec_1.size());
+                }
+                
+                // set particle random number seeds
+                unsigned psuffix = 1;
+                for (auto &p:my_vec) {
+                    p->setSeed(rng.randint(1,9999) + psuffix);
+                    psuffix += 2;
+                }
+                
+                // my_vec is grouped by _particle_increase
+                
+                vector<Particle::SharedPtr> new_vec;
+                
+//                for (unsigned inc = 0; inc < _particle_increase; inc++) {
+                unsigned ngroups = _nparticles;
+                _nparticles = _particle_increase;
+                unsigned index = 0;
+                for (unsigned a=0; a < ngroups; a++) {
+                    use_first = true;
+                    // if _particle_increase = 3
+                    // filter by my_vec[0-2], my_vec[2-4], my_vec[5-8]...
+                    vector<Particle::SharedPtr> use_vec( &my_vec[index], &my_vec[index]+_particle_increase);
+                    vector<Particle::SharedPtr> use_vec_1( &my_vec_1[index], &my_vec_1[index]+_particle_increase);
+                    vector<Particle::SharedPtr> use_vec_2( &my_vec_2[index], &my_vec_2[index]+_particle_increase);
+                    
+                    assert(use_vec.size() == _particle_increase);
+                    
+                    index += _particle_increase;
+                    
+                    cout << "beginning species tree proposals for new subset" << endl;
+                    for (unsigned s=0; s<nspecies; s++){
+                        cout << "beginning species tree proposals" << endl;
+                        //taxon joining and reweighting step
+                        
+                        proposeSpeciesParticles(use_vec);
+                        
+//                        for (auto &p:use_vec) {
+//                            p->showSpeciesParticle();
+//                        }
+                        
+                        normalizeSpeciesWeights(use_vec);
+                        
+                        double ess_inverse = 0.0;
+                        
+                        for (auto & p:use_vec) {
+                            ess_inverse += exp(2.0*p->getSpeciesLogWeight());
+                        }
+
+                        double ess = 1.0/ess_inverse;
+                        cout << "   " << "ESS = " << ess << endl;
+                     
+                        resampleSpeciesParticles(use_vec, use_first ? use_vec_2:use_vec_1);
+                        //if use_first is true, my_vec = my_vec_2
+                        //if use_first is false, my_vec = my_vec_1
+                        
+                        use_vec = use_first ? use_vec_2:use_vec_1;
+
+                        //change use_first from true to false or false to true
+                        use_first = !use_first;
+
+                        resetSpeciesWeights(use_vec);
+                        
+                    } // s loop
+                    for (auto &p:use_vec) {
+                        new_vec.push_back(p);
+                        p->showParticle();
+                    }
+                }
+                my_vec = new_vec;
+#endif
+                
+                
+#if defined (CONDITION_ON_ONE)
                 vector<vector<double>> likelihood_list;
                 likelihood_list.resize(nsubsets);
                 for (auto &p:my_vec) {
@@ -1349,20 +1443,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 }
                 
             _nparticles *= _particle_increase;
-//                if (_particle_increase > 1) {
-//                    for (unsigned p=0; p<_nparticles; p++) {
-//                        for (unsigned a=0; a<_particle_increase-1; a++) {
-//                            my_vec_1.push_back(Particle::SharedPtr(new Particle()));
-//                            my_vec_2.push_back(Particle::SharedPtr(new Particle()));
-//                            Particle::SharedPtr chosen_particle = my_vec_1[p];
-//                            my_vec_1[count] = Particle::SharedPtr(new Particle(*chosen_particle));
-//                            my_vec_2[count] = Particle::SharedPtr(new Particle(*chosen_particle));
-//                            count++;
-//                        }
-//                    }
-//                    _nparticles = (_nparticles*(_particle_increase-1)) + _nparticles;
-//                    assert (_nparticles == my_vec_1.size());
-//                }
                 
                 use_first = true;
                 
@@ -1402,14 +1482,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     resetSpeciesWeights(my_vec);
                     
                 } // s loop
+#endif
                 saveSpeciesTrees(my_vec);
-//                for (int i=1; i < nsubsets+1; i++) {
-//                    saveGeneTree(i, my_vec);
-//                }
-//                saveGeneTrees(nsubsets, my_vec); // sanity check to ensure all particles have same gene combination
 //                for (auto &p:my_vec) {
-//                    p->showParticle();
-//                }
+//                    p->showParticle();}
 #endif
                 
                 if (_verbose > 0) {
