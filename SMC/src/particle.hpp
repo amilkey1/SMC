@@ -906,6 +906,7 @@ class Particle {
                     
                 if (_forests[0]._lineages.size() > 1) {
                     _forests[i].resetDepthVector(species_joined);
+
                     max_depth = (_forests[i].getMinDepths())[0].first;
                     max_depth_vector.push_back(max_depth);
                 }
@@ -933,7 +934,7 @@ class Particle {
         
             for (int i = 1; i<_forests.size(); i++) {
                 double coal_like_increment = _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
-                _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood - _forests[i]._panmictic_coalescent_likelihood;
+                _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
 //                _log_coalescent_likelihood += coal_like_increment - _forests[i]._panmictic_coalescent_likelihood;
 //                _forests[i]._log_coalescent_likelihood += coal_like_increment;
 //                _total_panmictic_coalescent_likelihood += _forests[i]._panmictic_coalescent_likelihood;

@@ -1354,7 +1354,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     
                     index += _particle_increase;
                     
-                    cout << "beginning species tree proposals for new subset" << endl;
+                    cout << "beginning species tree proposals for subset " << a << endl;
                     for (unsigned s=0; s<nspecies; s++){
                         cout << "beginning species tree proposals" << endl;
                         //taxon joining and reweighting step
@@ -1363,6 +1363,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         
 //                        for (auto &p:use_vec) {
 //                            p->showSpeciesParticle();
+//                            p->showParticle();
 //                        }
                         
                         normalizeSpeciesWeights(use_vec);
@@ -1390,7 +1391,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     } // s loop
                     for (auto &p:use_vec) {
                         new_vec.push_back(p);
-                        p->showParticle();
+//                        p->showSpeciesParticle();
+//                        p->showParticle();
                     }
                 }
                 my_vec = new_vec;
