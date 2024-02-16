@@ -11,6 +11,8 @@
 #include <thread>
 #include <boost/algorithm/string/split.hpp>
 #include "conditionals.hpp"
+#include <algorithm>
+#include <random>
 
 using namespace std;
 using namespace boost;
@@ -99,6 +101,7 @@ namespace proj {
             string                      _string_ntaxaperspecies;
             string                      _sim_file_name;
             unsigned                    _particle_increase;
+            double                      _thin;
     };
 
     inline Proj::Proj() {
@@ -443,6 +446,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("ntaxaperspecies", boost::program_options::value(&_string_ntaxaperspecies)->default_value("1"), "number of taxa per species to simulate")
         ("filename", boost::program_options::value(&_sim_file_name), "name of file to write simulated data to")
         ("particle_increase", boost::program_options::value(&_particle_increase)->default_value(1), "how much to increase particles for species filtering")
+        ("thin", boost::program_options::value(&_thin)->default_value(1.0), "take this portion of particles for hierarchical species filtering")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -1301,19 +1305,28 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 // TODO: can reduce memory by just using gene tree increments here?
                 
 #if defined (HIERARCHICAL_FILTERING)
-                // TODO: try also hierarchical filtering
+                unsigned ngroups = round(_nparticles * _thin);
+                
+                shuffle(my_vec.begin(), my_vec.end(), std::mt19937{std::random_device{}()}); // shuffle particles
+                // delete first (1-_thin) % of particles
+                my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (_nparticles-ngroups)));
+                assert(my_vec.size() == ngroups);
+                
+                _nparticles = ngroups;
+                
                 for (auto &p:my_vec) {
                     // reset forest species partitions
                     p->resetSpecies();
                     p->mapSpecies(_taxon_map, _species_names);
-                    p->clearPartials(); // no more likelihood calculatinos
-                } // TODO: need to reset this for all particles?
+                    p->clearPartials(); // no more likelihood calculations
+                }
                 
                 // increase size of particle vector and copy each existing particle x times
                 unsigned count = _nparticles;
                 
                 if (_particle_increase > 1) {
-                    for (unsigned p=0; p<_nparticles; p++) {
+//                    for (unsigned p=0; p<_nparticles; p++) {
+                    for (unsigned p=0; p<ngroups; p++) {
                         for (unsigned a=0; a<_particle_increase-1; a++) { // use x-1 to increase by x
                             my_vec_1.push_back(Particle::SharedPtr(new Particle()));
                             my_vec_2.push_back(Particle::SharedPtr(new Particle()));
@@ -1323,8 +1336,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             count++;
                         }
                     }
-//                    _nparticles = (_nparticles*(_particle_increase-1)) + _nparticles;
-//                    assert (_nparticles == my_vec_1.size());
                 }
                 
                 // set particle random number seeds
@@ -1338,8 +1349,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 
                 vector<Particle::SharedPtr> new_vec;
                 
-//                for (unsigned inc = 0; inc < _particle_increase; inc++) {
-                unsigned ngroups = _nparticles;
+//                unsigned ngroups = _nparticles;
                 _nparticles = _particle_increase;
                 unsigned index = 0;
                 for (unsigned a=0; a < ngroups; a++) {
@@ -1354,7 +1364,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     
                     index += _particle_increase;
                     
-                    cout << "beginning species tree proposals for subset " << a << endl;
+                    cout << "beginning species tree proposals for subset " << a+1 << endl;
                     for (unsigned s=0; s<nspecies; s++){
                         cout << "beginning species tree proposals" << endl;
                         //taxon joining and reweighting step
