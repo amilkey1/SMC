@@ -1496,8 +1496,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 } // s loop
 #endif
                 saveSpeciesTrees(my_vec);
-//                for (auto &p:my_vec) {
-//                    p->showParticle();}
+                writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
+                for (auto &p:my_vec) {
+                    p->showParticle();
+                }
 #endif
                 
                 if (_verbose > 0) {
