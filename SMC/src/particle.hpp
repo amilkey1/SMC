@@ -104,6 +104,7 @@ class Particle {
         void                                            geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name);
         void                                            calculateIncrementPriors(double increment, string species_name, unsigned forest_number, bool speciation, bool first_step);
         void                                            changeTheta(unsigned i);
+        void                                            drawTheta();
         double                                          getIncrement() {return _prev_increment;}
         void                                            clearPartials();
         Lot::SharedPtr getLot() const {return _lot;}
@@ -125,6 +126,7 @@ class Particle {
 //        void                                            resetSpeciesTreeHeight(){ _species_tree_height = 0.0;}
         void                                            setForest(Forest f, unsigned forest_number);
         Forest                                          getForest(unsigned i) {return _forests[i];} // TODO: should return a pointer?
+        double                                          getNewTheta(){return _forests[1]._new_theta;}
 
     private:
 
@@ -158,7 +160,7 @@ class Particle {
         cout << "  _log_weight: " << _log_weight << "\n" ;
         cout << " _log_likelihood: " << _log_likelihood << "\n";
         cout << "  _forest: " << "\n";
-//        cout << " _theta: " << _forests[0]._new_theta << "\n";
+        cout << " _theta: " << _forests[0]._new_theta << "\n";
         cout << "\n";
         for (auto &_forest:_forests) {
             _forest.showForest();
@@ -882,6 +884,9 @@ class Particle {
             _forests[i].updateSpeciesPartition(species_joined);
         }
         _deep_coal = false;
+        
+        // after a speciation event, draw a new theta for the new population
+//        drawTheta();
     }
 
     inline void Particle::speciesOnlyProposal() {
@@ -957,6 +962,18 @@ class Particle {
 
     inline void Particle::geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name) {
         _forests[forest_number].allowCoalescence(species_name, increment, _lot);
+    }
+
+    inline void Particle::drawTheta() {
+//        double new_theta = _lot->uniform();
+//        double new_theta = rng.uniform();
+        double new_theta = rng.gamma(0.5,1); // TODO: log normal makes more sense
+        // TODO: draw a new theta for each population in each gene forest & save them all in a vector
+        for (auto &f:_forests) {
+//            double new_theta = rng.gamma(0.5,1);
+//            f._theta = new_theta;
+            f._new_theta = new_theta;
+        }
     }
 
     inline void Particle::changeTheta(unsigned i) {

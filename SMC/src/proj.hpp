@@ -219,8 +219,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << "\t" << pop_mean;
             
             for (int i=0; i<(nspecies*2-1); i++) {
-                logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
-//                logf << "\t" << p->getNewTheta() / 4.0;
+//                logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
+                logf << "\t" << p->getNewTheta() / 4.0;
             }
             
             logf << "\t" << Forest::_lambda;
@@ -324,8 +324,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << "\t" << pop_mean;
             
             for (int i=0; i<(nspecies*2-1); i++) {
-                logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
-    //                logf << "\t" << p->getNewTheta() / 4.0;
+//                logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
+                    logf << "\t" << p->getNewTheta() / 4.0;
             }
             
             logf << "\t" << Forest::_lambda;
@@ -541,6 +541,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000), "number of particles")
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
         ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.05), "theta")
+//        ("theta_max, tmax", boost::program_options::value(&Forest::_theta_max)->default_value(0.05), "theta max")
         ("lambda", boost::program_options::value(&Forest::_lambda)->default_value(1), "speciation rate")
         ("proposal",  boost::program_options::value(&Forest::_proposal)->default_value("prior-prior"), "a string defining a proposal (prior-prior or prior-post)")
         ("model", boost::program_options::value(&Forest::_model)->default_value("JC"), "a string defining a substitution model")
@@ -1306,6 +1307,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             
                 for (auto &p:my_vec) {
                     p->setLogLikelihood(starting_log_likelihoods);
+                    p->drawTheta();
                     if (Forest::_save_memory) {
                         p->clearPartials();
                     }
@@ -1438,7 +1440,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 unsigned count = _nparticles;
                 
                 if (_particle_increase > 1) {
-//                    for (unsigned p=0; p<_nparticles; p++) {
                     for (unsigned p=0; p<ngroups; p++) {
                         for (unsigned a=0; a<_particle_increase-1; a++) { // use x-1 to increase by x
                             my_vec_1.push_back(Particle::SharedPtr(new Particle()));
