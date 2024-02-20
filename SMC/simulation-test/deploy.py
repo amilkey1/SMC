@@ -7,10 +7,10 @@ method           = 'uniform' # should be either 'uniform' or 'lognorm'
 ntax           = [2,2,2,2,2] # number of taxa in each species
 
 # These used only if method == 'uniform' 
-T_low            = 0.1       # smallest tree height (T) value 
+T_low            = 0.5       # smallest tree height (T) value 
 T_high           = 1.0       # largest tree height (T) value
-half_theta_low   = 0.1       # smallest theta/2 value
-half_theta_high  = 1.0       # largest theta/2 value
+half_theta_low   = 0.05       # smallest theta/2 value
+half_theta_high  = 0.5       # largest theta/2 value
 
 # These used only if method == 'lornorm' 
 Tmean            = 1.0       # mean tree height (T)
@@ -20,8 +20,8 @@ Rsd              = 0.2       # standard deviation of theta/T ratios
 
 nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100       # number of sites in each gene
-nreps          = 100          # number of simulation replicates
-nparticles     = 5000       # number of particles to use for SMC
+nreps          = 10          # number of simulation replicates
+nparticles     = 500       # number of particles to use for SMC
 simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
@@ -29,18 +29,18 @@ smctreefname   = 'species_trees.trees' # name of species tree file for SMC
 beasttreefname = 'species.trees'           # name of species tree file for BEAST
 username       = 'aam21005'  # name of user on UConn HPC cluster
 nodechoices    = [('general', 'epyc128'), ('priority','skylake')]
-nodechoice     = 0           # 0-offset index into nodechoices
+nodechoice     = 0          # 0-offset index into nodechoices
 #partition      = 'general'   # specifies partition to use for HPC: either 'general' or 'priority'
 #constraint     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
-rnseed         = 977515      # overall pseudorandom number seed
-mcmciter       = 500000      # chain length for Beast MCMC
+rnseed         = 536122      # overall pseudorandom number seed
+mcmciter       = 510000      # chain length for Beast MCMC
 saveevery      = 100         # MCMC storeevery modulus
-preburnin      = 50000        # MCMC burn in
+preburnin      = 0        # MCMC burn in
 storeevery     = 100        # state storeevery modulus
 screenevery    = 100        # screen print modulus
 genetreeevery  = 100         # gene tree save modulus
-spptreeevery   = 100          # species tree save modulus (mcmciter/spptreeevery should equal nparticles
+spptreeevery   = 17          # species tree save modulus (mcmciter/spptreeevery should equal nparticles
 
 # Settings you can change but probably shouldn't
 maxsimult   = None        # maximum number of jobs to run simultaneously (set to None if there is no maximum)
@@ -253,6 +253,9 @@ def createSMCConf(rep_index):
     s += '\n'
     s += 'phi = 1.0\n'
     s += 'verbose = 2\n'
+    s += 'run_on_empty = false\n'
+    s += 'particle_increase = 200\n'
+    s += 'thin=0.5\n'
 
     smcconff = open(smcconffn, 'w')
     smcconff.write(s)
@@ -431,6 +434,7 @@ def createBeastXML(rep_index):
     s += '            <log idref="prior"/>\n'
     s += '            <log idref="vectorPrior"/>\n'
     s += '            <log idref="speciescoalescent"/>\n'
+    s += '            <log idref="speciationRate.t:Species"/>\n'
     s += '            <log id="TreeStat.Species" spec="beast.base.evolution.tree.TreeStatLogger" tree="@Tree.t:Species"/>\n'
     s += '            <log idref="YuleModel.t:Species"/>\n'
     s += '            <log idref="popMean"/>\n'
