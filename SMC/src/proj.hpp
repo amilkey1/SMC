@@ -41,6 +41,7 @@ namespace proj {
             void                writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                writeDeepCoalescenceFile(vector<Particle::SharedPtr> &v);
             void writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
+            void writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                normalizeWeights(vector<Particle::SharedPtr> & particles);
             void                normalizeSpeciesWeights(vector<Particle::SharedPtr> & particles);
             vector<double>      normalizeGeneWeights(vector<double> likelihoods);
@@ -241,6 +242,118 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         
         logf.close();
     }
+    inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFiltering(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const {
+        // this function creates a params file that is comparable to output from starbeast3
+        ofstream logf("params-beast-comparison.log");
+        logf << "iter ";
+        logf << "\t" << "posterior ";
+        logf << "\t" << "likelihood ";
+        logf << "\t" << "prior ";
+        logf << "\t" << "vectorPrior "; // log joint prior on population sizes (vectorPrior)
+        logf << "\t" << "speciescoalescent ";
+        logf << "\t" << "Tree.t:Species.height ";
+        logf << "\t" << "Tree.t:Species.treeLength ";
+        
+        for (int i=1; i<ngenes+1; i++) {
+            logf << "\t" << "Tree.t:gene" + to_string(i) + "height";
+            logf << "\t" << "Tree.t:gene" + to_string(i) + "treeLength";
+        }
+        
+        logf << "\t" << "YuleModel.t:Species "; // this is the log probability of the species tree (multiply by log(3!) to get increment log prob)
+        logf << "\t" << "popMean "; // this is psi in the InverseGamma(2,psi) distribution of popSize
+        
+        for (int i=0; i<(nspecies*2-1); i++) {
+            logf << "\t" << "popSize." + to_string(i+1);
+        }
+        
+        logf << "\t" << "speciationRate.t:Species ";
+        
+        for (int i=1; i<ngenes+1; i++) {
+            logf << "\t" << "treeLikelihood:gene" + to_string(i);
+        }
+        for (int i=1; i<ngenes+1; i++) {
+            logf << "\t" << "treePrior:gene" + to_string(i);
+        }
+        logf << endl;
+        
+        int iter = 0;
+        for (auto &p:v) {
+            logf << iter;
+            iter++;
+            
+            double log_likelihood = p->getLogLikelihood();
+            double log_prior = p->getAllPriors();
+            
+            double log_posterior = log_likelihood + log_prior;
+            
+            double log_coalescent_likelihood = 0.0;
+            for (unsigned g=1; g<ngenes+1; g++) {
+                log_coalescent_likelihood += p->getCoalescentLikelihood(g);
+            }
+            
+            logf << "\t" << log_posterior;
+            
+            logf << "\t" << log_likelihood;
+            
+            logf << "\t" << log_prior - log_coalescent_likelihood; // starbeast3 does not include coalescent likelihood in this prior
+            
+            double vector_prior = 0.0;
+            logf << "\t" << vector_prior; // log joint prior on population sizes (vectorPrior) - 0.0 for now since pop size is not a parameter
+            
+            logf << "\t" << log_coalescent_likelihood;
+            
+            double species_tree_height = p->getSpeciesTreeHeight();
+            logf << "\t" << species_tree_height;
+            
+            double species_tree_length = p->getSpeciesTreeLength();
+            logf << "\t" << species_tree_length;
+            
+            vector<double> gene_tree_heights = p->getGeneTreeHeights();
+            vector<double> gene_tree_lengths = p->getGeneTreeLengths();
+            assert (gene_tree_heights.size() == gene_tree_lengths.size());
+            
+            for (int i=0; i<gene_tree_heights.size(); i++) {
+                logf << "\t" << gene_tree_heights[i];
+                logf << "\t" << gene_tree_lengths[i];
+            }
+            
+            double yule_model = p->getSpeciesTreePrior(); // TODO: unsure if this is correct
+            logf << "\t" << yule_model;
+            
+            double pop_mean = 0.0; // setting this to 0.0 for now since pop size is not a parameter
+            logf << "\t" << pop_mean;
+            
+            for (int i=0; i<(nspecies*2-1); i++) {
+                logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
+    //                logf << "\t" << p->getNewTheta() / 4.0;
+            }
+            
+            logf << "\t" << Forest::_lambda;
+            
+            vector<double> gene_tree_log_likelihoods = p->getGeneTreeLogLikelihoods();
+            vector<double> gene_tree_priors = p->getGeneTreeCoalescentLikelihoods();
+            double test = 0.0;
+            for (auto &p:gene_tree_priors) {
+                test += p;
+            }
+//            p->showParticle();
+            assert (test == log_coalescent_likelihood);
+            assert (gene_tree_log_likelihoods.size() == gene_tree_priors.size());
+            
+            for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
+                logf << "\t" << gene_tree_log_likelihoods[i];
+            }
+            
+            for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
+                logf << "\t" << gene_tree_priors[i];
+            }
+            
+            logf << endl;
+        }
+        
+        logf.close();
+    }
+
 
     inline void Proj::writeDeepCoalescenceFile(vector<Particle::SharedPtr> &v) {
         ofstream logf("deep_coalescences.txt");
@@ -1349,7 +1462,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 
                 vector<Particle::SharedPtr> new_vec;
                 
-//                unsigned ngroups = _nparticles;
                 _nparticles = _particle_increase;
                 unsigned index = 0;
                 for (unsigned a=0; a < ngroups; a++) {
@@ -1365,16 +1477,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     index += _particle_increase;
                     
                     cout << "beginning species tree proposals for subset " << a+1 << endl;
-                    for (unsigned s=0; s<nspecies; s++){
+                    for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
                         cout << "beginning species tree proposals" << endl;
                         //taxon joining and reweighting step
                         
                         proposeSpeciesParticles(use_vec);
-                        
-//                        for (auto &p:use_vec) {
-//                            p->showSpeciesParticle();
-//                            p->showParticle();
-//                        }
                         
                         normalizeSpeciesWeights(use_vec);
                         
@@ -1401,8 +1508,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     } // s loop
                     for (auto &p:use_vec) {
                         new_vec.push_back(p);
-//                        p->showSpeciesParticle();
-//                        p->showParticle();
                     }
                 }
                 my_vec = new_vec;
@@ -1465,7 +1570,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     psuffix += 2;
                 }
                 
-                for (unsigned s=0; s<nspecies; s++){
+                for (unsigned s=0; s<nspecies-1; s++){
                     cout << "beginning species tree proposals" << endl;
                     //taxon joining and reweighting step
                     
@@ -1496,10 +1601,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 } // s loop
 #endif
                 saveSpeciesTrees(my_vec);
-                writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
-                for (auto &p:my_vec) {
-                    p->showParticle();
-                }
+                writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, my_vec);
 #endif
                 
                 if (_verbose > 0) {

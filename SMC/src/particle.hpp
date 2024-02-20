@@ -115,6 +115,7 @@ class Particle {
         vector<double>                                  getGeneTreeLengths();
         vector<double>                                  getGeneTreeLogLikelihoods();
         vector<double>                                  getGeneTreePriors();
+        inline vector<double>                           getGeneTreeCoalescentLikelihoods();
         double                                          getSpeciesTreePrior();
         double                                          getAllPriors();
         void                                            simulateData(vector<unsigned> sites_vector);
@@ -321,6 +322,14 @@ class Particle {
             }
             
             gene_tree_priors.push_back(prior);
+        }
+        return gene_tree_priors;
+    }
+
+    inline vector<double> Particle::getGeneTreeCoalescentLikelihoods() {
+        vector<double> gene_tree_priors;
+        for (int i=1; i<_forests.size(); i++) {
+            gene_tree_priors.push_back(_forests[i]._log_coalescent_likelihood);
         }
         return gene_tree_priors;
     }
@@ -876,7 +885,6 @@ class Particle {
     }
 
     inline void Particle::speciesOnlyProposal() {
-//        if (_generation == 0 || _generation == Forest::_ntaxa - 1) {
         if (_generation == 0) {
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i].refreshPreorder();
@@ -889,61 +897,62 @@ class Particle {
         double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
         vector<pair<int, int>> species_choices;
         
-        if (_forests[0]._last_edge_length > 0.0) {
-        // choose species to join if past the first species generation for each forest vector
-            species_joined = _forests[0].speciesTreeProposalTest();
-//            species_joined = _forests[0].speciesTreeProposal(_lot);
-        }
-            vector<double> max_depth_vector;
-            double max_depth = 0.0;
+            if (_forests[0]._last_edge_length > 0.0) {
+            // choose species to join if past the first species generation for each forest vector
+                species_joined = _forests[0].speciesTreeProposalTest();
+    //            species_joined = _forests[0].speciesTreeProposal(_lot);
+            }
+                vector<double> max_depth_vector;
+                double max_depth = 0.0;
 
-            for (int i=1; i<_forests.size(); i++) {
-                
-                _forests[i].updateSpeciesPartition(species_joined);
-                
-                string species1 = get<0>(species_joined);
-                string species2 = get<1>(species_joined);
+                for (int i=1; i<_forests.size(); i++) {
                     
-                if (_forests[0]._lineages.size() > 1) {
-                    _forests[i].resetDepthVector(species_joined);
+                    _forests[i].updateSpeciesPartition(species_joined);
+                    
+                    string species1 = get<0>(species_joined);
+                    string species2 = get<1>(species_joined);
+                        
+                    if (_forests[0]._lineages.size() > 1) {
+                        _forests[i].resetDepthVector(species_joined);
 
-                    max_depth = (_forests[i].getMinDepths())[0].first;
-                    max_depth_vector.push_back(max_depth);
+                        max_depth = (_forests[i].getMinDepths())[0].first;
+                        max_depth_vector.push_back(max_depth);
+                    }
                 }
-            }
-            if (_forests[0]._lineages.size() > 1) {
-                max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
-                max_depth -= _forests[0].getTreeHeight();
-                // choose a species tree increment
+                if (_forests[0]._lineages.size() > 1) {
+                    max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
+                    max_depth -= _forests[0].getTreeHeight();
+                    // choose a species tree increment
+                }
+                
+                if (_forests[0]._lineages.size() > 1) {
+                    assert (max_depth > 0.0);
+                    _forests[0].chooseSpeciesIncrementOnly(_lot, max_depth);
+                    _species_tree_height += _forests[0]._last_edge_length;
+                }
+                if (_forests[0]._lineages.size() == 1) {
+                    _forests[0]._last_edge_length = 0.0;
+                }
+                        
+                _t.push_back(make_pair(species_joined, _forests[0]._last_edge_length));
+                
+                _log_coalescent_likelihood = 0.0;
+            
+            if (_forests[0]._lineages.size() == 2) {
+                // join remaining species lineages
+                species_joined = _forests[0].speciesTreeProposalTest();
+                // coalescent likelihood is the same as calculating coalescent likelihood above and below species join
             }
             
-            if (_forests[0]._lineages.size() > 1) {
-                assert (max_depth > 0.0);
-                _forests[0].chooseSpeciesIncrementOnly(_lot, max_depth);
-                _species_tree_height += _forests[0]._last_edge_length;
-            }
-            if (_forests[0]._lineages.size() == 1) {
-                _forests[0]._last_edge_length = 0.0;
-            }
-                    
-            _t.push_back(make_pair(species_joined, _forests[0]._last_edge_length));
+                for (int i = 1; i<_forests.size(); i++) {
+                    _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
+                    _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
+                }
             
-//        double total_panmictic_coalescent_likelihood = 0.0;
-//        _total_panmictic_coalescent_likelihood = 0.0;
-        _log_coalescent_likelihood = 0.0;
-        
-            for (int i = 1; i<_forests.size(); i++) {
-                double coal_like_increment = _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
-                _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
-//                _log_coalescent_likelihood += coal_like_increment - _forests[i]._panmictic_coalescent_likelihood;
-//                _forests[i]._log_coalescent_likelihood += coal_like_increment;
-//                _total_panmictic_coalescent_likelihood += _forests[i]._panmictic_coalescent_likelihood;
-            }
-        
-            _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood;
-            double test = 1/_log_species_weight;
-        _generation++;
-        assert(test != -0);
+                _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood;
+                double test = 1/_log_species_weight;
+            _generation++;
+            assert(test != -0); // assert coalescent likelihood is not -inf
     }
 
     inline void Particle::geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name) {
