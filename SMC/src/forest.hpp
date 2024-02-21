@@ -11,6 +11,7 @@
 #include <mutex>
 #include <algorithm>
 #include "conditionals.hpp"
+#include <fstream>
 
 #include "lot.hpp"
 extern proj::Lot rng;
@@ -113,7 +114,8 @@ class Forest {
         void                        calcMinDepth();
         vector< pair<double, Node *>>      sortPreorder();
         void                        refreshPreorder();
-        vector<double>              _theta_vector;
+        void                        createThetaMap();
+        map<string, double>              _theta_map;
 
         std::vector<Node *>         _lineages;
     
@@ -155,6 +157,7 @@ class Forest {
         vector<pair<double, pair<string, string>>>              _depths;
         unsigned                    _nincrements = 0;
         vector<Node*>               _preorder;
+        double                      _small_enough;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -223,6 +226,7 @@ class Forest {
         _nincrements = 0;
         _preorder.clear();
         _panmictic_coalescent_likelihood = 0.0;
+        _small_enough = 0.0000001;
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -1289,7 +1293,8 @@ class Forest {
         _nincrements = other._nincrements;
         _preorder.resize(other._preorder.size());
         _panmictic_coalescent_likelihood = other._panmictic_coalescent_likelihood;
-        _theta_vector = other._theta_vector;
+        _theta_map = other._theta_map; // TODO: unsure if this will copy correctly
+        _small_enough = other._small_enough;
 
         // copy tree itself
 
@@ -1667,6 +1672,7 @@ class Forest {
     }
 
     inline void Forest::calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree) {
+#if defined (DRAW_NEW_THETA)
         double log_increment_prior = 0.0;
         
         if (!_done) {
@@ -1685,8 +1691,8 @@ class Forest {
                         if (coalescence) {
                             assert (s.second.size() > 1);
                             // if there is coalescence, need to use number of lineages before the join
-//                            double coalescence_rate = (s.second.size())*(s.second.size()-1) / _theta;
-                            double coalescence_rate = (s.second.size())*(s.second.size()-1) / _new_theta; // TODO: test
+                            double population_theta = _theta_map[s.first];
+                            double coalescence_rate = (s.second.size())*(s.second.size()-1) / population_theta;
                             assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
                             double nChooseTwo = (s.second.size())*(s.second.size()-1);
                             double log_prob_join = log(2/nChooseTwo);
@@ -1694,8 +1700,8 @@ class Forest {
                         }
                         else {
                             // no coalescence
-//                            double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
-                            double coalescence_rate = s.second.size()*(s.second.size() - 1) / _new_theta; // TODO: test
+                            double population_theta = _theta_map[s.first];
+                            double coalescence_rate = s.second.size()*(s.second.size() - 1) / population_theta;
                             log_increment_prior -= increment*coalescence_rate;
                         }
                     }
@@ -1704,8 +1710,8 @@ class Forest {
                 else if (!coalesced_gene) {
                     // no coalescence
                     for (auto &s:_species_partition) {
-//                        double coalescence_rate = s.second.size() * (s.second.size() - 1) / _theta; // TODO: test
-                        double coalescence_rate = s.second.size() * (s.second.size() - 1) / _new_theta;
+                        double population_theta = _theta_map[s.first];
+                        double coalescence_rate = s.second.size() * (s.second.size() - 1) / population_theta;
                         log_increment_prior -= increment*coalescence_rate;
                     }
                 }
@@ -1750,6 +1756,86 @@ class Forest {
             }
             _log_coalescent_likelihood_increment = log_increment_prior;
         }
+#else
+        double log_increment_prior = 0.0;
+        
+        if (!_done) {
+            if (gene_tree) {
+                if (coalesced_gene) {
+                    // calculate increment prior
+                    for (auto &s:_species_partition) {
+                        bool coalescence = false;
+                        if (s.first == species_name) {
+                            coalescence = true;
+                        }
+                        else {
+                            coalescence = false;
+                        }
+
+                        if (coalescence) {
+                            assert (s.second.size() > 1);
+                            // if there is coalescence, need to use number of lineages before the join
+                            double coalescence_rate = (s.second.size())*(s.second.size()-1) / _theta;
+                            assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
+                            double nChooseTwo = (s.second.size())*(s.second.size()-1);
+                            double log_prob_join = log(2/nChooseTwo);
+                            log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate) + log_prob_join;
+                        }
+                        else {
+                            // no coalescence
+                            double coalescence_rate = s.second.size()*(s.second.size() - 1) / _theta;
+                            log_increment_prior -= increment*coalescence_rate;
+                        }
+                    }
+                }
+            
+                else if (!coalesced_gene) {
+                    // no coalescence
+                    for (auto &s:_species_partition) {
+                        double coalescence_rate = s.second.size() * (s.second.size() - 1) / _theta;
+                        log_increment_prior -= increment*coalescence_rate;
+                    }
+                }
+            
+                if (new_increment) { // add a new increment to the list
+                    _increments_and_priors.push_back(make_pair(increment, log_increment_prior));
+                }
+            
+                else if (!new_increment) { // add to existing increment and prior
+                    assert (_increments_and_priors.size() > 0);
+                    _increments_and_priors.back().first += increment;
+                    _increments_and_priors.back().second += log_increment_prior;
+                }
+                _log_coalescent_likelihood += log_increment_prior;
+            }
+        
+            else {
+                // species tree
+                if (coalesced_gene) {
+                    double rate = _lambda*(_lineages.size());
+                    // calculate increment prior
+                    double nChooseTwo = (_lineages.size())*(_lineages.size()-1);
+                    double log_prob_join = log(2/nChooseTwo);
+                    log_increment_prior = log(rate) - (increment*rate) + log_prob_join;
+                }
+                else {
+                    double rate = _lambda*(_lineages.size());
+                    // calculate increment prior
+                    log_increment_prior = - (increment*rate);
+                }
+                
+                if (new_increment) {
+                    _increments_and_priors.push_back(make_pair(increment, log_increment_prior));
+                }
+                else {
+                    _increments_and_priors.back().first += increment;
+                    _increments_and_priors.back().second += log_increment_prior;
+                }
+                _log_coalescent_likelihood += log_increment_prior;
+            }
+            _log_coalescent_likelihood_increment = log_increment_prior;
+        }
+#endif
     }
 
     inline void Forest::coalesceChosenPair(string species_name, int node_pair_index) {
@@ -2719,8 +2805,14 @@ class Forest {
 
         for (auto &s:_species_partition) {
             if (s.second.size() > 1) { // if size == 0, no possibility of coalescence and rate is 0
-//                double population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta; // TODO: _theta
-                double population_coalescence_rate = s.second.size()*(s.second.size()-1)/_new_theta;
+                double population_coalescence_rate = 0.0;
+#if defined (DRAW_NEW_THETA)
+                assert (_theta_map.size() > 0);
+                double population_theta = _theta_map[s.first];
+                population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
+#else
+                population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta;
+#endif
                 string name = s.first;
                 rate_and_name = make_pair(population_coalescence_rate, name);
                 rates.push_back(rate_and_name);
@@ -2736,6 +2828,38 @@ class Forest {
         if (_index == 0) {
             _last_edge_length = increment;
             _cum_height += increment;
+        }
+    }
+
+    inline void Forest::createThetaMap() {
+        // map should be 2*nspecies - 1 size
+        unsigned number = 0;
+        vector<string> species_names;
+        
+        for (auto &s:_species_partition) {
+            species_names.push_back(s.first);
+            number++;
+        }
+        for (int i=0; i<_nspecies-1; i++) {
+            string name = boost::str(boost::format("node-%d")%number);
+            number++;
+            species_names.push_back(name);
+        }
+        
+        assert (species_names.size() == 2*_nspecies - 1);
+        
+//        ofstream logf("chosen_thetas.txt");
+        ofstream logf("chosen_thetas.txt", std::ios_base::app);
+        for (auto &name:species_names) {
+//            double new_theta = rng.logNormal(0, 0.2); // TODO: use inverse gamma
+            double new_theta = 0.0;
+            while (new_theta <= _small_enough) { // if theta is too small, it will create 0 branch lengths
+                new_theta = rng.gamma(0.3, 2.0);
+            }
+            logf << new_theta << "\n";
+            // TODO: fix random numbers
+            assert (new_theta > 0.0);
+            _theta_map[name] = new_theta;
         }
     }
 
@@ -2776,8 +2900,12 @@ class Forest {
                                 log_coalescent_likelihood = neg_inf; // if there is only 1 lineage left, there cannot be coalescence
                                 return log_coalescent_likelihood;
                             }
-
+#if defined (DRAW_NEW_THETA)
+                            double population_theta = _theta_map[s.first];
+                            double coalescence_rate = nlineages*(nlineages-1) / population_theta;
+#else
                             double coalescence_rate = nlineages*(nlineages-1) / Forest::_theta;
+#endif
                             double nChooseTwo = nlineages*(nlineages-1);
                             double log_prob_join = log(2/nChooseTwo);
                             log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
@@ -2798,7 +2926,12 @@ class Forest {
                             // no coalescence
                             unsigned nlineages = (int) s.second.size();
 
+#if defined (DRAW_NEW_THETA)
+                            double population_theta = _theta_map[s.first];
+                            double coalescence_rate = nlineages*(nlineages-1) / population_theta;
+#else
                             double coalescence_rate = nlineages*(nlineages-1) / _theta;
+#endif
                             log_coalescent_likelihood -= increment * coalescence_rate;
 
     //                            cout << "pr no coalescence = " << -1 * increment * coalescence_rate << endl;
@@ -2811,7 +2944,12 @@ class Forest {
             // no coalescence
             for (auto &s:_species_partition) {
                 unsigned nlineages = (int) s.second.size();
+#if defined (DRAW_NEW_THETA)
+                double population_theta = _theta_map[s.first];
+                double coalescence_rate = nlineages*(nlineages-1) / population_theta;
+#else
                 double coalescence_rate = nlineages*(nlineages-1) / _theta;
+#endif
                 log_coalescent_likelihood -= remaining_chunk_of_branch * coalescence_rate;
 
     //                cout << "pr no coalescence = " << -1 * remaining_chunk_of_branch * coalescence_rate << endl;
@@ -2836,10 +2974,15 @@ class Forest {
                 // calculate increment (should be heights_and_nodes[i].first - species_tree_height - cum_time (no need to worry about species increment now)
                 // calculate prob of coalescence, ln(rate) - rate*increment
                 double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
+#if defined (DRAW_NEW_THETA)
+                double population_theta = (--_theta_map.end())->second;
+//                double population_theta = _theta_map[s.first]; // TODO: for now, use the ancestral pop theta as the panmictic theta
+                double coalescence_rate = panmictic_nlineages*(panmictic_nlineages-1) / population_theta;
+#else
                 double coalescence_rate = panmictic_nlineages*(panmictic_nlineages-1) / _theta;
+#endif
                 double nChooseTwo = panmictic_nlineages*(panmictic_nlineages-1);
                 double log_prob_join = log(2/nChooseTwo);
-    //                log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
                 _panmictic_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
 
                 cum_time += increment;
@@ -2866,7 +3009,12 @@ class Forest {
                         // coalescence
                         unsigned nlineages = (int) s.second.size();
 
-                        double coalescence_rate = nlineages*(nlineages-1) / _theta;
+#if defined (DRAW_NEW_THETA)
+                        double population_theta = _theta_map[s.first];
+                        double coalescence_rate = nlineages*(nlineages-1) / population_theta;
+#else
+                        double coalescence_rate = nlineages*(nlineages-1) / _new_theta;
+#endif
                         double nChooseTwo = nlineages*(nlineages-1);
                         double log_prob_join = log(2/nChooseTwo);
                         double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
@@ -2883,8 +3031,6 @@ class Forest {
                 }
         }
         _log_coalescent_likelihood += log_coalescent_likelihood;
-//        _log_coalescent_likelihood = log_coalescent_likelihood + _panmictic_coalescent_likelihood;
-//        return log_coalescent_likelihood + _panmictic_coalescent_likelihood;
         return log_coalescent_likelihood;
     }
 

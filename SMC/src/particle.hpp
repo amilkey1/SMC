@@ -126,7 +126,9 @@ class Particle {
 //        void                                            resetSpeciesTreeHeight(){ _species_tree_height = 0.0;}
         void                                            setForest(Forest f, unsigned forest_number);
         Forest                                          getForest(unsigned i) {return _forests[i];} // TODO: should return a pointer?
-        double                                          getNewTheta(){return _forests[1]._new_theta;}
+        double                                          getNewTheta(){return _forests[1]._new_theta;} // TODO: will not work if different thetas for different forests
+        void                                            setNewTheta();
+        vector<double>                                  getThetaVector();
 
     private:
 
@@ -160,7 +162,13 @@ class Particle {
         cout << "  _log_weight: " << _log_weight << "\n" ;
         cout << " _log_likelihood: " << _log_likelihood << "\n";
         cout << "  _forest: " << "\n";
-        cout << " _theta: " << _forests[0]._new_theta << "\n";
+#if defined (DRAW_NEW_THETA)
+        unsigned a = 1;
+        for (auto &t:_forests[1]._theta_map) {
+            cout << "theta " << a << " = " << t.second << endl;
+            a++;
+        }
+#endif
         cout << "\n";
         for (auto &_forest:_forests) {
             _forest.showForest();
@@ -886,7 +894,6 @@ class Particle {
         _deep_coal = false;
         
         // after a speciation event, draw a new theta for the new population
-//        drawTheta();
     }
 
     inline void Particle::speciesOnlyProposal() {
@@ -964,16 +971,62 @@ class Particle {
         _forests[forest_number].allowCoalescence(species_name, increment, _lot);
     }
 
-    inline void Particle::drawTheta() {
-//        double new_theta = _lot->uniform();
-//        double new_theta = rng.uniform();
-        double new_theta = rng.gamma(0.5,1); // TODO: log normal makes more sense
-        // TODO: draw a new theta for each population in each gene forest & save them all in a vector
-        for (auto &f:_forests) {
-//            double new_theta = rng.gamma(0.5,1);
-//            f._theta = new_theta;
-            f._new_theta = new_theta;
+    inline void Particle::setNewTheta() {
+//        for (auto &f:_forests) {
+//            f._new_theta = Forest::_theta;
+//        }
+        // map should be 2*nspecies - 1 size
+        // create a theta map with all the same theta for simulations
+        unsigned number = 0;
+        vector<string> species_names;
+        map<string, double> theta_map;
+        
+        for (auto &s:_forests[1]._species_partition) {
+            species_names.push_back(s.first);
+            number++;
         }
+        for (int i=0; i<Forest::Forest::_nspecies-1; i++) {
+            string name = boost::str(boost::format("node-%d")%number);
+            number++;
+            species_names.push_back(name);
+        }
+        
+        assert (species_names.size() == 2*Forest::_nspecies - 1);
+        
+        for (auto &name:species_names) {
+            theta_map[name] = Forest::_theta;
+        }
+        
+        for (int i=1; i<_forests.size(); i++) {
+            _forests[i]._theta_map = theta_map;
+        }
+    }
+    
+    inline vector<double> Particle::getThetaVector() {
+        vector<double> theta_vec;
+        for (auto &t:_forests[1]._theta_map) {
+            theta_vec.push_back(t.second);
+        }
+        return theta_vec;
+    }
+
+    inline void Particle::drawTheta() {
+        _forests[1].createThetaMap(); // create map for one forest, then copy it to all forests
+        map<string, double> theta_map = _forests[1]._theta_map;
+        if (_forests.size() > 2) {
+            for (int i=2; i<_forests.size(); i++) {
+                _forests[i]._theta_map = theta_map;
+            }
+        }
+//
+//        double new_theta = rng.logNormal(0, 0.4); // TODO: use inverse gamma
+//        assert (new_theta > 0.0);
+//        // TODO: draw a new theta for each population in each gene forest & save them all in a vector
+//        // TODO: need to draw x new thetas
+//        for (auto &f:_forests) {
+//            f._new_theta = new_theta;
+//        }
+//        cout << "new theta is " << new_theta << endl;
     }
 
     inline void Particle::changeTheta(unsigned i) {

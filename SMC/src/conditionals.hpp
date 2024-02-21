@@ -23,3 +23,5 @@
 // #define CONDITION_ON_ONE // do not uncomment both CONDITION_ON_ONE and HIERARCHICAL_FILTERING
 
 #define HIERARCHICAL_FILTERING
+
+#define DRAW_NEW_THETA

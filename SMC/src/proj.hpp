@@ -103,6 +103,7 @@ namespace proj {
             string                      _sim_file_name;
             unsigned                    _particle_increase;
             double                      _thin;
+            unsigned                    _save_every;
     };
 
     inline Proj::Proj() {
@@ -219,8 +220,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << "\t" << pop_mean;
             
             for (int i=0; i<(nspecies*2-1); i++) {
-//                logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
-                logf << "\t" << p->getNewTheta() / 4.0;
+#if defined (DRAW_NEW_THETA)
+                vector<double> theta_vec = p->getThetaVector();
+                logf << "\t" << theta_vec[i] / 4.0;
+#else
+                logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
+#endif
             }
             
             logf << "\t" << Forest::_lambda;
@@ -324,8 +329,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << "\t" << pop_mean;
             
             for (int i=0; i<(nspecies*2-1); i++) {
-//                logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
-                    logf << "\t" << p->getNewTheta() / 4.0;
+#if defined (DRAW_NEW_THETA)
+                vector<double> theta_vec = p->getThetaVector();
+                logf << "\t" << theta_vec[i] / 4.0;
+#else
+                logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
+#endif
             }
             
             logf << "\t" << Forest::_lambda;
@@ -561,6 +570,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("filename", boost::program_options::value(&_sim_file_name), "name of file to write simulated data to")
         ("particle_increase", boost::program_options::value(&_particle_increase)->default_value(1), "how much to increase particles for species filtering")
         ("thin", boost::program_options::value(&_thin)->default_value(1.0), "take this portion of particles for hierarchical species filtering")
+        ("save_every", boost::program_options::value(&_save_every)->default_value(1.0), "take this portion of particles for output")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -946,7 +956,17 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         sum_h/=my_vec.size();
         cout << "mean height equals " << sum_h << endl;
         cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
+#if defined (DRAW_NEW_THETA)
+//        vector<double> theta_vec = p->getThetaVector();
+//        unsigned a = 1;
+//        for (auto &t:theta_vec) {
+//            cout << "theta " << a << " = " << theta_vec[i] << endl;
+//            a++;
+//        }
+        cout << "different theta for each population in each particle " << endl;
+#else
         cout << "theta = " << Forest::_theta << endl;
+#endif
         cout << "speciation rate = " << Forest::_lambda << endl;
     }
 
@@ -1121,7 +1141,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         
         vector<Particle::SharedPtr> sim_vec(1);
         sim_vec[0] = Particle::SharedPtr(new Particle);
-        
         // set particle randon number seed
         unsigned psuffix = 1;
         sim_vec[0]->setSeed(rng.randint(1,9999) + psuffix);
@@ -1153,6 +1172,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         sim_vec[0]->setSimData(_data, _taxon_map, nsubsets, (unsigned) _taxon_map.size());
         
         sim_vec[0]->mapSpecies(_taxon_map, _species_names);
+        
+#if defined (DRAW_NEW_THETA)
+        sim_vec[0]->setNewTheta(); // TODO: for now, stick with one theta
+#endif
 
         unsigned nsteps = (unsigned) (_taxon_map.size()-1)*nsubsets;
         
@@ -1245,7 +1268,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 cout << "Starting..." << endl;
                 cout << "Current working directory: " << boost::filesystem::current_path() << endl;
                 cout << "Random seed: " << _random_seed << endl;
+#if defined (DRAW_NEW_THETA)
+                cout << "drawing new theta for each particle " << endl;
+#else
                 cout << "Theta: " << Forest::_theta << endl;
+#endif
                 cout << "Number of threads: " << _nthreads << endl;
             }
             
@@ -1307,7 +1334,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             
                 for (auto &p:my_vec) {
                     p->setLogLikelihood(starting_log_likelihoods);
+#if defined (DRAW_NEW_THETA)
                     p->drawTheta();
+#endif
                     if (Forest::_save_memory) {
                         p->clearPartials();
                     }
@@ -1601,6 +1630,19 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     
                 } // s loop
 #endif
+                
+                if (_save_every > 1.0) { // thin sample for output by taking a random sample
+                    unsigned total_particles_in_existence = (unsigned) my_vec.size();
+//                    assert (my_vec.size() == _nparticles / _thin);
+                    unsigned sample_size = round(total_particles_in_existence / _save_every);
+//                    unsigned sample_size = round(_nparticles / _ ngroups / _save_every);
+                    
+                    shuffle(my_vec.begin(), my_vec.end(), std::mt19937{std::random_device{}()}); // shuffle particles
+                    // delete first (1-_thin) % of particles
+                    my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (total_particles_in_existence-sample_size)));
+                    assert (my_vec.size() == round(total_particles_in_existence / _save_every));
+                }
+                
                 saveSpeciesTrees(my_vec);
                 writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, my_vec);
 #endif
