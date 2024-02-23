@@ -2849,15 +2849,22 @@ class Forest {
         assert (species_names.size() == 2*_nspecies - 1);
         
 //        ofstream logf("chosen_thetas.txt");
+        // gamma mean = shape * scale
+        // draw mean from lognormal distribution
+        // shape = 2.0 to be consistent with starbeast3
+        // scale = mean / 2.0
+        ofstream logfm("chosen_means.txt", std::ios_base::app);
+//        double mean = rng.gamma(0.3, 2.0);
+        double mean = rng.logNormal(2.0, 1.0); // log normal mean ~12, var ~255
+        logfm << mean << "\n";
+        double scale = mean / 2.0;
+        assert (scale > 0.0);
         ofstream logf("chosen_thetas.txt", std::ios_base::app);
         for (auto &name:species_names) {
-//            double new_theta = rng.logNormal(0, 0.2); // TODO: use inverse gamma
             double new_theta = 0.0;
-            while (new_theta <= _small_enough) { // if theta is too small, it will create 0 branch lengths
-                new_theta = rng.gamma(0.3, 2.0);
-            }
+            new_theta = 1 / (rng.gamma(2.0, scale));
             logf << new_theta << "\n";
-            // TODO: fix random numbers
+            // TODO: fix random numbers - use lot instead
             assert (new_theta > 0.0);
             _theta_map[name] = new_theta;
         }

@@ -38,7 +38,7 @@ namespace proj {
             typedef boost::variate_generator<boost::mt19937 &, boost::random::gamma_distribution<> >        gamma_variate_generator_t;
 //            typedef boost::variate_generator<boost::mt19937 &, boost::math::inverse_gamma_distribution<> >      inverse_gamma_variate_generator_t;
             typedef boost::variate_generator<boost::mt19937 &, boost::random::uniform_int_distribution<> >  uniform_int_generator_t;
-            typedef boost::variate_generator<boost::mt19937 &, boost::random::lognormal_distribution<> >                 lognormal_variate_generator_t;
+            typedef boost::variate_generator<boost::mt19937 &, boost::random::lognormal_distribution<> >    lognormal_variate_generator_t;
 
             unsigned                                        _seed;
             boost::mt19937                                  _generator;
@@ -123,15 +123,11 @@ namespace proj {
 //    }
 
     inline double Lot::logNormal(double mu, double sigma) {
-//        assert(mu > 0.0);
-        assert(sigma > 0.0);
         if (mu != _lognormal_mu || sigma != _lognormal_sigma) {
             _lognormal_mu = mu;
             _lognormal_sigma = sigma;
-            _lognormal_variate_generator.reset(new lognormal_variate_generator_t(_generator, boost::random::lognormal_distribution<>(_lognormal_mu,_lognormal_sigma)));
+            _lognormal_variate_generator.reset(new lognormal_variate_generator_t(_generator, boost::random::lognormal_distribution<>(_lognormal_mu, _lognormal_sigma)));
         }
-//        double deviate = (*_lognormal_variate_generator)();
-//        return sigma*deviate;
         return (*_lognormal_variate_generator)();
     }
 
