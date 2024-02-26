@@ -997,9 +997,6 @@ class Particle {
     }
 
     inline void Particle::setNewTheta() {
-//        for (auto &f:_forests) {
-//            f._new_theta = Forest::_theta;
-//        }
         // map should be 2*nspecies - 1 size
         // create a theta map with all the same theta for simulations
         unsigned number = 0;
@@ -1043,15 +1040,6 @@ class Particle {
                 _forests[i]._theta_map = theta_map;
             }
         }
-//
-//        double new_theta = rng.logNormal(0, 0.4); // TODO: use inverse gamma
-//        assert (new_theta > 0.0);
-//        // TODO: draw a new theta for each population in each gene forest & save them all in a vector
-//        // TODO: need to draw x new thetas
-//        for (auto &f:_forests) {
-//            f._new_theta = new_theta;
-//        }
-//        cout << "new theta is " << new_theta << endl;
     }
 
     inline void Particle::changeTheta(unsigned i) {

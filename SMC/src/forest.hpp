@@ -2866,10 +2866,13 @@ class Forest {
         unsigned count = 0;
         for (auto &name:species_names) {
             if (count < _nspecies || count == 2*_nspecies-2) {
-                double new_theta = 1 / (rng.gamma(2.0, scale));
-                // TODO: fix random numbers - use lot instead
-                assert (new_theta > 0.0);
-                _theta_map[name] = new_theta;
+                double new_theta = 0.0;
+                if (new_theta < _small_enough) {
+                    new_theta = 1 / (rng.gamma(2.0, scale));
+                    // TODO: fix random numbers - use lot instead
+                    assert (new_theta > 0.0);
+                    _theta_map[name] = new_theta;
+                }
             }
             else {
                 _theta_map[name] = -1;
@@ -2881,14 +2884,17 @@ class Forest {
     inline void Forest::drawNewTheta(string new_species) {
         // draw a new theta for the newest species population
         double scale = 1 / _theta_mean;
-        _theta_map[new_species] = 1 / rng.gamma(2.0, scale);
+        double new_theta = 0.0;
+        if (new_theta < _small_enough) {
+            new_theta = 1 / rng.gamma(2.0, scale);
+            _theta_map[new_species] = new_theta;
+        }
 //        if (_ancestral_species_name != new_species) { // if ancestral species is not the species just created
 //            _theta_map[_ancestral_species_name] = 1 / rng.gamma(2.0, scale);
 //        }
     }
 
     inline void Forest::createThetaMap() {
-        // TODO: make theta_mean a private variable of forest
         // map should be 2*nspecies - 1 size
         unsigned number = 0;
         vector<string> species_names;
@@ -2912,21 +2918,19 @@ class Forest {
         // gamma mean = shape * scale
         // draw mean from lognormal distribution
         // shape = 2.0 to be consistent with starbeast3
-        // scale = mean / 2.0
-        ofstream logfm("chosen_means.txt", std::ios_base::app);
-//        double mean = rng.gamma(0.3, 2.0);
+        // scale = 1 / mean;
         _theta_mean = rng.logNormal(-4.6, 2.14);
-        logfm << _theta_mean << "\n";
 //        double scale = _theta_mean / 2.0;
         double scale = 1 / _theta_mean;
         assert (scale > 0.0);
-        ofstream logf("chosen_thetas.txt", std::ios_base::app);
         for (auto &name:species_names) {
-            double new_theta = 1 / (rng.gamma(2.0, scale));
-            logf << new_theta << "\n";
-            // TODO: fix random numbers - use lot instead
-            assert (new_theta > 0.0);
-            _theta_map[name] = new_theta;
+            double new_theta = 0.0;
+            if (new_theta < _small_enough) {
+                new_theta = 1 / (rng.gamma(2.0, scale));
+                // TODO: fix random numbers - use lot instead
+                assert (new_theta > 0.0);
+                _theta_map[name] = new_theta;
+            }
         }
     }
 
