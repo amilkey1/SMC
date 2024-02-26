@@ -2870,6 +2870,10 @@ class Forest {
                 if (new_theta < _small_enough) {
                     new_theta = 1 / (rng.gamma(2.0, scale));
                     // TODO: fix random numbers - use lot instead
+                    if (new_theta <= 0.0) {
+                        cout << "new theta is: " << new_theta << endl;
+                        cout << "scale param is: " << scale << endl;
+                    }
                     assert (new_theta > 0.0);
                     _theta_map[name] = new_theta;
                 }
