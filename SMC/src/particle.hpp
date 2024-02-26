@@ -910,6 +910,7 @@ class Particle {
                 for (int i=2; i<_forests.size(); i++) {
                     _forests[i]._theta_map = _forests[1]._theta_map;
                     _forests[i]._ancestral_species_name = _forests[1]._ancestral_species_name;
+                    _forests[i]._theta_mean = _forests[1]._theta_mean;
                 }
             }
         }
