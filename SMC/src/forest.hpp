@@ -2871,11 +2871,6 @@ class Forest {
                 if (new_theta < _small_enough) {
                     new_theta = 1 / (rng.gamma(2.0, scale));
                     // TODO: fix random numbers - use lot instead
-                    if (new_theta <= 0.0) {
-                        cout << "theta mean is : " << _theta_mean << endl;
-                        cout << "new theta is: " << new_theta << endl;
-                        cout << "scale param is: " << scale << endl;
-                    }
                     assert (new_theta > 0.0);
                     _theta_map[name] = new_theta;
                 }
@@ -2926,7 +2921,6 @@ class Forest {
         // shape = 2.0 to be consistent with starbeast3
         // scale = 1 / mean;
         _theta_mean = rng.logNormal(-4.6, 2.14);
-        cout << "setting theta mean to: " << _theta_mean << endl;
 //        double scale = _theta_mean / 2.0;
         double scale = 1 / _theta_mean;
         assert (scale > 0.0);
