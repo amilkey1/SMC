@@ -1039,6 +1039,7 @@ class Particle {
     }
 
     inline void Particle::drawTheta() {
+        cout << "about to create theta map" << endl;
         _forests[1].createThetaMap(); // create map for one forest, then copy it to all forests
         map<string, double> theta_map = _forests[1]._theta_map;
         if (_forests.size() > 2) {

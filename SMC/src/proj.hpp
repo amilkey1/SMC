@@ -1336,6 +1336,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 for (auto &p:my_vec) {
                     p->setLogLikelihood(starting_log_likelihoods);
 #if defined (DRAW_NEW_THETA)
+                    cout << "drawing new theta in proj " << endl;
                     p->drawTheta();
 #endif
                     if (Forest::_save_memory) {

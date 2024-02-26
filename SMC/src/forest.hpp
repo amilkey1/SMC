@@ -2925,8 +2925,8 @@ class Forest {
         // draw mean from lognormal distribution
         // shape = 2.0 to be consistent with starbeast3
         // scale = 1 / mean;
-        cout << "setting theta mean to: " << _theta_mean << endl;
         _theta_mean = rng.logNormal(-4.6, 2.14);
+        cout << "setting theta mean to: " << _theta_mean << endl;
 //        double scale = _theta_mean / 2.0;
         double scale = 1 / _theta_mean;
         assert (scale > 0.0);
