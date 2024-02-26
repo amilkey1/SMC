@@ -908,6 +908,9 @@ class Particle {
                     _forests[i]._theta_mean = _forests[1]._theta_mean;
                 }
             }
+            for (int i=1; i<_forests.size(); i++) {
+                assert (_forests[i]._theta_mean > 0.0);
+            }
             _forests[1].resetThetaMap(); // reset tip thetas and ancestral pop theta
             if (_forests.size() > 2) {
                 for (int i=2; i<_forests.size(); i++) {
