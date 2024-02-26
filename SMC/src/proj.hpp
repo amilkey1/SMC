@@ -104,6 +104,7 @@ namespace proj {
             unsigned                    _particle_increase;
             double                      _thin;
             unsigned                    _save_every;
+            bool                        _save_gene_trees;
     };
 
     inline Proj::Proj() {
@@ -216,8 +217,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             double yule_model = p->getSpeciesTreePrior(); // TODO: unsure if this is correct
             logf << "\t" << yule_model;
             
-            double pop_mean = 0.0; // setting this to 0.0 for now since pop size is not a parameter
-            logf << "\t" << pop_mean;
+//            double pop_mean = 0.0; // setting this to 0.0 for now since pop size is not a parameter
+            logf << "\t" << p->getPopMean();
             
             for (int i=0; i<(nspecies*2-1); i++) {
 #if defined (DRAW_NEW_THETA)
@@ -325,8 +326,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             double yule_model = p->getSpeciesTreePrior(); // TODO: unsure if this is correct
             logf << "\t" << yule_model;
             
-            double pop_mean = 0.0; // setting this to 0.0 for now since pop size is not a parameter
-            logf << "\t" << pop_mean;
+            logf << "\t" << p->getPopMean();
             
             for (int i=0; i<(nspecies*2-1); i++) {
 #if defined (DRAW_NEW_THETA)
@@ -571,6 +571,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("particle_increase", boost::program_options::value(&_particle_increase)->default_value(1), "how much to increase particles for species filtering")
         ("thin", boost::program_options::value(&_thin)->default_value(1.0), "take this portion of particles for hierarchical species filtering")
         ("save_every", boost::program_options::value(&_save_every)->default_value(1.0), "take this portion of particles for output")
+        ("save_gene_trees", boost::program_options::value(&_save_gene_trees)->default_value(true), "turn this off to not save gene trees and speed up program")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -1439,11 +1440,16 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     }
                 }
                 
-                writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
-                for (int i=1; i<nsubsets+1; i++) {
-                    saveGeneTree(i, my_vec);
+//                writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
+                if (_save_gene_trees) {
+                    for (int i=1; i<nsubsets+1; i++) {
+                        saveGeneTree(i, my_vec);
+                    }
                 }
-                writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
+                if (_verbose > 0) {
+                    cout << "marginal likelihood after combined filtering: " << _log_marginal_likelihood << endl;
+                }
+//                writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
                 
 #if defined (EXTRA_SPECIES_SAMPLING)
                 // TODO: can reduce memory by just using gene tree increments here?
@@ -1506,10 +1512,13 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     
                     index += _particle_increase;
                     
-                    cout << "beginning species tree proposals for subset " << a+1 << endl;
+                    if (_verbose > 0) {
+                        cout << "beginning species tree proposals for subset " << a+1 << endl;
+                    }
                     for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
-                        cout << "beginning species tree proposals" << endl;
-                        //taxon joining and reweighting step
+                        if (_verbose > 0) {
+                            cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
+                        }
                         
                         proposeSpeciesParticles(use_vec);
                         
@@ -1522,7 +1531,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         }
 
                         double ess = 1.0/ess_inverse;
-                        cout << "   " << "ESS = " << ess << endl;
+                        if (_verbose > 1) {
+                            cout << "   " << "ESS = " << ess << endl;
+                        }
                      
                         resampleSpeciesParticles(use_vec, use_first ? use_vec_2:use_vec_1);
                         //if use_first is true, my_vec = my_vec_2
@@ -1646,10 +1657,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 saveSpeciesTrees(my_vec);
                 writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, my_vec);
 #endif
-                
-                if (_verbose > 0) {
-                    cout << "marginal likelihood: " << _log_marginal_likelihood << endl;
-                }
             }
 
         catch (XProj & x) {

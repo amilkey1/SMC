@@ -115,6 +115,8 @@ class Forest {
         vector< pair<double, Node *>>      sortPreorder();
         void                        refreshPreorder();
         void                        createThetaMap();
+        void                        resetThetaMap();
+        void                        drawNewTheta(string new_species);
         map<string, double>              _theta_map;
 
         std::vector<Node *>         _lineages;
@@ -176,6 +178,8 @@ class Forest {
         void                        addIncrement(double increment);
         void                        simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
+        double                      _theta_mean;
+        string                      _ancestral_species_name;
 
     public:
 
@@ -227,6 +231,8 @@ class Forest {
         _preorder.clear();
         _panmictic_coalescent_likelihood = 0.0;
         _small_enough = 0.0000001;
+        _theta_mean = 0.0;
+        _ancestral_species_name = "";
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -1295,6 +1301,8 @@ class Forest {
         _panmictic_coalescent_likelihood = other._panmictic_coalescent_likelihood;
         _theta_map = other._theta_map; // TODO: unsure if this will copy correctly
         _small_enough = other._small_enough;
+        _theta_mean = other._theta_mean;
+        _ancestral_species_name = other._ancestral_species_name;
 
         // copy tree itself
 
@@ -2831,7 +2839,56 @@ class Forest {
         }
     }
 
+    inline void Forest::resetThetaMap() {
+        assert (_theta_map.size() == 0);
+        // map should be 2*nspecies - 1 size
+        unsigned number = 0;
+        vector<string> species_names;
+        
+        for (auto &s:_species_partition) {
+            species_names.push_back(s.first);
+            number++;
+        }
+        
+        for (int i=0; i<_nspecies-1; i++) {
+            string name = boost::str(boost::format("node-%d")%number);
+            number++;
+            species_names.push_back(name);
+        }
+        
+        assert (species_names.size() == 2*_nspecies - 1);
+        
+        // draw thetas for tips of species trees and ancestral population
+        // for all other populations, theta = -1
+        
+        double scale = 1 / _theta_mean;
+        
+        unsigned count = 0;
+        for (auto &name:species_names) {
+            if (count < _nspecies || count == 2*_nspecies-2) {
+                double new_theta = 1 / (rng.gamma(2.0, scale));
+                // TODO: fix random numbers - use lot instead
+                assert (new_theta > 0.0);
+                _theta_map[name] = new_theta;
+            }
+            else {
+                _theta_map[name] = -1;
+            }
+            count++;
+        }
+    }
+
+    inline void Forest::drawNewTheta(string new_species) {
+        // draw a new theta for the newest species population
+        double scale = 1 / _theta_mean;
+        _theta_map[new_species] = 1 / rng.gamma(2.0, scale);
+//        if (_ancestral_species_name != new_species) { // if ancestral species is not the species just created
+//            _theta_map[_ancestral_species_name] = 1 / rng.gamma(2.0, scale);
+//        }
+    }
+
     inline void Forest::createThetaMap() {
+        // TODO: make theta_mean a private variable of forest
         // map should be 2*nspecies - 1 size
         unsigned number = 0;
         vector<string> species_names;
@@ -2844,6 +2901,9 @@ class Forest {
             string name = boost::str(boost::format("node-%d")%number);
             number++;
             species_names.push_back(name);
+            if (i == _nspecies-2) {
+                _ancestral_species_name = name;
+            }
         }
         
         assert (species_names.size() == 2*_nspecies - 1);
@@ -2855,14 +2915,14 @@ class Forest {
         // scale = mean / 2.0
         ofstream logfm("chosen_means.txt", std::ios_base::app);
 //        double mean = rng.gamma(0.3, 2.0);
-        double mean = rng.logNormal(2.0, 1.0); // log normal mean ~12, var ~255
-        logfm << mean << "\n";
-        double scale = mean / 2.0;
+        _theta_mean = rng.logNormal(-4.6, 2.14);
+        logfm << _theta_mean << "\n";
+//        double scale = _theta_mean / 2.0;
+        double scale = 1 / _theta_mean;
         assert (scale > 0.0);
         ofstream logf("chosen_thetas.txt", std::ios_base::app);
         for (auto &name:species_names) {
-            double new_theta = 0.0;
-            new_theta = 1 / (rng.gamma(2.0, scale));
+            double new_theta = 1 / (rng.gamma(2.0, scale));
             logf << new_theta << "\n";
             // TODO: fix random numbers - use lot instead
             assert (new_theta > 0.0);
@@ -2893,7 +2953,7 @@ class Forest {
                     for (auto &s:_species_partition) {
                         for (auto &nd:s.second) {
                             if (nd == heights_and_nodes[i].second->_left_child) {
-                                species = s.first;
+                                species = s.first; // TODO: can break out of this to be faster
                                 node = nd;
                             }
                         }
@@ -2909,6 +2969,7 @@ class Forest {
                             }
 #if defined (DRAW_NEW_THETA)
                             double population_theta = _theta_map[s.first];
+                            assert (population_theta > 0.0);
                             double coalescence_rate = nlineages*(nlineages-1) / population_theta;
 #else
                             double coalescence_rate = nlineages*(nlineages-1) / Forest::_theta;
@@ -2935,6 +2996,7 @@ class Forest {
 
 #if defined (DRAW_NEW_THETA)
                             double population_theta = _theta_map[s.first];
+                            assert (population_theta > 0.0);
                             double coalescence_rate = nlineages*(nlineages-1) / population_theta;
 #else
                             double coalescence_rate = nlineages*(nlineages-1) / _theta;
@@ -2953,6 +3015,7 @@ class Forest {
                 unsigned nlineages = (int) s.second.size();
 #if defined (DRAW_NEW_THETA)
                 double population_theta = _theta_map[s.first];
+                assert (population_theta > 0.0);
                 double coalescence_rate = nlineages*(nlineages-1) / population_theta;
 #else
                 double coalescence_rate = nlineages*(nlineages-1) / _theta;
@@ -2982,7 +3045,9 @@ class Forest {
                 // calculate prob of coalescence, ln(rate) - rate*increment
                 double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
 #if defined (DRAW_NEW_THETA)
-                double population_theta = (--_theta_map.end())->second;
+                double population_theta = _theta_map[_ancestral_species_name]; // TODO: fix this for all gene trees
+                assert (population_theta > 0.0);
+//                double population_theta = (--_theta_map.end())->second; // TODO: this will not work - need ot use ancestrla species
 //                double population_theta = _theta_map[s.first]; // TODO: for now, use the ancestral pop theta as the panmictic theta
                 double coalescence_rate = panmictic_nlineages*(panmictic_nlineages-1) / population_theta;
 #else

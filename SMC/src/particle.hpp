@@ -129,6 +129,7 @@ class Particle {
         double                                          getNewTheta(){return _forests[1]._new_theta;} // TODO: will not work if different thetas for different forests
         void                                            setNewTheta();
         vector<double>                                  getThetaVector();
+        double                                          getPopMean(){return _forests[1]._theta_mean;}
 
     private:
 
@@ -902,9 +903,17 @@ class Particle {
                 _forests[i].refreshPreorder();
                 _forests[i].calcMinDepth();
                 _forests[i]._nincrements = 0;
+                _forests[i]._theta_map.clear(); // clear old thetas
+            }
+            _forests[1].resetThetaMap(); // reset tip thetas and ancestral pop theta
+            if (_forests.size() > 2) {
+                for (int i=2; i<_forests.size(); i++) {
+                    _forests[i]._theta_map = _forests[1]._theta_map;
+                    _forests[i]._ancestral_species_name = _forests[1]._ancestral_species_name;
+                }
             }
         }
-        
+                
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
         double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
         vector<pair<int, int>> species_choices;
@@ -949,17 +958,33 @@ class Particle {
                 _t.push_back(make_pair(species_joined, _forests[0]._last_edge_length));
                 
                 _log_coalescent_likelihood = 0.0;
+        
+        if (_generation > 0) {
+            _forests[1].drawNewTheta(get<2>(species_joined)); // each time species are joined, draw a new theta for the new population and ancestral pop
+            if (_forests.size() > 2) {
+                for (int i=2; i<_forests.size(); i++) {
+                    _forests[i]._theta_map = _forests[1]._theta_map;
+                }
+            }
+        }
             
             if (_forests[0]._lineages.size() == 2) {
                 // join remaining species lineages
                 species_joined = _forests[0].speciesTreeProposalTest();
                 // coalescent likelihood is the same as calculating coalescent likelihood above and below species join
-            }
-            
-                for (int i = 1; i<_forests.size(); i++) {
-                    _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
-                    _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
+                
+                _forests[1].drawNewTheta(get<2>(species_joined)); // each time species are joined, draw a new theta for the new population and ancestral pop
+                if (_forests.size() > 2) {
+                    for (int i=2; i<_forests.size(); i++) {
+                        _forests[i]._theta_map = _forests[1]._theta_map;
+                    }
                 }
+            }
+        
+            for (int i = 1; i<_forests.size(); i++) {
+                _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
+                _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
+            }
             
                 _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood;
                 double test = 1/_log_species_weight;
