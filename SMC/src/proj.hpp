@@ -550,7 +550,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000), "number of particles")
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
         ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.05), "theta")
-//        ("theta_max, tmax", boost::program_options::value(&Forest::_theta_max)->default_value(0.05), "theta max")
         ("lambda", boost::program_options::value(&Forest::_lambda)->default_value(1), "speciation rate")
         ("proposal",  boost::program_options::value(&Forest::_proposal)->default_value("prior-prior"), "a string defining a proposal (prior-prior or prior-post)")
         ("model", boost::program_options::value(&Forest::_model)->default_value("JC"), "a string defining a substitution model")
@@ -711,10 +710,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
         double log_particle_sum = getRunningSum(log_weight_vec);
         
-        double max = *max_element(std::begin(log_weight_vec), std::end(log_weight_vec));
-        double min = *min_element(std::begin(log_weight_vec), std::end(log_weight_vec)); // C++11
-        
         if (_verbose > 1) {
+            double max = *max_element(std::begin(log_weight_vec), std::end(log_weight_vec));
+            double min = *min_element(std::begin(log_weight_vec), std::end(log_weight_vec)); // C++11
+            
             cout << "\t" << "max weight = " << max << endl;;
             cout << "\t" << "min weight = " << min << endl;;
         }
@@ -746,10 +745,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
         double log_particle_sum = getRunningSum(log_weight_vec);
         
-        double max = *max_element(std::begin(log_weight_vec), std::end(log_weight_vec));
-        double min = *min_element(std::begin(log_weight_vec), std::end(log_weight_vec)); // C++11
-        
         if (_verbose > 1) {
+            double max = *max_element(std::begin(log_weight_vec), std::end(log_weight_vec));
+            double min = *min_element(std::begin(log_weight_vec), std::end(log_weight_vec)); // C++11
+            
             cout << "\t" << "max weight = " << max << endl;;
             cout << "\t" << "min weight = " << min << endl;;
         }
@@ -1427,7 +1426,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         
     //            saveAllHybridNodes(my_vec);
                 
-                saveSpeciesTrees(my_vec);
+//                saveSpeciesTrees(my_vec);
                 
                 if (Particle::_run_on_empty) { // make sure all gene tree log likelihoods are 0.0
                     vector<double> gene_tree_log_likelihoods;

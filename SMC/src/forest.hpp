@@ -152,8 +152,6 @@ class Forest {
         double                      _log_coalescent_likelihood_increment;
         double                      _cum_height;
         vector<string>              _species_for_coalescent_events;
-        double                      _new_theta;
-        double                      _theta_max;
         string                      _start_mode;
         vector<pair<double, double>>         _increments;
         vector<pair<double, pair<string, string>>>              _depths;
@@ -1291,7 +1289,6 @@ class Forest {
         _cum_height = other._cum_height;
         _species_for_coalescent_events = other. _species_for_coalescent_events;
         _outgroup = other._outgroup;
-        _new_theta = other._new_theta;
         _run_on_empty = other._run_on_empty;
         _start_mode = other._start_mode;
         _increments = other._increments;
@@ -3050,10 +3047,8 @@ class Forest {
                 // calculate prob of coalescence, ln(rate) - rate*increment
                 double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
 #if defined (DRAW_NEW_THETA)
-                double population_theta = _theta_map[_ancestral_species_name]; // TODO: fix this for all gene trees
+                double population_theta = _theta_map[_ancestral_species_name];
                 assert (population_theta > 0.0);
-//                double population_theta = (--_theta_map.end())->second; // TODO: this will not work - need ot use ancestrla species
-//                double population_theta = _theta_map[s.first]; // TODO: for now, use the ancestral pop theta as the panmictic theta
                 double coalescence_rate = panmictic_nlineages*(panmictic_nlineages-1) / population_theta;
 #else
                 double coalescence_rate = panmictic_nlineages*(panmictic_nlineages-1) / _theta;
@@ -3090,7 +3085,7 @@ class Forest {
                         double population_theta = _theta_map[s.first];
                         double coalescence_rate = nlineages*(nlineages-1) / population_theta;
 #else
-                        double coalescence_rate = nlineages*(nlineages-1) / _new_theta;
+                        double coalescence_rate = nlineages*(nlineages-1) / _theta;
 #endif
                         double nChooseTwo = nlineages*(nlineages-1);
                         double log_prob_join = log(2/nChooseTwo);

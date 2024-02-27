@@ -126,7 +126,6 @@ class Particle {
 //        void                                            resetSpeciesTreeHeight(){ _species_tree_height = 0.0;}
         void                                            setForest(Forest f, unsigned forest_number);
         Forest                                          getForest(unsigned i) {return _forests[i];} // TODO: should return a pointer?
-        double                                          getNewTheta(){return _forests[1]._new_theta;} // TODO: will not work if different thetas for different forests
         void                                            setNewTheta();
         vector<double>                                  getThetaVector();
         double                                          getPopMean(){return _forests[1]._theta_mean;}
@@ -933,18 +932,19 @@ class Particle {
                 double max_depth = 0.0;
 
                 for (int i=1; i<_forests.size(); i++) {
-                    
-                    _forests[i].updateSpeciesPartition(species_joined);
-                    
                     string species1 = get<0>(species_joined);
                     string species2 = get<1>(species_joined);
-                        
-                    if (_forests[0]._lineages.size() > 1) {
-                        _forests[i].resetDepthVector(species_joined);
-
-                        max_depth = (_forests[i].getMinDepths())[0].first;
-                        max_depth_vector.push_back(max_depth);
+                    
+                    if (species1 != "null") {
+                        _forests[i].updateSpeciesPartition(species_joined);
                     }
+                        
+                    if (_forests[0]._lineages.size() > 1 && species1 != "null") {
+                        _forests[i].resetDepthVector(species_joined);
+                    }
+
+                    max_depth = (_forests[i].getMinDepths())[0].first;
+                    max_depth_vector.push_back(max_depth);
                 }
                 if (_forests[0]._lineages.size() > 1) {
                     max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
@@ -954,7 +954,7 @@ class Particle {
                 
                 if (_forests[0]._lineages.size() > 1) {
                     assert (max_depth > 0.0);
-                    _forests[0].chooseSpeciesIncrementOnly(_lot, max_depth);
+                    _forests[0].chooseSpeciesIncrementOnly(_lot, max_depth); // TODO: fix random number
                     _species_tree_height += _forests[0]._last_edge_length;
                 }
                 if (_forests[0]._lineages.size() == 1) {
@@ -1309,19 +1309,15 @@ class Particle {
     }
 
     inline void Particle::resetSpecies() {
-//        _forests[0]->setLogLikelihood(0.0);
-//        _forests[0]._log_coalescent_likelihood = 0.0;
         _forests[0].clear();
         _generation = 0;
         setLogWeight(0.0);
-//        resetSpeciesInfo();
-//        resetSpeciesTreeHeight();
         _species_tree_height = 0.0;
-//        _forests[0].clear();
-//        _forests[0]._increments.clear();
         _log_coalescent_likelihood = 0.0;
         for (int i=1; i<_forests.size(); i++) {
             _forests[i]._log_coalescent_likelihood = 0.0;
+            _forests[i]._data = nullptr;
+            _forests[i]._log_weight = 0.0;
         }
         _t.clear();
         _forests[0]._last_edge_length = 0.0;
