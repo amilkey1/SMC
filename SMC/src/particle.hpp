@@ -907,9 +907,11 @@ class Particle {
                     _forests[i]._theta_mean = _forests[1]._theta_mean;
                 }
             }
+#if defined (DRAW_NEW_THETA)
             for (int i=1; i<_forests.size(); i++) {
                 assert (_forests[i]._theta_mean > 0.0);
             }
+//#endif
             _forests[1].resetThetaMap(); // reset tip thetas and ancestral pop theta
             if (_forests.size() > 2) {
                 for (int i=2; i<_forests.size(); i++) {
@@ -917,6 +919,7 @@ class Particle {
                     _forests[i]._ancestral_species_name = _forests[1]._ancestral_species_name;
                 }
             }
+#endif
         }
                 
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
@@ -973,25 +976,22 @@ class Particle {
                 }
             }
         }
-            
-            if (_forests[0]._lineages.size() == 2) {
-                // join remaining species lineages
-                species_joined = _forests[0].speciesTreeProposalTest();
-                // coalescent likelihood is the same as calculating coalescent likelihood above and below species join
-                
-                _forests[1].drawNewTheta(get<2>(species_joined)); // each time species are joined, draw a new theta for the new population and ancestral pop
-                if (_forests.size() > 2) {
-                    for (int i=2; i<_forests.size(); i++) {
-                        _forests[i]._theta_map = _forests[1]._theta_map;
-                    }
-                }
-            }
         
             for (int i = 1; i<_forests.size(); i++) {
                 _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
                 _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
             }
             
+        if (_forests[0]._lineages.size() == 2) {
+            // join remaining species lineages, no change in coalescent likelihood, just need to add panmictic coalescent for each gene tree (to avoid total recalculation)
+            // no need to draw a new theta because we are at the ancestral population now
+            species_joined = _forests[0].speciesTreeProposalTest();
+            for (int i=1; i<_forests.size(); i++) {
+                _forests[i]._log_coalescent_likelihood += _forests[i]._panmictic_coalescent_likelihood;
+                _forests[i]._panmictic_coalescent_likelihood = 0.0; // for clarity, reset to 0
+            }
+        }
+        
                 _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood;
                 double test = 1/_log_species_weight;
             _generation++;

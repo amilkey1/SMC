@@ -1448,6 +1448,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 if (_verbose > 0) {
                     cout << "marginal likelihood after combined filtering: " << _log_marginal_likelihood << endl;
                 }
+//                saveSpeciesTrees(my_vec);
 //                writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
                 
 #if defined (EXTRA_SPECIES_SAMPLING)
