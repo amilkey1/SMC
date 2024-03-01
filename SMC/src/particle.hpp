@@ -122,8 +122,6 @@ class Particle {
         void                                            simulateData(vector<unsigned> sites_vector);
         unsigned                                        getNumDeepCoalescences() {return _num_deep_coalescences;}
         void                                            resetSpecies();
-//        void                                            resetSpeciesInfo(){_t.clear();}
-//        void                                            resetSpeciesTreeHeight(){ _species_tree_height = 0.0;}
         void                                            setForest(Forest f, unsigned forest_number);
         Forest                                          getForest(unsigned i) {return _forests[i];} // TODO: should return a pointer?
         void                                            setNewTheta();
@@ -143,7 +141,6 @@ class Particle {
         bool                                    _species_join_proposed;
         double                                  _prev_increment;
         double                                  _log_coalescent_likelihood;
-        double                                  _total_panmictic_coalescent_likelihood;
         mutable                                 Lot::SharedPtr _lot;
         unsigned                                _num_deep_coalescences;
         bool                                    _deep_coal;
@@ -199,7 +196,6 @@ class Particle {
         _num_deep_coalescences = 0.0;
         _species_tree_height = 0.0;
         _t.clear();
-        _total_panmictic_coalescent_likelihood = 0.0;
     }
 
     inline void Particle::showSpeciesTree() {
@@ -911,7 +907,6 @@ class Particle {
             for (int i=1; i<_forests.size(); i++) {
                 assert (_forests[i]._theta_mean > 0.0);
             }
-//#endif
             _forests[1].resetThetaMap(); // reset tip thetas and ancestral pop theta
             if (_forests.size() > 2) {
                 for (int i=2; i<_forests.size(); i++) {
@@ -921,7 +916,7 @@ class Particle {
             }
 #endif
         }
-                
+        
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
         double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
         vector<pair<int, int>> species_choices;
@@ -963,7 +958,7 @@ class Particle {
                 if (_forests[0]._lineages.size() == 1) {
                     _forests[0]._last_edge_length = 0.0;
                 }
-                        
+        
                 _t.push_back(make_pair(species_joined, _forests[0]._last_edge_length));
                 
                 _log_coalescent_likelihood = 0.0;
@@ -977,6 +972,7 @@ class Particle {
             }
         }
         
+        assert (_log_coalescent_likelihood == 0.0);
             for (int i = 1; i<_forests.size(); i++) {
                 _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
                 _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
@@ -1343,7 +1339,6 @@ class Particle {
         _deep_coal = other._deep_coal;
         _species_tree_height = other._species_tree_height;
         _t = other._t;
-        _total_panmictic_coalescent_likelihood = other._total_panmictic_coalescent_likelihood;
     };
 }
 
