@@ -907,7 +907,7 @@ class Particle {
             for (int i=1; i<_forests.size(); i++) {
                 assert (_forests[i]._theta_mean > 0.0);
             }
-            _forests[1].resetThetaMap(); // reset tip thetas and ancestral pop theta
+            _forests[1].resetThetaMap(_lot); // reset tip thetas and ancestral pop theta
             if (_forests.size() > 2) {
                 for (int i=2; i<_forests.size(); i++) {
                     _forests[i]._theta_map = _forests[1]._theta_map;
@@ -924,7 +924,7 @@ class Particle {
             if (_forests[0]._last_edge_length > 0.0) {
             // choose species to join if past the first species generation for each forest vector
                 species_joined = _forests[0].speciesTreeProposalTest();
-    //            species_joined = _forests[0].speciesTreeProposal(_lot);
+//                species_joined = _forests[0].speciesTreeProposal(_lot); // TODO: fix random numbers
             }
                 vector<double> max_depth_vector;
                 double max_depth = 0.0;
@@ -1035,7 +1035,7 @@ class Particle {
     }
 
     inline void Particle::drawTheta() {
-        _forests[1].createThetaMap(); // create map for one forest, then copy it to all forests
+        _forests[1].createThetaMap(_lot); // create map for one forest, then copy it to all forests
         map<string, double> theta_map = _forests[1]._theta_map;
         if (_forests.size() > 2) {
             for (int i=2; i<_forests.size(); i++) {

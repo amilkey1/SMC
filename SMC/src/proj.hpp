@@ -67,7 +67,6 @@ namespace proj {
             void                simulateData();
             void                writePaupFile(vector<Particle::SharedPtr> particles, vector<string> taxpartition);
             void                sanityChecks();
-            unsigned            selectGene(vector<double> likelihood_vec);
 
         private:
 
@@ -288,7 +287,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << endl;
         }
         
-        int iter = group_number * _particle_increase;
+//        int iter = group_number * _particle_increase; // TODO: doesn't work if not saving every particle
+        unsigned sample_size = round(double (_particle_increase) / double(_save_every) );
+        if (sample_size == 0) {
+            sample_size = _particle_increase;
+        }
+        unsigned iter = group_number * sample_size;
         for (auto &p:v) {
             logf << iter;
             iter++;
@@ -1275,25 +1279,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
     }
 
-    inline unsigned Proj::selectGene(vector<double> likelihood_vec) {
-        // choose a random number [0,1]
-            double u = rng.uniform(); // TODO: change to lot
-//        double u =  _lot->uniform();
-        assert (u > 0.0);
-        assert (u < 1.0);
-        double cum_prob = 0.0;
-        unsigned index = 0;
-        for (int i=0; i < (int) likelihood_vec.size(); i++) {
-            cum_prob += exp(likelihood_vec[i]);
-            if (u <= cum_prob) {
-                index = i;
-                break;
-            }
-        }
-        // return index of choice
-        return index;
-    }
-
     inline void Proj::run() {
         sanityChecks();
         if (_start_mode == "sim") {
@@ -1640,7 +1625,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             cout << "\n";
                             cout << "current settings would save 0 species trees; saving every species tree\n";
                             cout << "\n";
-                            sample_size = 1;
+                            sample_size = _particle_increase;
                         }
                         
                         shuffle(use_vec.begin(), use_vec.end(), std::mt19937{std::random_device{}()}); // shuffle particles

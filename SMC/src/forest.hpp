@@ -114,8 +114,8 @@ class Forest {
         void                        calcMinDepth();
         vector< pair<double, Node *>>      sortPreorder();
         void                        refreshPreorder();
-        void                        createThetaMap();
-        void                        resetThetaMap();
+        void                        createThetaMap(Lot::SharedPtr lot);
+        void                        resetThetaMap(Lot::SharedPtr lot);
         void                        drawNewTheta(string new_species);
         map<string, double>              _theta_map;
 
@@ -176,7 +176,6 @@ class Forest {
         void                        addIncrement(double increment);
         void                        simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
-        void                        calcInitialCoalescentLikelihood();
         double                      _theta_mean;
         string                      _ancestral_species_name;
 
@@ -2837,7 +2836,7 @@ class Forest {
         }
     }
 
-    inline void Forest::resetThetaMap() {
+    inline void Forest::resetThetaMap(Lot::SharedPtr lot) {
         assert (_theta_map.size() == 0);
         // map should be 2*nspecies - 1 size
         unsigned number = 0;
@@ -2868,6 +2867,7 @@ class Forest {
                 double new_theta = 0.0;
                 if (new_theta < _small_enough) {
                     new_theta = 1 / (rng.gamma(2.0, scale));
+//                    new_theta = 1 / (lot->gamma(2.0, scale));
                     // TODO: fix random numbers - use lot instead
                     assert (new_theta > 0.0);
                     _theta_map[name] = new_theta;
@@ -2893,7 +2893,7 @@ class Forest {
 //        }
     }
 
-    inline void Forest::createThetaMap() {
+    inline void Forest::createThetaMap(Lot::SharedPtr lot) {
         // map should be 2*nspecies - 1 size
         unsigned number = 0;
         vector<string> species_names;
@@ -2913,65 +2913,23 @@ class Forest {
         
         assert (species_names.size() == 2*_nspecies - 1);
         
-//        ofstream logf("chosen_thetas.txt");
         // gamma mean = shape * scale
         // draw mean from lognormal distribution
         // shape = 2.0 to be consistent with starbeast3
         // scale = 1 / mean;
         _theta_mean = rng.logNormal(-4.6, 2.14);
-//        double scale = _theta_mean / 2.0;
         double scale = 1 / _theta_mean;
         assert (scale > 0.0);
         for (auto &name:species_names) {
             double new_theta = 0.0;
             if (new_theta < _small_enough) {
                 new_theta = 1 / (rng.gamma(2.0, scale));
+//                new_theta = 1 / (lot->gamma(2.0, scale));
                 // TODO: fix random numbers - use lot instead
                 assert (new_theta > 0.0);
                 _theta_map[name] = new_theta;
             }
         }
-    }
-
-    inline void Forest::calcInitialCoalescentLikelihood() {
-        vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
-        double log_coalescent_likelihood = 0.0;
-        double cum_time = 0.0;
-        int a = 0;
-        double species_tree_height = 0.0;
-        
-        assert (heights_and_nodes.size() > 0);
-        
-        // calculate coalescent likelihood for the panmictic tree
-            // calculate height of each join in the gene tree, minus the species tree height
-            // get number of lineages at beginning of that step and then decrement with each join
-            // don't increment _nincrements?
-
-            // start at _nincrements and go through heights and nodes list
-            int panmictic_nlineages = 0;
-            for (auto &s:_species_partition) {
-                panmictic_nlineages += s.second.size();
-            }
-
-            for (unsigned i=_nincrements; i < heights_and_nodes.size(); i++) {
-                // calculate increment (should be heights_and_nodes[i].first - species_tree_height - cum_time (no need to worry about species increment now)
-                // calculate prob of coalescence, ln(rate) - rate*increment
-                double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
-#if defined (DRAW_NEW_THETA)
-                double population_theta = _theta_map[_ancestral_species_name];
-                assert (population_theta > 0.0);
-                double coalescence_rate = panmictic_nlineages*(panmictic_nlineages-1) / population_theta;
-#else
-                double coalescence_rate = panmictic_nlineages*(panmictic_nlineages-1) / _theta;
-#endif
-                double nChooseTwo = panmictic_nlineages*(panmictic_nlineages-1);
-                double log_prob_join = log(2/nChooseTwo);
-                _panmictic_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
-
-                cum_time += increment;
-                panmictic_nlineages--;
-            }
-            assert (panmictic_nlineages == 1);
     }
 
     inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {
