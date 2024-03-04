@@ -951,8 +951,12 @@ class Particle {
                 }
                 
                 if (_forests[0]._lineages.size() > 1) {
+#if !defined (UNCONSTRAINED_PROPOSAL)
                     assert (max_depth > 0.0);
                     _forests[0].chooseSpeciesIncrementOnly(_lot, max_depth); // TODO: fix random number
+#else
+                    _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0); // TODO: fix random number, testing unconstrained proposal
+#endif
                     _species_tree_height += _forests[0]._last_edge_length;
                 }
                 if (_forests[0]._lineages.size() == 1) {
@@ -963,6 +967,7 @@ class Particle {
                 
                 _log_coalescent_likelihood = 0.0;
         
+#if defined (DRAW_NEW_THETA)
         if (_generation > 0) {
             _forests[1].drawNewTheta(get<2>(species_joined)); // each time species are joined, draw a new theta for the new population and ancestral pop
             if (_forests.size() > 2) {
@@ -971,12 +976,24 @@ class Particle {
                 }
             }
         }
-        
-        assert (_log_coalescent_likelihood == 0.0);
+#endif
+            assert (_log_coalescent_likelihood == 0.0);
+#if defined (UNCONSTRAINED_PROPOSAL)
+        if (_forests[0]._last_edge_length > max_depth) {
+            _log_coalescent_likelihood = -1*numeric_limits<double>::infinity();
+        }
+        else {
             for (int i = 1; i<_forests.size(); i++) {
                 _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
                 _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
             }
+        }
+#else
+        for (int i = 1; i<_forests.size(); i++) {
+            _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
+            _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
+        }
+#endif
             
         if (_forests[0]._lineages.size() == 2) {
             // join remaining species lineages, no change in coalescent likelihood, just need to add panmictic coalescent for each gene tree (to avoid total recalculation)
@@ -988,10 +1005,21 @@ class Particle {
             }
         }
         
-                _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood;
-                double test = 1/_log_species_weight;
+        double constrained_factor = 0.0;
+#if !defined (UNCONSTRAINED_PROPOSAL)
+        assert (max_depth > 0.0);
+        double nlineages = _forests[0]._lineages.size();
+//        double exponential_term = -1*nlineages * Forest::_lambda * max_depth;
+        constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
+#endif
+        
+        
+            _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
             _generation++;
+#if !defined (UNCONSTRAINED_PROPOSAL)
+            double test = 1/_log_species_weight;
             assert(test != -0); // assert coalescent likelihood is not -inf
+#endif
     }
 
     inline void Particle::geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name) {

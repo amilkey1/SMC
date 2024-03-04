@@ -747,6 +747,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     }
 
     inline void Proj::normalizeSpeciesWeights(vector<Particle::SharedPtr> & particles) {
+        double neg_inf = -1*numeric_limits<double>::infinity();
+        
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
         for (auto & p : particles) {
@@ -754,6 +756,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
 
         double log_particle_sum = getRunningSum(log_weight_vec);
+        if (isnan(log_particle_sum)) {
+            throw XProj("no species trees proposed legal increments; increase particle_increase and try again");
+        }
         
         if (_verbose > 1) {
             double max = *max_element(std::begin(log_weight_vec), std::end(log_weight_vec));
@@ -764,7 +769,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
 
         for (auto & p : particles) {
-            p->setLogSpeciesWeight(p->getSpeciesLogWeight() - log_particle_sum);
+            if (p->getSpeciesLogWeight() != neg_inf) {
+                p->setLogSpeciesWeight(p->getSpeciesLogWeight() - log_particle_sum);
+            }
         }
         
 //        _log_marginal_likelihood += log_particle_sum - log(_nparticles);
@@ -1480,6 +1487,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 #if !defined (HIERARCHICAL_FILTERING)
                 saveSpeciesTrees(my_vec);
                 writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
+//                for (auto &p:my_vec) {
+//                    p->showParticle();
+//                }
 #endif
                 
 #if defined (HIERARCHICAL_FILTERING)
@@ -1560,7 +1570,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     vector<Particle::SharedPtr> use_vec_2;
                     vector<Particle::SharedPtr> &use_vec = use_vec_1;
                     
-                    if (_particle_increase > 1) {
+//                    if (_particle_increase > 1) {
                         Particle::SharedPtr chosen_particle = my_vec_1[a]; // particle to copy
                         for (unsigned i=0; i<_particle_increase; i++) {
                             use_vec_1.push_back(Particle::SharedPtr(new Particle()));
@@ -1568,7 +1578,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             use_vec_1[i] = Particle::SharedPtr(new Particle(*chosen_particle));
                             use_vec_2[i] = Particle::SharedPtr(new Particle(*chosen_particle));
                         }
-                    }
+//                    }
                     
                     
                     // set particle random number seeds
@@ -1592,7 +1602,17 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         
                         proposeSpeciesParticles(use_vec);
                         
+//                        for (auto &p:use_vec) {
+//                            p->showSpeciesJoined();
+//                        }
+//
+//                        for (auto &p:use_vec) {
+//                            p->showSpeciesParticle();
+//                        }
+                        
                         normalizeSpeciesWeights(use_vec);
+                        
+//                        saveSpeciesTrees(use_vec);
                         
                         double ess_inverse = 0.0;
                         

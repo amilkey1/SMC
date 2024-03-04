@@ -1470,16 +1470,26 @@ class Forest {
             _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior));
         }
         else {
-            // hybridization prior
-            double rate = (_lambda)*_lineages.size();
-
+            double rate = _lambda*_lineages.size();
+            
+            assert (lot != nullptr);
             _last_edge_length = rng.gamma(1.0, 1.0/rate);
 
             for (auto nd:_lineages) {
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
             }
-            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
         }
+//        else {
+//            // hybridization prior
+//            double rate = (_lambda)*_lineages.size();
+//
+//            _last_edge_length = rng.gamma(1.0, 1.0/rate);
+//
+//            for (auto nd:_lineages) {
+//                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
+//            }
+//            _increments.push_back(make_pair(_last_edge_length, log(rate)-_last_edge_length*rate));
+//        }
     }
 
 
@@ -3030,6 +3040,7 @@ class Forest {
         }
 
         // calculate coalescent likelihood for the rest of the panmictic tree
+        if (log_coalescent_likelihood != neg_inf) {
         if (species_increment > 0.0) {
             double cum_time = 0.0;
             // calculate height of each join in the gene tree, minus the species tree height
@@ -3101,6 +3112,7 @@ class Forest {
                         // no deep coalescence to deal with
                     }
                 }
+        }
         }
         _log_coalescent_likelihood += log_coalescent_likelihood;
         return log_coalescent_likelihood;
