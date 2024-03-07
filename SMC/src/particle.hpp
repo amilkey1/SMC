@@ -898,12 +898,14 @@ class Particle {
                 _forests[i].refreshPreorder();
                 _forests[i].calcMinDepth();
                 _forests[i]._nincrements = 0;
+#if defined (DRAW_NEW_THETA) && ! defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD) // don't need to draw more thetas if integrating out
                 _forests[i]._theta_map.clear(); // clear old thetas
+#endif
                 if (i > 1) {
                     _forests[i]._theta_mean = _forests[1]._theta_mean;
                 }
             }
-#if defined (DRAW_NEW_THETA)
+#if defined (DRAW_NEW_THETA) && ! defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD) // don't need to draw more thetas if integrating out
             for (int i=1; i<_forests.size(); i++) {
                 assert (_forests[i]._theta_mean > 0.0);
             }
@@ -923,8 +925,8 @@ class Particle {
         
             if (_forests[0]._last_edge_length > 0.0) {
             // choose species to join if past the first species generation for each forest vector
-                species_joined = _forests[0].speciesTreeProposalTest();
-//                species_joined = _forests[0].speciesTreeProposal(_lot); // TODO: fix random numbers
+//                species_joined = _forests[0].speciesTreeProposalTest();
+                species_joined = _forests[0].speciesTreeProposal(_lot);
             }
                 vector<double> max_depth_vector;
                 double max_depth = 0.0;
@@ -953,9 +955,9 @@ class Particle {
                 if (_forests[0]._lineages.size() > 1) {
 #if !defined (UNCONSTRAINED_PROPOSAL)
                     assert (max_depth > 0.0);
-                    _forests[0].chooseSpeciesIncrementOnly(_lot, max_depth); // TODO: fix random number
+                    _forests[0].chooseSpeciesIncrementOnly(_lot, max_depth);
 #else
-                    _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0); // TODO: fix random number, testing unconstrained proposal
+                    _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
 #endif
                     _species_tree_height += _forests[0]._last_edge_length;
                 }
@@ -969,7 +971,7 @@ class Particle {
         
 #if defined (DRAW_NEW_THETA)
         if (_generation > 0) {
-            _forests[1].drawNewTheta(get<2>(species_joined)); // each time species are joined, draw a new theta for the new population and ancestral pop
+            _forests[1].drawNewTheta(get<2>(species_joined), _lot); // each time species are joined, draw a new theta for the new population and ancestral pop
             if (_forests.size() > 2) {
                 for (int i=2; i<_forests.size(); i++) {
                     _forests[i]._theta_map = _forests[1]._theta_map;
@@ -989,10 +991,24 @@ class Particle {
             }
         }
 #else
+        
+#if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
+//        showParticle();
+        unsigned total_num_coalescent_events = 0;
         for (int i = 1; i<_forests.size(); i++) {
+            _forests[i].calcCoalescentLikelihoodIntegratingOutTheta(_forests[0]._last_edge_length, species_joined, _species_tree_height, total_num_coalescent_events);
+            _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
+        }
+//        cout << "log coalescent likelihood: " << _log_coalescent_likelihood << endl;
+
+//#endif
+#else
+        for (int i = 1; i<_forests.size(); i++) {
+            // TODO: if defined GRAHAM_JONES_COALESCENT_LIKELIHOOD, need to first get the number of coalescent events across all genes within the species increment
             _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
             _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
         }
+#endif
 #endif
             
         if (_forests[0]._lineages.size() == 2) {
@@ -1012,7 +1028,6 @@ class Particle {
 //        double exponential_term = -1*nlineages * Forest::_lambda * max_depth;
         constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
 #endif
-        
         
             _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
             _generation++;
@@ -1279,7 +1294,6 @@ class Particle {
 
     inline int Particle::selectEvent(vector<double> weight_vec) {
         // choose a random number [0,1]
-//        double u = rng.uniform();
         double u =  _lot->uniform();
         assert (u > 0.0);
         assert (u < 1.0);

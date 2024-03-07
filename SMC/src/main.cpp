@@ -38,6 +38,7 @@ double Forest::_hybridization_rate;
 bool Particle::_run_on_empty;
 bool Forest::_run_on_empty;
 bool Forest::_save_memory;
+double Forest::_ploidy = 2.0;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT

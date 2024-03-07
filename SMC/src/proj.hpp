@@ -466,7 +466,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             unique_treef.close();
         }
         
-        assert (_start_mode == "smc");
+        assert (_start_mode != "sim");
         
             // save all species trees
             std::ofstream treef;
@@ -1363,11 +1363,16 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     
                 // reset marginal likelihood
                 _log_marginal_likelihood = 0.0;
-                vector<double> starting_log_likelihoods = my_vec[0]->calcGeneTreeLogLikelihoods();
+                vector<double> starting_log_likelihoods = my_vec[0]->calcGeneTreeLogLikelihoods(); // TODO: can start at 0 to save time
             
                 for (auto &p:my_vec) {
                     p->setLogLikelihood(starting_log_likelihoods);
 #if defined (DRAW_NEW_THETA)
+                    unsigned psuffix = 1;
+                    for (auto &p:my_vec) {
+                        p->setSeed(rng.randint(1,9999) + psuffix);
+                        psuffix += 2;
+                    }
                     p->drawTheta();
 #endif
                     if (Forest::_save_memory) {
@@ -1487,9 +1492,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 #if !defined (HIERARCHICAL_FILTERING)
                 saveSpeciesTrees(my_vec);
                 writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
-//                for (auto &p:my_vec) {
-//                    p->showParticle();
-//                }
 #endif
                 
 #if defined (HIERARCHICAL_FILTERING)
@@ -1545,7 +1547,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 
                 unsigned ngroups = round(_nparticles * _thin);
                 
-                shuffle(my_vec.begin(), my_vec.end(), std::mt19937{std::random_device{}()}); // shuffle particles
+                random_shuffle(my_vec.begin(), my_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
                 // delete first (1-_thin) % of particles
                 my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (_nparticles-ngroups)));
                 assert(my_vec.size() == ngroups);
@@ -1570,22 +1572,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     vector<Particle::SharedPtr> use_vec_2;
                     vector<Particle::SharedPtr> &use_vec = use_vec_1;
                     
-//                    if (_particle_increase > 1) {
-                        Particle::SharedPtr chosen_particle = my_vec_1[a]; // particle to copy
-                        for (unsigned i=0; i<_particle_increase; i++) {
-                            use_vec_1.push_back(Particle::SharedPtr(new Particle()));
-                            use_vec_2.push_back(Particle::SharedPtr(new Particle()));
-                            use_vec_1[i] = Particle::SharedPtr(new Particle(*chosen_particle));
-                            use_vec_2[i] = Particle::SharedPtr(new Particle(*chosen_particle));
-                        }
-//                    }
-                    
-                    
-                    // set particle random number seeds
-                    unsigned psuffix = 1;
-                    for (auto &p:use_vec) {
-                        p->setSeed(rng.randint(1,9999) + psuffix);
-                        psuffix += 2;
+                    Particle::SharedPtr chosen_particle = my_vec_1[a]; // particle to copy
+                    for (unsigned i=0; i<_particle_increase; i++) {
+                        use_vec_1.push_back(Particle::SharedPtr(new Particle()));
+                        use_vec_2.push_back(Particle::SharedPtr(new Particle()));
+                        use_vec_1[i] = Particle::SharedPtr(new Particle(*chosen_particle));
+                        use_vec_2[i] = Particle::SharedPtr(new Particle(*chosen_particle));
                     }
                     
                     assert(use_vec.size() == _particle_increase);
@@ -1600,15 +1592,14 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
                         }
                         
-                        proposeSpeciesParticles(use_vec);
+                        // set particle random number seeds
+                        unsigned psuffix = 1;
+                        for (auto &p:use_vec) {
+                            p->setSeed(rng.randint(1,9999) + psuffix);
+                            psuffix += 2;
+                        }
                         
-//                        for (auto &p:use_vec) {
-//                            p->showSpeciesJoined();
-//                        }
-//
-//                        for (auto &p:use_vec) {
-//                            p->showSpeciesParticle();
-//                        }
+                        proposeSpeciesParticles(use_vec);
                         
                         normalizeSpeciesWeights(use_vec);
                         
@@ -1636,7 +1627,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
                         resetSpeciesWeights(use_vec);
                         
-                        
                     } // s loop
                     
                     if (_save_every > 1.0) { // thin sample for output by taking a random sample
@@ -1648,7 +1638,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             sample_size = _particle_increase;
                         }
                         
-                        shuffle(use_vec.begin(), use_vec.end(), std::mt19937{std::random_device{}()}); // shuffle particles
+                        random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
                         // delete first (1-_thin) % of particles
                         use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
                         assert (use_vec.size() == sample_size);
@@ -1658,9 +1648,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, a);
                     
                     // clear used particle from my_vec
-                    my_vec[a]->clear();
-                    my_vec_2[a]->clear();
-                    my_vec_2[a]->clear();
+//                    my_vec[a]->clear();
+//                    my_vec_1[a]->clear();
+//                    my_vec_2[a]->clear();
                 }
                 
                 std::ofstream treef;
