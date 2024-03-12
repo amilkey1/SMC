@@ -101,7 +101,7 @@ class Forest {
         vector<double>              saveBranchLengths();
         int                         chooseDirectionOfHybridization(vector<double> likelihood_vec, Lot::SharedPtr lot);
         void                        hybridGeneTreeProposal(double species_tree_increment, string species_name);
-        vector<pair<double, string>>      calcForestRate();
+        vector<pair<double, string>>      calcForestRate(Lot::SharedPtr lot);
         void                        updateSpeciesPartition(tuple<string, string, string> species_info);
         double                      calcTopologyPrior(unsigned nlineages);
         void                        calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree);
@@ -2761,7 +2761,7 @@ class Forest {
         return _cum_height;
     }
 
-    inline vector<pair<double, string>> Forest::calcForestRate() {
+    inline vector<pair<double, string>> Forest::calcForestRate(Lot::SharedPtr lot) {
         vector<pair<double, string>> rates;
         pair<double, string> rate_and_name;
 
@@ -2769,8 +2769,24 @@ class Forest {
             if (s.second.size() > 1) { // if size == 0, no possibility of coalescence and rate is 0
                 double population_coalescence_rate = 0.0;
 #if defined (DRAW_NEW_THETA)
-                assert (_theta_map.size() > 0);
-                double population_theta = _theta_map[s.first];
+//                assert (_theta_map.size() > 0);
+                double population_theta = 0.0;
+                
+                // draw new population theta if it doesn't exist already
+                if (_theta_map[s.first]) {
+                    population_theta = _theta_map[s.first];
+                }
+                else {
+                    assert (_theta_mean > 0.0);
+                    double scale = 1 / _theta_mean;
+                    assert (scale > 0.0);
+                    if (population_theta < _small_enough) {
+                        population_theta = 1 / (lot->gamma(2.0, scale));
+                        assert (population_theta > 0.0);
+                        _theta_map[s.first] = population_theta;
+                    }
+                }
+//                double population_theta = _theta_map[s.first];
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
 #else
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta;
@@ -2876,21 +2892,22 @@ class Forest {
 //        ofstream logf ("theta_means.txt");
 //        for (int i=0; i<10000; i++) {
 //            _theta_mean = lot->logNormal(-4.6, 2.14); // TODO: mean = 0.1, sd = 1 --> make sd 0.1? - or try gamma
-        _theta_mean = lot->gamma(2, 0.1);
+        _theta_mean = lot->gamma(2, 0.05);
 //            logf << _theta_mean << "," << endl;
             
 //        }
 //        logf.close();
-        double scale = 1 / _theta_mean;
-        assert (scale > 0.0);
-        for (auto &name:species_names) {
-            double new_theta = 0.0;
-            if (new_theta < _small_enough) {
-                new_theta = 1 / (lot->gamma(2.0, scale)); // TODO: check the mean of this
-                assert (new_theta > 0.0);
-                _theta_map[name] = new_theta;
-            }
-        }
+        
+//        double scale = 1 / _theta_mean;
+//        assert (scale > 0.0);
+//        for (auto &name:species_names) {
+//            double new_theta = 0.0;
+//            if (new_theta < _small_enough) {
+//                new_theta = 1 / (lot->gamma(2.0, scale)); // TODO: check the mean of this
+//                assert (new_theta > 0.0);
+//                _theta_map[name] = new_theta;
+//            }
+//        }
     }
 
     inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {

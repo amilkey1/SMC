@@ -218,7 +218,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << "\t" << yule_model;
             
 //            double pop_mean = 0.0; // setting this to 0.0 for now since pop size is not a parameter
-            logf << "\t" << p->getPopMean();
+            logf << "\t" << p->getPopMean() / 4.0; // beast uses Ne * u = theta / 4
             
             for (int i=0; i<(nspecies*2-1); i++) {
 #if defined (DRAW_NEW_THETA)
@@ -336,7 +336,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             double yule_model = p->getSpeciesTreePrior(); // TODO: unsure if this is correct
             logf << "\t" << yule_model;
             
-            logf << "\t" << p->getPopMean();
+            logf << "\t" << p->getPopMean() / 4.0; // beast uses Ne * u = theta / 4
             
             for (int i=0; i<(nspecies*2-1); i++) {
 #if defined (DRAW_NEW_THETA)
@@ -1491,10 +1491,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     cout << "\n";
                 }
                 
-#if !defined (HIERARCHICAL_FILTERING)
+//#if !defined (HIERARCHICAL_FILTERING)
                 saveSpeciesTrees(my_vec);
                 writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
-#endif
+//#endif
                 
 #if defined (HIERARCHICAL_FILTERING)
                 cout << "\n";

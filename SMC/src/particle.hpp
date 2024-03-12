@@ -407,7 +407,7 @@ class Particle {
 #if defined (SNAKE)
                 changeTheta(i);
 #endif
-                vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate();
+                vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate(_lot);
                 double total_gene_rate = 0.0;
                 for (auto &r:rates_by_species) {
                     gene_forest_rates[i-1].push_back(r.first);
@@ -634,7 +634,7 @@ class Particle {
 #if defined (SNAKE)
                 changeTheta(i);
 #endif
-                vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate();
+                vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate(_lot);
                 double total_gene_rate = 0.0;
                 for (auto &r:rates_by_species) {
                     gene_forest_rates[i-1].push_back(r.first);
@@ -1129,12 +1129,14 @@ class Particle {
 
     inline void Particle::drawTheta() {
         _forests[1].createThetaMap(_lot); // create map for one forest, then copy it to all forests
+        double theta_mean = _forests[1]._theta_mean;
         map<string, double> theta_map = _forests[1]._theta_map;
         map<string, unsigned> species_indices = _forests[1]._species_indices;
         if (_forests.size() > 2) {
             for (int i=2; i<_forests.size(); i++) {
                 _forests[i]._theta_map = theta_map;
                 _forests[i]._species_indices = species_indices;
+                _forests[i]._theta_mean = theta_mean;
             }
         }
     }
