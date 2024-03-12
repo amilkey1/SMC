@@ -377,7 +377,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     inline void Proj::writeDeepCoalescenceFile(vector<Particle::SharedPtr> &v) {
         ofstream logf("deep_coalescences.txt");
         logf << "particle ";
-        logf << "\t" << "num deep coalescences ";
+        logf << "\t" << "num deep coalescences " << endl;
         unsigned count = 0;
         for (auto &p:v) {
             logf << "\n" << count;
@@ -1546,6 +1546,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 cout << "\n";
                 
                 unsigned ngroups = round(_nparticles * _thin);
+                if (ngroups == 0) {
+                    ngroups = 1;
+                    cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
+                }
                 
                 random_shuffle(my_vec.begin(), my_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
                 // delete first (1-_thin) % of particles
@@ -1644,6 +1648,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         assert (use_vec.size() == sample_size);
                     }
 
+//                    for (auto &p:use_vec){
+//                        p->showParticle();
+//                    }
                     saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
                     writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, a);
                     

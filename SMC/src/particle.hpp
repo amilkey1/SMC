@@ -158,6 +158,7 @@ class Particle {
         cout << "\nParticle:\n";
         cout << "  _log_weight: " << _log_weight << "\n" ;
         cout << " _log_likelihood: " << _log_likelihood << "\n";
+        cout << " _log_coalescent_likelihood: " << _log_coalescent_likelihood << "\n";
         cout << "  _forest: " << "\n";
 #if defined (DRAW_NEW_THETA)
         unsigned a = 1;
@@ -925,7 +926,6 @@ class Particle {
         
             if (_forests[0]._last_edge_length > 0.0) {
             // choose species to join if past the first species generation for each forest vector
-//                species_joined = _forests[0].speciesTreeProposalTest();
                 species_joined = _forests[0].speciesTreeProposal(_lot);
             }
                 vector<double> max_depth_vector;
@@ -936,7 +936,9 @@ class Particle {
                     string species2 = get<1>(species_joined);
                     
                     if (species1 != "null") {
-                        _forests[i].updateSpeciesPartition(species_joined);
+#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
+                        _forests[i].updateSpeciesPartition(species_joined); // if using Jones formula, this will happen in coalescent likelihood calculation
+#endif
                     }
                         
                     if (_forests[0]._lineages.size() > 1 && species1 != "null") {
@@ -993,39 +995,88 @@ class Particle {
 #else
         
 #if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
+        unsigned nbranches = Forest::_nspecies*2 - 1;
+        _log_coalescent_likelihood = 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * log(tgamma(2));
+        
 //        showParticle();
-        unsigned total_num_coalescent_events = 0;
+        vector<double> gamma_jb;
+        vector<unsigned> q_jb;
+        
         for (int i = 1; i<_forests.size(); i++) {
-            _forests[i].calcCoalescentLikelihoodIntegratingOutTheta(_forests[0]._last_edge_length, species_joined, _species_tree_height, total_num_coalescent_events);
-            _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
+            pair<vector<double>, vector<unsigned>> params = _forests[i].calcCoalescentLikelihoodIntegratingOutTheta(_forests[0]._species_build);
+            if (i == 1) {
+                for (auto &g:params.first) {
+                    gamma_jb.push_back(g);
+                }
+                for (auto &q:params.second) {
+                    q_jb.push_back(q);
+                }
+            }
+            else {
+                for (unsigned p=0; p<params.first.size(); p++) {
+                    gamma_jb[p] += params.first[p];
+                    q_jb[p] += params.second[p];
+                }
+            }
+//            _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
         }
-//        cout << "log coalescent likelihood: " << _log_coalescent_likelihood << endl;
-
-//#endif
+        
+//        _log_coalescent_likelihood = 0.0;
+        
+        if (_forests[0]._lineages.size() > 2) {
+            for (unsigned p=0; p<gamma_jb.size(); p++) {
+                double log_rb = q_jb[p] * log((4 / _forests[1]._ploidy));
+                double q_b = q_jb[p];
+                double gamma_b = gamma_jb[p];
+                unsigned nbranches = q_b + _forests.size() - 1; // each coalescent event adds 1 branch, plus the extra lineage increment in each gene
+                
+                double test = log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + log(tgamma(2 + q_b));
+                
+                _log_coalescent_likelihood += log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + log(tgamma(2 + q_b));
+//                _log_coalescent_likelihood += 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * log(tgamma(2));
+            }
+//            _log_coalescent_likelihood += 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * log(tgamma(2));
+        }
+        
+        else {
+            species_joined = _forests[0].speciesTreeProposal(_lot);
+            for (unsigned p=0; p<gamma_jb.size(); p++) {
+                double log_rb = q_jb[p] * log((4 / _forests[1]._ploidy));
+                double q_b = q_jb[p];
+                double gamma_b = gamma_jb[p];
+                unsigned nbranches = q_b + _forests.size() - 1; // each coalescent event adds 1 branch, plus the extra lineage increment in each gene
+                
+                double test = log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + log(tgamma(2 + q_b));
+                
+                _log_coalescent_likelihood += log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + log(tgamma(2 + q_b));
+//                _log_coalescent_likelihood += 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * log(tgamma(2));
+            }
+//            _log_coalescent_likelihood += 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * log(tgamma(2))l
+        }
 #else
         for (int i = 1; i<_forests.size(); i++) {
-            // TODO: if defined GRAHAM_JONES_COALESCENT_LIKELIHOOD, need to first get the number of coalescent events across all genes within the species increment
             _forests[i].calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
             _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
         }
 #endif
 #endif
-            
+        
+#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         if (_forests[0]._lineages.size() == 2) {
             // join remaining species lineages, no change in coalescent likelihood, just need to add panmictic coalescent for each gene tree (to avoid total recalculation)
             // no need to draw a new theta because we are at the ancestral population now
-            species_joined = _forests[0].speciesTreeProposalTest();
+            species_joined = _forests[0].speciesTreeProposal(_lot);
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i]._log_coalescent_likelihood += _forests[i]._panmictic_coalescent_likelihood;
                 _forests[i]._panmictic_coalescent_likelihood = 0.0; // for clarity, reset to 0
             }
         }
+#endif
         
         double constrained_factor = 0.0;
 #if !defined (UNCONSTRAINED_PROPOSAL)
         assert (max_depth > 0.0);
         double nlineages = _forests[0]._lineages.size();
-//        double exponential_term = -1*nlineages * Forest::_lambda * max_depth;
         constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
 #endif
         
@@ -1080,9 +1131,11 @@ class Particle {
     inline void Particle::drawTheta() {
         _forests[1].createThetaMap(_lot); // create map for one forest, then copy it to all forests
         map<string, double> theta_map = _forests[1]._theta_map;
+        map<string, unsigned> species_indices = _forests[1]._species_indices;
         if (_forests.size() > 2) {
             for (int i=2; i<_forests.size(); i++) {
                 _forests[i]._theta_map = theta_map;
+                _forests[i]._species_indices = species_indices;
             }
         }
     }
