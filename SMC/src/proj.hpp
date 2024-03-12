@@ -303,9 +303,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             double log_posterior = log_likelihood + log_prior;
             
             double log_coalescent_likelihood = 0.0;
-            for (unsigned g=1; g<ngenes+1; g++) {
-                log_coalescent_likelihood += p->getCoalescentLikelihood(g);
-            }
+//            for (unsigned g=1; g<ngenes+1; g++) {
+                log_coalescent_likelihood += p->getCoalescentLikelihood(1);
+//            }
             
             logf << "\t" << log_posterior;
             
@@ -351,6 +351,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             
             vector<double> gene_tree_log_likelihoods = p->getGeneTreeLogLikelihoods();
             vector<double> gene_tree_priors = p->getGeneTreeCoalescentLikelihoods();
+#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
             double test = 0.0;
             for (auto &p:gene_tree_priors) {
                 test += p;
@@ -358,6 +359,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 //            p->showParticle();
             assert (test == log_coalescent_likelihood);
             assert (gene_tree_log_likelihoods.size() == gene_tree_priors.size());
+#endif
             
             for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
                 logf << "\t" << gene_tree_log_likelihoods[i];

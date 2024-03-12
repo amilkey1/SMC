@@ -334,11 +334,20 @@ class Particle {
     }
 
     inline vector<double> Particle::getGeneTreeCoalescentLikelihoods() {
+#if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
+        // do not have separate coalescent likelihood for each gene tree
+        vector<double> gene_tree_priors;
+        for (int i=1; i<_forests.size(); i++) {
+            gene_tree_priors.push_back(-1);
+        }
+        return gene_tree_priors;
+#else
         vector<double> gene_tree_priors;
         for (int i=1; i<_forests.size(); i++) {
             gene_tree_priors.push_back(_forests[i]._log_coalescent_likelihood);
         }
         return gene_tree_priors;
+#endif
     }
 
     inline double Particle::getSpeciesTreePrior() {
@@ -1028,14 +1037,9 @@ class Particle {
                 double log_rb = q_jb[p] * log((4 / _forests[1]._ploidy));
                 double q_b = q_jb[p];
                 double gamma_b = gamma_jb[p];
-                unsigned nbranches = q_b + _forests.size() - 1; // each coalescent event adds 1 branch, plus the extra lineage increment in each gene
-                
-                double test = log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + log(tgamma(2 + q_b));
                 
                 _log_coalescent_likelihood += log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + log(tgamma(2 + q_b));
-//                _log_coalescent_likelihood += 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * log(tgamma(2));
             }
-//            _log_coalescent_likelihood += 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * log(tgamma(2));
         }
         
         else {
@@ -1044,14 +1048,9 @@ class Particle {
                 double log_rb = q_jb[p] * log((4 / _forests[1]._ploidy));
                 double q_b = q_jb[p];
                 double gamma_b = gamma_jb[p];
-                unsigned nbranches = q_b + _forests.size() - 1; // each coalescent event adds 1 branch, plus the extra lineage increment in each gene
-                
-                double test = log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + log(tgamma(2 + q_b));
                 
                 _log_coalescent_likelihood += log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + log(tgamma(2 + q_b));
-//                _log_coalescent_likelihood += 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * log(tgamma(2));
             }
-//            _log_coalescent_likelihood += 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * log(tgamma(2))l
         }
 #else
         for (int i = 1; i<_forests.size(); i++) {
@@ -1376,8 +1375,12 @@ class Particle {
     }
 
     inline double Particle::getCoalescentLikelihood(unsigned g) {
+#if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
+        return _log_coalescent_likelihood; // can't get coalescent likelihood separately for each gene tree
+#else
         assert (g>0); // no coalescent likelihood for species tree
         return _forests[g]._log_coalescent_likelihood;
+#endif
     }
 
     inline bool Particle::speciesJoinProposed() {
