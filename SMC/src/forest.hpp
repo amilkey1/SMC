@@ -2770,22 +2770,22 @@ class Forest {
                 double population_coalescence_rate = 0.0;
 #if defined (DRAW_NEW_THETA)
 //                assert (_theta_map.size() > 0);
-                double population_theta = 0.0;
+//                double population_theta = 0.0;
                 
                 // draw new population theta if it doesn't exist already
-                if (_theta_map[s.first]) {
-                    population_theta = _theta_map[s.first];
-                }
-                else {
-                    assert (_theta_mean > 0.0);
-                    double scale = 1 / _theta_mean;
-                    assert (scale > 0.0);
-                    if (population_theta < _small_enough) {
-                        population_theta = 1 / (lot->gamma(2.0, scale));
-                        assert (population_theta > 0.0);
-                        _theta_map[s.first] = population_theta;
-                    }
-                }
+//                if (_theta_map[s.first]) {
+                    double population_theta = _theta_map[s.first];
+//                }
+//                else {
+//                    assert (_theta_mean > 0.0);
+//                    double scale = 1 / _theta_mean;
+//                    assert (scale > 0.0);
+//                    if (population_theta < _small_enough) {
+//                        population_theta = 1 / (lot->gamma(2.0, scale));
+//                        assert (population_theta > 0.0);
+//                        _theta_map[s.first] = population_theta;
+//                    }
+//                }
 //                double population_theta = _theta_map[s.first];
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
 #else
@@ -2898,16 +2898,16 @@ class Forest {
 //        }
 //        logf.close();
         
-//        double scale = 1 / _theta_mean;
-//        assert (scale > 0.0);
-//        for (auto &name:species_names) {
-//            double new_theta = 0.0;
-//            if (new_theta < _small_enough) {
-//                new_theta = 1 / (lot->gamma(2.0, scale)); // TODO: check the mean of this
-//                assert (new_theta > 0.0);
-//                _theta_map[name] = new_theta;
-//            }
-//        }
+        double scale = 1 / _theta_mean;
+        assert (scale > 0.0);
+        for (auto &name:species_names) {
+            double new_theta = 0.0;
+            if (new_theta < _small_enough) {
+                new_theta = 1 / (lot->gamma(2.0, scale)); // TODO: check the mean of this
+                assert (new_theta > 0.0);
+                _theta_map[name] = new_theta;
+            }
+        }
     }
 
     inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {

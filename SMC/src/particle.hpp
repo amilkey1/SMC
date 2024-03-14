@@ -338,7 +338,7 @@ class Particle {
         // do not have separate coalescent likelihood for each gene tree
         vector<double> gene_tree_priors;
         for (int i=1; i<_forests.size(); i++) {
-            gene_tree_priors.push_back(-1);
+            gene_tree_priors.push_back(0);
         }
         return gene_tree_priors;
 #else
@@ -1032,13 +1032,14 @@ class Particle {
         
 //        _log_coalescent_likelihood = 0.0;
         
+        showParticle();
         if (_forests[0]._lineages.size() > 2) {
             for (unsigned p=0; p<gamma_jb.size(); p++) {
                 double log_rb = q_jb[p] * log((4 / _forests[1]._ploidy));
                 double q_b = q_jb[p];
                 double gamma_b = gamma_jb[p];
                 
-                _log_coalescent_likelihood += log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + log(tgamma(2 + q_b));
+                _log_coalescent_likelihood += log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + log(tgamma(2 + q_b)); // TODO: if q_b is very high, this will return infinity?
             }
         }
         

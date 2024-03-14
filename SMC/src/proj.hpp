@@ -351,6 +351,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             
             vector<double> gene_tree_log_likelihoods = p->getGeneTreeLogLikelihoods();
             vector<double> gene_tree_priors = p->getGeneTreeCoalescentLikelihoods();
+            
 #if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
             double test = 0.0;
             for (auto &p:gene_tree_priors) {
@@ -1491,10 +1492,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     cout << "\n";
                 }
                 
-//#if !defined (HIERARCHICAL_FILTERING)
+#if !defined (HIERARCHICAL_FILTERING)
                 saveSpeciesTrees(my_vec);
                 writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
-//#endif
+#endif
                 
 #if defined (HIERARCHICAL_FILTERING)
                 cout << "\n";
