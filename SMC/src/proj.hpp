@@ -1493,8 +1493,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 }
                 
 #if !defined (HIERARCHICAL_FILTERING)
-                saveSpeciesTrees(my_vec);
-                writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
+//                saveSpeciesTrees(my_vec);
+//                writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
 #endif
                 
 #if defined (HIERARCHICAL_FILTERING)

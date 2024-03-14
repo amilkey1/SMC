@@ -1032,7 +1032,7 @@ class Particle {
         
 //        _log_coalescent_likelihood = 0.0;
         
-        showParticle();
+//        showParticle();
         if (_forests[0]._lineages.size() > 2) {
             for (unsigned p=0; p<gamma_jb.size(); p++) {
                 double log_rb = q_jb[p] * log((4 / _forests[1]._ploidy));
