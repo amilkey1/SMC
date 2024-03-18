@@ -3125,10 +3125,7 @@ class Forest {
             updateSpeciesPartition(species_joined);
         
             for (auto &s:_species_partition) { // TODO: how to check if gene tree violates species tree?
-//                count++; // TODO: count is wrong and will overwrite from previous - each speceis needs to be associated with an index
                 count = _species_indices[s.first];
-//                gamma_b.push_back(0.0);
-//                q_b.push_back(0);
                 
                 bool done = false;
                 cum_time = 0.0;
@@ -3146,7 +3143,6 @@ class Forest {
                                     coalescence = true;
                                     a++;
                                 }
-                                // TODO: some deep coalescences not counted b/c the node is in a different species?
                                 else {
                                     done = true; // stop once gene increment goes below species tree height to avoid double counting some deep coalescences
                                 }
@@ -3163,12 +3159,6 @@ class Forest {
                                 double increment = heights_and_nodes[i].first - (species_tree_height - species_increment) - cum_time; // find increment height
                                 cum_time += increment;
                                 assert (increment > 0.0);
-                                
-//                                double k_jb = 1.0;
-//                                double gamma_b = 4* increment * nlineages *(nlineages-1) / (2*_ploidy);
-//                                double r_b = pow((4 / _ploidy), k_jb);
-//                                double q_b = 1.0;
-//                                log_coalescent_likelihood += log(r_b) + 2*log(_theta_mean) - (2+q_b)*log(_theta_mean + gamma_b) + log(tgamma(2+q_b)) - log(tgamma(2));
                                 assert (q_b.size() > 0);
                                 assert (gamma_b.size() > 0);
                                 
@@ -3186,11 +3176,6 @@ class Forest {
                                 cum_time += increment;
                                 assert (increment > 0.0);
                                 
-//                                double k_jb = 0.0;
-//                                double gamma_b = 4*increment * nlineages *(nlineages-1) / (2*_ploidy);
-//                                double r_b = pow((4 / _ploidy), k_jb);
-//                                double q_b = 0.0;
-//                                log_coalescent_likelihood += log(r_b) + 2*log(_theta_mean) - (2+q_b)*log(_theta_mean + gamma_b) + log(tgamma(2+q_b)) - log(tgamma(2));
                                 assert (gamma_b.size() > 0);
                                 gamma_b[count] += 4*increment * nlineages *(nlineages-1) / (2*_ploidy);
                             }
@@ -3199,9 +3184,6 @@ class Forest {
                 }
             }
         }
-        
-//        q_b.push_back(0.0); // add extra param for panmictic part
-//        gamma_b.push_back(0); // add extra param for panmictic part
         
         assert (q_b.back() == 0.0);
         assert (gamma_b.back() == 0);
@@ -3222,17 +3204,10 @@ class Forest {
 
                 for (unsigned i=a; i < heights_and_nodes.size(); i++) {
                     // calculate increment (should be heights_and_nodes[i].first - species_tree_height - cum_time (no need to worry about species increment now)
-                    // calculate prob of coalescence, ln(rate) - rate*increment
+                    // calculate prob of coalescence
                     double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
-
-//                    double k_jb = 1.0;
-//                    double gamma_b = 4*increment * panmictic_nlineages *(panmictic_nlineages-1) / (2*_ploidy);
-//                    double r_b = pow((4 / _ploidy), k_jb);
-//                    double q_b = 1.0;
                     q_b.back() += 1;
                     gamma_b.back() += 4*increment * panmictic_nlineages *(panmictic_nlineages-1) / (2*_ploidy);
-
-//                    _panmictic_coalescent_likelihood += log(r_b) + 2*log(_theta_mean) - (2+q_b)*log(_theta_mean + gamma_b) + log(tgamma(2+q_b)) - log(tgamma(2));
 
                     cum_time += increment;
                     panmictic_nlineages--;
@@ -3243,9 +3218,7 @@ class Forest {
         
         assert (gamma_b.size() == q_b.size());
         
-        return make_pair(gamma_b, q_b); // TODO: panmictic part?
-//        _log_coalescent_likelihood += log_coalescent_likelihood;
-//        return log_coalescent_likelihood;
+        return make_pair(gamma_b, q_b);
     }
 
     inline void Forest::resetDepthVector(tuple<string, string, string> species_joined) {

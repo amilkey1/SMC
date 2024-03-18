@@ -303,9 +303,13 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             double log_posterior = log_likelihood + log_prior;
             
             double log_coalescent_likelihood = 0.0;
-//            for (unsigned g=1; g<ngenes+1; g++) {
-                log_coalescent_likelihood += p->getCoalescentLikelihood(1);
-//            }
+#if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
+            log_coalescent_likelihood += p->getCoalescentLikelihood(1);
+#else
+            for (unsigned g=1; g<ngenes+1; g++) {
+                log_coalescent_likelihood += p->getCoalescentLikelihood(g);
+            }
+#endif
             
             logf << "\t" << log_posterior;
             
@@ -1493,8 +1497,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 }
                 
 #if !defined (HIERARCHICAL_FILTERING)
-//                saveSpeciesTrees(my_vec);
-//                writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
+                saveSpeciesTrees(my_vec);
+                writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
 #endif
                 
 #if defined (HIERARCHICAL_FILTERING)
