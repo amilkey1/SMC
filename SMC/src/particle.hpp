@@ -991,7 +991,7 @@ class Particle {
         }
 #endif
             assert (_log_coalescent_likelihood == 0.0);
-#if defined (UNCONSTRAINED_PROPOSAL)
+#if defined (UNCONSTRAINED_PROPOSAL) && !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         if (_forests[0]._last_edge_length > max_depth) {
             _log_coalescent_likelihood = -1*numeric_limits<double>::infinity();
         }
@@ -1005,26 +1005,38 @@ class Particle {
         
 #if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         unsigned nbranches = Forest::_nspecies*2 - 1;
-        _log_coalescent_likelihood = 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * log(tgamma(2));
+        _log_coalescent_likelihood = 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * boost::math::lgamma(2);
         
 //        showParticle();
         vector<double> gamma_jb;
         vector<unsigned> q_jb;
         
+//        showParticle();
+        double neg_inf = -1*numeric_limits<double>::infinity();
         for (int i = 1; i<_forests.size(); i++) {
-            pair<vector<double>, vector<unsigned>> params = _forests[i].calcCoalescentLikelihoodIntegratingOutTheta(_forests[0]._species_build);
-            if (i == 1) {
-                for (auto &g:params.first) {
-                    gamma_jb.push_back(g);
+            if (_log_coalescent_likelihood != neg_inf) {
+                pair<vector<double>, vector<unsigned>> params = _forests[i].calcCoalescentLikelihoodIntegratingOutTheta(_forests[0]._species_build);
+                if (i == 1) {
+                    for (auto &g:params.first) {
+                        if (g == neg_inf) {
+                            _log_coalescent_likelihood = neg_inf;
+                            break;
+                        }
+                        gamma_jb.push_back(g);
+                    }
+                    for (auto &q:params.second) {
+                        q_jb.push_back(q);
+                    }
                 }
-                for (auto &q:params.second) {
-                    q_jb.push_back(q);
-                }
-            }
-            else {
-                for (unsigned p=0; p<params.first.size(); p++) {
-                    gamma_jb[p] += params.first[p];
-                    q_jb[p] += params.second[p];
+                else {
+                    for (unsigned p=0; p<params.first.size(); p++) {
+                        gamma_jb[p] += params.first[p];
+                        if (params.first[p] == neg_inf) {
+                            _log_coalescent_likelihood = neg_inf;
+                            break;
+                        }
+                        q_jb[p] += params.second[p];
+                    }
                 }
             }
 //            _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
@@ -1039,7 +1051,13 @@ class Particle {
                 double q_b = q_jb[p];
                 double gamma_b = gamma_jb[p];
                 
-                _log_coalescent_likelihood += log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + log(tgamma(2 + q_b)); // TODO: if q_b is very high, this will return infinity?
+                if (gamma_b == neg_inf) {
+                    _log_coalescent_likelihood = neg_inf;
+                }
+                
+                if (_log_coalescent_likelihood != neg_inf) {
+                    _log_coalescent_likelihood += log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + boost::math::lgamma(2 + q_b); // TODO: if q_b is very high, this will return infinity?
+                }
             }
         }
         
@@ -1050,7 +1068,13 @@ class Particle {
                 double q_b = q_jb[p];
                 double gamma_b = gamma_jb[p];
                 
-                _log_coalescent_likelihood += log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + log(tgamma(2 + q_b));
+                if (gamma_b == neg_inf) {
+                    _log_coalescent_likelihood = neg_inf;
+                }
+                
+                if (_log_coalescent_likelihood != neg_inf) {
+                    _log_coalescent_likelihood += log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + boost::math::lgamma(2 + q_b);
+                }
             }
         }
 #else
@@ -1079,7 +1103,7 @@ class Particle {
         double nlineages = _forests[0]._lineages.size();
         constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
 #endif
-        
+//        constrained_factor = 0.0; // TODO: testing
             _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
             _generation++;
 #if !defined (UNCONSTRAINED_PROPOSAL)
