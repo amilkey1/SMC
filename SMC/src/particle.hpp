@@ -60,6 +60,7 @@ class Particle {
         vector<double>                          calcGeneTreeLogLikelihoods();
         double                                  calcHeight();
         double                                  getLogWeight() const {return _log_weight;}
+        double                                  getSpeciesIncrement () {return _forests[0]._last_edge_length;}
         double                                  getSpeciesLogWeight() const {return _log_species_weight;}
         void                                    setLogWeight(double w){_log_weight = w;}
         void                                    setLogSpeciesWeight(double w){_log_species_weight = w;}
@@ -128,6 +129,7 @@ class Particle {
         void                                            setNewTheta();
         vector<double>                                  getThetaVector();
         double                                          getPopMean(){return _forests[1]._theta_mean;}
+        pair<string, string>                                          getSpeciesJoined(){return make_pair(_forests[0]._species_joined.first->_name, _forests[0]._species_joined.second->_name);}
 
     private:
 
@@ -920,6 +922,7 @@ class Particle {
                 vector<double> max_depth_vector;
                 double max_depth = 0.0;
 
+//#if !defined (UNCONSTRAINED_PROPOSAL)
                 for (int i=1; i<_forests.size(); i++) {
                     string species1 = get<0>(species_joined);
                     string species2 = get<1>(species_joined);
@@ -940,10 +943,12 @@ class Particle {
                     max_depth -= _forests[0].getTreeHeight();
                     // choose a species tree increment
                 }
+//#endif
                 
                 if (_forests[0]._lineages.size() > 1) {
 #if !defined (UNCONSTRAINED_PROPOSAL)
                     assert (max_depth > 0.0);
+                    
                     _forests[0].chooseSpeciesIncrementOnly(_lot, max_depth);
 #else
                     _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
@@ -969,7 +974,13 @@ class Particle {
         double neg_inf = -1*numeric_limits<double>::infinity();
         for (int i = 1; i<_forests.size(); i++) {
             if (_log_coalescent_likelihood != neg_inf) {
-                pair<vector<double>, vector<unsigned>> params = _forests[i].calcCoalescentLikelihoodIntegratingOutTheta(_forests[0]._species_build);
+                pair<vector<double>, vector<unsigned>> params;
+                if (_forests[0]._lineages.size() > 1) {
+                    params = _forests[i].calcCoalescentLikelihoodIntegratingOutTheta(_forests[0]._species_build);
+                }
+                else {
+                    params = _forests[i].calcCoalescentLikelihoodIntegratingOutThetaLastStep(_forests[0]._species_build);
+                }
                 if (i == 1) {
                     for (auto &g:params.first) {
                         if (g == neg_inf) {
@@ -1017,11 +1028,11 @@ class Particle {
                 double log_rb = q_jb[p] * log((4 / _forests[1]._ploidy));
                 double q_b = q_jb[p];
                 double gamma_b = gamma_jb[p];
-                
+
                 if (gamma_b == neg_inf) {
                     _log_coalescent_likelihood = neg_inf;
                 }
-                
+
                 if (_log_coalescent_likelihood != neg_inf) {
                     _log_coalescent_likelihood += log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + boost::math::lgamma(2 + q_b);
                 }
@@ -1032,15 +1043,34 @@ class Particle {
 #if !defined (UNCONSTRAINED_PROPOSAL)
         assert (max_depth > 0.0);
         double nlineages = _forests[0]._lineages.size();
+        if (nlineages == 1) {
+            nlineages = 2; // for last step, constraint was before final two species were joined
+        }
+//        if (_forests[0]._lineages.size() == 1) {
+//            max_depth = numeric_limits<double>::infinity();
+//        }
         constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
+//        _log_coalescent_likelihood += constrained_factor; // TODO: testing
         
 #endif
 //        constrained_factor = 0.0;
-            _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
+            _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor; // TODO: testing
+//        _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood; // TODO: testing
 #if !defined (UNCONSTRAINED_PROPOSAL)
             double test = 1/_log_species_weight;
             assert(test != -0); // assert coalescent likelihood is not -inf
 #endif
+        
+//        if (_forests[0]._last_edge_length > 0.08 && _forests[0]._lineages.size() == 1) {
+//            cout << "stop";
+//        }
+        
+        if (_log_coalescent_likelihood != neg_inf) {
+//            if (_forests[0]._last_edge_length < max_depth) {
+//                showParticle();
+//            }
+            assert (_forests[0]._last_edge_length < max_depth);
+        }
         
         if (_log_coalescent_likelihood == neg_inf) {
             assert (_forests[0]._last_edge_length > max_depth);
@@ -1167,8 +1197,6 @@ class Particle {
         assert (max_depth > 0.0);
         double nlineages = _forests[0]._lineages.size();
         constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
-        // TODO: testing
-//        constrained_factor = log(1) - log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
 #endif
 //        constrained_factor = 0.0; // TODO: testing
             _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
@@ -1181,11 +1209,11 @@ class Particle {
             assert (_forests[0]._last_edge_length > max_depth);
         }
 //        if (_generation == 2) {
-            if (_log_coalescent_likelihood != neg_inf) {
-                ofstream testf;
-                testf.open("preserved_increments.txt", std::ios_base::app); // append instead of overwrite
-                testf << _forests[0]._increments.back().first << "," << endl;
-            }
+//            if (_log_coalescent_likelihood != neg_inf) {
+//                ofstream testf;
+//                testf.open("preserved_increments.txt", std::ios_base::app); // append instead of overwrite
+//                testf << _forests[0]._increments.back().first << "," << endl;
+//            }
 //        }
         
         _generation++;

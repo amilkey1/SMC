@@ -475,12 +475,14 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         
         assert (_start_mode != "sim");
         
+        unsigned count = 0;
             // save all species trees
             std::ofstream treef;
 
             treef.open(filename1, std::ios_base::app);
             for (auto &p:v) {
                 treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
+                count++;
             }
             treef.close();
     }
@@ -1599,6 +1601,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         cout << "beginning species tree proposals for subset " << a+1 << endl;
                     }
                     for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
+//                    for (unsigned s=0; s<nspecies; s++) {  // TODO: trying not skipping last round of filtering because weights are always 0
                         if (_verbose > 0) {
                             cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
                         }
@@ -1610,7 +1613,54 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             psuffix += 2;
                         }
                         
+                        if (s < 4) {
                         proposeSpeciesParticles(use_vec);
+                        
+//                        if (s == 2) {
+//                            ofstream incrf("increments-2-u.txt");
+//                            for (auto &p:use_vec) {
+////                                cout << p->getSpeciesJoined().first << ", " << p->getSpeciesJoined().second << ", " << p->getSpeciesLogWeight() << ", " << p->getSpeciesIncrement() << endl;
+////                                cout << p->getSpeciesJoined().first << ", " << p->getSpeciesJoined().second << ", " << p->getCoalescentLikelihood(0) << ", " << p->getSpeciesIncrement() << endl;
+//                                double neg_inf = -1*numeric_limits<double>::infinity();
+//                                if (p->getCoalescentLikelihood(0) != neg_inf) {
+////                                    cout << p->getSpeciesIncrement() << " , " ;
+//                                    incrf << p->getSpeciesIncrement() << " , " << endl;
+////                                    if (p->getSpeciesIncrement() > 0.08) {
+////                                        cout << "stop";
+////                                    }
+//                                }
+//
+//                            }
+//                            incrf.close();
+//                        }
+                            
+//                        if (s == 3) {
+//                            ofstream incrf("increments-3-u.txt");
+//                            for (auto &p:use_vec) {
+////                                cout << p->getSpeciesJoined().first << ", " << p->getSpeciesJoined().second << ", " << p->getSpeciesLogWeight() << ", " << p->getSpeciesIncrement() << endl;
+////                                cout << p->getSpeciesJoined().first << ", " << p->getSpeciesJoined().second << ", " << p->getCoalescentLikelihood(0) << ", " << p->getSpeciesIncrement() << endl;
+//                                double neg_inf = -1*numeric_limits<double>::infinity();
+//                                if (p->getCoalescentLikelihood(0) != neg_inf) {
+//                                    incrf << p->getSpeciesIncrement() << " , " << endl;
+//                                }
+//
+//                            }
+//                            incrf.close();
+//                        }
+                            
+//                            if (s == 1) {
+//                                ofstream incrf("increments-1-u.txt");
+//                                for (auto &p:use_vec) {
+//    //                                cout << p->getSpeciesJoined().first << ", " << p->getSpeciesJoined().second << ", " << p->getSpeciesLogWeight() << ", " << p->getSpeciesIncrement() << endl;
+//    //                                cout << p->getSpeciesJoined().first << ", " << p->getSpeciesJoined().second << ", " << p->getCoalescentLikelihood(0) << ", " << p->getSpeciesIncrement() << endl;
+//                                    double neg_inf = -1*numeric_limits<double>::infinity();
+//                                    if (p->getCoalescentLikelihood(0) != neg_inf) {
+//                                        incrf << p->getSpeciesIncrement() << " , " << endl;
+//                                    }
+//
+//                                }
+//                                incrf.close();
+//                            }
                         
                         normalizeSpeciesWeights(use_vec);
                         
@@ -1632,11 +1682,21 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         //if use_first is false, my_vec = my_vec_1
                         
                         use_vec = use_first ? use_vec_2:use_vec_1;
+                            
+//                        if (s == 2) {
+//                            saveSpeciesTrees(use_vec);
+////                            for (auto &p:use_vec) {
+////                                cout << p->getSpeciesJoined().first << ", " << p->getSpeciesJoined().second << ", " << p->getSpeciesLogWeight() << ", " << p->getSpeciesIncrement() << endl;
+////                            }
+//                        }
 
                         //change use_first from true to false or false to true
                         use_first = !use_first;
 
                         resetSpeciesWeights(use_vec);
+                        }
+                        
+//                        saveSpeciesTrees(use_vec);
                         
                     } // s loop
                     

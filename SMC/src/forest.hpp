@@ -179,6 +179,7 @@ class Forest {
         void                        simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
         pair<vector<double>, vector<unsigned>>        calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build);
+        pair<vector<double>, vector<unsigned>>        calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build);
         double                      _theta_mean;
         string                      _ancestral_species_name;
 
@@ -1574,7 +1575,9 @@ class Forest {
         
         updateNodeVector (_lineages, subtree1, subtree2, new_nd);
 
-        _species_joined = make_pair(subtree1, subtree2);
+        if (_lineages.size() > 1) {
+            _species_joined = make_pair(subtree1, subtree2); // last step just joins remaining two
+        }
         
         calcTopologyPrior((int) _lineages.size()+1);
 
@@ -3095,6 +3098,161 @@ class Forest {
 //#endif
     }
 
+inline pair<vector<double>, vector<unsigned>> Forest::calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build) {
+    vector<double> gamma_b; // contains gamma_b by species
+    vector<unsigned> q_b; // contains q_b by species
+    
+    gamma_b.resize(_nspecies + species_build.size());
+    q_b.resize(_nspecies + species_build.size());
+    
+    _panmictic_coalescent_likelihood = 0.0;
+    _log_coalescent_likelihood = 0.0;
+    
+    double neg_inf = -1*numeric_limits<double>::infinity();
+    vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
+    assert (heights_and_nodes.size() > 0);
+    
+    double log_coalescent_likelihood = 0.0;
+    double cum_time = 0.0;
+    string species;
+    bool found = false;
+    bool coalescence = false;
+    unsigned nlineages = 0;
+    unsigned a = 0;
+    double species_tree_height = 0.0;
+    
+    unsigned count = -1;
+    
+    assert (_taxon_map.size() > 0);
+    setUpGeneForest(_taxon_map);
+    
+    for (unsigned gen=0; gen < species_build.size() - 1; gen++) { // don't go into last step because panmictic part will take care of that
+        count = -1;
+        tuple<string, string, string> species_joined = species_build[gen].first;
+        double species_increment = species_build[gen].second;
+        species_tree_height += species_increment;
+        
+        updateSpeciesPartition(species_joined);
+    
+        for (auto &s:_species_partition) { // TODO: how to check if gene tree violates species tree?
+            if (gamma_b.size() > 0 && gamma_b[0] != neg_inf) {
+                count = _species_indices[s.first];
+                
+                bool done = false;
+                cum_time = 0.0;
+                species = s.first;
+                for (unsigned i=0; i < heights_and_nodes.size(); i++) {
+                    if (!done) {
+                        found = false;
+                        coalescence = false;
+                        Node*search_nd = heights_and_nodes[i].second->_left_child;
+                        for (auto &nd:s.second) {
+                            if (nd == search_nd) {
+                                search_nd = nd;
+                                nlineages = (unsigned) s.second.size();
+                                if (heights_and_nodes[i].first < species_tree_height) {
+                                    coalescence = true;
+                                    a++;
+                                }
+                                else {
+                                    done = true; // stop once gene increment goes below species tree height to avoid double counting some deep coalescences
+                                }
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (found) {
+                            if (species_increment == 0.0) {
+                                assert (coalescence); // no deep coalescence if last step
+                            }
+                            
+                            if (coalescence) {
+                                if (s.second.size() == 1) {
+                                    q_b.clear(); // don't push back to q_b because it is full of ints
+                                    gamma_b.clear();
+                                    gamma_b.push_back(neg_inf);
+                                    done = true;
+                                    break;
+                                }
+                                
+                                double increment = heights_and_nodes[i].first - (species_tree_height - species_increment) - cum_time; // find increment height
+                                cum_time += increment;
+                                assert (increment > 0.0);
+                                assert (q_b.size() > 0);
+                                assert (gamma_b.size() > 0);
+                                
+                                q_b[count] += 1;
+                                gamma_b[count] += 4* increment * nlineages *(nlineages-1) / (2*_ploidy);
+                                for (auto &s:_species_partition) {
+                                    if (s.first == species) {
+                                        bool found = (find(s.second.begin(), s.second.end(), search_nd->_right_sib) != s.second.end());
+                                        if (found ) {
+                                            updateNodeList(s.second, search_nd, search_nd->_right_sib, search_nd->_parent); // update the species lineage
+                                        }
+                                        else {
+                                            q_b.clear(); // don't push back to q_b because it is full of ints
+                                            gamma_b.clear();
+                                            gamma_b.push_back(neg_inf);
+                                            done = true;
+                                            break;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                            else {
+                                double increment = species_increment - cum_time; // find increment height - can't be any more deep coalescence, so gene increment is whatever remains of the species increment
+                                cum_time += increment;
+                                assert (increment > 0.0);
+                                
+                                assert (gamma_b.size() > 0);
+                                gamma_b[count] += 4*increment * nlineages *(nlineages-1) / (2*_ploidy);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    if (gamma_b.back() != neg_inf) {
+        assert (q_b.back() == 0.0);
+        assert (gamma_b.back() == 0);
+        
+        // calculate coalescent likelihood for the rest of the panmictic tree
+        double species_increment = species_build.back().second;
+        if (log_coalescent_likelihood != neg_inf) {
+            if (species_increment > 0.0) {
+                double cum_time = 0.0;
+                // calculate height of each join in the gene tree, minus the species tree height
+                // get number of lineages at beginning of that step and then decrement with each join
+
+                // start at _nincrements and go through heights and nodes list
+                int panmictic_nlineages = 0;
+                for (auto &s:_species_partition) {
+                    panmictic_nlineages += s.second.size();
+                }
+
+                for (unsigned i=a; i < heights_and_nodes.size(); i++) {
+                    // calculate increment (should be heights_and_nodes[i].first - species_tree_height - cum_time (no need to worry about species increment now)
+                    // calculate prob of coalescence
+                    double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
+                    q_b.back() += 1;
+                    gamma_b.back() += 4*increment * panmictic_nlineages *(panmictic_nlineages-1) / (2*_ploidy);
+
+                    cum_time += increment;
+                    panmictic_nlineages--;
+                }
+                assert (panmictic_nlineages == 1);
+            }
+        }
+        
+        assert (gamma_b.size() == q_b.size());
+    }
+    
+    return make_pair(gamma_b, q_b);
+}
+
     inline pair<vector<double>, vector<unsigned>> Forest::calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build) {
         vector<double> gamma_b; // contains gamma_b by species
         vector<unsigned> q_b; // contains q_b by species
@@ -3268,11 +3426,19 @@ class Forest {
                 d.second.second = get<2>(species_joined);
             }
         }
-        for (int i=0; i<_depths.size(); i++) {
+        
+        vector<unsigned> indices_to_erase;
+        for (int i=0; i<_depths.size(); i++) { // TODO: can't iterate through a vecotr and change it at the same time - keep track of which ones to erase and then erase them
             if (_depths[i].second.first == _depths[i].second.second) {
-                // species have already been joined in the species tree, so they are no longer a constraint
-                _depths.erase(_depths.begin()+i);
+//                // species have already been joined in the species tree, so they are no longer a constraint
+//                _depths.erase(_depths.begin()+i);
+                indices_to_erase.push_back(i);
             }
+        }
+        
+        for (unsigned i= (unsigned) indices_to_erase.size() - 1; i != -1; i--) {
+            unsigned num = indices_to_erase[i];
+            _depths.erase(_depths.begin() + num);
         }
         assert (_depths.size() > 0);
     }
