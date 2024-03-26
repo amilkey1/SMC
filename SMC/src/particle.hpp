@@ -96,7 +96,6 @@ class Particle {
         vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
         double                                          getCoalescentLikelihood(unsigned g);
         bool                                            speciesJoinProposed();
-        static bool                                     _run_on_empty;
         void                                            clear();
         vector<double>                                  chooseIncrements(vector<double> event_choice_rates);
         void                                            speciesProposal();
@@ -128,7 +127,9 @@ class Particle {
         void                                            setNewTheta();
         vector<double>                                  getThetaVector();
         double                                          getPopMean(){return _forests[1]._theta_mean;}
-        pair<string, string>                                          getSpeciesJoined(){return make_pair(_forests[0]._species_joined.first->_name, _forests[0]._species_joined.second->_name);}
+        pair<string, string>                            getSpeciesJoined(){return make_pair(_forests[0]._species_joined.first->_name, _forests[0]._species_joined.second->_name);}
+    
+        static bool                                     _run_on_empty;
 
     private:
 

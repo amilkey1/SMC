@@ -61,7 +61,6 @@ class Forest {
         string                      makeNewick(unsigned precision, bool use_names);
         string                      makePartialNewick(unsigned precision, bool use_names);
         pair<unsigned, unsigned>    chooseTaxaToJoin(double s, Lot::SharedPtr lot);
-        pair<unsigned, unsigned>    chooseTaxaToJoinOld(double s);
         tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> p, list<Node*> node_list, string species_name, double increment);
         void                        calcPartialArray(Node* new_nd);
         void                        setUpGeneForest(map<string, string> &taxon_map);
@@ -88,7 +87,6 @@ class Forest {
         void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
         void                        deleteTaxon(string key_to_del, unsigned taxon_choice);
         void                        allowCoalescence(string species_name, double increment, Lot::SharedPtr lot);
-        void                        coalesceChosenPair(string species_name, int node_pair_index);
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
         vector<string>              hybridizeSpecies();
         void                        moveGene(string new_nd, string parent, string hybrid);
@@ -726,28 +724,6 @@ class Forest {
 
         return make_pair(t1, t2);
     }
-                                                        
-    inline pair<unsigned, unsigned> Forest::chooseTaxaToJoinOld(double s){
-            // save random numbers
-            assert (s>1);
-            double nsubtrees = s;
-            unsigned t1=0;
-            unsigned t2=1;
-            //don't use this when there's only one choice (2 subtrees)
-            // thread safe random number generator with mutex
-            mtx.lock();
-            if (nsubtrees > 2) {
-                t1 = ::rng.randint(0, nsubtrees-1);
-                t2 = ::rng.randint(0, nsubtrees-1);
-
-                //keep calling t2 until it doesn't equal t1
-                while (t2 == t1) {
-                    t2 = ::rng.randint(0, nsubtrees-1);
-                }
-            }
-            mtx.unlock();
-            return make_pair(t1, t2);
-        }
                                                         
     inline tuple<unsigned, unsigned, unsigned> Forest::chooseTaxaToHybridize(){
         double nsubtrees = _lineages.size();
@@ -1691,69 +1667,6 @@ class Forest {
             _log_coalescent_likelihood_increment = log_increment_prior;
         }
 #endif
-    }
-
-    inline void Forest::coalesceChosenPair(string species_name, int node_pair_index) {
-        list<Node*> nodes;
-        for (auto &s:_species_partition) {
-            if (s.first == species_name) {
-                nodes = s.second;
-                break;
-            }
-        }
-        Node* subtree1 = _node_choices[node_pair_index].first;
-        Node* subtree2 =  _node_choices[node_pair_index].second;
-        
-        assert (subtree1 != subtree2);
-        
-        //new node is always needed
-        Node nd;
-        _nodes.push_back(nd);
-        Node* new_nd = &_nodes.back();
-
-        new_nd->_parent=0;
-        new_nd->_number=_nleaves+_ninternals;
-        new_nd->_edge_length=0.0;
-        _ninternals++;
-        new_nd->_right_sib=0;
-
-        new_nd->_left_child=subtree1;
-        subtree1->_right_sib=subtree2;
-
-        subtree1->_parent=new_nd;
-        subtree2->_parent=new_nd;
-
-        //always calculating partials now
-        assert (new_nd->_partial == nullptr);
-        new_nd->_partial=ps.getPartial(_npatterns*4);
-        assert(new_nd->_left_child->_right_sib);
-        
-        if (_save_memory) {
-            for (auto &nd:_lineages) {
-                if (nd->_partial == nullptr) {
-                    nd->_partial = ps.getPartial(_npatterns*4);
-                    calcPartialArray(nd);
-                }
-            }
-        }
-        calcPartialArray(new_nd);
-        
-        subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
-        subtree2->_partial=nullptr;
-
-        //update species list
-        updateNodeList(nodes, subtree1, subtree2, new_nd);
-        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-        
-        for (auto &s:_species_partition) {
-            if (s.first == species_name) {
-                s.second = nodes; // TODO: this should happen automatically
-                break;
-            }
-        }
-        
-        _gene_tree_log_likelihood = _log_likelihood_choices[node_pair_index];
-//        _gene_tree_log_likelihood = calcLogLikelihood();
     }
 
     inline void Forest::allowCoalescence(string species_name, double increment, Lot::SharedPtr lot) {
