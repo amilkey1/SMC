@@ -1312,6 +1312,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             
             if (Particle::_run_on_empty) { // if running with no data, choose taxa to join at random
                 Forest::_proposal = "prior-prior";
+                Forest::_run_on_empty = true;
             }
 
             try {
@@ -1373,7 +1374,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 #endif
                 
                 for (auto &p:my_vec) { // TODO: can parallelize this?
-                    p->setLogLikelihood(starting_log_likelihoods);
+                    if (!Forest::_run_on_empty) {
+                        p->setLogLikelihood(starting_log_likelihoods);
+                    }
 #if defined (DRAW_NEW_THETA)
                     p->drawTheta();
 #endif
@@ -1418,13 +1421,13 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         
                         normalizeWeights(my_vec);
                         
-                        for (auto & p:my_vec) {
-                            ess_inverse += exp(2.0*p->getLogWeight());
-                        }
-                        
-                        double ess = 1.0/ess_inverse;
                         if (_verbose > 1) {
-                            cout << "\t" << "ESS is : " << ess << endl;
+                            for (auto & p:my_vec) {
+                                ess_inverse += exp(2.0*p->getLogWeight());
+                            }
+                            
+                            double ess = 1.0/ess_inverse;
+                                cout << "\t" << "ESS is : " << ess << endl;
                         }
                         
                         bool filter = true;
@@ -1463,18 +1466,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     //            saveAllHybridNodes(my_vec);
                 
 //                saveSpeciesTrees(my_vec);
-//                saveGeneTrees(10, my_vec);
-                
-                if (Particle::_run_on_empty) { // make sure all gene tree log likelihoods are 0.0
-                    vector<double> gene_tree_log_likelihoods;
-                    gene_tree_log_likelihoods.resize(nsubsets);
-                    for (int i=0; i<nsubsets; i++) {
-                        gene_tree_log_likelihoods[i] = 0.0;
-                    }
-                    for (auto &p:my_vec) {
-                        p->setLogLikelihood(gene_tree_log_likelihoods);
-                    }
-                }
                 
 //                writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
                 if (_save_gene_trees) {

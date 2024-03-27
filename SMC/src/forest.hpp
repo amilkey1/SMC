@@ -1752,7 +1752,7 @@ class Forest {
                 }
             }
             
-            if (_proposal == "prior-prior" || one_choice) {
+            if ((_proposal == "prior-prior" || one_choice) && (!_run_on_empty) ) {
                 _gene_tree_log_likelihood = calcLogLikelihood();
                 _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
             }
