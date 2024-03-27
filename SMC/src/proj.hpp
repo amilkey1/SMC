@@ -1373,7 +1373,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 }
 #endif
                 
-                for (auto &p:my_vec) { // TODO: can parallelize this?
+                for (auto &p:my_vec) { // TODO: can parallelize this - is it worth it?
                     if (!Forest::_run_on_empty) {
                         p->setLogLikelihood(starting_log_likelihoods);
                     }
@@ -1396,10 +1396,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             cout << "starting step " << g << " of " << nsteps-1 << endl;
                         }
                         // set particle random number seeds
-                        unsigned psuffix = 1; // TODO: can do this in parallel?
+                        unsigned psuffix = 1;
                         for (auto &p:my_vec) {
                             p->setSeed(rng.randint(1,9999) + psuffix);
-//                                p->setPsuffix(psuffix); // set suffix here to set seed in parallelized proposals
                             psuffix += 2;
                         }
                         

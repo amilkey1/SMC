@@ -393,10 +393,7 @@ class Particle {
         return log_likelihood;
     }
 
-    inline void Particle::proposal() {
-//                assert (_psuffix > 0);
-//                setSeed(rng.randint(1,9999) + _psuffix);
-        
+    inline void Particle::proposal() {        
         _species_join_proposed = false;
         bool done = false;
                 
