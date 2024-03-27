@@ -688,37 +688,81 @@ def createRplot():
     plotstuff += 'kf <- read.table(file="kf-summary.txt")\n'
     plotstuff += 'kf_smc <- kf$V3\n'
     plotstuff += 'kf_beast <- kf$V6\n'
-    plotstuff += 'kf_smc_beast <- kf_smc - kf_beast\n'
     plotstuff += '\n'
     plotstuff += '# make more plots\n'
     plotstuff += 'library(ggplot2)\n'
     plotstuff += 'df <- data.frame(T, theta)\n'
     plotstuff += '\n'
+    
+    plotstuff += 'max_kf_beast <- max(kf_beast)\n'
+    plotstuff += 'max_kf_smc <- max(kf_smc)\n'
+    plotstuff += 'max_kf <- max(c(kf_beast, kf_smc))\n'
+    plotstuff += '\n'
+    plotstuff += 'max_rf_beast <- max(rf_beast)\n'
+    plotstuff += 'max_rf_smc <- max(rf_smc)\n'
+    plotstuff += 'max_rf <- max(c(rf_beast, rf_smc))\n'
+    plotstuff += '\n'
+    plotstuff += 'myPalette<-colorRampPalette(c("purple","yellow"))\n'
+    plotstuff += 'sc_kf <- scale_colour_gradientn(colours = myPalette(100), limits=c(0, max_kf+1))\n'
+    plotstuff += 'sc_rf <- scale_colour_gradientn(colours = myPalette(100), limits=c(0, max_rf+1))\n'
+	plotstuff += '\n'
+    
     plotstuff += '# color smc by kf distances\n'
     plotstuff += 'pdf("smc_kf_distances.pdf")\n'
-    plotstuff += 'p_kf_smc <- ggplot(df, aes(theta/2, T, color=kf_smc))\n'
+    plotstuff += 'p_kf_smc <- ggplot(df, aes(theta/2, T, color=kf_smc)) + sc_kf\n'
     plotstuff += 'p_kf_smc + geom_point()\n'
     plotstuff += 'dev.off()\n'
     plotstuff += '\n'
     plotstuff += '# color beast by kf distances\n'
     plotstuff += 'pdf("beast_kf_distances.pdf")\n'
-    plotstuff += 'p_kf_beast <- ggplot(df, aes(theta/2, T, color=kf_beast))\n'
+    plotstuff += 'p_kf_beast <- ggplot(df, aes(theta/2, T, color=kf_beast)) + sc_kf\n'
     plotstuff += 'p_kf_beast + geom_point()\n'
     plotstuff += 'dev.off()\n'
     plotstuff += '\n'
     plotstuff += '# color smc by rf distances\n'
     plotstuff += 'pdf("smc_rf_distances.pdf")\n'
-    plotstuff += 'p_rf_smc <- ggplot(df, aes(theta/2, T, color=rf_smc))\n'
+    plotstuff += 'p_rf_smc <- ggplot(df, aes(theta/2, T, color=rf_smc)) + sc_rf\n'
     plotstuff += 'p_rf_smc + geom_point()\n'
     plotstuff += 'dev.off()\n'
     plotstuff += '\n'
     plotstuff += '# color beast by rf distances\n'
     plotstuff += 'pdf("beast_rf_distances.pdf")\n'
-    plotstuff += 'p_rf_beast <- ggplot(df, aes(theta/2, T, color=rf_beast))\n'
+    plotstuff += 'p_rf_beast <- ggplot(df, aes(theta/2, T, color=rf_beast)) + sc_rf\n'
     plotstuff += 'p_kf_beast + geom_point()\n'
     plotstuff += 'dev.off()\n'
-    plotstuff == '\n'
+    plotstuff += '\n'
+    
+    plotstuff += 'deep_coal <- read.csv("deep_coal.txt", header=FALSE)\n'
+    plotstuff += 'deep_coal <- as.numeric(deep_coal)\n'
+    plotstuff += '\n'
+    plotstuff += 'pdf("deep_coal_kf_smc.pdf")\n'
+    plotstuff += 'df_smc_kf <- data.frame(kf_smc, deep_coal)\n'
+    plotstuff += 'p_smc_deep_kf <- ggplot(df_smc_kf, aes(deep_coal, kf_smc))\n'
+    plotstuff += 'p_smc_deep_kf+geom_point() + theme_classic() + ylim(0, max_kf+1)\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# plot number of deep coalescences vs KF distance -beast\n'
+    plotstuff += 'pdf("deep_coal_kf_beast.pdf")\n'
+    plotstuff += 'df_beast_kf <- data.frame(kf_beast, deep_coal)\n'
+    plotstuff += 'p_beast_deep_kf <- ggplot(df_beast_kf, aes(deep_coal, kf_beast))\n'
+    plotstuff += 'p_beast_deep_kf+geom_point() + theme_classic() + ylim(0, max_kf+1)\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# plot number of deep coalescences vs RF distance - smc\n'
+    plotstuff += 'pdf("deep_coal_rf_smc.pdf")\n'
+    plotstuff += 'df_smc_rf <- data.frame(rf_smc, deep_coal)\n'
+    plotstuff += 'p_smc_deep_rf <- ggplot(df_smc_rf, aes(deep_coal, rf_smc))\n'
+    plotstuff += 'p_smc_deep_rf+geom_point() + theme_classic() + ylim(0, max_rf+1)\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# plot number of deep coalescences vs RF distance -beast\n'
+    plotstuff += 'pdf("deep_coal_rf_beast.pdf")\n'
+    plotstuff += 'df_beast_rf <- data.frame(rf_beast, deep_coal)\n'
+    plotstuff += 'p_beast_deep_rf <- ggplot(df_beast_rf, aes(deep_coal, rf_beast))\n'
+    plotstuff += 'p_beast_deep_rf+geom_point() + theme_classic() + ylim(0, max_rf+1)\n'
+    plotstuff += 'dev.off()\n'
 
+    plotstuff == '\n'
     plotf = open(plotfn, 'w')
     plotf.write(plotstuff)
     plotf.close()
@@ -994,7 +1038,7 @@ def writeDeepCoalFile():
 	s += "	lines = open(name+'/sim'+'/deep_coalescences.txt', 'r').readlines()[1:]\n"
 	s += "	for line in lines[1:]:\n"
 	s += "		parts = line.strip().split()\n"
-	s += "		new_f.write(parts[1]+',')\n"
+	s += "		new_f.write(',' + parts[1])\n"
 	s += "	i+=1\n"
 	s += "new_f.close\n"
 	deepcoalf = open(deepcoalfn, 'w')
@@ -1054,10 +1098,10 @@ if __name__ == '__main__':
     createBeastSlurm()
     createCopyDataPy()
     createCrunch()
+    writeDeepCoalFile()
     #createPAUP('smc', smctreefname, 1)
     #createPAUP('beast', beasttreefname, 2)
     createTreeDist('smc', smctreefname, 1)
     createTreeDist('beast', beasttreefname, 2)
     createANOVAPy()
     writeTimeFile()
-    writeDeepCoalFile()
