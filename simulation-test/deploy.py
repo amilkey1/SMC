@@ -1,14 +1,27 @@
-import sys, os, re, random, subprocess as sub, shutil
-from math import log
+import sys, os, re, subprocess as sub, shutil, numpy as np
+from scipy.stats import randint,uniform,lognorm,describe
+from math import log,exp,sqrt,pow
 
 # Settings you can change
+method           = 'uniform' # should be either 'uniform' or 'lognorm'
 ntax           = [2,2,2,2,2] # number of taxa in each species
-lamda          = 1.0         # speciation rate (note: lambda is a python keyword)
-theta          = 0.1        # 4 Nm mu (same for all species and constant within species)
+
+# These used only if method == 'uniform' 
+T_low            = 0.1       # smallest tree height (T) value 
+T_high           = 1.0       # largest tree height (T) value
+half_theta_low   = 0.1       # smallest theta/2 value
+half_theta_high  = 1.0       # largest theta/2 value
+
+# These used only if method == 'lornorm' 
+Tmean            = 1.0       # mean tree height (T)
+Tsd              = 0.7       # standard deviation of T
+Rmean            = 0.2       # mean ratio of theta to T
+Rsd              = 0.2       # standard deviation of theta/T ratios
+
 nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100       # number of sites in each gene
-nreps          = 10          # number of simulation replicates
-nparticles     = 5000       # number of particles to use for SMC
+nreps          = 2          # number of simulation replicates
+nparticles     = 50       # number of particles to use for SMC
 simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
@@ -16,14 +29,14 @@ smctreefname   = 'species_trees.trees' # name of species tree file for SMC
 beasttreefname = 'species.trees'           # name of species tree file for BEAST
 username       = 'aam21005'  # name of user on UConn HPC cluster
 nodechoices    = [('general', 'epyc128'), ('priority','skylake')]
-nodechoice     = 0           # 0-offset index into nodechoices
+nodechoice     = 0          # 0-offset index into nodechoices
 #partition      = 'general'   # specifies partition to use for HPC: either 'general' or 'priority'
 #constraint     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
-rnseed         = 387515      # overall pseudorandom number seed
-mcmciter       = 500000      # chain length for Beast MCMC
+rnseed         = 381131      # overall pseudorandom number seed
+mcmciter       = 500      # chain length for Beast MCMC
 saveevery      = 100         # MCMC storeevery modulus
-preburnin      = 50000        # MCMC burn in
+preburnin      = 0        # MCMC burn in
 storeevery     = 100        # state storeevery modulus
 screenevery    = 100        # screen print modulus
 genetreeevery  = 100         # gene tree save modulus
@@ -33,9 +46,52 @@ spptreeevery   = 100          # species tree save modulus (mcmciter/spptreeevery
 maxsimult   = None        # maximum number of jobs to run simultaneously (set to None if there is no maximum)
 
 # Values obtained from settings
+np.random.seed(seed=rnseed)
 nspecies = len(ntax)
-random.seed(rnseed)
-rnseeds = [random.randint(1,999999) for i in range(nreps)]
+
+# Set up random variable for choosing seeds for each replicate
+rnseeds = randint.rvs(1, 1000000, size=nreps)
+
+if method == 'lognorm':
+    # Set up "standardized" scipy lognormal distribution for T
+    Tsigsq = log(1. + pow(Tsd/Tmean,2.))
+    Tsigma = sqrt(Tsigsq)
+    Tmu = log(Tmean) - 0.5*Tsigsq
+    Tshape = Tsigma
+    Tscale = exp(Tmu)
+    Trv = lognorm(Tshape, scale=Tscale)
+    Tvect = Trv.rvs(size=nreps)
+    Td = describe(Tvect, 0, 1)  # 0 = axis, 1 = df used in correcting variance)
+
+    # Set up "standardized" scipy lognormal distribution for theta/T ratio
+    Rsigsq = log(1. + pow(Rsd/Rmean,2.))
+    Rsigma = sqrt(Rsigsq)
+    Rmu = log(Rmean) - 0.5*Rsigsq
+    Rshape = Rsigma
+    Rscale = exp(Rmu)
+    Rrv = lognorm(Rshape, scale=Rscale)
+    Rvect = Rrv.rvs(size=nreps)
+    Rd = describe(Rvect, 0, 1)  # 0 = axis, 1 = df used in correcting variance)
+
+    thetas = [r*t for r,t in zip(Rvect, Tvect)]
+    thetad = describe(thetas, 0, 1)
+
+    nspp = len(ntax)
+    phi = sum([1./k for k in range(2, nspp + 1)])
+    lambdas = [phi/t for t in Tvect]
+    lambdad = describe(lambdas, 0, 1)
+elif method == 'uniform':
+    thetas = [2.*q for q in uniform.rvs(loc=half_theta_low, scale=half_theta_high-half_theta_low, size=nreps)]
+    thetad = describe(thetas, 0, 1)
+
+    Tvect = uniform.rvs(loc=T_low, scale=T_high-T_low, size=nreps)
+    Td = describe(Tvect, 0, 1)  # 0 = axis, 1 = df used in correcting variance)
+    nspp = len(ntax)
+    phi = sum([1./k for k in range(2, nspp + 1)])
+    lambdas = [phi/t for t in Tvect]
+    lambdad = describe(lambdas, 0, 1)
+else:
+    assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
 
 def inventName(k, lower_case):
     # If   0 <= k < 26, returns A, B, ..., Z,
@@ -141,8 +197,11 @@ def createBeastDir(rep_index):
     os.mkdir(beastdirpath)
 
 def createSimConf(rep_index):
+    theta = thetas[rep_index]
+    lamda = lambdas[rep_index]
     simdirpath = createSimDirPath(rep_index)
     fn = os.path.join(simdirpath, 'proj.conf')
+
     s  = ''
     s += 'filename  = sim.nex\n'
     s += 'startmode = sim\n'
@@ -169,6 +228,8 @@ def createSimConf(rep_index):
     outf.write(s)
     outf.close()
 def createSMCConf(rep_index):
+    theta = thetas[rep_index]
+    lamda = lambdas[rep_index]
     smcdirpath = createSMCDirPath(rep_index)
     smcconffn = os.path.join(smcdirpath, 'proj.conf')
 
@@ -183,15 +244,19 @@ def createSMCConf(rep_index):
         locus = g + 1
         s += 'subset = locus%d[nucleotide]:%d-%d\n' % (locus, cum + 1, cum + seqlen)
         cum += seqlen
-    s += 'theta  = 0.5\n'
+    s += 'theta  = %.2f\n' % theta
     s += 'lambda = %.2f\n' % lamda
     s += '\n'
     s += '\n'
     s += 'nparticles = %d\n' % nparticles
     s += 'nthreads = 34\n'
     s += '\n'
-    s += 'phi = 1.0\n'
-    s += 'verbose = 2\n'
+    s += 'verbose = 1\n'
+    s += 'run_on_empty = false\n'
+    s += 'particle_increase = 100\n'
+    s += 'thin=0.1\n'
+    s += 'save_every = 5\n'
+    s += 'save_gene_trees = false\n'
 
     smcconff = open(smcconffn, 'w')
     smcconff.write(s)
@@ -370,6 +435,7 @@ def createBeastXML(rep_index):
     s += '            <log idref="prior"/>\n'
     s += '            <log idref="vectorPrior"/>\n'
     s += '            <log idref="speciescoalescent"/>\n'
+    s += '            <log idref="speciationRate.t:Species"/>\n'
     s += '            <log id="TreeStat.Species" spec="beast.base.evolution.tree.TreeStatLogger" tree="@Tree.t:Species"/>\n'
     s += '            <log idref="YuleModel.t:Species"/>\n'
     s += '            <log idref="popMean"/>\n'
@@ -418,8 +484,55 @@ def createBeastXML(rep_index):
 
 def createREADME():
     readmefn = os.path.join(dirname, 'README')
-
-    readme  = ''
+    
+    readme  = 'Summary of parameters used in simulations\n'
+    readme += '-----------------------------------------\n'
+    if method == 'lognorm':
+        readme += 'T (tree height):\n'
+        readme += '  nobs = %d\n' % Td.nobs
+        readme += '  mean = %.5f (expected value = %.5f)\n' % (Td.mean, Tmean)
+        readme += '  s.d. = %.5f (expected value = %.5f)\n' % (sqrt(Td.variance),Tsd)
+        readme += '  min  = %.5f\n' % (min(Tvect),)
+        readme += '  max  = %.5f\n' % (max(Tvect),)
+        readme += '\n'
+        readme += 'R (theta/T ratio):\n'
+        readme += '  nobs = %d\n' % Rd.nobs
+        readme += '  mean = %.5f (expected value = %.5f)\n' % (Rd.mean, Rmean)
+        readme += '  s.d. = %.5f (expected value = %.5f)\n' % (sqrt(Rd.variance),Rsd)
+        readme += '  min  = %.5f\n' % (min(Rvect),)
+        readme += '  max  = %.5f\n' % (max(Rvect),)
+        readme += '\n'
+        readme += 'theta:\n'
+        readme += '  nobs = %d\n' % thetad.nobs
+        readme += '  mean = %.5f\n' % thetad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(thetad.variance),)
+        readme += '  min  = %.5f\n' % (min(thetas),)
+        readme += '  max  = %.5f\n' % (max(thetas),)
+        readme += '\n'
+        readme += 'lambda:\n'
+        readme += '  nobs = %d\n' % lambdad.nobs
+        readme += '  mean = %.5f\n' % lambdad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(lambdad.variance),)
+        readme += '  min  = %.5f\n' % (min(lambdas),)
+        readme += '  max  = %.5f\n' % (max(lambdas),)
+        readme += '\n'
+    elif method == 'uniform':
+        readme += 'theta:\n'
+        readme += '  nobs = %d\n' % thetad.nobs
+        readme += '  mean = %.5f\n' % thetad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(thetad.variance),)
+        readme += '  min  = %.5f\n' % (min(thetas),)
+        readme += '  max  = %.5f\n' % (max(thetas),)
+        readme += '\n'
+        readme += 'lambda:\n'
+        readme += '  nobs = %d\n' % lambdad.nobs
+        readme += '  mean = %.5f\n' % lambdad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(lambdad.variance),)
+        readme += '  min  = %.5f\n' % (min(lambdas),)
+        readme += '  max  = %.5f\n' % (max(lambdas),)
+        readme += '\n'
+    else:
+        assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
 
     readme += 'Installing SMC on the remote cluster\n'
     readme += '------------------------------------\n'
@@ -433,7 +546,7 @@ def createREADME():
     readme += '2. Ensure that the name of your executable is stored in the variable\n'
     readme += '   "smcprogname" in the "deploy.py" script.\n'
     readme += '\n'
-
+    
     readme += 'Installing BEAST on the remote cluster\n'
     readme += '--------------------------------------\n'
     readme += '\n'
@@ -494,7 +607,7 @@ def createREADME():
     readme += '\n'
     readme += 'cd g\n'
     readme += '\n'
-
+    
     readme += 'Running the simulation experiment on the remote cluster\n'
     readme += '-------------------------------------------------------\n'
     readme += '1. Simulate data:\n'
@@ -524,16 +637,91 @@ def createREADME():
     readme += '. beasttd.sh\n'
     readme += 'python3 crunch.py\n'
     readme += '\n'
-
     readme += '2. Carry out repeated-measures ANOVA on remote cluster\n'
     readme += '\n'
     readme += 'python3 anova-means.py  # ignores variation within runs, using the run mean as the data point\n'
     readme += 'python3 anova-full.py   # takes account of variation within runs, every posterior sample is used\n'
     readme += '\n'
-
+    
     readmef = open(readmefn, 'w')
     readmef.write(readme)
     readmef.close()
+
+def createRplot():
+    plotfn = os.path.join(dirname, 'simcond.R')
+
+    plotstuff  = 'cwd = system(\'cd "$( dirname "$0" )" && pwd\', intern = TRUE)\n'
+    plotstuff += 'setwd(cwd)\n'
+    plotstuff += 'pdf("simcond.pdf")\n'
+
+    if method == 'lognorm':
+        Tstr = ['%g' % t for t in Tvect]
+        plotstuff += 'T = c(%s)\n' % ','.join(Tstr)
+
+        Rstr = ['%g' % r for r in Rvect]
+        plotstuff += 'R = c(%s)\n' % ','.join(Rstr)
+
+        thetastr = ['%g' % q for q in thetas]
+        plotstuff += 'theta = c(%s)\n' % ','.join(thetastr)
+
+        lambdastr = ['%g' % l for l in lambdas]
+        plotstuff += 'lambda = c(%s)\n' % ','.join(lambdastr)
+
+        plotstuff += 'plot(theta, lambda, type="p", pch=19, main="Simulation conditions", xlab="theta", ylab="lambda")\n'
+    elif method == 'uniform':
+        Tstr = ['%g' % t for t in Tvect]
+        plotstuff += 'T = c(%s)\n' % ','.join(Tstr)
+
+        thetastr = ['%g' % q for q in thetas]
+        plotstuff += 'theta = c(%s)\n' % ','.join(thetastr)
+
+        plotstuff += 'plot(theta/2, T, type="p", pch=19, main="Simulation conditions", xlab="theta/2", ylab="T")\n'
+    else:
+        assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
+
+    plotstuff += 'dev.off()\n'
+
+    plotstuff += 'rf <- read.table(file="rf-summary.txt")\n'
+    plotstuff += 'rf_smc <- rf$V3\n'
+    plotstuff += 'rf_beast <- rf$V6\n'
+    plotstuff += '\n'
+    plotstuff += 'kf <- read.table(file="kf-summary.txt")\n'
+    plotstuff += 'kf_smc <- kf$V3\n'
+    plotstuff += 'kf_beast <- kf$V6\n'
+    plotstuff += 'kf_smc_beast <- kf_smc - kf_beast\n'
+    plotstuff += '\n'
+    plotstuff += '# make more plots\n'
+    plotstuff += 'library(ggplot2)\n'
+    plotstuff += 'df <- data.frame(T, theta)\n'
+    plotstuff += '\n'
+    plotstuff += '# color smc by kf distances\n'
+    plotstuff += 'pdf("smc_kf_distances.pdf")\n'
+    plotstuff += 'p_kf_smc <- ggplot(df, aes(theta/2, T, color=kf_smc))\n'
+    plotstuff += 'p_kf_smc + geom_point()\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# color beast by kf distances\n'
+    plotstuff += 'pdf("beast_kf_distances.pdf")\n'
+    plotstuff += 'p_kf_beast <- ggplot(df, aes(theta/2, T, color=kf_beast))\n'
+    plotstuff += 'p_kf_beast + geom_point()\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# color smc by rf distances\n'
+    plotstuff += 'pdf("smc_rf_distances.pdf")\n'
+    plotstuff += 'p_rf_smc <- ggplot(df, aes(theta/2, T, color=rf_smc))\n'
+    plotstuff += 'p_rf_smc + geom_point()\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# color beast by rf distances\n'
+    plotstuff += 'pdf("beast_rf_distances.pdf")\n'
+    plotstuff += 'p_rf_beast <- ggplot(df, aes(theta/2, T, color=rf_beast))\n'
+    plotstuff += 'p_kf_beast + geom_point()\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff == '\n'
+
+    plotf = open(plotfn, 'w')
+    plotf.write(plotstuff)
+    plotf.close()
 
 def createSimBash():
     simfn = os.path.join(dirname, 'simulate.sh')
@@ -623,6 +811,7 @@ def createCopyDataPy():
     shutil.copyfile('copydata_template.py', copydatafn)
     stuff = open(copydatafn, 'r').read()
     stuff, n = re.subn('__NLOCI__', '%d' % nloci, stuff, re.M | re.S)
+    assert n == 1
     stuff, n = re.subn('__SEQLEN__', '%d' % seqlen, stuff, re.M | re.S)
     assert n == 1
     copydataf = open(copydatafn, 'w')
@@ -686,14 +875,14 @@ def createCrunch():
     s  += '        self.group_mean[rep] = 0.0\n'
     s  += '        self.group_n[rep] = 0\n'
     s  += '\n'
-    s  += 'def getDistances(fnprefix):\n'
+    s  += 'def getKFDistances(fnprefix):\n'
     s  += '    d = DistSummary()\n'
     s  += '    for rep in range(%d):\n' % nreps
     s  += '        d.zero(rep)\n'
     s  += '        lines = open("%s%d.txt" % (fnprefix, rep+1,), "r").readlines()\n'
     s  += '        for line in lines[1:]:\n'
     s  += '            parts = line.strip().split()\n'
-    s  += '            assert len(parts) == 2\n'
+    s  += '            assert len(parts) == 3\n'
     s  += '            y = float(parts[1])\n'
     s  += '            d.dists[rep].append(y)\n'
     s  += '\n'
@@ -712,12 +901,48 @@ def createCrunch():
     s  += '        d.group_n[rep] = d.count[rep]\n'
     s  += '    return d\n'
     s  += '\n'
-    s  += 'dsmc = getDistances("smcdists")\n'
-    s  += 'dbeast = getDistances("beastdists")\n'
+    s  += '\n'
+    s  += 'def getRFDistances(fnprefix):\n'
+    s  += '    d = DistSummary()\n'
+    s  += '    for rep in range(%d):\n' % nreps
+    s  += '        d.zero(rep)\n'
+    s  += '        lines = open("%s%d.txt" % (fnprefix, rep+1,), "r").readlines()\n'
+    s  += '        for line in lines[1:]:\n'
+    s  += '            parts = line.strip().split()\n'
+    s  += '            assert len(parts) == 3\n'
+    s  += '            y = float(parts[2])\n'
+    s  += '            d.dists[rep].append(y)\n'
+    s  += '\n'
+    s  += '        d.count[rep] = len(d.dists[rep])\n'
+    s  += '        d.sum[rep] = sum(d.dists[rep])\n'
+    s  += '        d.sumsq[rep] = sum([y*y for y in d.dists[rep]])\n'
+    s  += '        d.cum[rep] += d.sum[rep]\n'
+    s  += '        d.total[rep] += d.count[rep]\n'
+    s  += '        d.mean[rep] = d.sum[rep]/d.count[rep]\n'
+    s  += '        d.var[rep] = (d.sumsq[rep] - pow(d.mean[rep],2.)*d.count[rep])/(d.count[rep]-1)\n'
+    s  += '        if d.var[rep] < 0.0:\n'
+    s  += '            print("warning: variance negative (%g) for %s rep %d: mean = %g, sumsq = %g, count = %d" % (d.var[rep], fnprefix, rep, d.mean[rep], d.sumsq[rep], d.count[rep]))\n'
+    s  += '            d.var[rep] = 0.0\n'
+    s  += '        d.stdev[rep] = sqrt(d.var[rep])\n'
+    s  += '        d.group_mean[rep] = d.mean[rep]\n'
+    s  += '        d.group_n[rep] = d.count[rep]\n'
+    s  += '    return d\n'
+    s  += 'kf = open("kf-summary.txt", "x")\n'
+    s  += 'rf = open("rf-summary.txt", "x")\n'
+    s  += 'dsmc_kf = getKFDistances("smcdists")\n'
+    s  += 'dbeast_kf = getKFDistances("beastdists")\n'
+    s  += 'dsmc_rf = getRFDistances("smcdists")\n'
+    s  += 'dbeast_rf = getRFDistances("beastdists")\n'
     s  += 'print("%12s %38s %38s" % ("replicate", "----------------- SMC ----------------", "---------------- BEAST ---------------"))\n'
     s  += 'print("%12s %12s %12s %12s %12s %12s %12s" % ("replicate", "count", "mean", "stdev", "count", "mean", "stdev"))\n'
     s  += 'for rep in range(%d):\n' % nreps
-    s  += '    print("%12d %12d %12.5f %12.5f %12d %12.5f %12.5f" % (rep+1, dsmc.count[rep], dsmc.mean[rep], dsmc.stdev[rep], dbeast.count[rep], dbeast.mean[rep], dbeast.stdev[rep]))\n'
+    s  += '    print("kf: %12d %12d %12.5f %12.5f %12d %12.5f %12.5f" % (rep+1, dsmc_kf.count[rep], dsmc_kf.mean[rep], dsmc_kf.stdev[rep], dbeast_kf.count[rep], dbeast_kf.mean[rep], dbeast_kf.stdev[rep]))\n'
+    s +=  '    kf.write("%12d %12d %12.5f %12.5f %12d %12.5f %12.5f \\n" % (rep+1, dsmc_kf.count[rep], dsmc_kf.mean[rep], dsmc_kf.stdev[rep], dbeast_kf.count[rep], dbeast_kf.mean[rep], dbeast_kf.stdev[rep]))\n'
+    s +=  '    kf.close\n'
+    s  += 'for rep in range(%d):\n' % nreps
+    s  += '    print("rf: %12d %12d %12.5f %12.5f %12d %12.5f %12.5f" % (rep+1, dsmc_rf.count[rep], dsmc_rf.mean[rep], dsmc_rf.stdev[rep], dbeast_rf.count[rep], dbeast_rf.mean[rep], dbeast_rf.stdev[rep]))\n'
+    s  += '    rf.write("%12d %12d %12.5f %12.5f %12d %12.5f %12.5f \\n" % (rep+1, dsmc_rf.count[rep], dsmc_rf.mean[rep], dsmc_rf.stdev[rep], dbeast_rf.count[rep], dbeast_rf.mean[rep], dbeast_rf.stdev[rep]))\n'
+    s  += '    rf.close\n'
     s  += 'print(" ")\n'
 
     crunchf = open(crunchfn, 'w')
@@ -760,6 +985,55 @@ def createTreeDist(pathname, fn, startat):
     tdf.write(s)
     tdf.close()
 
+def writeDeepCoalFile():
+	deepcoalfn = os.path.join(dirname, 'get-deep-coal.py')
+	s = "i = 1\n"
+	s += "new_f = open('deep_coal_all.txt', 'x')\n"
+	s += "for rep in range(%12d):\n" % nreps
+	s += "	name = 'rep' + str(i)\n"
+	s += "	lines = open(name+'/sim'+'/deep_coalescences.txt', 'r').readlines()[1:]\n"
+	s += "	for line in lines[1:]:\n"
+	s += "		parts = line.strip().split()\n"
+	s += "		new_f.write(parts[1]+',')\n"
+	s += "	i+=1\n"
+	s += "new_f.close\n"
+	deepcoalf = open(deepcoalfn, 'w')
+	deepcoalf.write(s)
+	deepcoalf.close()
+
+def writeTimeFile():
+	timefn = os.path.join(dirname, 'get-times.py')
+	s = "import os\n"
+	s += "import numpy\n"
+	s += "import shutil\n"
+	s +=  "nreps = %12d \n" % nreps
+	s += "timef = open ('times.txt', 'x')\n"
+	s += "smc_time_list = []\n"
+	s += "beast_time_list = []\n"
+	s += "for i in range(nreps):\n"
+	s += "	smc_file_name = 'smc-' + str(i+1) + '.err'\n"
+	s += "	with open (smc_file_name, mode = 'r') as file:\n"
+	s += "		for line in file:\n"
+	s += "			pass\n"
+	s += "		last_line = line\n"
+	s += "	smc_time_list.append(float(last_line[13:]))\n"
+	s +=  "	beast_file_name = 'beast-' + str(i+1) + '.err'\n"
+	s += "	with open (beast_file_name, mode='r') as file:\n"
+	s += "		for line in file:\n"
+	s += "			pass\n"
+	s += "		last_line = line\n"
+	s += "	beast_time_list.append(float(last_line[13:]))\n"
+	s += "smc_average = sum(smc_time_list) / len(smc_time_list)\n"
+	s += "timef.write('smc average time: ' + str(smc_average))\n"
+	s += "print('smc average time: ' + str(smc_average))\n"
+	s += "beast_average = sum(beast_time_list) / len(beast_time_list)\n"
+	s += "timef.write('beast average time: ' + str(beast_average))\n"
+	s += "print('beast average time: ' + str(beast_average))\n"
+
+	timef = open(timefn, 'w')
+	timef.write(s)
+	timef.close()
+
 if __name__ == '__main__':
     createMainDir()
     for rep in range(nreps):
@@ -774,6 +1048,7 @@ if __name__ == '__main__':
         createBeastXML(rep)
         
     createREADME()
+    createRplot()
     createSimBash()
     createSMCSlurm()
     createBeastSlurm()
@@ -784,3 +1059,5 @@ if __name__ == '__main__':
     createTreeDist('smc', smctreefname, 1)
     createTreeDist('beast', beasttreefname, 2)
     createANOVAPy()
+    writeTimeFile()
+    writeDeepCoalFile()
