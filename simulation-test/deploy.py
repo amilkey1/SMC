@@ -21,7 +21,7 @@ Rsd              = 0.2       # standard deviation of theta/T ratios
 nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100       # number of sites in each gene
 nreps          = 2          # number of simulation replicates
-nparticles     = 50       # number of particles to use for SMC
+nparticles     = 100       # number of particles to use for SMC
 simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
@@ -34,13 +34,13 @@ nodechoice     = 0          # 0-offset index into nodechoices
 #constraint     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
 rnseed         = 381131      # overall pseudorandom number seed
-mcmciter       = 500      # chain length for Beast MCMC
+mcmciter       = 100      # chain length for Beast MCMC
 saveevery      = 100         # MCMC storeevery modulus
 preburnin      = 0        # MCMC burn in
 storeevery     = 100        # state storeevery modulus
 screenevery    = 100        # screen print modulus
 genetreeevery  = 100         # gene tree save modulus
-spptreeevery   = 100          # species tree save modulus (mcmciter/spptreeevery should equal nparticles
+spptreeevery   = 1          # species tree save modulus (mcmciter/spptreeevery should equal nparticles
 
 # Settings you can change but probably shouldn't
 maxsimult   = None        # maximum number of jobs to run simultaneously (set to None if there is no maximum)
@@ -254,8 +254,8 @@ def createSMCConf(rep_index):
     s += 'verbose = 1\n'
     s += 'run_on_empty = false\n'
     s += 'particle_increase = 100\n'
-    s += 'thin=0.1\n'
-    s += 'save_every = 5\n'
+    s += 'thin=0.01\n'
+    s += 'save_every = 1\n'
     s += 'save_gene_trees = false\n'
 
     smcconff = open(smcconffn, 'w')
@@ -693,7 +693,7 @@ def createRplot():
     plotstuff += 'library(ggplot2)\n'
     plotstuff += 'df <- data.frame(T, theta)\n'
     plotstuff += '\n'
-    
+
     plotstuff += 'max_kf_beast <- max(kf_beast)\n'
     plotstuff += 'max_kf_smc <- max(kf_smc)\n'
     plotstuff += 'max_kf <- max(c(kf_beast, kf_smc))\n'
@@ -705,8 +705,8 @@ def createRplot():
     plotstuff += 'myPalette<-colorRampPalette(c("purple","yellow"))\n'
     plotstuff += 'sc_kf <- scale_colour_gradientn(colours = myPalette(100), limits=c(0, max_kf+1))\n'
     plotstuff += 'sc_rf <- scale_colour_gradientn(colours = myPalette(100), limits=c(0, max_rf+1))\n'
-	plotstuff += '\n'
-    
+    plotstuff += '\n'
+
     plotstuff += '# color smc by kf distances\n'
     plotstuff += 'pdf("smc_kf_distances.pdf")\n'
     plotstuff += 'p_kf_smc <- ggplot(df, aes(theta/2, T, color=kf_smc)) + sc_kf\n'
@@ -728,13 +728,14 @@ def createRplot():
     plotstuff += '# color beast by rf distances\n'
     plotstuff += 'pdf("beast_rf_distances.pdf")\n'
     plotstuff += 'p_rf_beast <- ggplot(df, aes(theta/2, T, color=rf_beast)) + sc_rf\n'
-    plotstuff += 'p_kf_beast + geom_point()\n'
+    plotstuff += 'p_rf_beast + geom_point()\n'
     plotstuff += 'dev.off()\n'
     plotstuff += '\n'
-    
+
     plotstuff += 'deep_coal <- read.csv("deep_coal.txt", header=FALSE)\n'
     plotstuff += 'deep_coal <- as.numeric(deep_coal)\n'
     plotstuff += '\n'
+    plotstuff += '# plot number of deep coalescences vs KF distance -smc \n'
     plotstuff += 'pdf("deep_coal_kf_smc.pdf")\n'
     plotstuff += 'df_smc_kf <- data.frame(kf_smc, deep_coal)\n'
     plotstuff += 'p_smc_deep_kf <- ggplot(df_smc_kf, aes(deep_coal, kf_smc))\n'
@@ -1032,14 +1033,18 @@ def createTreeDist(pathname, fn, startat):
 def writeDeepCoalFile():
 	deepcoalfn = os.path.join(dirname, 'get-deep-coal.py')
 	s = "i = 1\n"
-	s += "new_f = open('deep_coal_all.txt', 'x')\n"
+	s += "new_f = open('deep_coal.txt', 'x')\n"
 	s += "for rep in range(%12d):\n" % nreps
 	s += "	name = 'rep' + str(i)\n"
 	s += "	lines = open(name+'/sim'+'/deep_coalescences.txt', 'r').readlines()[1:]\n"
 	s += "	for line in lines[1:]:\n"
 	s += "		parts = line.strip().split()\n"
-	s += "		new_f.write(',' + parts[1])\n"
+	s += "		if (i == 1) :\n"
+	s += "			new_f.write(parts[1])\n"
+	s += "		else:\n"
+	s += "			new_f.write(',' + parts[1])\n"
 	s += "	i+=1\n"
+	s += "\n"
 	s += "new_f.close\n"
 	deepcoalf = open(deepcoalfn, 'w')
 	deepcoalf.write(s)
