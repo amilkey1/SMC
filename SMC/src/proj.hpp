@@ -54,7 +54,7 @@ namespace proj {
             void                createSpeciesMap(Data::SharedPtr);
             void                simSpeciesMap();
             string              inventName(unsigned k, bool lower_case);
-            void                showFinal(vector<Particle::SharedPtr>);
+            void                showFinal(vector<Particle::SharedPtr> my_vec);
             void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
             void                proposeSpeciesParticles(vector<Particle::SharedPtr> &particles);
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
@@ -63,6 +63,8 @@ namespace proj {
             void                simulateData();
             void                writePaupFile(vector<Particle::SharedPtr> particles, vector<string> taxpartition);
             void                sanityChecks();
+            void                initializeParticles(vector<Particle::SharedPtr> &particles);
+            void                initializeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
 
         private:
 
@@ -994,17 +996,13 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         sum_h/=my_vec.size();
         cout << "mean height equals " << sum_h << endl;
         cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
+        
 #if defined (DRAW_NEW_THETA)
-//        vector<double> theta_vec = p->getThetaVector();
-//        unsigned a = 1;
-//        for (auto &t:theta_vec) {
-//            cout << "theta " << a << " = " << theta_vec[i] << endl;
-//            a++;
-//        }
         cout << "different theta for each population in each particle " << endl;
 #else
         cout << "theta = " << Forest::_theta << endl;
 #endif
+        
         cout << "speciation rate = " << Forest::_lambda << endl;
     }
 
@@ -1043,6 +1041,66 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             threads[i].join();
           }
         }
+    }
+
+    inline void Proj::initializeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles) {
+        bool partials = false;
+        
+        for (unsigned i=first; i<last; i++){
+            particles[i]->setData(_data, _taxon_map, partials);
+            partials = false;
+            particles[i]->mapSpecies(_taxon_map, _species_names);
+        }
+    }
+
+    inline void Proj::initializeParticles(vector<Particle::SharedPtr> &particles) {
+        // set partials for first particle under save_memory setting for initial marginal likelihood calculation
+        assert (_nthreads > 0);
+        
+        bool partials = true;
+        
+        if (_nthreads == 1) {
+            for (auto & p:particles ) { // TODO: can initialize some of these things in parallel?
+                p->setData(_data, _taxon_map, partials);
+                partials = false;
+                p->mapSpecies(_taxon_map, _species_names);
+            }
+        }
+        
+        else {
+            // always set partials for first particle under save memory setting for initial marginal likelihood calculation
+            // for simplicity, do first particle separately under every setting
+            bool partials = true;
+            particles[0]->setData(_data, _taxon_map, partials);
+            particles[0]->mapSpecies(_taxon_map, _species_names);
+            
+            // divide up the remaining particles as evenly as possible across threads
+            unsigned first = 1;
+            unsigned incr = (_nparticles-1) /_nthreads + ((_nparticles - 1) % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
+            unsigned last = incr;
+
+            // need a vector of threads because we have to wait for each one to finish
+            vector<thread> threads;
+
+          while (true) {
+              // create a thread to handle particles first through last - 1
+                threads.push_back(thread(&Proj::initializeParticleRange, this, first, last, std::ref(particles)));
+              // update first and last
+              first = last;
+              last += incr;
+              if (last > _nparticles) {
+                last = _nparticles;
+                }
+              if (first>=_nparticles) {
+                  break;
+              }
+        }
+
+        // the join function causes this loop to pause until the ith thread finishes
+        for (unsigned i = 0; i < threads.size(); i++) {
+          threads[i].join();
+        }
+      }
     }
 
     inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles) {
@@ -1297,104 +1355,110 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 }
 
                 bool use_first = true;
-                bool partials = true;
-                for (auto & p:my_vec ) {
-                    p->setData(_data, _taxon_map, partials);
-                    partials = false;
-                    p->mapSpecies(_taxon_map, _species_names);
-                }
+//                bool partials = true;
+                
+                initializeParticles(my_vec); // initialize in parallel with multithreading
                     
                 // reset marginal likelihood
                 _log_marginal_likelihood = 0.0;
-                vector<double> starting_log_likelihoods = my_vec[0]->calcGeneTreeLogLikelihoods(); // TODO: can't start at 0 because not every gene gets changed
-            
+                vector<double> starting_log_likelihoods = my_vec[0]->calcGeneTreeLogLikelihoods(); // can't start at 0 because not every gene gets changed
+
+#if defined (DRAW_NEW_THETA)
+                unsigned psuffix = 1;
                 for (auto &p:my_vec) {
+                    p->setSeed(rng.randint(1,9999) + psuffix);
+//                        p->setPsuffix(psuffix);
+                    psuffix += 2;
+                }
+#endif
+                
+                for (auto &p:my_vec) { // TODO: can parallelize this?
                     p->setLogLikelihood(starting_log_likelihoods);
 #if defined (DRAW_NEW_THETA)
-                    unsigned psuffix = 1;
-                    for (auto &p:my_vec) {
-                        p->setSeed(rng.randint(1,9999) + psuffix);
-                        psuffix += 2;
-                    }
                     p->drawTheta();
 #endif
-                    if (Forest::_save_memory) {
-                        p->clearPartials();
-                    }
                 }
+                if (Forest::_save_memory) {
+                    my_vec[0]->clearPartials(); // all other particles should have no partials
+                }
+                
+                    normalizeWeights(my_vec); // initialize marginal likelihood
                     
-                        normalizeWeights(my_vec); // initialize marginal likelihood
-                        
-                        //run through each generation of particles
+                    //run through each generation of particles
+                
+                    unsigned nsteps = (ntaxa-1)*nsubsets;
                     
-                        unsigned nsteps = (ntaxa-1)*nsubsets;
+                    for (unsigned g=0; g<nsteps; g++){
+                        if (_verbose > 0) {
+                            cout << "starting step " << g << " of " << nsteps-1 << endl;
+                        }
+                        // set particle random number seeds
+                        unsigned psuffix = 1; // TODO: can do this in parallel?
+                        for (auto &p:my_vec) {
+                            p->setSeed(rng.randint(1,9999) + psuffix);
+//                                p->setPsuffix(psuffix); // set suffix here to set seed in parallelized proposals
+                            psuffix += 2;
+                        }
                         
-                        for (unsigned g=0; g<nsteps; g++){
-                            if (_verbose > 0) {
-                                cout << "starting step " << g << " of " << nsteps-1 << endl;
-                            }
-                            // set particle randon number seeds
-                            unsigned psuffix = 1;
-                            for (auto &p:my_vec) {
-                                p->setSeed(rng.randint(1,9999) + psuffix);
-                                psuffix += 2;
-                            }
-                            
-                            //taxon joining and reweighting step
-                            if (Forest::_proposal == "prior-prior") {
-                                proposeParticles(my_vec);
-                            }
-                            
-                            unsigned num_species_particles_proposed = 0;
-                            
-                            double ess_inverse = 0.0;
+                        //taxon joining and reweighting step
+                        if (Forest::_proposal == "prior-prior") {
+                            proposeParticles(my_vec);
+                        }
+                        
+                        unsigned num_species_particles_proposed = 0;
+                        
+                        double ess_inverse = 0.0;
+                        if (_verbose > 1) {
                             for (auto &p:my_vec) {
                                 if (p->speciesJoinProposed()) {
                                     num_species_particles_proposed++;
                                 }
                             }
+                        }
+                        
+                        normalizeWeights(my_vec);
+                        
+                        for (auto & p:my_vec) {
+                            ess_inverse += exp(2.0*p->getLogWeight());
+                        }
+                        
+                        double ess = 1.0/ess_inverse;
+                        if (_verbose > 1) {
+                            cout << "\t" << "ESS is : " << ess << endl;
+                        }
+                        
+                        bool filter = true;
+                        
+                        if (Particle::_run_on_empty) {
+                            filter = false;
+                        }
+                        if (filter) {
+                            resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
+                            //if use_first is true, my_vec = my_vec_2
+                            //if use_first is false, my_vec = my_vec_1
                             
-                            normalizeWeights(my_vec);
-                            
-                            for (auto & p:my_vec) {
-                                ess_inverse += exp(2.0*p->getLogWeight());
-                            }
-                            
-                            double ess = 1.0/ess_inverse;
-                            if (_verbose > 1) {
-                                cout << "\t" << "ESS is : " << ess << endl;
-                            }
-                            
-                            bool filter = true;
-                            
-                            if (Particle::_run_on_empty) {
-                                filter = false;
-                            }
-                            if (filter) {
-                                resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
-                                //if use_first is true, my_vec = my_vec_2
-                                //if use_first is false, my_vec = my_vec_1
-                                
-                                my_vec = use_first ? my_vec_2:my_vec_1;
+                            my_vec = use_first ? my_vec_2:my_vec_1;
 
-                                //change use_first from true to false or false to true
-                                use_first = !use_first;
-                                
-                                unsigned species_count = 0;
-                                
+                            //change use_first from true to false or false to true
+                            use_first = !use_first;
+                            
+                            unsigned species_count = 0;
+                            
+                            if (_verbose > 1) {
                                 for (auto &p:my_vec) {
                                     if (p->speciesJoinProposed()) {
                                         species_count++;
                                     }
                                 }
-                                
-                                if (_verbose > 1) {
-                                    cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
-                                    cout << "\t" << "number of species join particles accepted = " << species_count << endl;
-                                }
-                            resetWeights(my_vec);
                             }
-                    } // g loop
+                            
+                            if (_verbose > 1) {
+                                cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
+                                cout << "\t" << "number of species join particles accepted = " << species_count << endl;
+                            }
+                        resetWeights(my_vec);
+                        }
+                } // g loop
                         
     //            saveAllHybridNodes(my_vec);
                 

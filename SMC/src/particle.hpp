@@ -128,6 +128,7 @@ class Particle {
         vector<double>                                  getThetaVector();
         double                                          getPopMean(){return _forests[1]._theta_mean;}
         pair<string, string>                            getSpeciesJoined(){return make_pair(_forests[0]._species_joined.first->_name, _forests[0]._species_joined.second->_name);}
+        void                                            setPsuffix(unsigned psuffix) {_psuffix = psuffix;}
     
         static bool                                     _run_on_empty;
 
@@ -148,6 +149,7 @@ class Particle {
         unsigned                                _num_deep_coalescences;
         bool                                    _deep_coal;
         double                                  _species_tree_height;
+        unsigned                                _psuffix;
         vector<pair<tuple<string, string, string>, double>> _t;
 };
 
@@ -200,6 +202,7 @@ class Particle {
         _num_deep_coalescences = 0.0;
         _species_tree_height = 0.0;
         _t.clear();
+        _psuffix = 0;
     }
 
     inline void Particle::showSpeciesTree() {
@@ -391,6 +394,9 @@ class Particle {
     }
 
     inline void Particle::proposal() {
+//                assert (_psuffix > 0);
+//                setSeed(rng.randint(1,9999) + _psuffix);
+        
         _species_join_proposed = false;
         bool done = false;
                 
@@ -1034,6 +1040,10 @@ class Particle {
     }
 
     inline void Particle::drawTheta() {
+        // set seed first
+//        assert (_psuffix > 0);
+//        setSeed(rng.randint(1,9999) + _psuffix);
+            
         _forests[1].createThetaMap(_lot); // create map for one forest, then copy it to all forests
         double theta_mean = _forests[1]._theta_mean;
         map<string, double> theta_map = _forests[1]._theta_map;
@@ -1345,6 +1355,7 @@ class Particle {
         _deep_coal = other._deep_coal;
         _species_tree_height = other._species_tree_height;
         _t = other._t;
+        _psuffix = other._psuffix;
     };
 }
 
