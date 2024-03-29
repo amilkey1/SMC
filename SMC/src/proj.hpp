@@ -191,6 +191,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             double log_prior = p->getAllPriors();
             
             double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior; // TODO: check vector prior
+            // no vector prior under Jones method
             
             logf << "\t" << log_posterior;
             
@@ -310,17 +311,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 #endif
             
             double vector_prior = 0.0;
-#if defined DRAW_NEW_THETA
-            vector<double> vector_priors = p->getVectorPrior();
-            for (auto &v:vector_priors) {
-                vector_prior += v; // this is the InverseGamma(2, psi) prior on the 5 population sizes
-            }
-#endif
             
             double log_likelihood = p->getLogLikelihood();
             double log_prior = p->getAllPriors();
             
-            double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior; // TODO: check vector prior
+            double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior;
             
             logf << "\t" << log_posterior;
             

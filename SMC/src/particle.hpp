@@ -367,7 +367,7 @@ class Particle {
         return prior;
     }
 
-    inline double Particle::getAllPriors() { // TODO: include prior on theta? is prior on each gene tree still correct under jones coalescent likelihood?
+    inline double Particle::getAllPriors() {
 //        vector<double> gene_tree_priors = getGeneTreePriors();
         double species_tree_prior = getSpeciesTreePrior();
         double total_prior = 0.0;
@@ -376,7 +376,7 @@ class Particle {
 //        } // this is already accounted for in coalescent likelihood
         total_prior += species_tree_prior;
 #if defined (DRAW_NEW_THETA)
-        total_prior += -log(_forests[1]._scale); // TODO: is this correct?
+//        total_prior += -log(_forests[1]._scale); // TODO: do not include for second round
 #endif
         return total_prior;
     }

@@ -2549,7 +2549,8 @@ class Forest {
             double b = scale;
 //            double x = new_theta / 4.0;
             double x = new_theta; //  TODO: is x theta or theta / 4?
-            double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
+//            double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
+            double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
             _vector_prior.push_back(log_inv_gamma_prior);
 
         }
