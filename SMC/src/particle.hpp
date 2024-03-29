@@ -119,6 +119,7 @@ class Particle {
         inline vector<double>                           getGeneTreeCoalescentLikelihoods();
         double                                          getSpeciesTreePrior();
         double                                          getAllPriors();
+        vector<double>                                  getVectorPrior();
         void                                            simulateData(vector<unsigned> sites_vector);
         unsigned                                        getNumDeepCoalescences() {return _num_deep_coalescences;}
         void                                            resetSpecies();
@@ -126,7 +127,7 @@ class Particle {
         Forest                                          getForest(unsigned i) {return _forests[i];} // TODO: should return a pointer?
         void                                            setNewTheta();
         vector<double>                                  getThetaVector();
-        double                                          getPopMean(){return _forests[1]._theta_mean;}
+        double                                          getPopMean();
         pair<string, string>                            getSpeciesJoined(){return make_pair(_forests[0]._species_joined.first->_name, _forests[0]._species_joined.second->_name);}
         void                                            setPsuffix(unsigned psuffix) {_psuffix = psuffix;}
     
@@ -366,16 +367,24 @@ class Particle {
         return prior;
     }
 
-    inline double Particle::getAllPriors() {
-        vector<double> gene_tree_priors = getGeneTreePriors();
+    inline double Particle::getAllPriors() { // TODO: include prior on theta? is prior on each gene tree still correct under jones coalescent likelihood?
+//        vector<double> gene_tree_priors = getGeneTreePriors();
         double species_tree_prior = getSpeciesTreePrior();
         double total_prior = 0.0;
-        for (auto &g:gene_tree_priors) {
-            total_prior += g;
-        }
-        total_prior += species_tree_prior; // TODO: does starbeast3 include this?
+//        for (auto &g:gene_tree_priors) {
+//            total_prior += g;
+//        } // this is already accounted for in coalescent likelihood
+        total_prior += species_tree_prior;
+#if defined (DRAW_NEW_THETA)
+        total_prior += -log(_forests[1]._scale); // TODO: is this correct?
+#endif
         return total_prior;
     }
+
+inline vector<double> Particle::getVectorPrior() {
+// this is the InverseGamma(2, psi) prior on the population sizes
+    return _forests[1]._vector_prior;
+}
 
     inline double Particle::getLogLikelihood() {
         //retrieve likelihood for each gene tree
@@ -848,6 +857,7 @@ class Particle {
 #else
         
         if (_generation == 0) {
+            _forests[1]._vector_prior.clear();
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i].refreshPreorder();
                 _forests[i].calcMinDepth();
@@ -1021,6 +1031,14 @@ class Particle {
             theta_vec.push_back(t.second);
         }
         return theta_vec;
+    }
+
+    inline double Particle::getPopMean() {
+#if defined (DRAW_NEW_THETA)
+        return _forests[1]._theta_mean;
+#else
+        return Forest::_theta;
+#endif
     }
 
     inline void Particle::drawTheta() {

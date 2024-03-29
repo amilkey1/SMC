@@ -177,6 +177,8 @@ class Forest {
         pair<vector<double>, vector<unsigned>>        calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build);
         double                      _theta_mean;
         string                      _ancestral_species_name;
+        vector<double>              _vector_prior;
+        double                      _scale;
 
     public:
 
@@ -235,6 +237,8 @@ class Forest {
         _species_build.clear();
         _taxon_map.clear();
         _species_indices.clear();
+        _vector_prior.clear();
+        _scale = 0.0;
         
     }
 
@@ -1172,6 +1176,8 @@ class Forest {
         _species_build = other._species_build;
         _taxon_map = other._taxon_map;
         _species_indices = other._species_indices;
+        _vector_prior = other._vector_prior;
+        _scale = other._scale;
 
         // copy tree itself
 
@@ -2400,24 +2406,7 @@ class Forest {
             if (s.second.size() > 1) { // if size == 0, no possibility of coalescence and rate is 0
                 double population_coalescence_rate = 0.0;
 #if defined (DRAW_NEW_THETA)
-//                assert (_theta_map.size() > 0);
-//                double population_theta = 0.0;
-                
-                // draw new population theta if it doesn't exist already
-//                if (_theta_map[s.first]) {
                     double population_theta = _theta_map[s.first];
-//                }
-//                else {
-//                    assert (_theta_mean > 0.0);
-//                    double scale = 1 / _theta_mean;
-//                    assert (scale > 0.0);
-//                    if (population_theta < _small_enough) {
-//                        population_theta = 1 / (lot->gamma(2.0, scale));
-//                        assert (population_theta > 0.0);
-//                        _theta_map[s.first] = population_theta;
-//                    }
-//                }
-//                double population_theta = _theta_map[s.first];
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
 #else
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta;
@@ -2464,6 +2453,7 @@ class Forest {
         
         assert (_theta_mean > 0.0);
         double scale = 1 / _theta_mean;
+        _scale = scale;
         
         unsigned count = 0;
         for (auto &name:species_names) {
@@ -2474,6 +2464,13 @@ class Forest {
                     assert (new_theta > 0.0);
                     _theta_map[name] = new_theta;
                 }
+                // pop mean = theta / 4
+                double a = 2.0;
+                double b = scale;
+    //            double x = new_theta / 4.0;
+                double x = new_theta; //  TODO: is x theta or theta / 4?
+                double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
+                _vector_prior.push_back(log_inv_gamma_prior);
             }
             else {
                 _theta_map[name] = -1;
@@ -2485,12 +2482,20 @@ class Forest {
     inline void Forest::drawNewTheta(string new_species, Lot::SharedPtr lot) {
         // draw a new theta for the newest species population
         double scale = 1 / _theta_mean;
+        scale = _scale;
         double new_theta = 0.0;
         if (new_theta < _small_enough) {
 //            new_theta = 1 / rng.gamma(2.0, scale);
             new_theta = 1 / lot->gamma(2.0, scale);
             _theta_map[new_species] = new_theta;
         }
+        // pop mean = theta / 4
+        double a = 2.0;
+        double b = scale;
+//            double x = new_theta / 4.0;
+        double x = new_theta; //  TODO: is x theta or theta / 4?
+        double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
+        _vector_prior.push_back(log_inv_gamma_prior);
     }
 
     inline void Forest::createThetaMap(Lot::SharedPtr lot) {
@@ -2530,6 +2535,7 @@ class Forest {
 //        logf.close();
         
         double scale = 1 / _theta_mean;
+        _scale = scale;
         assert (scale > 0.0);
         for (auto &name:species_names) {
             double new_theta = 0.0;
@@ -2538,6 +2544,14 @@ class Forest {
                 assert (new_theta > 0.0);
                 _theta_map[name] = new_theta;
             }
+            // pop mean = theta / 4
+            double a = 2.0;
+            double b = scale;
+//            double x = new_theta / 4.0;
+            double x = new_theta; //  TODO: is x theta or theta / 4?
+            double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
+            _vector_prior.push_back(log_inv_gamma_prior);
+
         }
     }
 

@@ -174,15 +174,23 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << iter;
             iter++;
             
-            double log_likelihood = p->getLogLikelihood();
-            double log_prior = p->getAllPriors();
-            
-            double log_posterior = log_likelihood + log_prior;
+            double vector_prior = 0.0;
+#if defined DRAW_NEW_THETA
+            vector<double> vector_priors = p->getVectorPrior();
+            for (auto &v:vector_priors) {
+                vector_prior += v; // this is the InverseGamma(2, psi) prior on the 5 population sizes
+            }
+#endif
             
             double log_coalescent_likelihood = 0.0;
             for (unsigned g=1; g<ngenes+1; g++) {
                 log_coalescent_likelihood += p->getCoalescentLikelihood(g);
             }
+            
+            double log_likelihood = p->getLogLikelihood();
+            double log_prior = p->getAllPriors();
+            
+            double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior; // TODO: check vector prior
             
             logf << "\t" << log_posterior;
             
@@ -190,8 +198,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             
             logf << "\t" << log_prior - log_coalescent_likelihood; // starbeast3 does not include coalescent likelihood in this prior
             
-            double vector_prior = 0.0;
-            logf << "\t" << vector_prior; // log joint prior on population sizes (vectorPrior) - 0.0 for now since pop size is not a parameter
+            
+            logf << "\t" << vector_prior;
             
             logf << "\t" << log_coalescent_likelihood;
             
@@ -283,7 +291,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << endl;
         }
         
-//        int iter = group_number * _particle_increase; // TODO: doesn't work if not saving every particle
         unsigned sample_size = round(double (_particle_increase) / double(_save_every) );
         if (sample_size == 0) {
             sample_size = _particle_increase;
@@ -292,11 +299,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         for (auto &p:v) {
             logf << iter;
             iter++;
-            
-            double log_likelihood = p->getLogLikelihood();
-            double log_prior = p->getAllPriors();
-            
-            double log_posterior = log_likelihood + log_prior;
             
             double log_coalescent_likelihood = 0.0;
 #if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
@@ -307,14 +309,26 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
 #endif
             
+            double vector_prior = 0.0;
+#if defined DRAW_NEW_THETA
+            vector<double> vector_priors = p->getVectorPrior();
+            for (auto &v:vector_priors) {
+                vector_prior += v; // this is the InverseGamma(2, psi) prior on the 5 population sizes
+            }
+#endif
+            
+            double log_likelihood = p->getLogLikelihood();
+            double log_prior = p->getAllPriors();
+            
+            double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior; // TODO: check vector prior
+            
             logf << "\t" << log_posterior;
             
             logf << "\t" << log_likelihood;
             
             logf << "\t" << log_prior - log_coalescent_likelihood; // starbeast3 does not include coalescent likelihood in this prior
             
-            double vector_prior = 0.0;
-            logf << "\t" << vector_prior; // log joint prior on population sizes (vectorPrior) - 0.0 for now since pop size is not a parameter
+            logf << "\t" << vector_prior;
             
             logf << "\t" << log_coalescent_likelihood;
             
@@ -357,7 +371,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             for (auto &p:gene_tree_priors) {
                 test += p;
             }
-//            p->showParticle();
             assert (test == log_coalescent_likelihood);
             assert (gene_tree_log_likelihoods.size() == gene_tree_priors.size());
 #endif
