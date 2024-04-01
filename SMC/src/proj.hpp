@@ -26,7 +26,7 @@ namespace proj {
 
     class Proj {
         public:
-        
+
                                 Proj();
                                 ~Proj();
 
@@ -146,21 +146,21 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         logf << "\t" << "speciescoalescent ";
         logf << "\t" << "Tree.t:Species.height ";
         logf << "\t" << "Tree.t:Species.treeLength ";
-        
+
         for (int i=1; i<ngenes+1; i++) {
             logf << "\t" << "Tree.t:gene" + to_string(i) + "height";
             logf << "\t" << "Tree.t:gene" + to_string(i) + "treeLength";
         }
-        
+
         logf << "\t" << "YuleModel.t:Species "; // this is the log probability of the species tree (multiply by log(3!) to get increment log prob)
         logf << "\t" << "popMean "; // this is psi in the InverseGamma(2,psi) distribution of popSize
-        
+
         for (int i=0; i<(nspecies*2-1); i++) {
             logf << "\t" << "popSize." + to_string(i+1);
         }
-        
+
         logf << "\t" << "speciationRate.t:Species ";
-        
+
         for (int i=1; i<ngenes+1; i++) {
             logf << "\t" << "treeLikelihood:gene" + to_string(i);
         }
@@ -168,12 +168,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << "\t" << "treePrior:gene" + to_string(i);
         }
         logf << endl;
-        
+
         int iter = 0;
         for (auto &p:v) {
             logf << iter;
             iter++;
-            
+
             double vector_prior = 0.0;
 #if defined DRAW_NEW_THETA
             vector<double> vector_priors = p->getVectorPrior();
@@ -181,50 +181,50 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 vector_prior += v; // this is the InverseGamma(2, psi) prior on the 5 population sizes
             }
 #endif
-            
+
             double log_coalescent_likelihood = 0.0;
             for (unsigned g=1; g<ngenes+1; g++) {
                 log_coalescent_likelihood += p->getCoalescentLikelihood(g);
             }
-            
+
             double log_likelihood = p->getLogLikelihood();
             double log_prior = p->getAllPriors();
-            
+
             double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior; // TODO: check vector prior
             // no vector prior under Jones method
-            
+
             logf << "\t" << log_posterior;
-            
+
             logf << "\t" << log_likelihood;
-            
+
             logf << "\t" << log_prior - log_coalescent_likelihood; // starbeast3 does not include coalescent likelihood in this prior
-            
-            
+
+
             logf << "\t" << vector_prior;
-            
+
             logf << "\t" << log_coalescent_likelihood;
-            
+
             double species_tree_height = p->getSpeciesTreeHeight();
             logf << "\t" << species_tree_height;
-            
+
             double species_tree_length = p->getSpeciesTreeLength();
             logf << "\t" << species_tree_length;
-            
+
             vector<double> gene_tree_heights = p->getGeneTreeHeights();
             vector<double> gene_tree_lengths = p->getGeneTreeLengths();
             assert (gene_tree_heights.size() == gene_tree_lengths.size());
-            
+
             for (int i=0; i<gene_tree_heights.size(); i++) {
                 logf << "\t" << gene_tree_heights[i];
                 logf << "\t" << gene_tree_lengths[i];
             }
-            
+
             double yule_model = p->getSpeciesTreePrior(); // TODO: unsure if this is correct
             logf << "\t" << yule_model;
-            
+
 //            double pop_mean = 0.0; // setting this to 0.0 for now since pop size is not a parameter
             logf << "\t" << p->getPopMean() / 4.0; // beast uses Ne * u = theta / 4
-            
+
             for (int i=0; i<(nspecies*2-1); i++) {
 #if defined (DRAW_NEW_THETA)
                 vector<double> theta_vec = p->getThetaVector();
@@ -233,24 +233,24 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
 #endif
             }
-            
+
             logf << "\t" << Forest::_lambda;
-            
+
             vector<double> gene_tree_log_likelihoods = p->getGeneTreeLogLikelihoods();
             vector<double> gene_tree_priors = p->getGeneTreePriors();
             assert (gene_tree_log_likelihoods.size() == gene_tree_priors.size());
-            
+
             for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
                 logf << "\t" << gene_tree_log_likelihoods[i];
             }
-            
+
             for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
                 logf << "\t" << gene_tree_priors[i];
             }
-            
+
             logf << endl;
         }
-        
+
         logf.close();
     }
     inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFiltering(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number) const {
@@ -258,7 +258,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         std::ofstream logf;
 
         logf.open(filename, std::ios_base::app);
-        
+
         if (group_number == 0) { // name columns
             logf << "iter ";
             logf << "\t" << "posterior ";
@@ -268,21 +268,21 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << "\t" << "speciescoalescent ";
             logf << "\t" << "Tree.t:Species.height ";
             logf << "\t" << "Tree.t:Species.treeLength ";
-            
+
             for (int i=1; i<ngenes+1; i++) {
                 logf << "\t" << "Tree.t:gene" + to_string(i) + "height";
                 logf << "\t" << "Tree.t:gene" + to_string(i) + "treeLength";
             }
-            
+
             logf << "\t" << "YuleModel.t:Species "; // this is the log probability of the species tree (multiply by log(3!) to get increment log prob)
             logf << "\t" << "popMean "; // this is psi in the InverseGamma(2,psi) distribution of popSize
-            
+
             for (int i=0; i<(nspecies*2-1); i++) {
                 logf << "\t" << "popSize." + to_string(i+1);
             }
-            
+
             logf << "\t" << "speciationRate.t:Species ";
-            
+
             for (int i=1; i<ngenes+1; i++) {
                 logf << "\t" << "treeLikelihood:gene" + to_string(i);
             }
@@ -291,7 +291,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
             logf << endl;
         }
-        
+
         unsigned sample_size = round(double (_particle_increase) / double(_save_every) );
         if (sample_size == 0) {
             sample_size = _particle_increase;
@@ -300,7 +300,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         for (auto &p:v) {
             logf << iter;
             iter++;
-            
+
             double log_coalescent_likelihood = 0.0;
 #if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
             log_coalescent_likelihood += p->getCoalescentLikelihood(1);
@@ -309,44 +309,44 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 log_coalescent_likelihood += p->getCoalescentLikelihood(g);
             }
 #endif
-            
+
             double vector_prior = 0.0;
-            
+
             double log_likelihood = p->getLogLikelihood();
             double log_prior = p->getAllPriors();
-            
+
             double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior;
-            
+
             logf << "\t" << log_posterior;
-            
+
             logf << "\t" << log_likelihood;
-            
+
             logf << "\t" << log_prior - log_coalescent_likelihood; // starbeast3 does not include coalescent likelihood in this prior
-            
+
             logf << "\t" << vector_prior;
-            
+
             logf << "\t" << log_coalescent_likelihood;
-            
+
             double species_tree_height = p->getSpeciesTreeHeight();
             logf << "\t" << species_tree_height;
-            
+
             double species_tree_length = p->getSpeciesTreeLength();
             logf << "\t" << species_tree_length;
-            
+
             vector<double> gene_tree_heights = p->getGeneTreeHeights();
             vector<double> gene_tree_lengths = p->getGeneTreeLengths();
             assert (gene_tree_heights.size() == gene_tree_lengths.size());
-            
+
             for (int i=0; i<gene_tree_heights.size(); i++) {
                 logf << "\t" << gene_tree_heights[i];
                 logf << "\t" << gene_tree_lengths[i];
             }
-            
+
             double yule_model = p->getSpeciesTreePrior(); // TODO: unsure if this is correct
             logf << "\t" << yule_model;
-            
+
             logf << "\t" << p->getPopMean() / 4.0; // beast uses Ne * u = theta / 4
-            
+
             for (int i=0; i<(nspecies*2-1); i++) {
 #if defined (DRAW_NEW_THETA)
                 vector<double> theta_vec = p->getThetaVector();
@@ -355,12 +355,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
 #endif
             }
-            
+
             logf << "\t" << Forest::_lambda;
-            
+
             vector<double> gene_tree_log_likelihoods = p->getGeneTreeLogLikelihoods();
             vector<double> gene_tree_priors = p->getGeneTreeCoalescentLikelihoods();
-            
+
 #if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
             double test = 0.0;
             for (auto &p:gene_tree_priors) {
@@ -369,18 +369,18 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             assert (test == log_coalescent_likelihood);
             assert (gene_tree_log_likelihoods.size() == gene_tree_priors.size());
 #endif
-            
+
             for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
                 logf << "\t" << gene_tree_log_likelihoods[i];
             }
-            
+
             for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
                 logf << "\t" << gene_tree_priors[i];
             }
-            
+
             logf << endl;
         }
-        
+
         logf.close();
     }
 
@@ -412,16 +412,16 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
         logf << "\t" << "coalescent_likelihood";
         logf << endl;
-        
+
         unsigned iter = 0;
         for (auto &p:v) {
             logf << iter;
             iter++;
-            
+
             logf << "\t" << p->getLogLikelihood();
 
             double species_tree_prior = 0.0;
-            
+
             for (unsigned g=0; g<ngenes+1; g++) {
                 for (auto &b:p->getIncrementPriors(g)) {
                     logf << "\t" << b.first;
@@ -432,21 +432,21 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     assert (b.first > 0.0);
                 }
                 assert (species_tree_prior != 0.0);
-                
+
                 if (g == 0) {
                     logf << "\t" << species_tree_prior;
                 }
             }
-            
+
             double log_coalescent_likelihood = 0.0;
             for (unsigned g=1; g<ngenes+1; g++) {
                 log_coalescent_likelihood += p->getCoalescentLikelihood(g);
             }
             logf << "\t" << log_coalescent_likelihood;
-            
+
             logf << endl;
         }
-        
+
         logf.close();
     }
 
@@ -454,11 +454,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         // save only unique species trees
         if (!Forest::_run_on_empty) {
             vector<vector<pair<double, double>>> unique_increments_and_priors;
-            
+
             std::ofstream unique_treef;
 
             unique_treef.open(filename2, std::ios_base::app);
-            
+
             for (auto &p:v) {
                 vector<pair<double, double>> increments_and_priors = p->getSpeciesTreeIncrementPriors();
                 bool found = false;
@@ -472,9 +472,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
             unique_treef.close();
         }
-        
+
         assert (_start_mode != "sim");
-        
+
         unsigned count = 0;
             // save all species trees
             std::ofstream treef;
@@ -491,7 +491,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         // save only unique species trees
         if (!Forest::_run_on_empty) {
             vector<vector<pair<double, double>>> unique_increments_and_priors;
-            
+
             ofstream unique_treef("unique_species_trees.trees");
             unique_treef << "#nexus\n\n";
             unique_treef << "begin trees;\n";
@@ -509,7 +509,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             unique_treef << "end;\n";
             unique_treef.close();
         }
-        
+
         if (_start_mode == "smc") {
             // save all species trees
             ofstream treef("species_trees.trees");
@@ -532,7 +532,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             treef << "end;\n";
             treef.close();
         }
-        
+
         }
 
     inline void Proj::saveGeneTrees(unsigned ngenes, vector<Particle::SharedPtr> &v) const {
@@ -549,7 +549,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             treef << "end;\n";
             treef.close();
         }
-        
+
         else {
             // save true species tree
             ofstream treef("true-gene-trees.tre");
@@ -576,7 +576,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             treef << endl;
         }
         treef << "end;\n";
-        
+
         treef.close();
     }
 
@@ -593,7 +593,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         std::vector<std::string> partition_subsets;
         boost::program_options::variables_map vm;
         boost::program_options::options_description desc("Allowed options");
-        
+
         desc.add_options()
         ("help,h", "produce help message")
         ("version,v", "show program version")
@@ -656,7 +656,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 _partition->parseSubsetDefinition(s);
             }
         }
-        
+
         // If user specified "base_frequencies" in conf file, convert them to a vector<double>
         if (vm.count("base_frequencies") > 0) {
             handleBaseFrequencies();
@@ -678,7 +678,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             throw XProj(format("outgroup name does not match any species name"));
         }
     }
-    
+
     inline void Proj::handleNTaxaPerSpecies() {
         vector<string> temp;
         split(temp, _string_ntaxaperspecies, is_any_of(","));
@@ -708,7 +708,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     inline void Proj::summarizeData(Data::SharedPtr) {
         // Report information about data partition subsets
         unsigned nsubsets = _data->getNumSubsets();
-        
+
         std::cout << "\nNumber of taxa: " << _data->getNumTaxa() << std::endl;
         std::cout << "Number of partition subsets: " << nsubsets << std::endl;
         std::cout << "Number of particles: " << _nparticles << std::endl;
@@ -744,7 +744,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
     inline void Proj::normalizeSpeciesWeights(vector<Particle::SharedPtr> & particles) {
         double neg_inf = -1*numeric_limits<double>::infinity();
-        
+
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
         for (auto & p : particles) {
@@ -755,11 +755,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         if (isnan(log_particle_sum)) {
             throw XProj("no species trees proposed legal increments; increase particle_increase and try again");
         }
-        
+
         if (_verbose > 1) {
             double max = *max_element(std::begin(log_weight_vec), std::end(log_weight_vec));
             double min = *min_element(std::begin(log_weight_vec), std::end(log_weight_vec)); // C++11
-            
+
             cout << "\t" << "max weight = " << max << endl;;
             cout << "\t" << "min weight = " << min << endl;;
         }
@@ -769,13 +769,13 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 p->setLogSpeciesWeight(p->getSpeciesLogWeight() - log_particle_sum);
             }
         }
-        
+
 //        _log_marginal_likelihood += log_particle_sum - log(_nparticles);
     }
 
     inline vector<double> Proj::normalizeGeneWeights(vector<double> likelihoods) {
         double log_sum = getRunningSum(likelihoods);
-        
+
         vector<double> normalized_likelihoods;
         normalized_likelihoods.resize(likelihoods.size());
         for (int n=0; n < normalized_likelihoods.size(); n++) {
@@ -792,11 +792,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
 
         double log_particle_sum = getRunningSum(log_weight_vec);
-        
+
         if (_verbose > 1) {
             double max = *max_element(std::begin(log_weight_vec), std::end(log_weight_vec));
             double min = *min_element(std::begin(log_weight_vec), std::end(log_weight_vec)); // C++11
-            
+
             cout << "\t" << "max weight = " << max << endl;;
             cout << "\t" << "min weight = " << min << endl;;
         }
@@ -804,25 +804,25 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         for (auto & p : particles) {
             p->setLogWeight(p->getLogWeight() - log_particle_sum);
         }
-        
+
         _log_marginal_likelihood += log_particle_sum - log(_nparticles);
     }
 
     inline void Proj::resampleSpeciesParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles) {
         assert (from_particles.size() == _nparticles);
         assert (to_particles.size() == _nparticles);
-        
+
         vector<pair<double, double>> cum_probs;
             // Create vector of pairs p, with p.first = log weight and p.second = particle index
         cum_probs.resize(_nparticles);
         unsigned i = 0;
-        
+
         for (unsigned p=0; p < _nparticles; p++) {
             cum_probs[i].first = from_particles[p]->getSpeciesLogWeight();
             cum_probs[i].second = i;
             ++i;
             }
-            
+
             // Sort cum_probs vector so that largest log weights come first
             sort(cum_probs.begin(), cum_probs.end(), greater< pair<double,unsigned> >());
 
@@ -832,15 +832,15 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 cumpr += exp(w.first);
                 w.first = cumpr;
             }
-            
+
             // Last element in cum_probs should hold 1.0 if weights were indeed normalized coming in
             assert( fabs( 1.0 - cum_probs[_nparticles-1].first ) < Proj::_small_enough);
 
-        
+
         // Draw new set of particles by sampling with replacement according to cum_probs
         to_particles.resize(_nparticles);
         for(unsigned i = 0; i < _nparticles; i++) {
-        
+
             // Select a particle to copy to the ith slot in to_particles
             int sel_index = -1;
             double u = rng.uniform();
@@ -851,10 +851,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 }
             }
             assert(sel_index > -1);
-            
+
             Particle::SharedPtr p0 = from_particles[sel_index];
             to_particles[i]=Particle::SharedPtr(new Particle(*p0));
-            
+
             assert(_nparticles == to_particles.size());
             }
     }
@@ -862,18 +862,18 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     inline void Proj::resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles) {
          assert (from_particles.size() == _nparticles);
          assert (to_particles.size() == _nparticles);
-         
+
          vector<pair<double, double>> cum_probs;
              // Create vector of pairs p, with p.first = log weight and p.second = particle index
          cum_probs.resize(_nparticles);
          unsigned i = 0;
-         
+
          for (unsigned p=0; p < _nparticles; p++) {
              cum_probs[i].first = from_particles[p]->getLogWeight();
              cum_probs[i].second = i;
              ++i;
              }
-             
+
              // Sort cum_probs vector so that largest log weights come first
              sort(cum_probs.begin(), cum_probs.end(), greater< pair<double,unsigned> >());
 
@@ -883,15 +883,15 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                  cumpr += exp(w.first);
                  w.first = cumpr;
              }
-             
+
              // Last element in cum_probs should hold 1.0 if weights were indeed normalized coming in
              assert( fabs( 1.0 - cum_probs[_nparticles-1].first ) < Proj::_small_enough);
 
-         
+
          // Draw new set of particles by sampling with replacement according to cum_probs
          to_particles.resize(_nparticles);
          for(unsigned i = 0; i < _nparticles; i++) {
-         
+
              // Select a particle to copy to the ith slot in to_particles
              int sel_index = -1;
              double u = rng.uniform();
@@ -902,10 +902,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                  }
              }
              assert(sel_index > -1);
-             
+
              Particle::SharedPtr p0 = from_particles[sel_index];
              to_particles[i]=Particle::SharedPtr(new Particle(*p0));
-             
+
              assert(_nparticles == to_particles.size());
              }
         }
@@ -939,7 +939,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         // third  = ((19009 - 18278 - 3*26^0                  )/26^1) % 26 = 2
         // second = ((19009 - 18278 - 3*26^0 - 2*26^1         )/26^2) % 26 = 1
         // first  = ((19009 - 18278 - 3*26^0 - 2*26^1 - 1*26^2)/26^3) % 26 = 0
-                
+
         // Find how long a species name string must be
         double logibase26 = log(k)/log(26);
         unsigned n = 1 + (unsigned)floor(logibase26);
@@ -971,7 +971,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             _species_names.push_back(species_name);
         }
     }
-    
+
     inline void Proj::createSpeciesMap(Data::SharedPtr d) {
         // TODO: this only works if names are in taxon^species format (no _)
         const vector<string> &names = d->getTaxonNames();
@@ -990,12 +990,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
         }
     }
-    
+
     inline void Proj::showFinal(vector<Particle::SharedPtr> my_vec) {
         for (auto &p:my_vec){
             p->showParticle();
         }
-        
+
         double sum_h = 0.0;
         for (auto & p:my_vec) {
             double h = p->calcHeight();
@@ -1004,13 +1004,13 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         sum_h/=my_vec.size();
         cout << "mean height equals " << sum_h << endl;
         cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
-        
+
 #if defined (DRAW_NEW_THETA)
         cout << "different theta for each population in each particle " << endl;
 #else
         cout << "theta = " << Forest::_theta << endl;
 #endif
-        
+
         cout << "speciation rate = " << Forest::_lambda << endl;
     }
 
@@ -1053,7 +1053,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
     inline void Proj::initializeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles) {
         bool partials = false;
-        
+
         for (unsigned i=first; i<last; i++){
             particles[i]->setData(_data, _taxon_map, partials);
             partials = false;
@@ -1064,9 +1064,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     inline void Proj::initializeParticles(vector<Particle::SharedPtr> &particles) {
         // set partials for first particle under save_memory setting for initial marginal likelihood calculation
         assert (_nthreads > 0);
-        
+
         bool partials = true;
-        
+
         if (_nthreads == 1) {
             for (auto & p:particles ) { // TODO: can initialize some of these things in parallel?
                 p->setData(_data, _taxon_map, partials);
@@ -1074,41 +1074,43 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 p->mapSpecies(_taxon_map, _species_names);
             }
         }
-        
+
         else {
             // always set partials for first particle under save memory setting for initial marginal likelihood calculation
             // for simplicity, do first particle separately under every setting
             bool partials = true;
             particles[0]->setData(_data, _taxon_map, partials);
             particles[0]->mapSpecies(_taxon_map, _species_names);
-            
-            // divide up the remaining particles as evenly as possible across threads
-            unsigned first = 1;
-            unsigned incr = (_nparticles-1) /_nthreads + ((_nparticles - 1) % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
-            unsigned last = incr;
 
-            // need a vector of threads because we have to wait for each one to finish
-            vector<thread> threads;
+            if (particles.size() > 1) {
+                // divide up the remaining particles as evenly as possible across threads
+                unsigned first = 1;
+                unsigned incr = (_nparticles-1) /_nthreads + ((_nparticles - 1) % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
+                unsigned last = incr;
 
-          while (true) {
-              // create a thread to handle particles first through last - 1
-                threads.push_back(thread(&Proj::initializeParticleRange, this, first, last, std::ref(particles)));
-              // update first and last
-              first = last;
-              last += incr;
-              if (last > _nparticles) {
-                last = _nparticles;
-                }
-              if (first>=_nparticles) {
-                  break;
-              }
+                // need a vector of threads because we have to wait for each one to finish
+                vector<thread> threads;
+
+              while (true) {
+                  // create a thread to handle particles first through last - 1
+                    threads.push_back(thread(&Proj::initializeParticleRange, this, first, last, std::ref(particles)));
+                  // update first and last
+                  first = last;
+                  last += incr;
+                  if (last > _nparticles) {
+                    last = _nparticles;
+                    }
+                  if (first>=_nparticles) {
+                      break;
+                  }
+            }
+
+            // the join function causes this loop to pause until the ith thread finishes
+            for (unsigned i = 0; i < threads.size(); i++) {
+              threads[i].join();
+            }
+          }
         }
-
-        // the join function causes this loop to pause until the ith thread finishes
-        for (unsigned i = 0; i < threads.size(); i++) {
-          threads[i].join();
-        }
-      }
     }
 
     inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles) {
@@ -1194,14 +1196,14 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         // set to one thread
         _nthreads = 1;
         rng.setSeed(_random_seed);
-        
+
         if (_ntaxaperspecies.size() == 1) {
             unsigned ntaxa = _ntaxaperspecies[0];
             for (int i=0; i<_sim_nspecies-1; i++) {
                 _ntaxaperspecies.push_back(ntaxa);
             }
         }
-        
+
         vector<Particle::SharedPtr> sim_vec(1);
         sim_vec[0] = Particle::SharedPtr(new Particle);
         // set particle randon number seed
@@ -1212,46 +1214,46 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         Particle::_run_on_empty = true;
         Forest::_run_on_empty = true;
         Forest::_proposal = "prior-prior";
-        
+
         _data = Data::SharedPtr(new Data());
         _data->setPartition(_partition);
-        
+
         // make up the species map
         simSpeciesMap();
-        
+
         vector<string> taxpartition;
         for (auto &t:_taxon_map) {
             taxpartition.push_back(t.second);
         }
-        
+
         // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
         if (Forest::_outgroup != "none") {
             checkOutgroupName();
         }
-        
+
         unsigned nsubsets = _data->getNumSubsets();
         Particle::setNumSubsets(nsubsets);
-        
+
         sim_vec[0]->setSimData(_data, _taxon_map, nsubsets, (unsigned) _taxon_map.size());
-        
+
         sim_vec[0]->mapSpecies(_taxon_map, _species_names);
-        
+
         sim_vec[0]->setNewTheta(); // TODO: for now, stick with one theta
 
         unsigned nsteps = (unsigned) (_taxon_map.size()-1)*nsubsets;
-        
+
         for (unsigned g=0; g<nsteps; g++){
             proposeParticles(sim_vec);
         }
-        
+
         cout << "\nBuilding species tree and associated gene trees....\n";
         vector<string> taxon_names;
         for (auto &t:_taxon_map) {
             taxon_names.push_back(t.first);
         }
-        
+
         _data->setTaxonNames(taxon_names);
-        
+
         // Simulate sequence data
         cout << "\nSimulating sequence data....\n";
        vector<tuple<unsigned, unsigned, unsigned, unsigned>> sites_tuples = _partition->getSubsetRangeVect();
@@ -1259,15 +1261,15 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         for (auto &s:sites_tuples) {
             sites_vector.push_back(get<1>(s) - get<0>(s) + 1);
         }
-        
+
         sim_vec[0]->simulateData(sites_vector);
 
         _data->compressPatterns();
         _data->writeDataToFile(_sim_file_name);
-        
+
         saveGeneTrees(nsubsets, sim_vec);
         saveSpeciesTrees(sim_vec);
-        
+
         writePaupFile(sim_vec, taxpartition);
         writeDeepCoalescenceFile(sim_vec);
     }
@@ -1317,7 +1319,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 #endif
                 cout << "Number of threads: " << _nthreads << endl;
             }
-            
+
             if (Particle::_run_on_empty) { // if running with no data, choose taxa to join at random
                 Forest::_proposal = "prior-prior";
                 Forest::_run_on_empty = true;
@@ -1336,7 +1338,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     summarizeData(_data);
                 }
                 createSpeciesMap(_data);
-                
+
                 // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
                 if (Forest::_outgroup != "none") {
                     checkOutgroupName();
@@ -1350,14 +1352,14 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
     //          create vector of particles
                 unsigned nparticles = _nparticles;
-                
+
                 unsigned nsubsets = _data->getNumSubsets();
                 Particle::setNumSubsets(nsubsets);
-                
+
                 vector<Particle::SharedPtr> my_vec_1(nparticles);
                 vector<Particle::SharedPtr> my_vec_2(nparticles);
                 vector<Particle::SharedPtr> &my_vec = my_vec_1;
-                    
+
                 for (unsigned i=0; i<nparticles; i++) {
                     my_vec_1[i] = Particle::SharedPtr(new Particle);
                     my_vec_2[i] = Particle::SharedPtr(new Particle);
@@ -1365,9 +1367,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
                 bool use_first = true;
 //                bool partials = true;
-                
+
                 initializeParticles(my_vec); // initialize in parallel with multithreading
-                    
+
                 // reset marginal likelihood
                 _log_marginal_likelihood = 0.0;
                 vector<double> starting_log_likelihoods = my_vec[0]->calcGeneTreeLogLikelihoods(); // can't start at 0 because not every gene gets changed
@@ -1380,7 +1382,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     psuffix += 2;
                 }
 #endif
-                
+
                 for (auto &p:my_vec) { // TODO: can parallelize this - is it worth it?
                     if (!Forest::_run_on_empty) {
                         p->setLogLikelihood(starting_log_likelihoods);
@@ -1392,13 +1394,13 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 if (Forest::_save_memory) {
                     my_vec[0]->clearPartials(); // all other particles should have no partials
                 }
-                
+
                     normalizeWeights(my_vec); // initialize marginal likelihood
-                    
+
                     //run through each generation of particles
-                
+
                     unsigned nsteps = (ntaxa-1)*nsubsets;
-                    
+
                     for (unsigned g=0; g<nsteps; g++){
                         if (_verbose > 0) {
                             cout << "starting step " << g << " of " << nsteps-1 << endl;
@@ -1409,14 +1411,14 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             p->setSeed(rng.randint(1,9999) + psuffix);
                             psuffix += 2;
                         }
-                        
+
                         //taxon joining and reweighting step
                         if (Forest::_proposal == "prior-prior") {
                             proposeParticles(my_vec);
                         }
-                        
+
                         unsigned num_species_particles_proposed = 0;
-                        
+
                         double ess_inverse = 0.0;
                         if (_verbose > 1) {
                             for (auto &p:my_vec) {
@@ -1425,20 +1427,20 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                                 }
                             }
                         }
-                        
+
                         normalizeWeights(my_vec);
-                        
+
                         if (_verbose > 1) {
                             for (auto & p:my_vec) {
                                 ess_inverse += exp(2.0*p->getLogWeight());
                             }
-                            
+
                             double ess = 1.0/ess_inverse;
                                 cout << "\t" << "ESS is : " << ess << endl;
                         }
-                        
+
                         bool filter = true;
-                        
+
                         if (Particle::_run_on_empty) {
                             filter = false;
                         }
@@ -1446,14 +1448,14 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                             //if use_first is true, my_vec = my_vec_2
                             //if use_first is false, my_vec = my_vec_1
-                            
+
                             my_vec = use_first ? my_vec_2:my_vec_1;
 
                             //change use_first from true to false or false to true
                             use_first = !use_first;
-                            
+
                             unsigned species_count = 0;
-                            
+
                             if (_verbose > 1) {
                                 for (auto &p:my_vec) {
                                     if (p->speciesJoinProposed()) {
@@ -1461,7 +1463,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                                     }
                                 }
                             }
-                            
+
                             if (_verbose > 1) {
                                 cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
                                 cout << "\t" << "number of species join particles accepted = " << species_count << endl;
@@ -1469,11 +1471,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         resetWeights(my_vec);
                         }
                 } // g loop
-                        
+
     //            saveAllHybridNodes(my_vec);
-                
+
 //                saveSpeciesTrees(my_vec);
-                
+
 //                writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
                 if (_save_gene_trees) {
                     for (int i=1; i<nsubsets+1; i++) {
@@ -1485,12 +1487,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     cout << "marginal likelihood after combined filtering: " << _log_marginal_likelihood << endl;
                     cout << "\n";
                 }
-                
+
 #if !defined (HIERARCHICAL_FILTERING)
                 saveSpeciesTrees(my_vec);
                 writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
 #endif
-                
+
 #if defined (HIERARCHICAL_FILTERING)
                 cout << "\n";
                 string filename1 = "species_trees.trees";
@@ -1541,38 +1543,38 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     }
                 }
                 cout << "\n";
-                
+
                 unsigned ngroups = round(_nparticles * _thin);
                 if (ngroups == 0) {
                     ngroups = 1;
                     cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
                 }
-                
+
                 random_shuffle(my_vec.begin(), my_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
                 // delete first (1-_thin) % of particles
                 my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (_nparticles-ngroups)));
                 assert(my_vec.size() == ngroups);
-                
+
                 _nparticles = ngroups;
-                
+
                 for (auto &p:my_vec) {
                     // reset forest species partitions
                     p->clearPartials(); // no more likelihood calculations
                     p->resetSpecies();
                     p->mapSpecies(_taxon_map, _species_names);
                 }
-                
+
                 vector<Particle::SharedPtr> new_vec;
-                
+
                 _nparticles = _particle_increase;
                 unsigned index = 0;
                 for (unsigned a=0; a < ngroups; a++) {
                     use_first = true;
-                    
+
                     vector<Particle::SharedPtr> use_vec_1;
                     vector<Particle::SharedPtr> use_vec_2;
                     vector<Particle::SharedPtr> &use_vec = use_vec_1;
-                    
+
                     Particle::SharedPtr chosen_particle = my_vec_1[a]; // particle to copy
                     for (unsigned i=0; i<_particle_increase; i++) {
                         use_vec_1.push_back(Particle::SharedPtr(new Particle()));
@@ -1580,11 +1582,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         use_vec_1[i] = Particle::SharedPtr(new Particle(*chosen_particle));
                         use_vec_2[i] = Particle::SharedPtr(new Particle(*chosen_particle));
                     }
-                    
+
                     assert(use_vec.size() == _particle_increase);
-                    
+
                     index += _particle_increase;
-                    
+
                     if (_verbose > 0) {
                         cout << "beginning species tree proposals for subset " << a+1 << endl;
                     }
@@ -1592,22 +1594,22 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         if (_verbose > 0) {
                             cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
                         }
-                        
+
                         // set particle random number seeds
                         unsigned psuffix = 1;
                         for (auto &p:use_vec) {
                             p->setSeed(rng.randint(1,9999) + psuffix);
                             psuffix += 2;
                         }
-                        
+
                         proposeSpeciesParticles(use_vec);
 
-                        
+
                         normalizeSpeciesWeights(use_vec);
-                        
-                        
+
+
                         double ess_inverse = 0.0;
-                        
+
                         for (auto & p:use_vec) {
                             ess_inverse += exp(2.0*p->getSpeciesLogWeight());
                         }
@@ -1616,20 +1618,20 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         if (_verbose > 1) {
                             cout << "   " << "ESS = " << ess << endl;
                         }
-                     
+
                         resampleSpeciesParticles(use_vec, use_first ? use_vec_2:use_vec_1);
                         //if use_first is true, my_vec = my_vec_2
                         //if use_first is false, my_vec = my_vec_1
-                        
+
                         use_vec = use_first ? use_vec_2:use_vec_1;
 
                         //change use_first from true to false or false to true
                         use_first = !use_first;
 
                         resetSpeciesWeights(use_vec);
-                                                
+
                     } // s loop
-                    
+
                     if (_save_every > 1.0) { // thin sample for output by taking a random sample
                         unsigned sample_size = round (double (_particle_increase) / double(_save_every));
                         if (sample_size == 0) {
@@ -1638,7 +1640,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             cout << "\n";
                             sample_size = _particle_increase;
                         }
-                        
+
                         random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
                         // delete first (1-_thin) % of particles
                         use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
@@ -1650,18 +1652,18 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 //                    }
                     saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
                     writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, a);
-                    
+
                     // clear used particle from my_vec
 //                    my_vec[a]->clear();
 //                    my_vec_1[a]->clear();
 //                    my_vec_2[a]->clear();
                 }
-                
+
                 std::ofstream treef;
                 treef.open(filename1, std::ios_base::app);
                 treef << "end;\n";
                 treef.close();
-                
+
                 std::ofstream unique_treef;
                 unique_treef.open(filename2, std::ios_base::app);
                 unique_treef << "end;\n";
@@ -1678,4 +1680,3 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         std::cout << "\nFinished!" << std::endl;
     }
 }
-
