@@ -683,6 +683,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         if (vm.count("base_frequencies") > 0) {
             handleNTaxaPerSpecies();
         }
+        
+        // if save_every > particle_increase, quit
+        if (_save_every > _particle_increase) {
+            throw XProj("particle_increase must be greater than or equal to save_every");
+        }
     }
 
     inline void Proj::checkOutgroupName() {
@@ -1722,7 +1727,15 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 if (parallelize_by_group) {
                 // don't bother with this if not multithreading
                     proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3, nsubsets, ntaxa);
-                    // TODO: write params file to another file, including an extra iteration column
+                    ofstream strees;
+                    strees.open("species_trees.trees", std::ios::app);
+                    strees << "end;" << endl;
+                    strees.close();
+                    
+                    ofstream u_strees;
+                    u_strees.open("unique_species_trees.trees", std::ios::app);
+                    u_strees << "end;" << endl;
+                    u_strees.close();
 
                     string line;
                     // For writing text file
