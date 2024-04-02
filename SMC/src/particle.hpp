@@ -204,6 +204,7 @@ class Particle {
         _species_tree_height = 0.0;
         _t.clear();
         _psuffix = 0;
+        _deep_coal = false;
     }
 
     inline void Particle::showSpeciesTree() {

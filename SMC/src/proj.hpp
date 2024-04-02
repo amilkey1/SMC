@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <random>
 #include <cstdio>
+#include <mutex>
 
 using namespace std;
 using namespace boost;
@@ -1112,9 +1113,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 assert (use_vec.size() == sample_size);
             }
 
-            saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
+            mtx.lock();
+            saveSpeciesTreesHierarchical(use_vec, filename1, filename2); // TODO: use mutex to make both thread safe - will this cause a slow down?
             _count++;
-            writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, i);  // TODO: this will be a problem
+            writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, i);
+            mtx.unlock();
         }
     }
 
@@ -1726,14 +1729,14 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     // Creating ofstream & ifstream class object
                     ifstream in ("params-beast-comparison.log");
                     ofstream f("params-beast-comparison-final.log");
-                    
+
                     unsigned line_count = 0;
-                    
+
                     while (!in.eof()) {
                         string text;
 
                         getline(in, text);
-                        
+
                         if (line_count == 0) {
                             string add = "iter ";
                             text = add + text;
@@ -1749,7 +1752,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         }
                         line_count++;
                     }
-                    
+
                     // remove existing params file and replace with copy
                     char oldfname[] = "params-beast-comparison.log";
                     char newfname[] = "params-beast-comparison-final.log";
