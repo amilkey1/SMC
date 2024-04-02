@@ -13,6 +13,7 @@
 #include "conditionals.hpp"
 #include <algorithm>
 #include <random>
+#include <cstdio>
 
 using namespace std;
 using namespace boost;
@@ -42,7 +43,7 @@ namespace proj {
             void                writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                writeDeepCoalescenceFile(vector<Particle::SharedPtr> &v);
             void                writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
-            void                writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number) const;
+            void                writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
             void                normalizeWeights(vector<Particle::SharedPtr> & particles);
             void                normalizeSpeciesWeights(vector<Particle::SharedPtr> & particles);
             vector<double>      normalizeGeneWeights(vector<double> likelihoods);
@@ -104,6 +105,9 @@ namespace proj {
             double                      _thin;
             unsigned                    _save_every;
             bool                        _save_gene_trees;
+            bool                        _first_line;
+            unsigned                    _count; // counter for params output file
+            vector<string>              _vec_test;
     };
 
     inline Proj::Proj() {
@@ -255,14 +259,19 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
         logf.close();
     }
-    inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFiltering(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number) const {
+    inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFiltering(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number) {
         // this function creates a params file that is comparable to output from starbeast3
         std::ofstream logf;
 
         logf.open(filename, std::ios_base::app);
 
-        if (group_number == 0) { // name columns
+//        if (group_number == 0) { // name columns
+        if (_first_line) {
+//            _count = 0;
+            _first_line = false;
+#if !defined PARALLELIZE_BY_GROUP
             logf << "iter ";
+#endif
             logf << "\t" << "posterior ";
             logf << "\t" << "likelihood ";
             logf << "\t" << "prior ";
@@ -294,14 +303,19 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << endl;
         }
 
+        _vec_test.push_back("");
         unsigned sample_size = round(double (_particle_increase) / double(_save_every) );
         if (sample_size == 0) {
             sample_size = _particle_increase;
         }
-        unsigned iter = group_number * sample_size;
+        
+       unsigned iter = group_number * sample_size;
+
         for (auto &p:v) {
+#if !defined PARALLELIZE_BY_GROUP
             logf << iter;
             iter++;
+#endif
 
             double log_coalescent_likelihood = 0.0;
 #if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
@@ -381,6 +395,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
 
             logf << endl;
+//            _count++;
         }
 
         logf.close();
@@ -1058,15 +1073,14 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
                 normalizeSpeciesWeights(use_vec);
 
-
-                double ess_inverse = 0.0;
-
-                for (auto & p:use_vec) {
-                    ess_inverse += exp(2.0*p->getSpeciesLogWeight());
-                }
-
-                double ess = 1.0/ess_inverse;
                 if (_verbose > 1) {
+                    double ess_inverse = 0.0;
+
+                    for (auto & p:use_vec) {
+                        ess_inverse += exp(2.0*p->getSpeciesLogWeight());
+                    }
+
+                    double ess = 1.0/ess_inverse;
                     cout << "   " << "ESS = " << ess << endl;
                 }
 
@@ -1099,10 +1113,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
 
             saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
-            writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, i);
-            
-            // TODO: save species trees to individual files - species trees, unique species trees, param files
-            // TODO: then combine files
+            _count++;
+            writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, i);  // TODO: this will be a problem
         }
     }
 
@@ -1424,6 +1436,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     }
 
     inline void Proj::run() {
+        _first_line = true;
         sanityChecks();
         if (_start_mode == "sim") {
             try {
@@ -1706,6 +1719,42 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 if (parallelize_by_group) {
                 // don't bother with this if not multithreading
                     proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3, nsubsets, ntaxa);
+                    // TODO: write params file to another file, including an extra iteration column
+
+                    string line;
+                    // For writing text file
+                    // Creating ofstream & ifstream class object
+                    ifstream in ("params-beast-comparison.log");
+                    ofstream f("params-beast-comparison-final.log");
+                    
+                    unsigned line_count = 0;
+                    
+                    while (!in.eof()) {
+                        string text;
+
+                        getline(in, text);
+                        
+                        if (line_count == 0) {
+                            string add = "iter ";
+                            text = add + text;
+                        }
+                        else {
+                            if (text != "") {
+                                string add = to_string(line_count);
+                                text = add + text;
+                            }
+                        }
+                        if (text != "") {
+                            f << text << endl; // account for blank line at end of file
+                        }
+                        line_count++;
+                    }
+                    
+                    // remove existing params file and replace with copy
+                    char oldfname[] = "params-beast-comparison.log";
+                    char newfname[] = "params-beast-comparison-final.log";
+                    filesystem::remove(oldfname);
+                    std::rename(newfname, oldfname);
                 }
                  
                 else {
