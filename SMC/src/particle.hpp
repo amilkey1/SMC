@@ -64,6 +64,7 @@ class Particle {
         void                                    setLogWeight(double w){_log_weight = w;}
         void                                    setLogSpeciesWeight(double w){_log_species_weight = w;}
         void                                    setLogLikelihood(vector<double> forest_likelihoods);
+        void                                    setLogCoalescentLikelihood(double coalescent_like);
         void                                    operator=(const Particle & other);
         const vector<Forest> &                  getForest() const {return _forests;}
         string                                  saveForestNewick() {
@@ -130,6 +131,7 @@ class Particle {
         double                                          getPopMean();
         pair<string, string>                            getSpeciesJoined(){return make_pair(_forests[0]._species_joined.first->_name, _forests[0]._species_joined.second->_name);}
         void                                            setPsuffix(unsigned psuffix) {_psuffix = psuffix;}
+        double                                          calcInitialCoalescentLikelihood();
     
         static bool                                     _run_on_empty;
 
@@ -271,6 +273,11 @@ class Particle {
         for (int i=1; i<_forests.size(); i++) {
             _forests[i].clearPartials();
         }
+    }
+
+    inline void Particle::setLogCoalescentLikelihood(double log_coal_like) {
+        _log_coalescent_likelihood = log_coal_like;
+        _log_species_weight = _log_coalescent_likelihood;
     }
 
     inline void Particle::setLogLikelihood(vector<double> forest_log_likelihoods) {
@@ -836,6 +843,7 @@ inline vector<double> Particle::getVectorPrior() {
                 nlineages = 2; // for last step, constraint was before final two species were joined
             }
             constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
+//            constrained_factor = 0.0; // TODO: testing
         }
         
 #endif
@@ -982,16 +990,52 @@ inline vector<double> Particle::getVectorPrior() {
         if (_log_coalescent_likelihood == neg_inf) {
             assert (_forests[0]._last_edge_length > max_depth);
         }
-//        if (_generation == 2) {
-//            if (_log_coalescent_likelihood != neg_inf) {
-//                ofstream testf;
-//                testf.open("preserved_increments.txt", std::ios_base::app); // append instead of overwrite
-//                testf << _forests[0]._increments.back().first << "," << endl;
-//            }
-//        }
         
         _generation++;
 #endif
+    }
+
+    inline double Particle::calcInitialCoalescentLikelihood() { // TODO: only call when integrating out theta - testing
+        unsigned nbranches = Forest::_nspecies*2 - 1;
+        _log_coalescent_likelihood = 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * boost::math::lgamma(2);
+        
+        vector<double> gamma_jb;
+        vector<unsigned> q_jb;
+        
+        double neg_inf = -1*numeric_limits<double>::infinity();
+        for (int i = 1; i<_forests.size(); i++) {
+            
+            _forests[i].refreshPreorder();
+            
+            if (_log_coalescent_likelihood != neg_inf) {
+                pair<vector<double>, vector<unsigned>> params;
+                params = _forests[i].calcInitialCoalescentLikelihoodIntegratingOutTheta();
+                
+                if (i == 1) {
+                    for (auto &g:params.first) {
+                        if (g == neg_inf) {
+                            _log_coalescent_likelihood = neg_inf;
+                            break;
+                        }
+                        gamma_jb.push_back(g);
+                    }
+                    for (auto &q:params.second) {
+                        q_jb.push_back(q);
+                    }
+                }
+                else {
+                    for (unsigned p=0; p<params.first.size(); p++) {
+                        gamma_jb[p] += params.first[p];
+                        if (params.first[p] == neg_inf) {
+                            _log_coalescent_likelihood = neg_inf;
+                            break;
+                        }
+                        q_jb[p] += params.second[p];
+                    }
+                }
+            }
+        }
+        return _log_coalescent_likelihood;
     }
 
     inline void Particle::geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name) {
@@ -1336,6 +1380,7 @@ inline vector<double> Particle::getVectorPrior() {
         }
         _t.clear();
         _forests[0]._last_edge_length = 0.0;
+        _forests[0]._increments_and_priors.clear();
     }
 
     inline void Particle::setForest(Forest f, unsigned forest_number) {

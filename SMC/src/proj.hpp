@@ -42,6 +42,7 @@ namespace proj {
             void                saveGeneTrees(unsigned ngenes, vector<Particle::SharedPtr> &v) const;
             void                saveGeneTree(unsigned gene_number, vector<Particle::SharedPtr> &v) const;
             void                writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
+            void                writeLoradFileAfterSpeciesFiltering(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                writeDeepCoalescenceFile(vector<Particle::SharedPtr> &v);
             void                writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
@@ -76,6 +77,7 @@ namespace proj {
             Partition::SharedPtr        _partition;
             Data::SharedPtr             _data;
             double                      _log_marginal_likelihood = 0.0;
+            double                      _log_species_tree_marginal_likelihood = 0.0;
             bool                        _use_gpu;
             bool                        _ambig_missing;
             unsigned                    _nparticles;
@@ -468,6 +470,47 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         logf.close();
     }
 
+    inline void Proj::writeLoradFileAfterSpeciesFiltering(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const {
+        ofstream logf("params.log");
+        logf << "iteration ";
+        for (int s=0; s<nspecies-1; s++) {
+            logf << "\t" << "species_increment";
+        }
+        logf << "\t" << "species_tree_prior";
+        logf << "\t" << "coalescent_likelihood";
+        logf << endl;
+
+        unsigned iter = 0;
+        for (auto &p:v) {
+            logf << iter;
+            iter++;
+            
+            for (auto &b:p->getIncrementPriors(0)) {
+                logf << "\t" << b.first;
+            }
+            
+            double species_tree_prior = p->getAllPriors(); // TODO: don't need this prior? included in coalescent likelihood?
+            assert (species_tree_prior != 0.0);
+            logf << "\t" << species_tree_prior;
+
+#if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
+            double log_coalescent_likelihood = p->getCoalescentLikelihood(0);
+            logf << "\t" << log_coalescent_likelihood;
+#else
+            double log_coalescent_likelihood = 0.0;
+            for (unsigned g=1; g<ngenes+1; g++) {
+                log_coalescent_likelihood += p->getCoalescentLikelihood(g);
+            }
+            logf << "\t" << log_coalescent_likelihood;
+#endif
+
+            logf << endl;
+        }
+
+        logf.close();
+    }
+
+
     inline void Proj::saveSpeciesTreesHierarchical(vector<Particle::SharedPtr> &v, string filename1, string filename2) const {
         // save only unique species trees
         if (!Forest::_run_on_empty) {
@@ -793,7 +836,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
         }
 
-//        _log_marginal_likelihood += log_particle_sum - log(_nparticles);
+        _log_species_tree_marginal_likelihood += log_particle_sum - log(_nparticles);
     }
 
     inline vector<double> Proj::normalizeGeneWeights(vector<double> likelihoods) {
@@ -1118,8 +1161,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 assert (use_vec.size() == sample_size);
             }
 
-            mtx.lock();
-            saveSpeciesTreesHierarchical(use_vec, filename1, filename2); // TODO: use mutex to make both thread safe - will this cause a slow down?
+            mtx.lock(); // TODO: is this a bad idea?
+            saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
             _count++;
             writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, i);
             mtx.unlock();
@@ -1775,6 +1818,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                  
                 else {
                     for (unsigned a=0; a < ngroups; a++) {
+//                        _log_species_tree_marginal_likelihood = 0.0; // TODO: for now, write lorad file for first set of species tree filtering and report the marginal likelihood for comparison
+                        
                         use_first = true;
 
                         vector<Particle::SharedPtr> use_vec_1;
@@ -1853,16 +1898,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             assert (use_vec.size() == sample_size);
                         }
 
-    //                    for (auto &p:use_vec){
-    //                        p->showParticle();
-    //                    }
                         saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
                         writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, a);
-
-                        // clear used particle from my_vec
-    //                    my_vec[a]->clear();
-    //                    my_vec_1[a]->clear();
-    //                    my_vec_2[a]->clear();
+                        if (a == 0) {
+                            writeLoradFileAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec); // testing the marginal likelihood by writing to file for lorad for first species group only
+                            cout << "species tree log marginal likelihood is: " << _log_species_tree_marginal_likelihood << endl;
+                        }
                     }
 
                     std::ofstream treef;
@@ -1875,7 +1916,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     unique_treef << "end;\n";
                     unique_treef.close();
                 }
-//                cout << "stop";
 #endif
 
             }
