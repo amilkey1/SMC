@@ -1339,14 +1339,11 @@ class Forest {
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
             }
             
-            double log_constrained_factor = log(1 - exp(-1*(double) _lineages.size()*Forest::_lambda*max_depth));
-//            log_constrained_factor = 0.0;
-            double nChooseTwo = _lineages.size()*_lineages.size();
-            double log_prob_join = log(2/nChooseTwo);
-            double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join + log_constrained_factor;
+            // lorad only works if all topologies the same - then don't include the prior on joins b/c it is fixed
+            double increment_prior = (log(rate)-_last_edge_length*rate);
                         
             _increments.push_back(make_pair(_last_edge_length, increment_prior));
-            _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior)); // TODO: include correction for max depth in prior?
+            _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior)); // do not include constrained factor in increment prior
         }
         else {
             double rate = _lambda*_lineages.size();
@@ -1358,7 +1355,7 @@ class Forest {
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
             }
             
-            double nChooseTwo = _lineages.size()*_lineages.size();
+            double nChooseTwo = _lineages.size()*(_lineages.size() - 1);
             double log_prob_join = log(2/nChooseTwo);
             double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
 
@@ -2532,11 +2529,12 @@ class Forest {
 //        ofstream logf ("theta_means.txt");
 //        for (int i=0; i<10000; i++) {
 //            _theta_mean = lot->logNormal(-4.6, 2.14); // TODO: mean = 0.1, sd = 1 --> make sd 0.1? - or try gamma
-        _theta_mean = lot->gamma(2, 0.05);
 //            logf << _theta_mean << "," << endl;
             
 //        }
 //        logf.close();
+        
+            _theta_mean = lot->gamma(2, 0.05);
         
         double scale = 1 / _theta_mean;
         _scale = scale;

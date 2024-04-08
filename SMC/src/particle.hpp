@@ -642,13 +642,6 @@ inline vector<double> Particle::getVectorPrior() {
             else {
                 assert (increment > 0.0);
                 double log_speciation_term = 0.0;
-                unsigned num_species_lineages = (unsigned)_forests[0]._lineages.size();
-                
-//                if (speciation_time != -1) {
-//                    assert (speciation_time > increment);
-//                    assert (!_forests[0]._done);
-//                    log_speciation_term = log(1/(num_species_lineages*Forest::_lambda))-(num_species_lineages*Forest::_lambda*(increment - speciation_time));
-//                }
                 geneProposal(event_choice_index, forest_number, event_choice_name, increment, species_name);
                 double log_likelihood_term = _forests[forest_number]._log_weight;
 
@@ -843,7 +836,6 @@ inline vector<double> Particle::getVectorPrior() {
                 nlineages = 2; // for last step, constraint was before final two species were joined
             }
             constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
-//            constrained_factor = 0.0; // TODO: testing
         }
         
 #endif
@@ -980,7 +972,6 @@ inline vector<double> Particle::getVectorPrior() {
         double nlineages = _forests[0]._lineages.size();
         constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
 #endif
-//        constrained_factor = 0.0; // TODO: testing
             _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
 #if !defined (UNCONSTRAINED_PROPOSAL)
             double test = 1/_log_species_weight;
