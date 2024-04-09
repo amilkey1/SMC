@@ -132,6 +132,7 @@ class Particle {
         pair<string, string>                            getSpeciesJoined(){return make_pair(_forests[0]._species_joined.first->_name, _forests[0]._species_joined.second->_name);}
         void                                            setPsuffix(unsigned psuffix) {_psuffix = psuffix;}
         double                                          calcInitialCoalescentLikelihood();
+        void                                            processGeneNewicks(vector<string> newicks);
     
         static bool                                     _run_on_empty;
 
@@ -763,6 +764,7 @@ inline vector<double> Particle::getVectorPrior() {
                 if (_log_coalescent_likelihood != neg_inf) {
                     pair<vector<double>, vector<unsigned>> params;
                     if (_forests[0]._lineages.size() > 1) {
+//                        _forests[i].showForest(); // TODO: gene 8 not fully built
                         params = _forests[i].calcCoalescentLikelihoodIntegratingOutTheta(_forests[0]._species_build);
                     }
                     else {
@@ -1355,6 +1357,15 @@ inline vector<double> Particle::getVectorPrior() {
             unsigned nsites = sites_vector[i-1];
             _forests[i].simulateData(_lot, starting_site, nsites);
             starting_site += sites_vector[i-1];
+        }
+    }
+
+    inline void Particle::processGeneNewicks(vector<string> newicks) {
+        for (int i=1; i<_forests.size(); i++) {
+//            _forests[i]._nodes.clear();
+            _forests[i].buildFromNewick(newicks[i-1], true, false); // newicks starts at 0 // TODO: gene 8 not working
+            _forests[i].refreshPreorder();
+            _forests[i]._theta_mean = Forest::_theta; // for now, set theta mean equal to whatever theta user specifies
         }
     }
 

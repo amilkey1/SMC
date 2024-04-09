@@ -20,4 +20,4 @@
 
 #define GRAHAM_JONES_COALESCENT_LIKELIHOOD // if defined, also define DRAW_NEW_THETA
 
-//#define PARALLELIZE_BY_GROUP
+#define PARALLELIZE_BY_GROUP

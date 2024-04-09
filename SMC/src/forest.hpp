@@ -111,6 +111,13 @@ class Forest {
         void                        createThetaMap(Lot::SharedPtr lot);
         void                        resetThetaMap(Lot::SharedPtr lot);
         void                        drawNewTheta(string new_species, Lot::SharedPtr lot);
+        void                        buildFromNewick(const string newick, bool rooted, bool allow_polytomies);
+        void                        stripOutNexusComments(std::string & newick);
+        unsigned                    countNewickLeaves(const std::string newick);
+        void                        extractEdgeLen(Node * nd, std::string edge_length_string);
+        void                        renumberInternals();
+        bool                        canHaveSibling(Node * nd, bool rooted, bool allow_polytomies);
+    
         map<string, double>              _theta_map;
 
         std::vector<Node *>         _lineages;
@@ -197,6 +204,7 @@ class Forest {
         static string               _outgroup;
         static bool                 _run_on_empty;
         static double               _ploidy;
+        static double               _gamma_scale;
 };
 
 
@@ -1179,6 +1187,7 @@ class Forest {
         _species_indices = other._species_indices;
         _vector_prior = other._vector_prior;
         _scale = other._scale;
+        _gamma_scale = other._gamma_scale;
 
         // copy tree itself
 
@@ -2468,8 +2477,7 @@ class Forest {
                 // pop mean = theta / 4
                 double a = 2.0;
                 double b = scale;
-    //            double x = new_theta / 4.0;
-                double x = new_theta; //  TODO: is x theta or theta / 4?
+                double x = new_theta;
                 double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
                 _vector_prior.push_back(log_inv_gamma_prior);
             }
@@ -2534,7 +2542,9 @@ class Forest {
 //        }
 //        logf.close();
         
-            _theta_mean = lot->gamma(2, 0.05);
+//            _theta_mean = lot->gamma(2, 0.05);
+        _theta_mean = lot->gamma(2, _gamma_scale);
+
         
         double scale = 1 / _theta_mean;
         _scale = scale;
@@ -3060,6 +3070,7 @@ class Forest {
             }
         }
         
+//        showForest();
         if (gamma_b.back() != neg_inf) {
             assert (q_b.back() == 0.0);
             assert (gamma_b.back() == 0);
@@ -3242,12 +3253,11 @@ class Forest {
         return(heights_and_nodes);
     }
 
-
     inline double Forest::getLineageHeight(Node* nd) {
         if (nd != nullptr) {
             double sum_height = 0.0;
             
-//            sum_height += nd->getEdgeLength();
+            sum_height += nd->getEdgeLength();
             if (nd->_left_child) {
                 for (Node* child = nd->_left_child; child; child=child->_left_child) {
                     sum_height += child->getEdgeLength();
@@ -3359,6 +3369,380 @@ class Forest {
                 }
             }
             t++;
+        }
+    }
+
+    inline void Forest::stripOutNexusComments(std::string & newick) {
+        regex commentexpr("\\[.*?\\]");
+        newick = std::regex_replace(newick, commentexpr, std::string(""));
+    }
+
+    inline unsigned Forest::countNewickLeaves(const std::string newick) {
+        regex taxonexpr("[(,]\\s*(\\d+|\\S+?|['].+?['])\\s*(?=[,):])");
+        sregex_iterator m1(newick.begin(), newick.end(), taxonexpr);
+        sregex_iterator m2;
+        return (unsigned)std::distance(m1, m2);
+    }
+
+    inline bool Forest::canHaveSibling(Node * nd, bool rooted, bool allow_polytomies) {
+        assert(nd);
+        if (!nd->_parent) {
+            // trying to give root node a sibling
+            return false;
+        }
+
+        if (allow_polytomies)
+            return true;
+
+        bool nd_can_have_sibling = true;
+        if (nd != nd->_parent->_left_child) {
+            if (nd->_parent->_parent) {
+                // trying to give a sibling to a sibling of nd, and nd's parent is not the root
+                nd_can_have_sibling = false;
+            }
+            else {
+                if (rooted) {
+                    // root node has exactly 2 children in rooted trees
+                    nd_can_have_sibling = false;
+                }
+                else if (nd != nd->_parent->_left_child->_right_sib) {
+                    // trying to give root node more than 3 children
+                    nd_can_have_sibling = false;
+                }
+            }
+        }
+
+        return nd_can_have_sibling;
+    }
+
+    inline void Forest::renumberInternals() {
+        assert(_preorder.size() > 0);
+
+        // Renumber internal nodes in postorder sequence
+        unsigned curr_internal = _nleaves;
+        for (auto nd : boost::adaptors::reverse(_preorder)) {
+            if (nd->_left_child) {
+                // nd is an internal node
+                nd->_number = curr_internal++;
+            }
+        }
+
+        _ninternals = curr_internal - _nleaves;
+
+        // If the tree has polytomies, then there are Node objects stored in
+        // the _tree->_nodes vector that have not yet been numbered. These can
+        // be identified because their _number is currently equal to -1.
+        for (auto & nd : _nodes) {
+            if (nd._number == -1)
+                nd._number = curr_internal++;
+        }
+    }
+
+    inline void Forest::extractEdgeLen(Node * nd, std::string edge_length_string) {
+        assert(nd);
+        bool success = true;
+        double d = 0.0;
+        try {
+            d = std::stod(edge_length_string);
+        }
+        catch(std::invalid_argument &) {
+            // edge_length_string could not be converted to a double value
+            success = false;
+        }
+
+        if (success) {
+            // conversion succeeded
+            nd->setEdgeLength(d);
+        }
+        else
+            throw XProj(boost::str(boost::format("%s is not interpretable as an edge length") % edge_length_string));
+    }
+
+
+    inline void Forest::buildFromNewick(const std::string newick, bool rooted, bool allow_polytomies) {
+        
+        set<unsigned> used; // used to ensure that no two leaf nodes have the same number
+        unsigned curr_leaf = 0;
+        unsigned num_edge_lengths = 0;
+        unsigned curr_node_index = 0;
+
+        // Remove comments from the supplied newick string
+        string commentless_newick = newick;
+        stripOutNexusComments(commentless_newick);
+
+        // Resize the _nodes vector
+        _nleaves = countNewickLeaves(commentless_newick);
+    //        if (_nleaves < 4) {
+    //            throw XProj("Expecting newick tree description to have at least 4 leaves");
+    //        }
+        unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
+        _nodes.resize(max_nodes);
+    //        int b=0;
+        for (auto & nd : _nodes ) {
+            nd._name = "";
+            nd._number = -1;
+        }
+
+        try {
+            // Root node is the last node in _nodes
+            auto l_front = _nodes.begin();
+            std::advance(l_front, curr_node_index); // TODO: curr_node_index should be 0
+            Node *nd = &*l_front;
+
+            if (rooted) {
+                auto l_front = _nodes.begin();
+                std::advance(l_front, ++curr_node_index);
+                nd = &*l_front;
+
+                auto parent = _nodes.begin();
+                std::advance(parent, curr_node_index - 1);
+                nd->_parent = &*parent;
+                nd->_parent->_left_child = nd;
+            }
+
+            // Some flags to keep track of what we did last
+            enum {
+                Prev_Tok_LParen        = 0x01,    // previous token was a left parenthesis ('(')
+                Prev_Tok_RParen        = 0x02,    // previous token was a right parenthesis (')')
+                Prev_Tok_Colon        = 0x04,    // previous token was a colon (':')
+                Prev_Tok_Comma        = 0x08,    // previous token was a comma (',')
+                Prev_Tok_Name        = 0x10,    // previous token was a node name (e.g. '2', 'P._articulata')
+                Prev_Tok_EdgeLen    = 0x20    // previous token was an edge length (e.g. '0.1', '1.7e-3')
+            };
+            unsigned previous = Prev_Tok_LParen;
+
+            // Some useful flag combinations
+            unsigned LParen_Valid = (Prev_Tok_LParen | Prev_Tok_Comma);
+            unsigned RParen_Valid = (Prev_Tok_RParen | Prev_Tok_Name | Prev_Tok_EdgeLen);
+            unsigned Comma_Valid  = (Prev_Tok_RParen | Prev_Tok_Name | Prev_Tok_EdgeLen);
+            unsigned Colon_Valid  = (Prev_Tok_RParen | Prev_Tok_Name);
+            unsigned Name_Valid   = (Prev_Tok_RParen | Prev_Tok_LParen | Prev_Tok_Comma);
+
+            // Set to true while reading an edge length
+            bool inside_edge_length = false;
+            std::string edge_length_str;
+            unsigned edge_length_position = 0;
+
+            // Set to true while reading a node name surrounded by (single) quotes
+            bool inside_quoted_name = false;
+
+            // Set to true while reading a node name not surrounded by (single) quotes
+            bool inside_unquoted_name = false;
+
+            // Set to start of each node name and used in case of error
+            unsigned node_name_position = 0;
+
+            // loop through the characters in newick, building up tree as we go
+            unsigned position_in_string = 0;
+            for (auto ch : commentless_newick) {
+                position_in_string++;
+
+                if (inside_quoted_name) {
+                    if (ch == '\'') {
+                        inside_quoted_name = false;
+                        node_name_position = 0;
+                        if (!nd->_left_child) {
+                            curr_leaf++;
+                        }
+                        previous = Prev_Tok_Name;
+                    }
+                    else if (iswspace(ch))
+                        nd->_name += ' ';
+                    else {
+                        nd->_name += ch;
+                    }
+
+                    continue;
+                }
+                else if (inside_unquoted_name) {
+                    if (ch == '(')
+                        throw XProj(boost::str(boost::format("Unexpected left parenthesis inside node name at position %d in tree description") % node_name_position));
+
+                    if (iswspace(ch) || ch == ':' || ch == ',' || ch == ')') {
+                        inside_unquoted_name = false;
+
+                        // Expect node name only after a left paren (child's name), a comma (sib's name) or a right paren (parent's name)
+                        if (!(previous & Name_Valid))
+                            throw XProj(boost::str(boost::format("Unexpected node name (%s) at position %d in tree description") % nd->_name % node_name_position));
+
+                        if (!nd->_left_child) {
+                            curr_leaf++;
+                        }
+
+                        previous = Prev_Tok_Name;
+                    }
+                    else {
+                        nd->_name += ch;
+                        continue;
+                    }
+                }
+                else if (inside_edge_length) {
+                    if (ch == ',' || ch == ')' || iswspace(ch)) {
+                        inside_edge_length = false;
+                        edge_length_position = 0;
+                        extractEdgeLen(nd, edge_length_str);
+                        ++num_edge_lengths;
+                        previous = Prev_Tok_EdgeLen;
+                    }
+                    else {
+                        bool valid = (ch =='e' || ch == 'E' || ch =='.' || ch == '-' || ch == '+' || isdigit(ch));
+                        if (!valid)
+                            throw XProj(boost::str(boost::format("Invalid branch length character (%c) at position %d in tree description") % ch % position_in_string));
+                        edge_length_str += ch;
+                        continue;
+                    }
+                }
+
+                if (iswspace(ch))
+                    continue;
+
+                switch(ch) {
+                    case ';':
+                        break;
+
+                    case ')':
+                        // If nd is bottommost node, expecting left paren or semicolon, but not right paren
+                        if (!nd->_parent)
+                            throw XProj(boost::str(boost::format("Too many right parentheses at position %d in tree description") % position_in_string));
+
+                        // Expect right paren only after an edge length, a node name, or another right paren
+                        if (!(previous & RParen_Valid))
+                            throw XProj(boost::str(boost::format("Unexpected right parenthesisat position %d in tree description") % position_in_string));
+
+                        // Go down a level
+                        nd = nd->_parent;
+                        if (!nd->_left_child->_right_sib)
+                            throw XProj(boost::str(boost::format("Internal node has only one child at position %d in tree description") % position_in_string));
+                        previous = Prev_Tok_RParen;
+                        break;
+
+                    case ':':
+                        // Expect colon only after a node name or another right paren
+                        if (!(previous & Colon_Valid))
+                            throw XProj(boost::str(boost::format("Unexpected colon at position %d in tree description") % position_in_string));
+                        previous = Prev_Tok_Colon;
+                        break;
+
+                    case ',':
+                    {
+                        // Expect comma only after an edge length, a node name, or a right paren
+                        if (!nd->_parent || !(previous & Comma_Valid))
+                            throw XProj(boost::str(boost::format("Unexpected comma at position %d in tree description") % position_in_string));
+
+                        // Check for polytomies
+                        if (!canHaveSibling(nd, rooted, allow_polytomies)) {
+                            throw XProj(boost::str(boost::format("Polytomy found in the following tree description but polytomies prohibited:\n%s") % newick));
+                        }
+
+                        // Create the sibling
+                        curr_node_index++;
+                        if (curr_node_index == _nodes.size())
+                            throw XProj(boost::str(boost::format("Too many nodes specified by tree description (%d nodes allocated for %d leaves)") % _nodes.size() % _nleaves));
+
+                        auto l_front = _nodes.begin();
+                        std::advance(l_front, curr_node_index);
+                        nd->_right_sib = &*l_front;
+
+                        nd->_right_sib->_parent = nd->_parent;
+                        nd = nd->_right_sib;
+                        previous = Prev_Tok_Comma;
+                        break;
+                    }
+
+                    case '(':
+                    {
+                        // Expect left paren only after a comma or another left paren
+                        if (!(previous & LParen_Valid))
+                            throw XProj(boost::str(boost::format("Not expecting left parenthesis at position %d in tree description") % position_in_string));
+
+                        // Create new node above and to the left of the current node
+                        assert(!nd->_left_child);
+                        curr_node_index++;
+                        if (curr_node_index == _nodes.size())
+                            throw XProj(boost::str(boost::format("malformed tree description (more than %d nodes specified)") % _nodes.size()));
+
+                        auto l_front = _nodes.begin();
+                        std::advance(l_front, curr_node_index);
+                        nd->_left_child = &*l_front;
+
+                        nd->_left_child->_parent = nd;
+                        nd = nd->_left_child;
+                        previous = Prev_Tok_LParen;
+                        break;
+                    }
+
+                    case '\'':
+                        // Encountered an apostrophe, which always indicates the start of a
+                        // node name (but note that node names do not have to be quoted)
+
+                        // Expect node name only after a left paren (child's name), a comma (sib's name)
+                        // or a right paren (parent's name)
+                        if (!(previous & Name_Valid))
+                            throw XProj(boost::str(boost::format("Not expecting node name at position %d in tree description") % position_in_string));
+
+                        // Get the rest of the name
+                        nd->_name.clear();
+
+                        inside_quoted_name = true;
+                        node_name_position = position_in_string;
+
+                        break;
+
+                    default:
+                        // Get here if ch is not one of ();:,'
+
+                        // Expecting either an edge length or an unquoted node name
+                        if (previous == Prev_Tok_Colon) {
+                            // Edge length expected (e.g. "235", "0.12345", "1.7e-3")
+                            inside_edge_length = true;
+                            edge_length_position = position_in_string;
+                            edge_length_str = ch;
+                        }
+                        else {
+                            // Get the node name
+                            nd->_name = ch;
+
+                            inside_unquoted_name = true;
+                            node_name_position = position_in_string;
+                        }
+                }   // end of switch statement
+            }   // loop over characters in newick string
+
+            if (inside_unquoted_name) {
+                cout << "entering exception " << endl;
+                throw XProj(boost::str(boost::format("Tree description ended before end of node name starting at position %d was found") % node_name_position));
+            }
+            if (inside_edge_length)
+                throw XProj(boost::str(boost::format("Tree description ended before end of edge length starting at position %d was found") % edge_length_position));
+            if (inside_quoted_name)
+                throw XProj(boost::str(boost::format("Expecting single quote to mark the end of node name at position %d in tree description") % node_name_position));
+
+            if (rooted) {
+                refreshPreorder();
+            }
+            renumberInternals();
+        }
+        catch(XProj &x) {
+            clear();
+            throw x;
+        }
+
+        _nodes.pop_front(); // remove node at beginning of list because it's an extra root
+        // remove parent from new last node
+        _nodes.front()._parent = NULL;
+        
+        _nodes.sort(
+             [this](Node& lhs, Node& rhs) {
+                 return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } ); // TODO: this isn't working?
+        _lineages.clear();
+        
+        _lineages.push_back(&_nodes.back());
+        
+        // reset node names
+        int j = 0;
+        for (auto &nd:_nodes) {
+            nd._number = j;
+            j++;
         }
     }
 

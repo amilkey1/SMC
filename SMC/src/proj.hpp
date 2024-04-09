@@ -71,6 +71,7 @@ namespace proj {
             void                sanityChecks();
             void                initializeParticles(vector<Particle::SharedPtr> &particles);
             void                initializeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
+            void                handleGeneNewicks();
 
         private:
 
@@ -113,6 +114,8 @@ namespace proj {
             unsigned                    _count; // counter for params output file
 //            vector<string>              _species_newicks; // vector of species newicks for output when parallelizing by species gropu
             vector<string>              _vec_test;
+            bool                        _gene_newicks_specified;
+            unsigned                    _ngenes_provided;
     };
 
     inline Proj::Proj() {
@@ -369,8 +372,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
             for (int i=0; i<(nspecies*2-1); i++) {
 #if defined (DRAW_NEW_THETA)
-                vector<double> theta_vec = p->getThetaVector();
-                logf << "\t" << theta_vec[i] / 4.0;
+                if (!_gene_newicks_specified) {
+                    vector<double> theta_vec = p->getThetaVector();
+                    logf << "\t" << theta_vec[i] / 4.0;
+                }
 #else
                 logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
 #endif
@@ -701,6 +706,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("thin", boost::program_options::value(&_thin)->default_value(1.0), "take this portion of particles for hierarchical species filtering")
         ("save_every", boost::program_options::value(&_save_every)->default_value(1.0), "take this portion of particles for output")
         ("save_gene_trees", boost::program_options::value(&_save_gene_trees)->default_value(true), "turn this off to not save gene trees and speed up program")
+        ("gene_newicks", boost::program_options::value(&_gene_newicks_specified)->default_value(false), "set true if user is specifying gene tree files")
+        ("ngenes", boost::program_options::value(&_ngenes_provided)->default_value(0), "number of gene newick files specified")
+        ("gamma_scale", boost::program_options::value(&Forest::_gamma_scale)->default_value(0.05), "shape parameter of gamma distributon prior on theta - mean of the gamma distribution is gamma_scale * 2")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -809,6 +817,324 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ntaxa = _data->getNumTaxa();
         Forest::setNumTaxa(ntaxa);
         return ntaxa;
+    }
+
+    inline void Proj::handleGeneNewicks() {
+        vector<vector<string>> newicks; // vector of vector of newicks, 1 vector per gene
+        if (_ngenes_provided == 0) {
+            throw XProj("must specify number of genes in the conf file");
+        }
+        
+        for (int i=1; i<_ngenes_provided+1; i++) {
+            vector<string> current_gene_newicks;
+            string file_name = "gene" + to_string(i) + ".trees"; // file must be named gene1.trees, gene2.trees, etc.
+            ifstream infile (file_name);
+            string newick;
+            unsigned size_before = (unsigned) current_gene_newicks.size();
+            
+            while (getline(infile, newick)) { // file newicks must start with the word "tree"
+//                size_t found = newick.find("tree");
+                if (newick.find("tree") == 2) { // TODO: not sure why / if this works - switch to checking for parnethesis?
+                    // TODO: also need to start at the parenthesis?
+                    size_t pos = newick.find("("); //find location of parenthesis
+                    newick.erase(0,pos); //delete everything prior to location found
+                    current_gene_newicks.push_back(newick);
+                }
+            }
+            int size_after = (int) current_gene_newicks.size();
+            if (size_before == size_after) {
+                string error_message = "cannot find gene " + to_string(i) + " file";
+                throw XProj(error_message);
+            }
+            
+            newicks.push_back(current_gene_newicks);
+        }
+
+        _data = Data::SharedPtr(new Data());
+        _data->setPartition(_partition); // TODO: set the species partition but not any node names, or clear everything before building from the newick
+        _data->getDataFromFile(_data_file_name);
+
+        if (_verbose > 0) {
+            summarizeData(_data);
+        }
+        createSpeciesMap(_data);
+
+        // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
+        if (Forest::_outgroup != "none") {
+            checkOutgroupName();
+        }
+
+        //set number of species to number in data file
+        unsigned ntaxa = setNumberTaxa(_data);
+        unsigned nspecies = (unsigned) _species_names.size();
+        Forest::setNumSpecies(nspecies);
+        rng.setSeed(_random_seed);
+
+//          create vector of particles
+        unsigned nparticles = _nparticles;
+
+        unsigned nsubsets = _data->getNumSubsets();
+        Particle::setNumSubsets(nsubsets);
+
+        vector<Particle::SharedPtr> my_vec_1(nparticles);
+        vector<Particle::SharedPtr> my_vec_2(nparticles);
+        vector<Particle::SharedPtr> &my_vec = my_vec_1;
+
+        for (unsigned i=0; i<nparticles; i++) {
+            my_vec_1[i] = Particle::SharedPtr(new Particle);
+            my_vec_2[i] = Particle::SharedPtr(new Particle);
+        }
+
+        bool use_first = true;
+
+        initializeParticles(my_vec); // initialize in parallel with multithreading
+        
+        unsigned count = 0;
+        for (auto &p:my_vec) {
+            // TODO: process gene newicks
+            vector<string> particle_newicks;
+            for (int i = 0; i<newicks.size(); i++) {
+                particle_newicks.push_back(newicks[i][count]);
+            }
+            assert (particle_newicks.size() == nsubsets);
+            p->processGeneNewicks(particle_newicks); // TODO: some genes aren't fully built?
+            count++;
+        }
+
+        cout << "\n";
+        string filename1 = "species_trees.trees";
+        string filename2 = "unique_species_trees.trees";
+        string filename3 = "params-beast-comparison.log";
+        if (filesystem::remove(filename1)) {
+            ofstream speciestrf(filename1);
+            speciestrf << "#nexus\n\n";
+            speciestrf << "begin trees;\n";
+            if (_verbose > 0) {
+                cout << "existing file " << filename1 << " removed and replaced\n";
+            }
+        }
+        else {
+            ofstream speciestrf(filename1);
+            speciestrf << "#nexus\n\n";
+            speciestrf << "begin trees;\n";
+            if (_verbose > 0) {
+                cout << "created new file " << filename1 << "\n";
+            }
+        }
+        if (filesystem::remove(filename2)) {
+            ofstream uniquespeciestrf(filename2);
+            uniquespeciestrf << "#nexus\n\n";
+            uniquespeciestrf << "begin trees;\n";
+            if (_verbose > 0) {
+                cout << "existing file " << filename2 << " removed and replaced\n";
+            }
+        }
+        else {
+            ofstream uniquespeciestrf(filename2);
+            uniquespeciestrf << "#nexus\n\n";
+            uniquespeciestrf << "begin trees;\n";
+            if (_verbose > 0) {
+                cout << "created new file " << filename2 << "\n";
+            }
+        }
+        if (filesystem::remove(filename3)) {
+            ofstream paramsf(filename3);
+            if (_verbose > 0) {
+               cout << "existing file " << filename3 << " removed and replaced\n";
+            }
+        }
+        else {
+            ofstream paramsf(filename3);
+            if (_verbose > 0) {
+                cout << "created new file " << filename3 << "\n";
+            }
+        }
+        cout << "\n";
+
+        unsigned ngroups = round(_nparticles * _thin);
+        if (ngroups == 0) {
+            ngroups = 1;
+            cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
+        }
+
+        random_shuffle(my_vec.begin(), my_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
+        // delete first (1-_thin) % of particles
+        my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (_nparticles-ngroups)));
+        assert(my_vec.size() == ngroups);
+
+        _nparticles = ngroups;
+
+        for (auto &p:my_vec) {
+            // reset forest species partitions
+            p->clearPartials(); // no more likelihood calculations
+            p->resetSpecies();
+            p->mapSpecies(_taxon_map, _species_names);
+        }
+
+        vector<Particle::SharedPtr> new_vec;
+
+        _nparticles = _particle_increase;
+        unsigned index = 0;
+        
+        bool parallelize_by_group = false;
+        
+        if (_nthreads > 1) {
+#if defined PARALLELIZE_BY_GROUP
+            parallelize_by_group = true;
+#endif
+        }
+        
+        if (parallelize_by_group) {
+        // don't bother with this if not multithreading
+            proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3, nsubsets, ntaxa);
+//                    saveSpeciesTreeStringsHierarchical(_species_newicks, filename1); // TODO: need to write to files as you go for output purposes
+            ofstream strees;
+            strees.open("species_trees.trees", std::ios::app);
+            strees << "end;" << endl;
+            strees.close();
+            
+            ofstream u_strees;
+            u_strees.open("unique_species_trees.trees", std::ios::app);
+            u_strees << "end;" << endl;
+            u_strees.close();
+
+            string line;
+            // For writing text file
+            // Creating ofstream & ifstream class object
+            ifstream in ("params-beast-comparison.log");
+            ofstream f("params-beast-comparison-final.log");
+
+            unsigned line_count = 0;
+
+            while (!in.eof()) {
+                string text;
+
+                getline(in, text);
+
+                if (line_count == 0) {
+                    string add = "iter ";
+                    text = add + text;
+                }
+                else {
+                    if (text != "") {
+                        string add = to_string(line_count);
+                        text = add + text;
+                    }
+                }
+                if (text != "") {
+                    f << text << endl; // account for blank line at end of file
+                }
+                line_count++;
+            }
+
+            // remove existing params file and replace with copy
+            char oldfname[] = "params-beast-comparison.log";
+            char newfname[] = "params-beast-comparison-final.log";
+            filesystem::remove(oldfname);
+            std::rename(newfname, oldfname);
+        }
+         
+        else {
+            for (unsigned a=0; a < ngroups; a++) {
+//                        _log_species_tree_marginal_likelihood = 0.0; // TODO: for now, write lorad file for first set of species tree filtering and report the marginal likelihood for comparison
+                
+                use_first = true;
+
+                vector<Particle::SharedPtr> use_vec_1;
+                vector<Particle::SharedPtr> use_vec_2;
+                vector<Particle::SharedPtr> &use_vec = use_vec_1;
+
+                Particle::SharedPtr chosen_particle = my_vec_1[a]; // particle to copy
+                for (unsigned i=0; i<_particle_increase; i++) {
+                    use_vec_1.push_back(Particle::SharedPtr(new Particle()));
+                    use_vec_2.push_back(Particle::SharedPtr(new Particle()));
+                    use_vec_1[i] = Particle::SharedPtr(new Particle(*chosen_particle));
+                    use_vec_2[i] = Particle::SharedPtr(new Particle(*chosen_particle));
+                }
+
+                assert(use_vec.size() == _particle_increase);
+
+                index += _particle_increase;
+
+                if (_verbose > 0) {
+                    cout << "beginning species tree proposals for subset " << a+1 << endl;
+                }
+                for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
+                    if (_verbose > 0) {
+                        cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
+                    }
+
+                    // set particle random number seeds
+                    unsigned psuffix = 1;
+                    for (auto &p:use_vec) {
+                        p->setSeed(rng.randint(1,9999) + psuffix);
+                        psuffix += 2;
+                    }
+
+                    proposeSpeciesParticles(use_vec);
+
+
+                    normalizeSpeciesWeights(use_vec);
+
+
+                    double ess_inverse = 0.0;
+
+                    for (auto & p:use_vec) {
+                        ess_inverse += exp(2.0*p->getSpeciesLogWeight());
+                    }
+
+                    double ess = 1.0/ess_inverse;
+                    if (_verbose > 1) {
+                        cout << "   " << "ESS = " << ess << endl;
+                    }
+
+                    resampleSpeciesParticles(use_vec, use_first ? use_vec_2:use_vec_1);
+                    //if use_first is true, my_vec = my_vec_2
+                    //if use_first is false, my_vec = my_vec_1
+
+                    use_vec = use_first ? use_vec_2:use_vec_1;
+
+                    //change use_first from true to false or false to true
+                    use_first = !use_first;
+
+                    resetSpeciesWeights(use_vec);
+
+                } // s loop
+
+                if (_save_every > 1.0) { // thin sample for output by taking a random sample
+                    unsigned sample_size = round (double (_particle_increase) / double(_save_every));
+                    if (sample_size == 0) {
+                        cout << "\n";
+                        cout << "current settings would save 0 species trees; saving every species tree\n";
+                        cout << "\n";
+                        sample_size = _particle_increase;
+                    }
+
+                    random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
+                    // delete first (1-_thin) % of particles
+                    use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
+                    assert (use_vec.size() == sample_size);
+                }
+
+                saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
+                writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, a);
+                if (a == 0) {
+                    writeLoradFileAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec); // testing the marginal likelihood by writing to file for lorad for first species group only
+                    cout << "species tree log marginal likelihood is: " << _log_species_tree_marginal_likelihood << endl;
+                }
+            }
+
+            std::ofstream treef;
+            treef.open(filename1, std::ios_base::app);
+            treef << "end;\n";
+            treef.close();
+
+            std::ofstream unique_treef;
+            unique_treef.open(filename2, std::ios_base::app);
+            unique_treef << "end;\n";
+            unique_treef.close();
+        }
+        
     }
 
     inline double Proj::getRunningSum(const vector<double> & log_weight_vec) const {
@@ -1278,6 +1604,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         assert (_nthreads > 0);
 
         bool partials = true;
+        if (_gene_newicks_specified) {
+            partials = false;
+            Forest::_save_memory = true;
+        }
 
         if (_nthreads == 1) {
             for (auto & p:particles ) { // TODO: can initialize some of these things in parallel?
@@ -1510,9 +1840,26 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     }
 
     inline void Proj::run() {
-        _first_line = true;
-        sanityChecks();
-        if (_start_mode == "sim") {
+        if (_gene_newicks_specified) {
+            if (_start_mode == "sim") {
+                throw XProj("cannot specify gene newicks and simulations");
+            }
+            try {
+                handleGeneNewicks();
+            }
+            catch (XProj & x) {
+                std::cerr << "Proj encountered a problem:\n  " << x.what() << std::endl;
+            }
+        }
+        
+        else if (_start_mode == "sim") {
+            if (_gene_newicks_specified) {
+                throw XProj("cannot specify gene newicks and simulations");
+            }
+            
+            _first_line = true;
+            sanityChecks();
+            
             try {
                 simulateData();
             }
@@ -1521,6 +1868,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
         }
         else {
+            _first_line = true;
+            sanityChecks();
             if (_verbose > 0) {
                 cout << "Starting..." << endl;
                 cout << "Current working directory: " << boost::filesystem::current_path() << endl;
@@ -1579,7 +1928,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 }
 
                 bool use_first = true;
-//                bool partials = true;
 
                 initializeParticles(my_vec); // initialize in parallel with multithreading
 
