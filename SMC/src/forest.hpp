@@ -2536,14 +2536,15 @@ class Forest {
 //        _theta_mean = rng.logNormal(-4.6, 2.14);
 //        ofstream logf ("theta_means.txt");
 //        for (int i=0; i<10000; i++) {
-//            _theta_mean = lot->logNormal(-4.6, 2.14); // TODO: mean = 0.1, sd = 1 --> make sd 0.1? - or try gamma
+            _theta_mean = lot->logNormal(-4.6, 2.14); // TODO: mean = 0.1, sd = 1 --> make sd 0.1? - or try gamma
 //            logf << _theta_mean << "," << endl;
             
 //        }
 //        logf.close();
         
 //            _theta_mean = lot->gamma(2, 0.05);
-        _theta_mean = lot->gamma(2, _gamma_scale);
+//            _theta_mean = lot->gamma(0.01, 10); // variance is too symmetrical - proposes tiny values
+//        _theta_mean = lot->gamma(2, _gamma_scale); // mean = 2 * scale, var = 2 * scale^2 // TODO: variance is very small when scale small
 
         
         double scale = 1 / _theta_mean;
