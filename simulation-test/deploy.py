@@ -9,8 +9,8 @@ ntax           = [2,2,2,2,2] # number of taxa in each species
 # These used only if method == 'uniform' 
 T_low            = 0.1       # smallest tree height (T) value 
 T_high           = 1.0       # largest tree height (T) value
-half_theta_low   = 0.1       # smallest theta/2 value
-half_theta_high  = 1.0       # largest theta/2 value
+half_theta_low   = 0.005       # smallest theta/2 value
+half_theta_high  = 0.5       # largest theta/2 value
 
 # These used only if method == 'lornorm' 
 Tmean            = 1.0       # mean tree height (T)
@@ -21,7 +21,7 @@ Rsd              = 0.2       # standard deviation of theta/T ratios
 nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100       # number of sites in each gene
 nreps          = 2          # number of simulation replicates
-nparticles     = 100       # number of particles to use for SMC
+nparticles     = 6250       # number of particles to use for SMC
 simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
@@ -33,14 +33,14 @@ nodechoice     = 0          # 0-offset index into nodechoices
 #partition      = 'general'   # specifies partition to use for HPC: either 'general' or 'priority'
 #constraint     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
-rnseed         = 381131      # overall pseudorandom number seed
-mcmciter       = 100      # chain length for Beast MCMC
-saveevery      = 100         # MCMC storeevery modulus
+rnseed         = 1235      # overall pseudorandom number seed
+mcmciter       = 50000000      # chain length for Beast MCMC
+saveevery      = 1000         # MCMC storeevery modulus
 preburnin      = 0        # MCMC burn in
-storeevery     = 100        # state storeevery modulus
-screenevery    = 100        # screen print modulus
-genetreeevery  = 100         # gene tree save modulus
-spptreeevery   = 1          # species tree save modulus (mcmciter/spptreeevery should equal nparticles
+storeevery     = 1000        # state storeevery modulus
+screenevery    = 1000        # screen print modulus
+genetreeevery  = 1000         # gene tree save modulus
+spptreeevery   = 1000          # species tree save modulus (mcmciter/spptreeevery should equal nparticles
 
 # Settings you can change but probably shouldn't
 maxsimult   = None        # maximum number of jobs to run simultaneously (set to None if there is no maximum)
@@ -249,13 +249,13 @@ def createSMCConf(rep_index):
     s += '\n'
     s += '\n'
     s += 'nparticles = %d\n' % nparticles
-    s += 'nthreads = 34\n'
+    s += 'nthreads = 36\n'
     s += '\n'
     s += 'verbose = 1\n'
     s += 'run_on_empty = false\n'
-    s += 'particle_increase = 100\n'
-    s += 'thin=0.01\n'
-    s += 'save_every = 1\n'
+    s += 'particle_increase = 200\n'
+    s += 'thin=1.0\n'
+    s += 'save_every = 25\n'
     s += 'save_gene_trees = false\n'
 
     smcconff = open(smcconffn, 'w')
@@ -839,6 +839,7 @@ def createBeastSlurm():
     s += '#SBATCH --job-name=beast\n'
     s += '#SBATCH -o beast-%a.out\n'
     s += '#SBATCH -e beast-%a.err\n'
+    s += '#SBATCH --mem=150G\n'
     s += '\n'
     s += 'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$HOME/lib"\n'
     s += 'export TIMEFORMAT="user-seconds %3U"\n'
@@ -1048,6 +1049,43 @@ def writeDeepCoalFile():
 	deepcoalf.write(s)
 	deepcoalf.close()
 
+def writeThetaFile():
+	thetafn = os.path.join(dirname, 'get-average-theta.py')
+	s = "import os\n"
+	s += "import numpy\n"
+	s += "import shutil\n"
+	s += "import pandas as pd\n"
+	s += "import csv\n"
+	s +=  "nreps = %12d \n" % nreps
+	s += "smc_theta_list = []\n"
+	s += "beast_theta_list = []\n"
+	s += "true_theta_list = []\n"
+	s += "for i in range(%12d):" % nreps
+	s += "	# get smc average theta\n"
+	s += "	smc = pd.read_csv('rep' + str(i+1) + '/smc/params-beast-comparison.log', sep='\t')\n"
+	s += "	theta_smc = smc['popMean '].mean()*4\n"
+	s += "	smc_theta_list.append(theta_smc)\n"
+	s += "	# get beast average theta\n"
+	s += "	beast = pd.read_csv('rep' + str(i+1) + '/beast/starbeast3.log', sep = '\t', comment = '#')\n"
+	s += "	theta_beast = beast['popMean'].mean()*4\n"
+	s += "	beast_theta_list.append(theta_beast)\n"
+	s += "	# get true theta\n"
+	s += "	with  open('rep' + str(i+1) + '/sim/proj.conf') as fi:\n"
+	s += "		id = []\n"
+	s += "		for ln in fi:\n"
+	s += "			if ln.startswith('theta'):\n"
+	s += "				true_theta_list.append(float(ln[9:13]))\n"
+	s += "rows = zip(smc_theta_list, beast_theta_list, true_theta_list)\n"
+	s += "with open('theta-comparisons.txt', 'w') as f:\n"
+	s += "	f.write('smc, beast, true\\n')\n"
+	s += "	writer = csv.writer(f)\n"
+	s += "	for row in rows:\n"
+	s += "		writer.writerow(row)\n"
+	thetaf = open(thetafn, 'w')
+	thetaf.write(s)
+	thetaf.close()
+
+
 def writeTimeFile():
 	timefn = os.path.join(dirname, 'get-times.py')
 	s = "import os\n"
@@ -1108,3 +1146,4 @@ if __name__ == '__main__':
     createTreeDist('beast', beasttreefname, 2)
     createANOVAPy()
     writeTimeFile()
+    writeThetaFile()
