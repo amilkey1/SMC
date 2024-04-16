@@ -1,41 +1,97 @@
-import sys, os, re, random, subprocess as sub, shutil
-from math import log
+import sys, os, re, subprocess as sub, shutil, numpy as np
+from scipy.stats import randint,uniform,lognorm,describe
+from math import log,exp,sqrt,pow
 
 # Settings you can change
-ntax           = [2, 2,2,2,2] # number of taxa in each species
-lamda          = 1.0         # speciation rate (note: lambda is a python keyword)
-theta          = 0.1        # 4 Nm mu (same for all species and constant within species)
+method           = 'uniform' # should be either 'uniform' or 'lognorm'
+ntax           = [2,2,2,2,2] # number of taxa in each species
+
+# These used only if method == 'uniform' 
+T_low            = 0.1       # smallest tree height (T) value 
+T_high           = 1.0       # largest tree height (T) value
+half_theta_low   = 0.005       # smallest theta/2 value
+half_theta_high  = 0.5       # largest theta/2 value
+
+# These used only if method == 'lornorm' 
+Tmean            = 1.0       # mean tree height (T)
+Tsd              = 0.7       # standard deviation of T
+Rmean            = 0.2       # mean ratio of theta to T
+Rsd              = 0.2       # standard deviation of theta/T ratios
+
 nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100       # number of sites in each gene
-nreps          = 10          # number of simulation replicates
-nparticles     = 2500       # number of particles to use for SMC
+nreps          = 2          # number of simulation replicates
+nparticles     = 6250       # number of particles to use for SMC
 simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 smctreefname   = 'species_trees.trees' # name of species tree file for SMC
 beasttreefname = 'species.trees'           # name of species tree file for BEAST
 username       = 'aam21005'  # name of user on UConn HPC cluster
-#nodechoices    = [('general','skylake'), ('priority', 'epyc128')]   # specifies partition to use for HPC: either 'general' or 'priority'
-#nodechoices     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
-partition = 'general'
-constraint = 'epyc128'
+nodechoices    = [('general', 'epyc128'), ('priority','skylake')]
+nodechoice     = 0          # 0-offset index into nodechoices
+#partition      = 'general'   # specifies partition to use for HPC: either 'general' or 'priority'
+#constraint     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
-rnseed         = 13579       # overall pseudorandom number seed
-mcmciter       = 500000      # chain length for Beast MCMC
-saveevery      = 500         # MCMC storeevery modulus
+rnseed         = 1235      # overall pseudorandom number seed
+mcmciter       = 50000000      # chain length for Beast MCMC
+saveevery      = 1000         # MCMC storeevery modulus
 preburnin      = 0        # MCMC burn in
 storeevery     = 1000        # state storeevery modulus
 screenevery    = 1000        # screen print modulus
-genetreeevery  = 500         # gene tree save modulus
-spptreeevery   = 200          # species tree save modulus (mcmciter/spptreeevery should equal nparticles
+genetreeevery  = 1000         # gene tree save modulus
+spptreeevery   = 1000          # species tree save modulus (mcmciter/spptreeevery should equal nparticles
 
 # Settings you can change but probably shouldn't
 maxsimult   = None        # maximum number of jobs to run simultaneously (set to None if there is no maximum)
 
 # Values obtained from settings
+np.random.seed(seed=rnseed)
 nspecies = len(ntax)
-random.seed(rnseed)
-rnseeds = [random.randint(1,999999) for i in range(nreps)]
+
+# Set up random variable for choosing seeds for each replicate
+rnseeds = randint.rvs(1, 1000000, size=nreps)
+
+if method == 'lognorm':
+    # Set up "standardized" scipy lognormal distribution for T
+    Tsigsq = log(1. + pow(Tsd/Tmean,2.))
+    Tsigma = sqrt(Tsigsq)
+    Tmu = log(Tmean) - 0.5*Tsigsq
+    Tshape = Tsigma
+    Tscale = exp(Tmu)
+    Trv = lognorm(Tshape, scale=Tscale)
+    Tvect = Trv.rvs(size=nreps)
+    Td = describe(Tvect, 0, 1)  # 0 = axis, 1 = df used in correcting variance)
+
+    # Set up "standardized" scipy lognormal distribution for theta/T ratio
+    Rsigsq = log(1. + pow(Rsd/Rmean,2.))
+    Rsigma = sqrt(Rsigsq)
+    Rmu = log(Rmean) - 0.5*Rsigsq
+    Rshape = Rsigma
+    Rscale = exp(Rmu)
+    Rrv = lognorm(Rshape, scale=Rscale)
+    Rvect = Rrv.rvs(size=nreps)
+    Rd = describe(Rvect, 0, 1)  # 0 = axis, 1 = df used in correcting variance)
+
+    thetas = [r*t for r,t in zip(Rvect, Tvect)]
+    thetad = describe(thetas, 0, 1)
+
+    nspp = len(ntax)
+    phi = sum([1./k for k in range(2, nspp + 1)])
+    lambdas = [phi/t for t in Tvect]
+    lambdad = describe(lambdas, 0, 1)
+elif method == 'uniform':
+    thetas = [2.*q for q in uniform.rvs(loc=half_theta_low, scale=half_theta_high-half_theta_low, size=nreps)]
+    thetad = describe(thetas, 0, 1)
+
+    Tvect = uniform.rvs(loc=T_low, scale=T_high-T_low, size=nreps)
+    Td = describe(Tvect, 0, 1)  # 0 = axis, 1 = df used in correcting variance)
+    nspp = len(ntax)
+    phi = sum([1./k for k in range(2, nspp + 1)])
+    lambdas = [phi/t for t in Tvect]
+    lambdad = describe(lambdas, 0, 1)
+else:
+    assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
 
 def inventName(k, lower_case):
     # If   0 <= k < 26, returns A, B, ..., Z,
@@ -141,8 +197,11 @@ def createBeastDir(rep_index):
     os.mkdir(beastdirpath)
 
 def createSimConf(rep_index):
+    theta = thetas[rep_index]
+    lamda = lambdas[rep_index]
     simdirpath = createSimDirPath(rep_index)
     fn = os.path.join(simdirpath, 'proj.conf')
+
     s  = ''
     s += 'filename  = sim.nex\n'
     s += 'startmode = sim\n'
@@ -169,6 +228,8 @@ def createSimConf(rep_index):
     outf.write(s)
     outf.close()
 def createSMCConf(rep_index):
+    theta = thetas[rep_index]
+    lamda = lambdas[rep_index]
     smcdirpath = createSMCDirPath(rep_index)
     smcconffn = os.path.join(smcdirpath, 'proj.conf')
 
@@ -188,10 +249,14 @@ def createSMCConf(rep_index):
     s += '\n'
     s += '\n'
     s += 'nparticles = %d\n' % nparticles
-    s += 'nthreads = 34\n'
+    s += 'nthreads = 36\n'
     s += '\n'
-    s += 'phi = 1.0\n'
-    s += 'verbose = 2\n'
+    s += 'verbose = 1\n'
+    s += 'run_on_empty = false\n'
+    s += 'particle_increase = 200\n'
+    s += 'thin=1.0\n'
+    s += 'save_every = 25\n'
+    s += 'save_gene_trees = false\n'
 
     smcconff = open(smcconffn, 'w')
     smcconff.write(s)
@@ -370,6 +435,7 @@ def createBeastXML(rep_index):
     s += '            <log idref="prior"/>\n'
     s += '            <log idref="vectorPrior"/>\n'
     s += '            <log idref="speciescoalescent"/>\n'
+    s += '            <log idref="speciationRate.t:Species"/>\n'
     s += '            <log id="TreeStat.Species" spec="beast.base.evolution.tree.TreeStatLogger" tree="@Tree.t:Species"/>\n'
     s += '            <log idref="YuleModel.t:Species"/>\n'
     s += '            <log idref="popMean"/>\n'
@@ -418,8 +484,55 @@ def createBeastXML(rep_index):
 
 def createREADME():
     readmefn = os.path.join(dirname, 'README')
-
-    readme  = ''
+    
+    readme  = 'Summary of parameters used in simulations\n'
+    readme += '-----------------------------------------\n'
+    if method == 'lognorm':
+        readme += 'T (tree height):\n'
+        readme += '  nobs = %d\n' % Td.nobs
+        readme += '  mean = %.5f (expected value = %.5f)\n' % (Td.mean, Tmean)
+        readme += '  s.d. = %.5f (expected value = %.5f)\n' % (sqrt(Td.variance),Tsd)
+        readme += '  min  = %.5f\n' % (min(Tvect),)
+        readme += '  max  = %.5f\n' % (max(Tvect),)
+        readme += '\n'
+        readme += 'R (theta/T ratio):\n'
+        readme += '  nobs = %d\n' % Rd.nobs
+        readme += '  mean = %.5f (expected value = %.5f)\n' % (Rd.mean, Rmean)
+        readme += '  s.d. = %.5f (expected value = %.5f)\n' % (sqrt(Rd.variance),Rsd)
+        readme += '  min  = %.5f\n' % (min(Rvect),)
+        readme += '  max  = %.5f\n' % (max(Rvect),)
+        readme += '\n'
+        readme += 'theta:\n'
+        readme += '  nobs = %d\n' % thetad.nobs
+        readme += '  mean = %.5f\n' % thetad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(thetad.variance),)
+        readme += '  min  = %.5f\n' % (min(thetas),)
+        readme += '  max  = %.5f\n' % (max(thetas),)
+        readme += '\n'
+        readme += 'lambda:\n'
+        readme += '  nobs = %d\n' % lambdad.nobs
+        readme += '  mean = %.5f\n' % lambdad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(lambdad.variance),)
+        readme += '  min  = %.5f\n' % (min(lambdas),)
+        readme += '  max  = %.5f\n' % (max(lambdas),)
+        readme += '\n'
+    elif method == 'uniform':
+        readme += 'theta:\n'
+        readme += '  nobs = %d\n' % thetad.nobs
+        readme += '  mean = %.5f\n' % thetad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(thetad.variance),)
+        readme += '  min  = %.5f\n' % (min(thetas),)
+        readme += '  max  = %.5f\n' % (max(thetas),)
+        readme += '\n'
+        readme += 'lambda:\n'
+        readme += '  nobs = %d\n' % lambdad.nobs
+        readme += '  mean = %.5f\n' % lambdad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(lambdad.variance),)
+        readme += '  min  = %.5f\n' % (min(lambdas),)
+        readme += '  max  = %.5f\n' % (max(lambdas),)
+        readme += '\n'
+    else:
+        assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
 
     readme += 'Installing SMC on the remote cluster\n'
     readme += '------------------------------------\n'
@@ -433,7 +546,7 @@ def createREADME():
     readme += '2. Ensure that the name of your executable is stored in the variable\n'
     readme += '   "smcprogname" in the "deploy.py" script.\n'
     readme += '\n'
-
+    
     readme += 'Installing BEAST on the remote cluster\n'
     readme += '--------------------------------------\n'
     readme += '\n'
@@ -462,7 +575,7 @@ def createREADME():
     readme += './packagemanager -dir $HOME/beast-packages -add starbeast3\n'
     readme += '\n'
 
-    readme += 'Creating a simulation experiment on your local laptop\n'
+    readme += 'Creating a simulation experiment on the remote cluster\n'
     readme += '-----------------------------------------------------\n'
     readme += '1. Remove the directory specified in the variable "dirname" (e.g. "g")\n'
     readme += '\n'
@@ -472,29 +585,11 @@ def createREADME():
     readme += '\n'
     readme += 'python3 deploy.py\n'
     readme += '\n'
-    readme += '3. Tar up the "g" directory:\n'
-    readme += '\n'
-    readme += 'tar zcvf g.tar.gz g\n'
-    readme += '\n'
-    readme += '4. Move the "g.tar.gz" file to the cluster:\n'
-    readme += '   (the following assumes that the alias "hpc" has been defined in\n'
-    readme += '   your ~/.ssh/config file.)\n'
-    readme += '\n'
-    readme += 'scp g.tar.gz hpc:\n'
-    readme += '\n'
-    readme += '5. Login to the cluster:\n'
-    readme += '\n'
-    readme += 'ssh hpc\n'
-    readme += '\n'
-    readme += '6. Untar the file:\n'
-    readme += '\n'
-    readme += 'tar zxvf g.tar.gz\n'
-    readme += '\n'
-    readme += '7. Navigate into the "g" directory:\n'
+    readme += '4. Navigate into the "g" directory:\n'
     readme += '\n'
     readme += 'cd g\n'
     readme += '\n'
-
+    
     readme += 'Running the simulation experiment on the remote cluster\n'
     readme += '-------------------------------------------------------\n'
     readme += '1. Simulate data:\n'
@@ -518,23 +613,170 @@ def createREADME():
     
     readme += 'Summarizing results on the remote cluster\n'
     readme += '-----------------------------------------\n'
-    readme += '1. Use PAUP* to compute distances to true species tree for SMC and BEAST runs\n'
+    readme += '1. Use td ("treedist") to compute KF  distances to true species tree for SMC and BEAST runs\n'
     readme += '\n'
-
-    readme += 'paup smcpaup.nex\n'
-    readme += 'paup beastpaup.nex\n'
+    readme += '. smctd.sh\n'
+    readme += '. beasttd.sh\n'
     readme += 'python3 crunch.py\n'
     readme += '\n'
-
     readme += '2. Carry out repeated-measures ANOVA on remote cluster\n'
     readme += '\n'
     readme += 'python3 anova-means.py  # ignores variation within runs, using the run mean as the data point\n'
     readme += 'python3 anova-full.py   # takes account of variation within runs, every posterior sample is used\n'
     readme += '\n'
-
+    readme += '3. Get number of deep coalescences for each simulation\n'
+    readme += '\n'
+    readme += 'python3 get-deep-coal.py\n'
+    readme += '4. Get time for each program\n'
+    readme += '\n'
+    readme += 'python3 get-times.py\n'
+    readme += '\n'
+    
+    readme += 'Plotting results on local computer\n'
+    readme += '-----------------------------------------\n'
+    readme += 'Transfer the following files to local computer: \n'
+    readme += '		rf-summary.txt\n'
+    readme += '		kf-summary.txt\n'
+    readme += '		simcond.R\n'
+    readme += '		deep_coal.txt\n'
+    readme += '\n'
+    
     readmef = open(readmefn, 'w')
     readmef.write(readme)
     readmef.close()
+
+def createRplot():
+    plotfn = os.path.join(dirname, 'simcond.R')
+
+    plotstuff  = 'cwd = system(\'cd "$( dirname "$0" )" && pwd\', intern = TRUE)\n'
+    plotstuff += 'setwd(cwd)\n'
+    plotstuff += 'pdf("simcond.pdf")\n'
+
+    if method == 'lognorm':
+        Tstr = ['%g' % t for t in Tvect]
+        plotstuff += 'T = c(%s)\n' % ','.join(Tstr)
+
+        Rstr = ['%g' % r for r in Rvect]
+        plotstuff += 'R = c(%s)\n' % ','.join(Rstr)
+
+        thetastr = ['%g' % q for q in thetas]
+        plotstuff += 'theta = c(%s)\n' % ','.join(thetastr)
+
+        lambdastr = ['%g' % l for l in lambdas]
+        plotstuff += 'lambda = c(%s)\n' % ','.join(lambdastr)
+
+        plotstuff += 'plot(theta, lambda, type="p", pch=19, main="Simulation conditions", xlab="theta", ylab="lambda")\n'
+    elif method == 'uniform':
+        Tstr = ['%g' % t for t in Tvect]
+        plotstuff += 'T = c(%s)\n' % ','.join(Tstr)
+
+        thetastr = ['%g' % q for q in thetas]
+        plotstuff += 'theta = c(%s)\n' % ','.join(thetastr)
+
+        plotstuff += 'plot(theta/2, T, type="p", pch=19, main="Simulation conditions", xlab="theta/2", ylab="T")\n'
+    else:
+        assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
+
+    plotstuff += 'dev.off()\n'
+
+    plotstuff += 'rf <- read.table(file="rf-summary.txt")\n'
+    plotstuff += 'rf_smc <- rf$V3\n'
+    plotstuff += 'rf_beast <- rf$V6\n'
+    plotstuff += '\n'
+    plotstuff += 'kf <- read.table(file="kf-summary.txt")\n'
+    plotstuff += 'kf_smc <- kf$V3\n'
+    plotstuff += 'kf_beast <- kf$V6\n'
+    plotstuff += '\n'
+    plotstuff += '# make more plots\n'
+    plotstuff += 'library(ggplot2)\n'
+    plotstuff += 'df <- data.frame(T, theta)\n'
+    plotstuff += '\n'
+
+    plotstuff += 'max_kf_beast <- max(kf_beast)\n'
+    plotstuff += 'max_kf_smc <- max(kf_smc)\n'
+    plotstuff += 'max_kf <- max(c(kf_beast, kf_smc))\n'
+    plotstuff += '\n'
+    plotstuff += 'max_rf_beast <- max(rf_beast)\n'
+    plotstuff += 'max_rf_smc <- max(rf_smc)\n'
+    plotstuff += 'max_rf <- max(c(rf_beast, rf_smc))\n'
+    plotstuff += '\n'
+    plotstuff += 'myPalette<-colorRampPalette(c("purple","yellow"))\n'
+    plotstuff += 'sc_kf <- scale_colour_gradientn(colours = myPalette(100), limits=c(0, max_kf+1))\n'
+    plotstuff += 'sc_rf <- scale_colour_gradientn(colours = myPalette(100), limits=c(0, max_rf+1))\n'
+    plotstuff += '\n'
+
+    plotstuff += '# color smc by kf distances\n'
+    plotstuff += 'pdf("smc_kf_distances.pdf")\n'
+    plotstuff += 'p_kf_smc <- ggplot(df, aes(theta/2, T, color=kf_smc)) + sc_kf\n'
+    plotstuff += 'p_kf_smc + geom_point()\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# color beast by kf distances\n'
+    plotstuff += 'pdf("beast_kf_distances.pdf")\n'
+    plotstuff += 'p_kf_beast <- ggplot(df, aes(theta/2, T, color=kf_beast)) + sc_kf\n'
+    plotstuff += 'p_kf_beast + geom_point()\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# color smc by rf distances\n'
+    plotstuff += 'pdf("smc_rf_distances.pdf")\n'
+    plotstuff += 'p_rf_smc <- ggplot(df, aes(theta/2, T, color=rf_smc)) + sc_rf\n'
+    plotstuff += 'p_rf_smc + geom_point()\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# color beast by rf distances\n'
+    plotstuff += 'pdf("beast_rf_distances.pdf")\n'
+    plotstuff += 'p_rf_beast <- ggplot(df, aes(theta/2, T, color=rf_beast)) + sc_rf\n'
+    plotstuff += 'p_rf_beast + geom_point()\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+
+    plotstuff += 'deep_coal <- read.csv("deep_coal.txt", header=FALSE)\n'
+    plotstuff += 'deep_coal <- as.numeric(deep_coal)\n'
+    plotstuff += '\n'
+    plotstuff += '# plot number of deep coalescences vs KF distance -smc \n'
+    plotstuff += 'pdf("deep_coal_kf_smc.pdf")\n'
+    plotstuff += 'df_smc_kf <- data.frame(kf_smc, deep_coal)\n'
+    plotstuff += 'p_smc_deep_kf <- ggplot(df_smc_kf, aes(deep_coal, kf_smc))\n'
+    plotstuff += 'p_smc_deep_kf+geom_point() + theme_classic() + ylim(0, max_kf+1)\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# plot number of deep coalescences vs KF distance -beast\n'
+    plotstuff += 'pdf("deep_coal_kf_beast.pdf")\n'
+    plotstuff += 'df_beast_kf <- data.frame(kf_beast, deep_coal)\n'
+    plotstuff += 'p_beast_deep_kf <- ggplot(df_beast_kf, aes(deep_coal, kf_beast))\n'
+    plotstuff += 'p_beast_deep_kf+geom_point() + theme_classic() + ylim(0, max_kf+1)\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# plot number of deep coalescences vs RF distance - smc\n'
+    plotstuff += 'pdf("deep_coal_rf_smc.pdf")\n'
+    plotstuff += 'df_smc_rf <- data.frame(rf_smc, deep_coal)\n'
+    plotstuff += 'p_smc_deep_rf <- ggplot(df_smc_rf, aes(deep_coal, rf_smc))\n'
+    plotstuff += 'p_smc_deep_rf+geom_point() + theme_classic() + ylim(0, max_rf+1)\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# plot number of deep coalescences vs RF distance -beast\n'
+    plotstuff += 'pdf("deep_coal_rf_beast.pdf")\n'
+    plotstuff += 'df_beast_rf <- data.frame(rf_beast, deep_coal)\n'
+    plotstuff += 'p_beast_deep_rf <- ggplot(df_beast_rf, aes(deep_coal, rf_beast))\n'
+    plotstuff += 'p_beast_deep_rf+geom_point() + theme_classic() + ylim(0, max_rf+1)\n'
+    plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# make bar plot of differences between smc / true theta and beast / true theta\n'
+    plotstuff += 'thetadf <- read.csv("theta-comparisons.txt", header=TRUE)\n'
+    plotstuff += 'tibble::rowid_to_column(thetadf, "ID") # add indices\n'
+    plotstuff += 'smc_dif <- thetadf$smc - thetadf$true\n'
+    plotstuff += 'beast_dif <- thetadf$beast - thetadf$true\n'
+    plotstuff += '\n'
+    plotstuff += 'barplot(height = t(thetadf[c("smc", "beast")]), names.arg = thetadf$ID, beside = TRUE)\n'
+    plotstuff += 'smc_mean <- mean(smc_dif)\n'
+    plotstuff += 'beast_mean <- mean(beast_dif)\n'
+    plotstuff += 'smc_mean\n'
+    plotstuff += 'beast_mean\n'
+
+    plotstuff == '\n'
+    plotf = open(plotfn, 'w')
+    plotf.write(plotstuff)
+    plotf.close()
 
 def createSimBash():
     simfn = os.path.join(dirname, 'simulate.sh')
@@ -557,8 +799,8 @@ def createSMCSlurm():
     s  = ''
     s += '#!/bin/bash\n'
     s += '\n'
-#    partition = nodechoices[nodechoice][0]
-#    constraint = nodechoices[nodechoice][1]
+    partition  = nodechoices[nodechoice][0]
+    constraint = nodechoices[nodechoice][1]
     if partition == 'general':
         s += '#SBATCH -p general\n'
     else:
@@ -592,8 +834,8 @@ def createBeastSlurm():
     s  = ''
     s += '#!/bin/bash\n'
     s += '\n'
- #   partition = nodechoices[nodechoice][0]
- #   constraint = nodechoices[nodechoice][1]
+    partition = nodechoices[nodechoice][0]
+    constraint = nodechoices[nodechoice][1]
     if partition == 'general':
         s += '#SBATCH -p general\n'
     else:
@@ -609,6 +851,7 @@ def createBeastSlurm():
     s += '#SBATCH --job-name=beast\n'
     s += '#SBATCH -o beast-%a.out\n'
     s += '#SBATCH -e beast-%a.err\n'
+    s += '#SBATCH --mem=150G\n'
     s += '\n'
     s += 'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$HOME/lib"\n'
     s += 'export TIMEFORMAT="user-seconds %3U"\n'
@@ -624,6 +867,7 @@ def createCopyDataPy():
     shutil.copyfile('copydata_template.py', copydatafn)
     stuff = open(copydatafn, 'r').read()
     stuff, n = re.subn('__NLOCI__', '%d' % nloci, stuff, re.M | re.S)
+    assert n == 1
     stuff, n = re.subn('__SEQLEN__', '%d' % seqlen, stuff, re.M | re.S)
     assert n == 1
     copydataf = open(copydatafn, 'w')
@@ -634,7 +878,7 @@ def createANOVAPy():
     anovafn =  os.path.join(dirname, 'anova-means.py')
     shutil.copyfile('anova-means-template.py', anovafn)
     stuff = open(anovafn, 'r').read()
-    stuff, n = re.subn('__NLOCI__', '%d' % nloci, stuff, re.M | re.S)
+    stuff, n = re.subn('__NREPS__', '%d' % nreps, stuff, re.M | re.S)
     assert n == 1
     stuff, n = re.subn('__SAMPLESIZE__', '%d' % nparticles, stuff, re.M | re.S)
     assert n == 1
@@ -645,7 +889,7 @@ def createANOVAPy():
     anovafn =  os.path.join(dirname, 'anova-full.py')
     shutil.copyfile('anova-full-template.py', anovafn)
     stuff = open(anovafn, 'r').read()
-    stuff, n = re.subn('__NLOCI__', '%d' % nloci, stuff, re.M | re.S)
+    stuff, n = re.subn('__NREPS__', '%d' % nreps, stuff, re.M | re.S)
     assert n == 1
     stuff, n = re.subn('__SAMPLESIZE__', '%d' % nparticles, stuff, re.M | re.S)
     assert n == 1
@@ -687,14 +931,14 @@ def createCrunch():
     s  += '        self.group_mean[rep] = 0.0\n'
     s  += '        self.group_n[rep] = 0\n'
     s  += '\n'
-    s  += 'def getDistances(fnprefix):\n'
+    s  += 'def getKFDistances(fnprefix):\n'
     s  += '    d = DistSummary()\n'
-    s  += '    for rep in range(10):\n'
+    s  += '    for rep in range(%d):\n' % nreps
     s  += '        d.zero(rep)\n'
     s  += '        lines = open("%s%d.txt" % (fnprefix, rep+1,), "r").readlines()\n'
     s  += '        for line in lines[1:]:\n'
     s  += '            parts = line.strip().split()\n'
-    s  += '            assert len(parts) == 2\n'
+    s  += '            assert len(parts) == 3\n'
     s  += '            y = float(parts[1])\n'
     s  += '            d.dists[rep].append(y)\n'
     s  += '\n'
@@ -713,12 +957,48 @@ def createCrunch():
     s  += '        d.group_n[rep] = d.count[rep]\n'
     s  += '    return d\n'
     s  += '\n'
-    s  += 'dsmc = getDistances("smcdists")\n'
-    s  += 'dbeast = getDistances("beastdists")\n'
+    s  += '\n'
+    s  += 'def getRFDistances(fnprefix):\n'
+    s  += '    d = DistSummary()\n'
+    s  += '    for rep in range(%d):\n' % nreps
+    s  += '        d.zero(rep)\n'
+    s  += '        lines = open("%s%d.txt" % (fnprefix, rep+1,), "r").readlines()\n'
+    s  += '        for line in lines[1:]:\n'
+    s  += '            parts = line.strip().split()\n'
+    s  += '            assert len(parts) == 3\n'
+    s  += '            y = float(parts[2])\n'
+    s  += '            d.dists[rep].append(y)\n'
+    s  += '\n'
+    s  += '        d.count[rep] = len(d.dists[rep])\n'
+    s  += '        d.sum[rep] = sum(d.dists[rep])\n'
+    s  += '        d.sumsq[rep] = sum([y*y for y in d.dists[rep]])\n'
+    s  += '        d.cum[rep] += d.sum[rep]\n'
+    s  += '        d.total[rep] += d.count[rep]\n'
+    s  += '        d.mean[rep] = d.sum[rep]/d.count[rep]\n'
+    s  += '        d.var[rep] = (d.sumsq[rep] - pow(d.mean[rep],2.)*d.count[rep])/(d.count[rep]-1)\n'
+    s  += '        if d.var[rep] < 0.0:\n'
+    s  += '            print("warning: variance negative (%g) for %s rep %d: mean = %g, sumsq = %g, count = %d" % (d.var[rep], fnprefix, rep, d.mean[rep], d.sumsq[rep], d.count[rep]))\n'
+    s  += '            d.var[rep] = 0.0\n'
+    s  += '        d.stdev[rep] = sqrt(d.var[rep])\n'
+    s  += '        d.group_mean[rep] = d.mean[rep]\n'
+    s  += '        d.group_n[rep] = d.count[rep]\n'
+    s  += '    return d\n'
+    s  += 'kf = open("kf-summary.txt", "x")\n'
+    s  += 'rf = open("rf-summary.txt", "x")\n'
+    s  += 'dsmc_kf = getKFDistances("smcdists")\n'
+    s  += 'dbeast_kf = getKFDistances("beastdists")\n'
+    s  += 'dsmc_rf = getRFDistances("smcdists")\n'
+    s  += 'dbeast_rf = getRFDistances("beastdists")\n'
     s  += 'print("%12s %38s %38s" % ("replicate", "----------------- SMC ----------------", "---------------- BEAST ---------------"))\n'
     s  += 'print("%12s %12s %12s %12s %12s %12s %12s" % ("replicate", "count", "mean", "stdev", "count", "mean", "stdev"))\n'
-    s  += 'for rep in range(10):\n'
-    s  += '    print("%12d %12d %12.5f %12.5f %12d %12.5f %12.5f" % (rep+1, dsmc.count[rep], dsmc.mean[rep], dsmc.stdev[rep], dbeast.count[rep], dbeast.mean[rep], dbeast.stdev[rep]))\n'
+    s  += 'for rep in range(%d):\n' % nreps
+    s  += '    print("kf: %12d %12d %12.5f %12.5f %12d %12.5f %12.5f" % (rep+1, dsmc_kf.count[rep], dsmc_kf.mean[rep], dsmc_kf.stdev[rep], dbeast_kf.count[rep], dbeast_kf.mean[rep], dbeast_kf.stdev[rep]))\n'
+    s +=  '    kf.write("%12d %12d %12.5f %12.5f %12d %12.5f %12.5f \\n" % (rep+1, dsmc_kf.count[rep], dsmc_kf.mean[rep], dsmc_kf.stdev[rep], dbeast_kf.count[rep], dbeast_kf.mean[rep], dbeast_kf.stdev[rep]))\n'
+    s +=  '    kf.close\n'
+    s  += 'for rep in range(%d):\n' % nreps
+    s  += '    print("rf: %12d %12d %12.5f %12.5f %12d %12.5f %12.5f" % (rep+1, dsmc_rf.count[rep], dsmc_rf.mean[rep], dsmc_rf.stdev[rep], dbeast_rf.count[rep], dbeast_rf.mean[rep], dbeast_rf.stdev[rep]))\n'
+    s  += '    rf.write("%12d %12d %12.5f %12.5f %12d %12.5f %12.5f \\n" % (rep+1, dsmc_rf.count[rep], dsmc_rf.mean[rep], dsmc_rf.stdev[rep], dbeast_rf.count[rep], dbeast_rf.mean[rep], dbeast_rf.stdev[rep]))\n'
+    s  += '    rf.close\n'
     s  += 'print(" ")\n'
 
     crunchf = open(crunchfn, 'w')
@@ -744,29 +1024,138 @@ def createPAUP(pathname, fn, startat):
     s  += '    quit;\n'
     s  += 'end;\n'
 
-    paupfn = open(paupfn, 'w')
-    paupfn.write(s)
-    paupfn.close()
+    paupf = open(paupfn, 'w')
+    paupf.write(s)
+    paupf.close()
+
+def createTreeDist(pathname, fn, startat):
+    # see https://blog.ronin.cloud/slurm-job-arrays/
+    tdfn = os.path.join(dirname, '%std.sh' % pathname)
+
+    s   = '#!/bin/bash\n'
+    for rep in range(nreps):
+        s  += '\n\n### rep%d ###\n' % (rep+1,)
+        s  += 'td --reffile rep%d/sim/true-species-tree.tre --treefile rep%d/%s/%s --skip %d --reftree 1 --outfile %sdists%d.txt\n' % (rep+1,rep+1, pathname, fn, startat, pathname, rep+1)
+
+    tdf = open(tdfn, 'w')
+    tdf.write(s)
+    tdf.close()
+
+def writeDeepCoalFile():
+	deepcoalfn = os.path.join(dirname, 'get-deep-coal.py')
+	s = "i = 1\n"
+	s += "new_f = open('deep_coal.txt', 'x')\n"
+	s += "for rep in range(%12d):\n" % nreps
+	s += "	name = 'rep' + str(i)\n"
+	s += "	lines = open(name+'/sim'+'/deep_coalescences.txt', 'r').readlines()[1:]\n"
+	s += "	for line in lines[1:]:\n"
+	s += "		parts = line.strip().split()\n"
+	s += "		if (i == 1) :\n"
+	s += "			new_f.write(parts[1])\n"
+	s += "		else:\n"
+	s += "			new_f.write(',' + parts[1])\n"
+	s += "	i+=1\n"
+	s += "\n"
+	s += "new_f.close\n"
+	deepcoalf = open(deepcoalfn, 'w')
+	deepcoalf.write(s)
+	deepcoalf.close()
+
+def writeThetaFile():
+	thetafn = os.path.join(dirname, 'get-average-theta.py')
+	s = "import os\n"
+	s += "import numpy\n"
+	s += "import shutil\n"
+	s += "import pandas as pd\n"
+	s += "import csv\n"
+	s +=  "nreps = %12d \n" % nreps
+	s += "smc_theta_list = []\n"
+	s += "beast_theta_list = []\n"
+	s += "true_theta_list = []\n"
+	s += "for i in range(%12d):" % nreps
+	s += "	# get smc average theta\n"
+	s += "	smc = pd.read_csv('rep' + str(i+1) + '/smc/params-beast-comparison.log', sep='\t')\n"
+	s += "	theta_smc = smc['popMean '].mean()*4\n"
+	s += "	smc_theta_list.append(theta_smc)\n"
+	s += "	# get beast average theta\n"
+	s += "	beast = pd.read_csv('rep' + str(i+1) + '/beast/starbeast3.log', sep = '\t', comment = '#')\n"
+	s += "	theta_beast = beast['popMean'].mean()*4\n"
+	s += "	beast_theta_list.append(theta_beast)\n"
+	s += "	# get true theta\n"
+	s += "	with  open('rep' + str(i+1) + '/sim/proj.conf') as fi:\n"
+	s += "		id = []\n"
+	s += "		for ln in fi:\n"
+	s += "			if ln.startswith('theta'):\n"
+	s += "				true_theta_list.append(float(ln[9:13]))\n"
+	s += "rows = zip(smc_theta_list, beast_theta_list, true_theta_list)\n"
+	s += "with open('theta-comparisons.txt', 'w') as f:\n"
+	s += "	f.write('smc, beast, true\\n')\n"
+	s += "	writer = csv.writer(f)\n"
+	s += "	for row in rows:\n"
+	s += "		writer.writerow(row)\n"
+	thetaf = open(thetafn, 'w')
+	thetaf.write(s)
+	thetaf.close()
+
+
+def writeTimeFile():
+	timefn = os.path.join(dirname, 'get-times.py')
+	s = "import os\n"
+	s += "import numpy\n"
+	s += "import shutil\n"
+	s +=  "nreps = %12d \n" % nreps
+	s += "timef = open ('times.txt', 'x')\n"
+	s += "smc_time_list = []\n"
+	s += "beast_time_list = []\n"
+	s += "for i in range(nreps):\n"
+	s += "	smc_file_name = 'smc-' + str(i+1) + '.err'\n"
+	s += "	with open (smc_file_name, mode = 'r') as file:\n"
+	s += "		for line in file:\n"
+	s += "			pass\n"
+	s += "		last_line = line\n"
+	s += "	smc_time_list.append(float(last_line[13:]))\n"
+	s +=  "	beast_file_name = 'beast-' + str(i+1) + '.err'\n"
+	s += "	with open (beast_file_name, mode='r') as file:\n"
+	s += "		for line in file:\n"
+	s += "			pass\n"
+	s += "		last_line = line\n"
+	s += "	beast_time_list.append(float(last_line[13:]))\n"
+	s += "smc_average = sum(smc_time_list) / len(smc_time_list)\n"
+	s += "timef.write('smc average time: ' + str(smc_average))\n"
+	s += "print('smc average time: ' + str(smc_average))\n"
+	s += "beast_average = sum(beast_time_list) / len(beast_time_list)\n"
+	s += "timef.write('beast average time: ' + str(beast_average))\n"
+	s += "print('beast average time: ' + str(beast_average))\n"
+
+	timef = open(timefn, 'w')
+	timef.write(s)
+	timef.close()
 
 if __name__ == '__main__':
     createMainDir()
     for rep in range(nreps):
         createRepDir(rep)
-
+        
         createSimDir(rep)
         createSMCDir(rep)
         createBeastDir(rep)
-
+        
         createSimConf(rep)
         createSMCConf(rep)
         createBeastXML(rep)
-
+        
     createREADME()
+    createRplot()
     createSimBash()
     createSMCSlurm()
     createBeastSlurm()
     createCopyDataPy()
     createCrunch()
-    createPAUP('smc', smctreefname, 1)
-    createPAUP('beast', beasttreefname, 2)
+    writeDeepCoalFile()
+    #createPAUP('smc', smctreefname, 1)
+    #createPAUP('beast', beasttreefname, 2)
+    createTreeDist('smc', smctreefname, 1)
+    createTreeDist('beast', beasttreefname, 2)
     createANOVAPy()
+    writeTimeFile()
+    writeThetaFile()

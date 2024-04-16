@@ -760,6 +760,18 @@ def createRplot():
     plotstuff += 'p_beast_deep_rf <- ggplot(df_beast_rf, aes(deep_coal, rf_beast))\n'
     plotstuff += 'p_beast_deep_rf+geom_point() + theme_classic() + ylim(0, max_rf+1)\n'
     plotstuff += 'dev.off()\n'
+    plotstuff += '\n'
+    plotstuff += '# make bar plot of differences between smc / true theta and beast / true theta\n'
+    plotstuff += 'thetadf <- read.csv("theta-comparisons.txt", header=TRUE)\n'
+    plotstuff += 'tibble::rowid_to_column(thetadf, "ID") # add indices\n'
+    plotstuff += 'smc_dif <- thetadf$smc - thetadf$true\n'
+    plotstuff += 'beast_dif <- thetadf$beast - thetadf$true\n'
+    plotstuff += '\n'
+    plotstuff += 'barplot(height = t(thetadf[c("smc", "beast")]), names.arg = thetadf$ID, beside = TRUE)\n'
+    plotstuff += 'smc_mean <- mean(smc_dif)\n'
+    plotstuff += 'beast_mean <- mean(beast_dif)\n'
+    plotstuff += 'smc_mean\n'
+    plotstuff += 'beast_mean\n'
 
     plotstuff == '\n'
     plotf = open(plotfn, 'w')
