@@ -1133,6 +1133,115 @@ def writeTimeFile():
 	timef.write(s)
 	timef.close()
 
+def create3DRPlot():
+	plotfn = os.path.join(dirname, 'plotdistances.py')
+	s = "import plotly.express as px\n"
+	s += "import plotly.figure_factory as ff\n"
+	s += "import plotly.graph_objs as go\n"
+	s += "import pandas as pd\n"
+	s += "import math, random, sys, os\n"
+	s += "import scipy,numpy\n"
+	s += "\n"
+	s += "file = open('kf-summary.txt','r')\n"
+	s += "lines = file.readlines()\n"
+	s += "file.close()\n"
+	s += "\n"
+	s += "kf_smc = []\n"
+	s += "kf_beast = []\n"
+	s += "\n"
+	s += "for line in lines:\n"
+	s += "  parts = line.split() # split line into parts\n"
+	s += "  column3 = parts[2]\n"
+	s += "  kf_smc.append(column3)\n"
+	s += "  column6 = parts[5]\n"
+	s += "  kf_beast.append(column6)\n"
+	s += "\n"
+	s += "file = open('rf-summary.txt','r')\n"
+	s += "lines = file.readlines()\n"
+	s += "file.close()\n"
+	s += "\n"
+	s += "rf_smc = []\n"
+	s += "rf_beast = []\n"
+	s += "\n"
+	s += "for line in lines:\n"
+	s += "  parts = line.split() # split line into parts\n"
+	s += "  column3 = parts[2]\n"
+	s += "  rf_smc.append(column3)\n"
+	s += "  column6 = parts[5]\n"
+	s += "  rf_beast.append(column6)\n"
+	s += "\n"
+	s += "plot_type = 'scatterplot'\n"
+	s += "#plot_type = 'meshplot'\n"
+	s += "\n"
+	s += "plot_saved_to_file = False\n"
+	s += "plotting_filename = '%s.png' % plot_type\n"
+	s += "plotting_height = 1000\n"
+	s += "plotting_scale = 1\n"
+	s += "\n"
+	if method == 'lognorm':
+		Tstr = ['%g' % t for t in Tvect]
+		s += 'T = [%s]\n' % ','.join(Tstr)
+		Rstr = ['%g' % r for r in Rvect]
+		s += 'R = [%s]\n' % ','.join(Rstr)
+		thetastr = ['%g' % q for q in thetas]
+		s += 'theta = [%s]\n' % ','.join(thetastr)
+		lambdastr = ['%g' % l for l in lambdas]
+		s += 'lambda = c(%s)\n' % ','.join(lambdastr)
+	elif method == 'uniform':
+		Tstr = ['%g' % t for t in Tvect]
+		s += 'T = [%s]\n' % ','.join(Tstr)
+		thetastr = ['%g' % q for q in thetas]
+		s += 'theta = [%s]\n' % ','.join(thetastr)
+	else:
+		assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
+	s += 'RF_smc = [float(i) for i in rf_smc]\n'
+	s += 'RF_beast = [float(i) for i in rf_beast]\n'
+	s += 'KF_smc = [float(i) for i in kf_smc]\n'
+	s += 'KF_beast = [float(i) for i in kf_beast]\n'
+	s += 'halfT     = [0.5*t for t in T]\n'
+	s += 'KFdiff    = [kfs - kfb for (kfs,kfb) in zip(KF_smc, KF_beast)]\n'
+	s += 'KFabsdiff = [math.fabs(kfs - kfb) for (kfs,kfb) in zip(KF_smc, KF_beast)]\n'
+	s += 'RFdiff    = [rfs - rfb for (rfs,rfb) in zip(RF_smc, RF_beast)]\n'
+	s += '#RFdiff    = [rfs - rfb for (rfs,rfb) in zip(RF_beast, RF_smc)]\n'
+	s += 'RFabsdiff = [math.fabs(rfs - rfb) for (rfs,rfb) in zip(RF_smc, RF_beast)]\n'
+	s += '\n'
+	s += 'if plot_type == "scatterplot":\n'
+	s += '	fig = go.Figure(data=[go.Scatter3d(\n'
+	s += '		x=halfT,\n'
+	s += '		y=theta,\n'
+	s += '		z=RFdiff,\n'
+	s += '		mode="markers",\n'
+	s += '		marker=dict(\n'
+	s += '			size=12,\n'
+	s += '			color=RFdiff,                # set color to an array/list of desired values\n'
+	s += '			colorscale="Rainbow",   # choose a colorscale\n'
+	s += '			opacity=0.8\n'
+	s += '		)\n'
+	s += '	)])\n'
+	s += 'elif plot_type == "meshplot":\n'
+	s += '	fig = go.Figure(data=[go.Mesh3d(\n'
+	s += '		x=halfT,\n'
+	s += '		y=theta,\n'
+	s += '		z=RFdiff,\n'
+	s += '		flatshading=True,\n'
+	s += '		intensity=RFabsdiff,\n'
+	s += '		color="firebrick"\n'
+	s += '	)])\n'
+	s += '# tight layout\n'
+	s += 'fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))\n'
+	s += 'if plot_saved_to_file:\n'
+	s += '	fig.write_image(plotting_filename, height=plotting_height, scale=plotting_scale) # this creates a static file    \n'
+	s += 'else:\n'
+	s += '	fig.show(renderer="browser") # this opens your browser to show you the plot now\n'
+	s += '# Named colors\n'
+	s += '# aliceblue, antiquewhite, aqua, aquamarine, azure, beige, bisque, black, blanchedalmond, blue, blueviolet, brown, burlywood, cadetblue, chartreuse, chocolate, coral, cornflowerblue, cornsilk, crimson, cyan, darkblue, darkcyan, darkgoldenrod, darkgray, darkgrey, darkgreen, darkkhaki, darkmagenta, darkolivegreen, darkorange, darkorchid, darkred, darksalmon, darkseagreen, darkslateblue, darkslategray, darkslategrey, darkturquoise, darkviolet, deeppink, deepskyblue, dimgray, dimgrey, dodgerblue, firebrick, floralwhite, forestgreen, fuchsia, gainsboro, ghostwhite, gold, goldenrod, gray, grey, green, greenyellow, honeydew, hotpink, indianred, indigo, ivory, khaki, lavender, lavenderblush, lawngreen, lemonchiffon, lightblue, lightcoral, lightcyan, lightgoldenrodyellow, lightgray, lightgrey, lightgreen, lightpink, lightsalmon, lightseagreen, lightskyblue, lightslategray, lightslategrey, lightsteelblue, lightyellow, lime, limegreen, linen, magenta, maroon, mediumaquamarine, mediumblue, mediumorchid, mediumpurple, mediumseagreen, mediumslateblue, mediumspringgreen, mediumturquoise, mediumvioletred, midnightblue, mintcream, mistyrose, moccasin, navajowhite, navy, oldlace, olive, olivedrab, orange, orangered, orchid, palegoldenrod, palegreen, paleturquoise, palevioletred, papayawhip, peachpuff, peru, pink, plum, powderblue, purple, red, rosybrown, royalblue, rebeccapurple, saddlebrown, salmon, sandybrown, seagreen, seashell, sienna, silver, skyblue, slateblue, slategray, slategrey, snow, springgreen, steelblue, tan, teal, thistle, tomato, turquoise, violet, wheat, white, whitesmoke, yellow, yellowgreen\n'
+
+
+
+	plotf = open(plotfn, 'w')
+	plotf.write(s)
+	plotf.close()
+
 if __name__ == '__main__':
     createMainDir()
     for rep in range(nreps):
@@ -1161,3 +1270,4 @@ if __name__ == '__main__':
     createANOVAPy()
     writeTimeFile()
     writeThetaFile()
+    create3DRPlot()
