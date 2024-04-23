@@ -838,15 +838,17 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             string file_name = "gene" + to_string(i) + ".trees"; // file must be named gene1.trees, gene2.trees, etc.
             ifstream infile (file_name);
             string newick;
-            unsigned size_before = (unsigned) current_gene_newicks.size();
+            unsigned size_before = (unsigned) current_gene_newicks.size(); // TODO: if nparticles < newicks size, only read in first x newicks (or maybe randomize?)
             
             while (getline(infile, newick)) { // file newicks must start with the word "tree"
+                if (current_gene_newicks.size() < _nparticles) { // stop adding newicks once the number of particles has been reached
 //                size_t found = newick.find("tree");
-                if (newick.find("tree") == 2) { // TODO: not sure why / if this works - switch to checking for parnethesis?
+                if (newick.find("tree") == 2) { // TODO: not sure why / if this works - switch to checking for parenthesis?
                     // TODO: also need to start at the parenthesis?
-                    size_t pos = newick.find("("); //find location of parenthesis
-                    newick.erase(0,pos); //delete everything prior to location found
-                    current_gene_newicks.push_back(newick);
+                        size_t pos = newick.find("("); //find location of parenthesis
+                        newick.erase(0,pos); //delete everything prior to location found
+                        current_gene_newicks.push_back(newick);
+                    }
                 }
             }
             int size_after = (int) current_gene_newicks.size();
@@ -858,8 +860,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             newicks.push_back(current_gene_newicks);
         }
 
-        _data = Data::SharedPtr(new Data());
-        _data->setPartition(_partition); // TODO: set the species partition but not any node names, or clear everything before building from the newick
+        _data = Data::SharedPtr(new Data()); // TODO: don't need to set data b/c will not calculate a Felsenstein likelihood
+        _data->setPartition(_partition);
         _data->getDataFromFile(_data_file_name);
 
         if (_verbose > 0) {
@@ -1958,10 +1960,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         p->setLogLikelihood(starting_log_likelihoods);
                     }
 #if defined (DRAW_NEW_THETA)
-                    p->drawTheta(); // TODO: _theta_mean should not be global or it will be copied to all particles (make a new variable for setting constant theta mean for testing)
-                    if (p->getPopMean() < 1.0) {
-                        cout << p->getPopMean() << endl;
-                    }
+                    p->drawTheta();
 #endif
                 }
                 if (Forest::_save_memory) {
@@ -1983,7 +1982,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         for (auto &p:my_vec) {
                             p->setSeed(rng.randint(1,9999) + psuffix);
                             psuffix += 2;
-//                            cout << p->getPopMean() << endl;
                         }
 
                         //taxon joining and reweighting step
@@ -2002,9 +2000,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             }
                         }
 
-//                        for (auto &p:my_vec) {
-//                            p->showParticle();
-//                        }
                         normalizeWeights(my_vec);
 
                         if (_verbose > 1) {
