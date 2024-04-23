@@ -709,6 +709,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("gene_newicks", boost::program_options::value(&_gene_newicks_specified)->default_value(false), "set true if user is specifying gene tree files")
         ("ngenes", boost::program_options::value(&_ngenes_provided)->default_value(0), "number of gene newick files specified")
         ("gamma_scale", boost::program_options::value(&Forest::_gamma_scale)->default_value(0.05), "shape parameter of gamma distributon prior on theta - mean of the gamma distribution is gamma_scale * 2")
+        ("theta_proposal_mean", boost::program_options::value(&Forest::_theta_proposal_mean)->default_value(0.0), "theta proposal mean")
+        ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
+        ("theta_constant_mean", boost::program_options::value(&Forest::_theta_constant_mean)->default_value(0.0), "theta mean to remain constant across all particles")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -754,6 +757,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         // if save_every > particle_increase, quit
         if (_save_every > _particle_increase) {
             throw XProj("particle_increase must be greater than or equal to save_every");
+        }
+        
+        // if user specified theta_mean and theta_proposal_mean / theta_prior_mean, qit
+        if (Forest::_theta_constant_mean > 0.0 && (Forest::_theta_proposal_mean > 0.0 || Forest::_theta_prior_mean > 0.0)) {
+            throw XProj("cannot specify constant theta mean and proposal / prior distribution for theta");
         }
     }
 
@@ -1892,6 +1900,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     cout << "\n*** Reading and storing the data in the file " << _data_file_name << endl;
                     cout << "data file name is " << _data_file_name << endl;
                 }
+                
                 _data = Data::SharedPtr(new Data());
                 _data->setPartition(_partition);
                 _data->getDataFromFile(_data_file_name);
@@ -1949,7 +1958,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         p->setLogLikelihood(starting_log_likelihoods);
                     }
 #if defined (DRAW_NEW_THETA)
-                    p->drawTheta();
+                    p->drawTheta(); // TODO: _theta_mean should not be global or it will be copied to all particles (make a new variable for setting constant theta mean for testing)
+                    if (p->getPopMean() < 1.0) {
+                        cout << p->getPopMean() << endl;
+                    }
 #endif
                 }
                 if (Forest::_save_memory) {
@@ -1971,6 +1983,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         for (auto &p:my_vec) {
                             p->setSeed(rng.randint(1,9999) + psuffix);
                             psuffix += 2;
+//                            cout << p->getPopMean() << endl;
                         }
 
                         //taxon joining and reweighting step
@@ -1989,6 +2002,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             }
                         }
 
+//                        for (auto &p:my_vec) {
+//                            p->showParticle();
+//                        }
                         normalizeWeights(my_vec);
 
                         if (_verbose > 1) {

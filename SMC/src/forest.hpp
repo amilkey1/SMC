@@ -183,15 +183,18 @@ class Forest {
         pair<vector<double>, vector<unsigned>>        calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build);
         inline pair<vector<double>, vector<unsigned>> calcInitialCoalescentLikelihoodIntegratingOutTheta();
         pair<vector<double>, vector<unsigned>>        calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build);
-        double                      _theta_mean;
         string                      _ancestral_species_name;
         vector<double>              _vector_prior;
         double                      _scale;
+        double                      _theta_mean;
 
     public:
 
         typedef std::shared_ptr<Forest> SharedPtr;
         static double               _theta;
+        static double               _theta_proposal_mean;
+        static double               _theta_constant_mean;
+        static double               _theta_prior_mean;
         static double               _lambda;
         static string               _proposal;
         static string               _model;
@@ -1179,7 +1182,9 @@ class Forest {
         _panmictic_coalescent_likelihood = other._panmictic_coalescent_likelihood;
         _theta_map = other._theta_map; // TODO: unsure if this will copy correctly
         _small_enough = other._small_enough;
+        _theta_proposal_mean = other._theta_proposal_mean;
         _theta_mean = other._theta_mean;
+        _theta_prior_mean = other._theta_prior_mean;
         _ancestral_species_name = other._ancestral_species_name;
         _ploidy = other._ploidy;
         _species_build = other._species_build;
@@ -2439,7 +2444,7 @@ class Forest {
         }
     }
 
-    inline void Forest::resetThetaMap(Lot::SharedPtr lot) {
+    inline void Forest::resetThetaMap(Lot::SharedPtr lot) { // TODO: not sure if this works if not doing jones coalescent likelihood - double check
         assert (_theta_map.size() == 0);
         // map should be 2*nspecies - 1 size
         unsigned number = 0;
@@ -2461,8 +2466,8 @@ class Forest {
         // draw thetas for tips of species trees and ancestral population
         // for all other populations, theta = -1
         
-        assert (_theta_mean > 0.0);
-        double scale = 1 / _theta_mean;
+        assert (_theta_proposal_mean > 0.0);
+        double scale = 1 / _theta_proposal_mean;
         _scale = scale;
         
         unsigned count = 0;
@@ -2502,7 +2507,7 @@ class Forest {
         double a = 2.0;
         double b = scale;
 //            double x = new_theta / 4.0;
-        double x = new_theta; //  TODO: is x theta or theta / 4?
+        double x = new_theta;
         double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
         _vector_prior.push_back(log_inv_gamma_prior);
     }
@@ -2533,17 +2538,22 @@ class Forest {
         // draw mean from lognormal distribution
         // shape = 2.0 to be consistent with starbeast3
         // scale = 1 / mean;
-//        _theta_mean = rng.logNormal(-4.6, 2.14);
-//        ofstream logf ("theta_means.txt");
-//        for (int i=0; i<10000; i++) {
-            _theta_mean = lot->logNormal(-4.6, 2.14); // TODO: mean = 0.1, sd = 1 --> make sd 0.1? - or try gamma
-//            logf << _theta_mean << "," << endl;
-            
-//        }
-//        logf.close();
         
-//            _theta_mean = lot->gamma(2, 0.05);
-//            _theta_mean = lot->gamma(0.01, 10); // variance is too symmetrical - proposes tiny values
+        if (_theta_proposal_mean > 0.0) {
+            assert (_theta_mean == 0.0);
+//            double exponential_rate = 1 / _theta_proposal_mean;
+//            _theta_mean = -log(1.0 - rng.uniform()) / exponential_rate;
+//            double mean = 1 / exponential_rate;
+//            _theta_mean = lot->gamma(1, mean); // mean = 10, equivalent to exponential(exponential_rate)
+            _theta_mean = lot->gamma(1, _theta_proposal_mean);
+        }
+        
+//        if (_theta_mean == 0.0) { // TODO: cannot specify theta_mean and theta_proposal_mean / theta_prior_mean
+            // Draw _theta_mean from Exponential prior
+//            _theta_mean = -log(1.0 - rng.uniform())/exponential_prior_rate;
+//            _theta_proposal_mean = lot->logNormal(-4.6, 2.14); // TODO: mean = 0.1, sd = 1 --> make sd 0.1? - or try gamma
+//        }
+//        _theta_mean = lot->gamma(1, 10); // mean = 10, equivalent to exponential(0.1)
 //        _theta_mean = lot->gamma(2, _gamma_scale); // mean = 2 * scale, var = 2 * scale^2 // TODO: variance is very small when scale small
 
         
@@ -2553,16 +2563,15 @@ class Forest {
         for (auto &name:species_names) {
             double new_theta = 0.0;
             if (new_theta < _small_enough) {
-                new_theta = 1 / (lot->gamma(2.0, scale)); // TODO: check the mean of this
+//                new_theta = 1 / (lot->gamma(2.00001, scale));
+                new_theta = 1 / (lot->gamma(2.0, scale));
                 assert (new_theta > 0.0);
                 _theta_map[name] = new_theta;
             }
             // pop mean = theta / 4
             double a = 2.0;
             double b = scale;
-//            double x = new_theta / 4.0;
-            double x = new_theta; //  TODO: is x theta or theta / 4?
-//            double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
+            double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
             double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
             _vector_prior.push_back(log_inv_gamma_prior);
 

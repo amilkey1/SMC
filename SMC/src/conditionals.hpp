@@ -12,7 +12,7 @@
 //#define SIM_TEST // simulated example with 2 taxa, 2 species - 1 taxon per species
 //#define SIM_TEST3 // simulated example with 3 species, 3 taxa
 
-#define HIERARCHICAL_FILTERING
+//#define HIERARCHICAL_FILTERING
 
 #define DRAW_NEW_THETA
 

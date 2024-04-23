@@ -621,7 +621,7 @@ inline vector<double> Particle::getVectorPrior() {
                 first_step = false;
             }
             if (first_step) {
-                for (int i=1; i<_forests.size(); i++) {
+                for (int i=1; i<_forests.size(); i++) { // TODO: can make this faster - just check 1st gene forest
                     if (_forests[i]._lineages.size() != Forest::_ntaxa) {
                         first_step = false;
                     }
@@ -647,6 +647,23 @@ inline vector<double> Particle::getVectorPrior() {
                 double log_likelihood_term = _forests[forest_number]._log_weight;
 
                 _log_weight = log_speciation_term + log_likelihood_term;
+                
+                assert (_forests[1]._theta_prior_mean > 0.0);
+                assert (_forests[1]._theta_proposal_mean > 0.0);
+                assert (_forests[1]._theta_mean > 0.0);
+                
+//                assert (_forests[1]._theta_mean == _forests[10]._theta_mean);
+                
+                // modifier only happens on first round
+                if (_generation == 0) {
+                    double prior_rate = 1.0/_forests[1]._theta_prior_mean;
+                    double proposal_rate = 1.0/_forests[1]._theta_proposal_mean;
+                    double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
+                    
+                    _log_weight += log_weight_modifier;
+                }
+       
+                
                 done = true;
             }
                   
@@ -764,7 +781,6 @@ inline vector<double> Particle::getVectorPrior() {
                 if (_log_coalescent_likelihood != neg_inf) {
                     pair<vector<double>, vector<unsigned>> params;
                     if (_forests[0]._lineages.size() > 1) {
-//                        _forests[i].showForest(); // TODO: gene 8 not fully built
                         params = _forests[i].calcCoalescentLikelihoodIntegratingOutTheta(_forests[0]._species_build);
                     }
                     else {
@@ -1086,6 +1102,8 @@ inline vector<double> Particle::getVectorPrior() {
             
         _forests[1].createThetaMap(_lot); // create map for one forest, then copy it to all forests
         double theta_mean = _forests[1]._theta_mean;
+        double theta_proposal_mean = _forests[1]._theta_proposal_mean;
+        double theta_prior_mean = _forests[1]._theta_prior_mean;
         map<string, double> theta_map = _forests[1]._theta_map;
         map<string, unsigned> species_indices = _forests[1]._species_indices;
         if (_forests.size() > 2) {
@@ -1093,6 +1111,8 @@ inline vector<double> Particle::getVectorPrior() {
                 _forests[i]._theta_map = theta_map;
                 _forests[i]._species_indices = species_indices;
                 _forests[i]._theta_mean = theta_mean;
+                _forests[i]._theta_proposal_mean = theta_proposal_mean;
+                _forests[i]._theta_prior_mean = theta_prior_mean;
             }
         }
     }
@@ -1363,7 +1383,7 @@ inline vector<double> Particle::getVectorPrior() {
     inline void Particle::processGeneNewicks(vector<string> newicks) {
         for (int i=1; i<_forests.size(); i++) {
 //            _forests[i]._nodes.clear();
-            _forests[i].buildFromNewick(newicks[i-1], true, false); // newicks starts at 0 // TODO: gene 8 not working
+            _forests[i].buildFromNewick(newicks[i-1], true, false); // newicks starts at 0
             _forests[i].refreshPreorder();
             _forests[i]._theta_mean = Forest::_theta; // for now, set theta mean equal to whatever theta user specifies
         }
