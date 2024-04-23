@@ -39,7 +39,6 @@ bool Particle::_run_on_empty;
 bool Forest::_run_on_empty;
 bool Forest::_save_memory;
 double Forest::_ploidy = 2.0;
-double Forest::_gamma_scale = 0.05;
 double Forest::_theta_proposal_mean = 0.0;
 double Forest::_theta_prior_mean = 0.0;
 double Forest::_theta_constant_mean = 0.0;

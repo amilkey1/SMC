@@ -120,6 +120,7 @@ class Particle {
         inline vector<double>                           getGeneTreeCoalescentLikelihoods();
         double                                          getSpeciesTreePrior();
         double                                          getAllPriors();
+        double                                          getAllPriorsFirstRound();
         vector<double>                                  getVectorPrior();
         void                                            simulateData(vector<unsigned> sites_vector);
         unsigned                                        getNumDeepCoalescences() {return _num_deep_coalescences;}
@@ -376,17 +377,23 @@ class Particle {
         return prior;
     }
 
-    inline double Particle::getAllPriors() {
-//        vector<double> gene_tree_priors = getGeneTreePriors();
+    inline double Particle::getAllPriorsFirstRound() {
         double species_tree_prior = getSpeciesTreePrior();
         double total_prior = 0.0;
-//        for (auto &g:gene_tree_priors) {
-//            total_prior += g;
-//        } // this is already accounted for in coalescent likelihood
+        // starbeast3 does not include gene tree priors separately - this is already accounted for in coalescent likelihood
         total_prior += species_tree_prior;
-#if defined (DRAW_NEW_THETA)
-//        total_prior += -log(_forests[1]._scale); // TODO: do not include for second round
-#endif
+    #if defined (DRAW_NEW_THETA)
+        total_prior += log(Forest::_theta_prior_mean) - (_forests[1]._theta * Forest::_theta_prior_mean);
+    #endif
+        return total_prior;
+    }
+
+    inline double Particle::getAllPriors() {
+        double species_tree_prior = getSpeciesTreePrior();
+        double total_prior = 0.0;
+        // starbeast3 does not include gene tree priors separately - this is already accounted for in coalescent likelihood
+        total_prior += species_tree_prior;
+        // no prior on theta for second round
         return total_prior;
     }
 
@@ -1004,7 +1011,8 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
     }
 
-    inline double Particle::calcInitialCoalescentLikelihood() { // TODO: only call when integrating out theta - testing
+    inline double Particle::calcInitialCoalescentLikelihood() {
+#if defined GRAHAM_JONES_COALESCENT_LIKELIHOOD
         unsigned nbranches = Forest::_nspecies*2 - 1;
         _log_coalescent_likelihood = 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * boost::math::lgamma(2);
         
@@ -1045,6 +1053,11 @@ inline vector<double> Particle::getVectorPrior() {
             }
         }
         return _log_coalescent_likelihood;
+#else
+        cerr << "calling calc initial coalescent likelihood when Graham Jones coalescent likelihood integrating out theta is not defined" << endl;
+        assert (1 == 2); // only call this function when integrating out theta
+        return 0;
+#endif
     }
 
     inline void Particle::geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name) {

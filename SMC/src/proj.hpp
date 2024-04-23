@@ -192,7 +192,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 #if defined DRAW_NEW_THETA
             vector<double> vector_priors = p->getVectorPrior();
             for (auto &v:vector_priors) {
-                vector_prior += v; // this is the InverseGamma(2, psi) prior on the 5 population sizes
+                vector_prior += v; // this is the InverseGamma(2, psi) prior on the 5 population sizes -- only for first round
             }
 #endif
 
@@ -202,9 +202,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
 
             double log_likelihood = p->getLogLikelihood();
-            double log_prior = p->getAllPriors();
+            double log_prior = p->getAllPriorsFirstRound();
 
-            double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior; // TODO: check vector prior
+            double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior;
             // no vector prior under Jones method
 
             logf << "\t" << log_posterior;
@@ -233,10 +233,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 logf << "\t" << gene_tree_lengths[i];
             }
 
-            double yule_model = p->getSpeciesTreePrior(); // TODO: unsure if this is correct
+            double yule_model = p->getSpeciesTreePrior();
             logf << "\t" << yule_model;
 
-//            double pop_mean = 0.0; // setting this to 0.0 for now since pop size is not a parameter
             logf << "\t" << p->getPopMean() / 4.0; // beast uses Ne * u = theta / 4
 
             for (int i=0; i<(nspecies*2-1); i++) {
@@ -365,7 +364,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 logf << "\t" << gene_tree_lengths[i];
             }
 
-            double yule_model = p->getSpeciesTreePrior(); // TODO: unsure if this is correct
+            double yule_model = p->getSpeciesTreePrior();
             logf << "\t" << yule_model;
 
             logf << "\t" << p->getPopMean() / 4.0; // beast uses Ne * u = theta / 4
@@ -708,7 +707,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("save_gene_trees", boost::program_options::value(&_save_gene_trees)->default_value(true), "turn this off to not save gene trees and speed up program")
         ("gene_newicks", boost::program_options::value(&_gene_newicks_specified)->default_value(false), "set true if user is specifying gene tree files")
         ("ngenes", boost::program_options::value(&_ngenes_provided)->default_value(0), "number of gene newick files specified")
-        ("gamma_scale", boost::program_options::value(&Forest::_gamma_scale)->default_value(0.05), "shape parameter of gamma distributon prior on theta - mean of the gamma distribution is gamma_scale * 2")
         ("theta_proposal_mean", boost::program_options::value(&Forest::_theta_proposal_mean)->default_value(0.0), "theta proposal mean")
         ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
         ("theta_constant_mean", boost::program_options::value(&Forest::_theta_constant_mean)->default_value(0.0), "theta mean to remain constant across all particles")
@@ -838,10 +836,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             string file_name = "gene" + to_string(i) + ".trees"; // file must be named gene1.trees, gene2.trees, etc.
             ifstream infile (file_name);
             string newick;
-            unsigned size_before = (unsigned) current_gene_newicks.size(); // TODO: if nparticles < newicks size, only read in first x newicks (or maybe randomize?)
+            unsigned size_before = (unsigned) current_gene_newicks.size();
             
             while (getline(infile, newick)) { // file newicks must start with the word "tree"
-                if (current_gene_newicks.size() < _nparticles) { // stop adding newicks once the number of particles has been reached
+                if (current_gene_newicks.size() < _nparticles) { // stop adding newicks once the number of particles has been reached // TODO: add option to randomize this?
 //                size_t found = newick.find("tree");
                 if (newick.find("tree") == 2) { // TODO: not sure why / if this works - switch to checking for parenthesis?
                     // TODO: also need to start at the parenthesis?

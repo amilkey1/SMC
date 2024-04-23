@@ -53,7 +53,6 @@ class Forest {
 
     private:
 
-        typedef std::vector <double> partial_array_t;
         void                        clear();
         void                        setData(Data::SharedPtr d, int index, map<string, string> &taxon_map, bool partials);
         void                        setSimData(Data::SharedPtr d, int index, map<string, string> &taxon_map, unsigned ntaxa);
@@ -185,7 +184,6 @@ class Forest {
         pair<vector<double>, vector<unsigned>>        calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build);
         string                      _ancestral_species_name;
         vector<double>              _vector_prior;
-        double                      _scale;
         double                      _theta_mean;
 
     public:
@@ -207,7 +205,6 @@ class Forest {
         static string               _outgroup;
         static bool                 _run_on_empty;
         static double               _ploidy;
-        static double               _gamma_scale;
 };
 
 
@@ -250,7 +247,6 @@ class Forest {
         _taxon_map.clear();
         _species_indices.clear();
         _vector_prior.clear();
-        _scale = 0.0;
         
     }
 
@@ -1191,8 +1187,6 @@ class Forest {
         _taxon_map = other._taxon_map;
         _species_indices = other._species_indices;
         _vector_prior = other._vector_prior;
-        _scale = other._scale;
-        _gamma_scale = other._gamma_scale;
 
         // copy tree itself
 
@@ -2468,7 +2462,6 @@ class Forest {
         
         assert (_theta_proposal_mean > 0.0);
         double scale = 1 / _theta_proposal_mean;
-        _scale = scale;
         
         unsigned count = 0;
         for (auto &name:species_names) {
@@ -2496,7 +2489,6 @@ class Forest {
     inline void Forest::drawNewTheta(string new_species, Lot::SharedPtr lot) {
         // draw a new theta for the newest species population
         double scale = 1 / _theta_mean;
-        scale = _scale;
         double new_theta = 0.0;
         if (new_theta < _small_enough) {
 //            new_theta = 1 / rng.gamma(2.0, scale);
@@ -2554,11 +2546,9 @@ class Forest {
 //            _theta_proposal_mean = lot->logNormal(-4.6, 2.14); // TODO: mean = 0.1, sd = 1 --> make sd 0.1? - or try gamma
 //        }
 //        _theta_mean = lot->gamma(1, 10); // mean = 10, equivalent to exponential(0.1)
-//        _theta_mean = lot->gamma(2, _gamma_scale); // mean = 2 * scale, var = 2 * scale^2 // TODO: variance is very small when scale small
 
         
         double scale = 1 / _theta_mean;
-        _scale = scale;
         assert (scale > 0.0);
         for (auto &name:species_names) {
             double new_theta = 0.0;
