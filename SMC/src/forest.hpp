@@ -60,7 +60,6 @@ class Forest {
         string                      makeNewick(unsigned precision, bool use_names);
         string                      makePartialNewick(unsigned precision, bool use_names);
         pair<unsigned, unsigned>    chooseTaxaToJoin(double s, Lot::SharedPtr lot);
-        tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> p, list<Node*> node_list, string species_name, double increment);
         void                        calcPartialArray(Node* new_nd);
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
@@ -72,7 +71,6 @@ class Forest {
         double                      getRunningSumChoices(vector<double> &log_weight_choices);
         double                      getRunningSumHybridChoices(vector<double> &log_weight_choices);
         vector<double>              reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
-        pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
         int                         selectPair(vector<double> weight_vec, Lot::SharedPtr lot);
         void                        chooseSpeciesIncrement(Lot::SharedPtr lot);
         void                        chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth);
@@ -151,7 +149,6 @@ class Forest {
         double                      _panmictic_coalescent_likelihood;
         double                      _log_coalescent_likelihood_increment;
         double                      _cum_height;
-        vector<string>              _species_for_coalescent_events;
         string                      _start_mode;
         vector<pair<double, double>>         _increments;
         vector<pair<double, pair<string, string>>>              _depths;
@@ -175,7 +172,6 @@ class Forest {
         double                      getLineageHeight(Node* nd);
         double                      getTotalLineageHeight(Node* nd);
         double                      _log_weight;
-        double                      _other_log_weight;
         void                        addIncrement(double increment);
         void                        simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
@@ -230,7 +226,6 @@ class Forest {
         _done = false;
         _log_coalescent_likelihood = 0.0;
         _log_coalescent_likelihood_increment = 0.0;
-        _other_log_weight = 0.0;
         _cum_height = 0.0;
         _nleaves=_ntaxa;
         _ninternals=0;
@@ -978,30 +973,6 @@ class Forest {
         return log_weight_choices_sum;
     }
 
-    inline pair<Node*, Node*> Forest::getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list) {
-        Node *subtree1 = nullptr;
-        Node *subtree2 = nullptr;
-
-        unsigned a = 0;
-        for (auto iter=node_list.begin(); iter != node_list.end(); iter++){
-            if (a==t.first) {
-                subtree1 = *iter;
-            }
-            else if (a==t.second) {
-                subtree2 = *iter;
-            }
-            if (subtree1 && subtree2) {
-                break;
-            }
-            a++;
-        }
-
-        pair<Node*, Node*> s = make_pair(subtree1, subtree2);
-        _node_choices.push_back(s);
-
-        return s;
-    }
-
     inline unsigned Forest::getDeepCoal(tuple <string, string, string> species_joined) {
         unsigned num_deep_coal = 0;
 //        if (_species_partition.size() > 2) { // don't count ancestral population as deep coalescence
@@ -1053,40 +1024,6 @@ class Forest {
             //                _num_deep_coalescences += _forests[i]._species_partition[new_spp].size() - 1;
 //        }
         return num_deep_coal;
-    }
-
-    inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, string species_name, double increment) {
-        pair<Node*, Node*> p = getSubtreeAt(t, node_list);
-
-        Node* subtree1 = p.first;
-        Node* subtree2 = p.second;
-
-//        new node is always needed
-        Node nd;
-        _nodes.push_back(nd);
-        Node* new_nd = &_nodes.back();
-        new_nd->_parent=0;
-        new_nd->_number=_nleaves+_ninternals;
-        new_nd->_edge_length=0.0;
-        new_nd->_right_sib=0;
-
-        new_nd->_left_child=subtree1;
-        subtree1->_right_sib=subtree2;
-
-        subtree1->_parent=new_nd;
-        subtree2->_parent=new_nd;
-
-        //always calculating partials now
-        assert (new_nd->_partial == nullptr);
-        new_nd->_partial=ps.getPartial(_npatterns*4);
-        assert(new_nd->_left_child->_right_sib);
-        calcPartialArray(new_nd);
-
-        // update node vector
-        // don't update the species list
-        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-        
-        return make_tuple(subtree1, subtree2, new_nd);
     }
 
     inline void Forest::debugLogLikelihood(Node* nd, double log_like) {
@@ -1165,9 +1102,7 @@ class Forest {
         _done = other._done;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
-        _other_log_weight = other._other_log_weight;
         _cum_height = other._cum_height;
-        _species_for_coalescent_events = other. _species_for_coalescent_events;
         _outgroup = other._outgroup;
         _run_on_empty = other._run_on_empty;
         _start_mode = other._start_mode;
@@ -1687,7 +1622,6 @@ class Forest {
     inline void Forest::allowCoalescence(string species_name, double increment, Lot::SharedPtr lot) {
         _log_likelihood_choices.clear();
         _node_choices.clear();
-        _other_log_weight = 0.0;
         double prev_log_likelihood = _gene_tree_log_likelihood;
             
         Node *subtree1 = nullptr;

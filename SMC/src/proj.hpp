@@ -35,11 +35,9 @@ namespace proj {
             void                clear();
             void                processCommandLineOptions(int argc, const char * argv[]);
             void                run();
-//            void                saveAllForests(const vector<Particle> &v) const ;
             void                saveAllForests(vector<Particle::SharedPtr> &v) const ;
             void                saveSpeciesTrees(vector<Particle::SharedPtr> &v) const;
             void                saveSpeciesTreesHierarchical(vector<Particle::SharedPtr> &v, string filename1, string filename2) const;
-            void                saveSpeciesTreeStringsHierarchical(vector<string> newicks, string filename1) const;
             void                saveGeneTrees(unsigned ngenes, vector<Particle::SharedPtr> &v) const;
             void                saveGeneTree(unsigned gene_number, vector<Particle::SharedPtr> &v) const;
             void                writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
@@ -49,12 +47,10 @@ namespace proj {
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
             void                normalizeWeights(vector<Particle::SharedPtr> & particles);
             void                normalizeSpeciesWeights(vector<Particle::SharedPtr> & particles);
-            vector<double>      normalizeGeneWeights(vector<double> likelihoods);
             void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                resampleSpeciesParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                resetWeights(vector<Particle::SharedPtr> & particles);
             void                resetSpeciesWeights(vector<Particle::SharedPtr> & particles);
-            double              getWeightAverage(vector<double> log_weight_vec);
             void                createSpeciesMap(Data::SharedPtr);
             void                simSpeciesMap();
             string              inventName(unsigned k, bool lower_case);
@@ -112,8 +108,6 @@ namespace proj {
             bool                        _save_gene_trees;
             bool                        _first_line;
             unsigned                    _count; // counter for params output file
-//            vector<string>              _species_newicks; // vector of species newicks for output when parallelizing by species gropu
-            vector<string>              _vec_test;
             bool                        _gene_newicks_specified;
             unsigned                    _ngenes_provided;
     };
@@ -310,7 +304,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << endl;
         }
 
-        _vec_test.push_back("");
         unsigned sample_size = round(double (_particle_increase) / double(_save_every) );
         if (sample_size == 0) {
             sample_size = _particle_increase;
@@ -515,22 +508,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         logf.close();
     }
 
-    inline void Proj::saveSpeciesTreeStringsHierarchical(vector<string> newicks, string filename1) const {
-    assert (_start_mode != "sim");
-
-    unsigned count = 0;
-        // save all species trees
-        std::ofstream treef;
-
-        treef.open(filename1, std::ios_base::app);
-        for (auto &s:newicks) {
-            treef << "  tree test = [&R] " << s  << ";\n";
-            count++;
-        }
-        treef.close();
-    }
-
-
     inline void Proj::saveSpeciesTreesHierarchical(vector<Particle::SharedPtr> &v, string filename1, string filename2) const {
         // save only unique species trees
         if (!Forest::_run_on_empty) {
@@ -647,7 +624,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
     }
 
-    inline void Proj::saveGeneTree (unsigned gene_number, vector<Particle::SharedPtr> &v) const {
+    inline void Proj::saveGeneTree(unsigned gene_number, vector<Particle::SharedPtr> &v) const {
         string name = "gene" + to_string(gene_number) + ".trees";
         ofstream treef(name);
         treef << "#nexus\n\n";
@@ -995,7 +972,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         if (parallelize_by_group) {
         // don't bother with this if not multithreading
             proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3, nsubsets, ntaxa);
-//                    saveSpeciesTreeStringsHierarchical(_species_newicks, filename1); // TODO: need to write to files as you go for output purposes
             ofstream strees;
             strees.open("species_trees.trees", std::ios::app);
             strees << "end;" << endl;
@@ -1187,17 +1163,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
 
         _log_species_tree_marginal_likelihood += log_particle_sum - log(_nparticles);
-    }
-
-    inline vector<double> Proj::normalizeGeneWeights(vector<double> likelihoods) {
-        double log_sum = getRunningSum(likelihoods);
-
-        vector<double> normalized_likelihoods;
-        normalized_likelihoods.resize(likelihoods.size());
-        for (int n=0; n < normalized_likelihoods.size(); n++) {
-            normalized_likelihoods[n] = likelihoods[n] - log_sum;
-        }
-        return normalized_likelihoods;
     }
 
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles) {
@@ -1515,9 +1480,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 assert (use_vec.size() == sample_size);
             }
 
-//            for (auto &p:use_vec) {
-//                _species_newicks.push_back(p->saveForestNewick());
-//            }
             mtx.lock(); // TODO: does this slow things down?
             saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
             _count++;
@@ -2150,7 +2112,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 if (parallelize_by_group) {
                 // don't bother with this if not multithreading
                     proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3, nsubsets, ntaxa);
-//                    saveSpeciesTreeStringsHierarchical(_species_newicks, filename1); // TODO: need to write to files as you go for output purposes
                     ofstream strees;
                     strees.open("species_trees.trees", std::ios::app);
                     strees << "end;" << endl;
