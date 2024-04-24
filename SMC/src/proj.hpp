@@ -808,7 +808,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             handleBaseFrequencies();
         }
         // if user specified "ntaxaperspecies" in conf file, convert them to a vector<unsigned>
-        if (vm.count("ntaxaperspecies") > 0) {
+        if (vm.count("ntaxaperspecies") > 0 && _start_mode == "sim") {
             handleNTaxaPerSpecies();
         }
         
