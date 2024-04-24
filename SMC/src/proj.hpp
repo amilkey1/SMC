@@ -745,7 +745,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("ambigmissing",  boost::program_options::value(&_ambig_missing)->default_value(true), "treat all ambiguities as missing data")
         ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000), "number of particles")
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
-        ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.05), "theta")
+        ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.0), "theta")
         ("lambda", boost::program_options::value(&Forest::_lambda)->default_value(1), "speciation rate")
         ("proposal",  boost::program_options::value(&Forest::_proposal)->default_value("prior-prior"), "a string defining a proposal (prior-prior or prior-post)")
         ("model", boost::program_options::value(&Forest::_model)->default_value("JC"), "a string defining a substitution model")
@@ -841,6 +841,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             if (_sim_file_name == "") {
                 throw XProj("must specify name of file to write simulated data to; ex. filename = sim.nex");
             }
+            if (Forest::_theta == 0.0) {
+                throw XProj("must specify theta for simulations");
+            }
         }
         else {
             if (_data_file_name == "") {
@@ -853,7 +856,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             // no proposal or prior mean if theta fixed
             else if (Forest::_theta_prior_mean > 0.0 && Forest::_theta_proposal_mean ==  0.0) {
                 cout << boost::format("\nSetting theta proposal mean equal to theta prior mean of %d\n") % Forest::_theta_prior_mean;
-                Forest::_theta_prior_mean = Forest::_theta_proposal_mean;
+                Forest::_theta_proposal_mean = Forest::_theta_prior_mean;
             }
             else if (Forest::_theta_prior_mean == 0.0 && Forest::_theta_proposal_mean == 0.0) {
                 cout << boost::format("\nTheta mean of %d will be fixed for all particles; population sizes will all be drawn from the same theta\n") % Forest::_theta;
