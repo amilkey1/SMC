@@ -65,7 +65,6 @@ namespace proj {
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
             void                simulateData();
             void                writePaupFile(vector<Particle::SharedPtr> particles, vector<string> taxpartition);
-            void                sanityChecks();
             void                initializeParticles(vector<Particle::SharedPtr> &particles);
             void                initializeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
             void                handleGeneNewicks();
@@ -760,8 +759,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("save_memory", boost::program_options::value(&Forest::_save_memory)->default_value(false), "save memory at the expense of time")
         ("outgroup", boost::program_options::value(&Forest::_outgroup)->default_value("none"), "a string defining the outgroup")
         ("startmode", boost::program_options::value(&_start_mode)->default_value("smc"), "a string defining whether to simulate data or perform smc")
-        ("nspecies", boost::program_options::value(&_sim_nspecies)->default_value(1), "number of species to simulate")
-        ("ntaxaperspecies", boost::program_options::value(&_string_ntaxaperspecies)->default_value("1"), "number of taxa per species to simulate")
+        ("nspecies", boost::program_options::value(&_sim_nspecies)->default_value(0), "number of species to simulate")
+        ("ntaxaperspecies", boost::program_options::value(&_string_ntaxaperspecies)->default_value(""), "number of taxa per species to simulate")
         ("filename", boost::program_options::value(&_sim_file_name), "name of file to write simulated data to")
         ("particle_increase", boost::program_options::value(&_particle_increase)->default_value(1), "how much to increase particles for species filtering")
         ("thin", boost::program_options::value(&_thin)->default_value(1.0), "take this portion of particles for hierarchical species filtering")
@@ -771,7 +770,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("ngenes", boost::program_options::value(&_ngenes_provided)->default_value(0), "number of gene newick files specified")
         ("theta_proposal_mean", boost::program_options::value(&Forest::_theta_proposal_mean)->default_value(0.0), "theta proposal mean")
         ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
-        ("theta_constant_mean", boost::program_options::value(&Forest::_theta_constant_mean)->default_value(0.0), "theta mean to remain constant across all particles")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -810,7 +808,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             handleBaseFrequencies();
         }
         // if user specified "ntaxaperspecies" in conf file, convert them to a vector<unsigned>
-        if (vm.count("base_frequencies") > 0) {
+        if (vm.count("ntaxaperspecies") > 0) {
             handleNTaxaPerSpecies();
         }
         
@@ -819,9 +817,47 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             throw XProj("particle_increase must be greater than or equal to save_every");
         }
         
-        // if user specified theta_mean and theta_proposal_mean / theta_prior_mean, qit
-        if (Forest::_theta_constant_mean > 0.0 && (Forest::_theta_proposal_mean > 0.0 || Forest::_theta_prior_mean > 0.0)) {
-            throw XProj("cannot specify constant theta mean and proposal / prior distribution for theta");
+        if (Forest::_model == "JC") {
+            cout << "Setting kappa to 1.0 under JC model\n";
+            cout << "Setting base frequencies equal under JC model\n";
+            if (Forest::_kappa != 1.0) {
+                cout << "\nIgnoring kappa under JC model\n";
+            }
+        }
+        if (_start_mode == "sim") {
+            if (_data_file_name != "") {
+                cout << "\nIgnoring data file name for simulation\n";
+            }
+            if (_sim_nspecies == 0) {
+                throw XProj("must specify number of species for which to simulate data");
+            }
+            
+            if (_ntaxaperspecies.size() != 1 && _ntaxaperspecies.size() != _sim_nspecies) {
+                throw XProj("ntaxaperspecies must be one number for all species or must match the total number of species specified; ex: ntaxaperspecies = 5 or ntaxaperspecies = 5, 2, 3 if nspecies = 3");
+            }
+            if (Forest::_run_on_empty) {
+                cout << "\nIgnoring start_mode = run_on_empty and simulating data\n";
+            }
+            if (_sim_file_name == "") {
+                throw XProj("must specify name of file to write simulated data to; ex. filename = sim.nex");
+            }
+        }
+        else {
+            if (_data_file_name == "") {
+                throw XProj("must specify name of data file if smc option is chosen; ex. data file = sim.nex");
+            }
+            if (Forest::_theta_prior_mean == 0.0 && Forest::_theta_proposal_mean > 0.0) {
+                cout << boost::format("\nSetting theta prior mean equal to theta proposal mean of %d\n") % Forest::_theta_proposal_mean;
+                Forest::_theta_prior_mean = Forest::_theta_proposal_mean;
+            }
+            // no proposal or prior mean if theta fixed
+            else if (Forest::_theta_prior_mean > 0.0 && Forest::_theta_proposal_mean ==  0.0) {
+                cout << boost::format("\nSetting theta proposal mean equal to theta prior mean of %d\n") % Forest::_theta_prior_mean;
+                Forest::_theta_prior_mean = Forest::_theta_proposal_mean;
+            }
+            else if (Forest::_theta_prior_mean == 0.0 && Forest::_theta_proposal_mean == 0.0) {
+                cout << boost::format("\nTheta mean of %d will be fixed for all particles; population sizes will all be drawn from the same theta\n") % Forest::_theta;
+            }
         }
     }
 
@@ -841,6 +877,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         vector<string> temp;
         split(temp, _string_ntaxaperspecies, is_any_of(","));
         // iterate throgh temp
+        if (temp[0] == "") {
+            throw XProj("must specify number of taxa per species");
+        }
         for (auto &i:temp) {
             double f = stof(i);
             _ntaxaperspecies.push_back(f);
@@ -1605,7 +1644,12 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             mtx.lock(); // TODO: does this slow things down?
             saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
             _count++;
-            writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nspecies, ntaxa, use_vec, filename3, i);
+            if (_gene_newicks_specified) {
+                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nspecies, ntaxa, use_vec, filename3, i);
+            }
+            else {
+                writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, i);
+            }
             mtx.unlock();
         }
     }
@@ -1907,29 +1951,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         writeDeepCoalescenceFile(sim_vec);
     }
 
-    inline void Proj::sanityChecks() {
-        if (Forest::_model == "JC") {
-            cout << "Setting kappa to 1.0 under JC model\n";
-            cout << "Setting base frequencies equal under JC model\n";
-            if (Forest::_kappa != 1.0) {
-                cout << "\nIgnoring kappa under JC model\n";
-            }
-        }
-        if (_start_mode == "sim") {
-            if (_data_file_name != "") {
-                cout << "\nIgnoring data file name for simulation\n";
-            }
-            if (_ntaxaperspecies.size() != 1 && _ntaxaperspecies.size() != _sim_nspecies) {
-                throw XProj("must specify number of taxa per species or one number if equal number of taxa per species");
-            }
-        }
-        else {
-            if (_data_file_name == "") {
-                throw XProj("must specify name of data file if smc option is chosen");
-            }
-        }
-    }
-
     inline void Proj::run() {
         if (_gene_newicks_specified) {
             if (_start_mode == "sim") {
@@ -1949,7 +1970,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
             
             _first_line = true;
-            sanityChecks();
             
             try {
                 simulateData();
@@ -1960,7 +1980,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         }
         else {
             _first_line = true;
-            sanityChecks();
             if (_verbose > 0) {
                 cout << "Starting..." << endl;
                 cout << "Current working directory: " << boost::filesystem::current_path() << endl;

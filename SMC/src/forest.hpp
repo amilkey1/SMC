@@ -187,7 +187,6 @@ class Forest {
         typedef std::shared_ptr<Forest> SharedPtr;
         static double               _theta;
         static double               _theta_proposal_mean;
-        static double               _theta_constant_mean;
         static double               _theta_prior_mean;
         static double               _lambda;
         static string               _proposal;
@@ -2472,6 +2471,9 @@ class Forest {
 //            double mean = 1 / exponential_rate;
 //            _theta_mean = lot->gamma(1, mean); // mean = 10, equivalent to exponential(exponential_rate)
             _theta_mean = lot->gamma(1, _theta_proposal_mean);
+        }
+        else {
+            _theta_mean = Forest::_theta; // if no proposal distribution specified, use one theta mean for all particles
         }
         
 //        if (_theta_mean == 0.0) { // TODO: cannot specify theta_mean and theta_proposal_mean / theta_prior_mean

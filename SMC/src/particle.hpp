@@ -655,14 +655,14 @@ inline vector<double> Particle::getVectorPrior() {
 
                 _log_weight = log_speciation_term + log_likelihood_term;
                 
-                assert (_forests[1]._theta_prior_mean > 0.0);
-                assert (_forests[1]._theta_proposal_mean > 0.0);
+//                assert (_forests[1]._theta_prior_mean > 0.0);
+//                assert (_forests[1]._theta_proposal_mean > 0.0);
                 assert (_forests[1]._theta_mean > 0.0);
                 
 //                assert (_forests[1]._theta_mean == _forests[10]._theta_mean);
                 
                 // modifier only happens on first round
-                if (_generation == 0) {
+                if (_generation == 0 && _forests[1]._theta_prior_mean > 0.0 && _forests[1]._theta_proposal_mean > 0.0) {
                     double prior_rate = 1.0/_forests[1]._theta_prior_mean;
                     double proposal_rate = 1.0/_forests[1]._theta_proposal_mean;
                     double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
@@ -1066,7 +1066,7 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline void Particle::setNewTheta() {
         // map should be 2*nspecies - 1 size
-        // create a theta map with all the same theta for simulations
+        // create a theta map with all the same theta for simulations, set theta_mean to theta
         unsigned number = 0;
         vector<string> species_names;
         map<string, double> theta_map;
@@ -1089,6 +1089,7 @@ inline vector<double> Particle::getVectorPrior() {
         
         for (int i=1; i<_forests.size(); i++) {
             _forests[i]._theta_map = theta_map;
+            _forests[i]._theta_mean = Forest::_theta;
         }
     }
     

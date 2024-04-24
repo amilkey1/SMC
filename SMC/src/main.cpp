@@ -40,7 +40,6 @@ bool Forest::_save_memory;
 double Forest::_ploidy = 2.0;
 double Forest::_theta_proposal_mean = 0.0;
 double Forest::_theta_prior_mean = 0.0;
-double Forest::_theta_constant_mean = 0.0;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT
