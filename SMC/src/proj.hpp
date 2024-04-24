@@ -45,6 +45,7 @@ namespace proj {
             void                writeDeepCoalescenceFile(vector<Particle::SharedPtr> &v);
             void                writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
+            void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
             void                normalizeWeights(vector<Particle::SharedPtr> & particles);
             void                normalizeSpeciesWeights(vector<Particle::SharedPtr> & particles);
             void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
@@ -260,6 +261,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
         logf.close();
     }
+
     inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFiltering(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number) {
         // this function creates a params file that is comparable to output from starbeast3
         std::ofstream logf;
@@ -397,6 +399,89 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
             logf << endl;
 //            _count++;
+        }
+
+        logf.close();
+    }
+
+    inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number) {
+        // this function creates a params file that is comparable to output from starbeast3
+        std::ofstream logf;
+
+        logf.open(filename, std::ios_base::app);
+
+        // no gene tree parameters now
+    //        if (group_number == 0) { // name columns
+        if (_first_line) {
+    //            _count = 0;
+            _first_line = false;
+    #if !defined PARALLELIZE_BY_GROUP
+            logf << "iter ";
+    #endif
+            logf << "\t" << "posterior ";
+            logf << "\t" << "prior ";
+            logf << "\t" << "vectorPrior "; // log joint prior on population sizes (vectorPrior)
+            logf << "\t" << "speciescoalescent ";
+            logf << "\t" << "Tree.t:Species.height ";
+            logf << "\t" << "Tree.t:Species.treeLength ";
+
+            logf << "\t" << "YuleModel.t:Species "; // this is the log probability of the species tree (multiply by log(3!) to get increment log prob)
+            logf << "\t" << "popMean "; // here, this will be user specified theta
+
+            logf << "\t" << "speciationRate.t:Species ";
+
+            logf << endl;
+        }
+
+        unsigned sample_size = round(double (_particle_increase) / double(_save_every) );
+        if (sample_size == 0) {
+            sample_size = _particle_increase;
+        }
+        
+        for (auto &p:v) {
+    #if !defined PARALLELIZE_BY_GROUP
+            unsigned iter = group_number * sample_size;
+            logf << iter;
+            iter++;
+    #endif
+
+            double log_coalescent_likelihood = 0.0;
+    #if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
+            log_coalescent_likelihood += p->getCoalescentLikelihood(1);
+    #else
+            for (unsigned g=1; g<ngenes+1; g++) {
+                log_coalescent_likelihood += p->getCoalescentLikelihood(g);
+            }
+    #endif
+
+            double vector_prior = 0.0;
+
+            double log_prior = p->getAllPriors();
+
+            double log_posterior = log_prior + log_coalescent_likelihood + vector_prior;
+
+            logf << "\t" << log_posterior;
+            
+            logf << "\t" << log_prior;
+
+            logf << "\t" << vector_prior;
+
+            logf << "\t" << log_coalescent_likelihood;
+
+            double species_tree_height = p->getSpeciesTreeHeight();
+            logf << "\t" << species_tree_height;
+
+            double species_tree_length = p->getSpeciesTreeLength();
+            logf << "\t" << species_tree_length;
+
+            double yule_model = p->getSpeciesTreePrior();
+            logf << "\t" << yule_model;
+
+            logf << "\t" << p->getPopMean() / 4.0; // beast uses Ne * u = theta / 4
+
+            logf << "\t" << Forest::_lambda;
+
+            logf << endl;
         }
 
         logf.close();
@@ -804,6 +889,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
     inline void Proj::handleGeneNewicks() {
         vector<vector<string>> newicks; // vector of vector of newicks, 1 vector per gene
+        _first_line = true;
         if (_ngenes_provided == 0) {
             throw XProj("must specify number of genes in the conf file");
         }
@@ -882,7 +968,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 particle_newicks.push_back(newicks[i][count]);
             }
             assert (particle_newicks.size() == nsubsets);
-            p->processGeneNewicks(particle_newicks); // TODO: some genes aren't fully built?
+            p->processGeneNewicks(particle_newicks);
             count++;
         }
 
@@ -1101,7 +1187,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 }
 
                 saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
-                writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, a);
+                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nspecies, ntaxa, use_vec, filename3, a);
                 if (a == 0) {
                     writeLoradFileAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec); // testing the marginal likelihood by writing to file for lorad for first species group only
                     cout << "species tree log marginal likelihood is: " << _log_species_tree_marginal_likelihood << endl;
@@ -1117,8 +1203,44 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             unique_treef.open(filename2, std::ios_base::app);
             unique_treef << "end;\n";
             unique_treef.close();
+            
+            
+            // add iteration to params file
+            string line;
+            // For writing text file
+            // Creating ofstream & ifstream class object
+            ifstream in ("params-beast-comparison.log");
+            ofstream f("params-beast-comparison-final.log");
+
+            unsigned line_count = 0;
+
+            while (!in.eof()) {
+                string text;
+
+                getline(in, text);
+
+                if (line_count == 0) {
+                    string add = "iter ";
+                    text = add + text;
+                }
+                else {
+                    if (text != "") {
+                        string add = to_string(line_count);
+                        text = add + text;
+                    }
+                }
+                if (text != "") {
+                    f << text << endl; // account for blank line at end of file
+                }
+                line_count++;
+            }
+
+            // remove existing params file and replace with copy
+            char oldfname[] = "params-beast-comparison.log";
+            char newfname[] = "params-beast-comparison-final.log";
+            filesystem::remove(oldfname);
+            std::rename(newfname, oldfname);
         }
-        
     }
 
     inline double Proj::getRunningSum(const vector<double> & log_weight_vec) const {
@@ -1483,7 +1605,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             mtx.lock(); // TODO: does this slow things down?
             saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
             _count++;
-            writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, i);
+            writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nspecies, ntaxa, use_vec, filename3, i);
             mtx.unlock();
         }
     }
@@ -2160,7 +2282,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                  
                 else {
                     for (unsigned a=0; a < ngroups; a++) {
-//                        _log_species_tree_marginal_likelihood = 0.0; // TODO: for now, write lorad file for first set of species tree filtering and report the marginal likelihood for comparison
+//                        _log_species_tree_marginal_likelihood = 0.0; // for now, write lorad file for first set of species tree filtering and report the marginal likelihood for comparison
                         
                         use_first = true;
 
