@@ -135,7 +135,7 @@ class Particle {
         double                                          calcInitialCoalescentLikelihood();
         void                                            processGeneNewicks(vector<string> newicks);
     
-        static bool                                     _run_on_empty;
+//        static bool                                     _run_on_empty;
 
     private:
 
@@ -247,7 +247,7 @@ class Particle {
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
         }
-        if (_generation == 0 && !_run_on_empty) {
+        if (_generation == 0 && !Forest::_run_on_empty) {
             _log_weight = log_likelihood;
         }
 
@@ -261,7 +261,7 @@ class Particle {
         //calculate likelihood for each gene tree
         for (unsigned i=1; i<_forests.size(); i++) {
             double gene_tree_log_likelihood  = 0.0;
-            if (!_run_on_empty) {
+            if (!Forest::_run_on_empty) {
                 gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
                 assert(!isnan (gene_tree_log_likelihood));
             }
@@ -411,7 +411,7 @@ inline vector<double> Particle::getVectorPrior() {
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
         }
-        if (_generation == 0 && !_run_on_empty) {
+        if (_generation == 0 && !Forest::_run_on_empty) {
             _log_weight = log_likelihood;
         }
 
@@ -674,7 +674,7 @@ inline vector<double> Particle::getVectorPrior() {
                 done = true;
             }
                   
-            if (_run_on_empty) {
+            if (Forest::_run_on_empty) {
                 _log_weight = 0.0;
             }
             
@@ -776,7 +776,7 @@ inline vector<double> Particle::getVectorPrior() {
         
             assert (_log_coalescent_likelihood == 0.0);
 
-        if (!_run_on_empty) {
+        if (!Forest::_run_on_empty) {
             unsigned nbranches = Forest::_nspecies*2 - 1;
             _log_coalescent_likelihood = 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * boost::math::lgamma(2);
             
@@ -854,7 +854,7 @@ inline vector<double> Particle::getVectorPrior() {
 
         double constrained_factor = 0.0;
 #if !defined (UNCONSTRAINED_PROPOSAL)
-        if (!_run_on_empty) {
+        if (!Forest::_run_on_empty) {
             assert (max_depth > 0.0);
             double nlineages = _forests[0]._lineages.size();
             if (nlineages == 1) {
@@ -870,7 +870,7 @@ inline vector<double> Particle::getVectorPrior() {
             assert(test != -0); // assert coalescent likelihood is not -inf
 #endif
         
-        if (_run_on_empty) {
+        if (Forest::_run_on_empty) {
             assert (_log_coalescent_likelihood == 0.0);
             assert (_log_species_weight == 0.0);
         }

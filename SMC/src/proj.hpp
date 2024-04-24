@@ -755,7 +755,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("nthreads",  boost::program_options::value(&_nthreads)->default_value(1), "number of threads for multi threading")
         ("migration_rate", boost::program_options::value(&Forest::_migration_rate)->default_value(0.0), "migration rate")
         ("hybridization_rate", boost::program_options::value(&Forest::_hybridization_rate)->default_value(0.0), "hybridization rate")
-        ("run_on_empty", boost::program_options::value(&Particle::_run_on_empty)->default_value(false), "run program without data")
+        ("run_on_empty", boost::program_options::value(&Forest::_run_on_empty)->default_value(false), "run program without data")
         ("verbose", boost::program_options::value(&_verbose)->default_value(1), "set amount of output printed")
         ("save_memory", boost::program_options::value(&Forest::_save_memory)->default_value(false), "save memory at the expense of time")
         ("outgroup", boost::program_options::value(&Forest::_outgroup)->default_value("none"), "a string defining the outgroup")
@@ -1845,7 +1845,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         sim_vec[0]->setSeed(rng.randint(1,9999) + psuffix);
         psuffix += 2;
 
-        Particle::_run_on_empty = true;
         Forest::_run_on_empty = true;
         Forest::_proposal = "prior-prior";
 
@@ -1974,9 +1973,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 cout << "Number of threads: " << _nthreads << endl;
             }
 
-            if (Particle::_run_on_empty) { // if running with no data, choose taxa to join at random
+            if (Forest::_run_on_empty) { // if running with no data, choose taxa to join at random
                 Forest::_proposal = "prior-prior";
-                Forest::_run_on_empty = true;
             }
 
             try {
@@ -2095,7 +2093,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
                         bool filter = true;
 
-                        if (Particle::_run_on_empty) {
+                        if (Forest::_run_on_empty) {
                             filter = false;
                         }
                         if (filter) {
