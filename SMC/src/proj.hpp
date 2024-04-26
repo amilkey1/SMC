@@ -2399,6 +2399,42 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     unique_treef.open(filename2, std::ios_base::app);
                     unique_treef << "end;\n";
                     unique_treef.close();
+                    
+                    // add iterations to params file
+                    string line;
+                    // For writing text file
+                    // Creating ofstream & ifstream class object
+                    ifstream in ("params-beast-comparison.log");
+                    ofstream f("params-beast-comparison-final.log");
+
+                    unsigned line_count = 0;
+
+                    while (!in.eof()) {
+                        string text;
+
+                        getline(in, text);
+
+                        if (line_count == 0) {
+                            string add = "iter ";
+                            text = add + text;
+                        }
+                        else {
+                            if (text != "") {
+                                string add = to_string(line_count);
+                                text = add + text;
+                            }
+                        }
+                        if (text != "") {
+                            f << text << endl; // account for blank line at end of file
+                        }
+                        line_count++;
+                    }
+
+                    // remove existing params file and replace with copy
+                    char oldfname[] = "params-beast-comparison.log";
+                    char newfname[] = "params-beast-comparison-final.log";
+                    filesystem::remove(oldfname);
+                    std::rename(newfname, oldfname);
                 }
 #endif
 
