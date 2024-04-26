@@ -631,7 +631,11 @@ inline vector<double> Particle::getVectorPrior() {
                     }
                 }
             }
+            
+#if !defined (HIERARCHICAL_FILTERING)
+            // only calculate increment priors if not doing another round of species filtering
             calculateIncrementPriors(increment, species_name, forest_number, speciation, first_step);
+#endif
             
             if (species_name == "species") {
                 unsigned n = (unsigned) _forests[0]._lineages.size();
@@ -966,7 +970,6 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
             assert (_log_coalescent_likelihood == 0.0);
         
-#if defined (UNCONSTRAINED_PROPOSAL)
         if (_forests[0]._last_edge_length > max_depth) {
             _log_coalescent_likelihood = -1*numeric_limits<double>::infinity();
         }
@@ -976,7 +979,6 @@ inline vector<double> Particle::getVectorPrior() {
                 _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
             }
         }
-#endif
         
         if (_forests[0]._lineages.size() == 2) {
             // join remaining species lineages, no change in coalescent likelihood, just need to add panmictic coalescent for each gene tree (to avoid total recalculation)
@@ -1213,6 +1215,7 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
 //            new_increment = true;
             _forests[f].calcIncrementPrior(increment, species_name, new_increment, coalescence, gene_tree);
+            
 #if defined (SIM_TEST3)
             _species_join_proposed = false;
 #endif

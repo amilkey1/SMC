@@ -45,7 +45,7 @@ namespace proj {
             void                writeDeepCoalescenceFile(vector<Particle::SharedPtr> &v);
             void                writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
-            void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
+            void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
             void                normalizeWeights(vector<Particle::SharedPtr> & particles);
             void                normalizeSpeciesWeights(vector<Particle::SharedPtr> & particles);
             void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
@@ -403,7 +403,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         logf.close();
     }
 
-    inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number) {
+    inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number) {
         // this function creates a params file that is comparable to output from starbeast3
         std::ofstream logf;
 
@@ -1229,7 +1229,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 }
 
                 saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
-                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nspecies, ntaxa, use_vec, filename3, a);
+                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nsubsets, nspecies, ntaxa, use_vec, filename3, a);
                 if (a == 0) {
                     writeLoradFileAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec); // testing the marginal likelihood by writing to file for lorad for first species group only
                     cout << "species tree log marginal likelihood is: " << _log_species_tree_marginal_likelihood << endl;
@@ -1648,7 +1648,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
             _count++;
             if (_gene_newicks_specified) {
-                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nspecies, ntaxa, use_vec, filename3, i);
+                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nsubsets, nspecies, ntaxa, use_vec, filename3, i);
             }
             else {
                 writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, i);
