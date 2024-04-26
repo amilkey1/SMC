@@ -627,8 +627,9 @@ inline vector<double> Particle::getVectorPrior() {
             if (_forests[0]._lineages.size() != Forest::_nspecies) {
                 first_step = false;
             }
+            
             if (first_step) {
-                for (int i=1; i<_forests.size(); i++) { // TODO: can make this faster - just check 1st gene forest
+                for (int i=1; i<_forests.size(); i++) {
                     if (_forests[i]._lineages.size() != Forest::_ntaxa) {
                         first_step = false;
                     }
@@ -791,7 +792,7 @@ inline vector<double> Particle::getVectorPrior() {
                         params = _forests[i].calcCoalescentLikelihoodIntegratingOutTheta(_forests[0]._species_build);
                     }
                     else {
-                        params = _forests[i].calcCoalescentLikelihoodIntegratingOutThetaLastStep(_forests[0]._species_build);
+                        params = _forests[i].calcCoalescentLikelihoodIntegratingOutThetaLastStep(_forests[0]._species_build); // not using this right now
                     }
                     if (i == 1) {
                         for (auto &g:params.first) {

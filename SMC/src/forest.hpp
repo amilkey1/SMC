@@ -1429,14 +1429,20 @@ class Forest {
         _taxon_map = taxon_map;
         assert (_index >0);
         _species_partition.clear();
-//        for (auto nd:_lineages) {
+        
+        unsigned count = 0;
+        
         for (auto &nd:_nodes) {
-            if (!nd._left_child) {
-                string species_name = taxon_map[nd._name];
-                _species_partition[species_name].push_back(&nd);
+            count++;
+            assert (!nd._left_child);
+            string species_name = taxon_map[nd._name];
+            _species_partition[species_name].push_back(&nd);
+            if (count == Forest::_ntaxa) {
+                break;
             }
         }
-        assert (_species_partition.size() > 0);
+        
+        assert (_species_partition.size() == Forest::_nspecies);
     }
 
     inline double Forest::calcTopologyPrior(unsigned nlineages) {
@@ -3065,10 +3071,9 @@ class Forest {
         }
         
         vector<unsigned> indices_to_erase;
-        for (int i=0; i<_depths.size(); i++) { // TODO: can't iterate through a vecotr and change it at the same time - keep track of which ones to erase and then erase them
+        for (int i=0; i<_depths.size(); i++) {
             if (_depths[i].second.first == _depths[i].second.second) {
 //                // species have already been joined in the species tree, so they are no longer a constraint
-//                _depths.erase(_depths.begin()+i);
                 indices_to_erase.push_back(i);
             }
         }
