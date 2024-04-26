@@ -106,7 +106,6 @@ class Particle {
         void                                            calculateIncrementPriors(double increment, string species_name, unsigned forest_number, bool speciation, bool first_step);
         void                                            changeTheta(unsigned i);
         void                                            drawTheta();
-        double                                          getIncrement() {return _prev_increment;}
         void                                            clearPartials();
         Lot::SharedPtr getLot() const {return _lot;}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
@@ -148,7 +147,6 @@ class Particle {
         int                                     _generation = 0;
         unsigned                                _prev_forest_number;
         bool                                    _species_join_proposed;
-        double                                  _prev_increment;
         double                                  _log_coalescent_likelihood;
         mutable                                 Lot::SharedPtr _lot;
         unsigned                                _num_deep_coalescences;
@@ -202,7 +200,6 @@ class Particle {
         _generation     = 0;
         _prev_forest_number = 0;
         _species_join_proposed = false;
-        _prev_increment = 0.0;
         _log_coalescent_likelihood = 0.0;
         _num_deep_coalescences = 0.0;
         _species_tree_height = 0.0;
@@ -607,7 +604,6 @@ inline vector<double> Particle::getVectorPrior() {
         
             string species_name = event_choice_name[index];
 #endif
-            _prev_increment = increment;
                 
             // add increment to all nodes in all forests
             for (int i=0; i<_forests.size(); i++) {
@@ -1201,9 +1197,7 @@ inline vector<double> Particle::getVectorPrior() {
             if (f > 0) {
                 gene_tree = true;
             }
-//            if (_generation == 0) {
-//                new_increment = true;
-//            }
+
 #if defined (SIM_TEST)
             if (_species_join_proposed) {
                 new_increment = false;
@@ -1434,7 +1428,6 @@ inline vector<double> Particle::getVectorPrior() {
         _generation     = other._generation;
         _prev_forest_number = other._prev_forest_number;
         _species_join_proposed = other._species_join_proposed;
-        _prev_increment = other._prev_increment;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _num_deep_coalescences = other._num_deep_coalescences;
         _deep_coal = other._deep_coal;

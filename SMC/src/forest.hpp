@@ -115,7 +115,7 @@ class Forest {
         void                        renumberInternals();
         bool                        canHaveSibling(Node * nd, bool rooted, bool allow_polytomies);
     
-        map<string, double>              _theta_map;
+        map<string, double>         _theta_map;
 
         std::vector<Node *>         _lineages;
     
@@ -136,9 +136,6 @@ class Forest {
         unsigned                    _index;
         map<string, list<Node*> >   _species_partition;
         double                      _gene_tree_log_likelihood;
-        vector<pair<Node*, Node*>>  _node_choices;
-        vector<double>              _log_likelihood_choices;
-        int                         _index_of_choice;
         pair<Node*, Node*>          _species_joined;
         tuple<Node*, Node*, Node*>  _hybrid_species_joined;
         string                      _last_direction;
@@ -150,7 +147,6 @@ class Forest {
         double                      _log_coalescent_likelihood_increment;
         double                      _cum_height;
         string                      _start_mode;
-        vector<pair<double, double>>         _increments;
         vector<pair<double, pair<string, string>>>              _depths;
         unsigned                    _nincrements = 0;
         vector<Node*>               _preorder;
@@ -158,6 +154,10 @@ class Forest {
         vector<pair<tuple<string,string,string>, double>>    _species_build;
         map<string, string>         _taxon_map;
         map<string, unsigned>       _species_indices;
+        double                      _log_weight;
+        string                      _ancestral_species_name;
+        vector<double>              _vector_prior;
+        double                      _theta_mean;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -171,16 +171,12 @@ class Forest {
         double                      getSpeciesTreeIncrement();
         double                      getLineageHeight(Node* nd);
         double                      getTotalLineageHeight(Node* nd);
-        double                      _log_weight;
         void                        addIncrement(double increment);
         void                        simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
         pair<vector<double>, vector<unsigned>>        calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build);
         inline pair<vector<double>, vector<unsigned>> calcInitialCoalescentLikelihoodIntegratingOutTheta();
         pair<vector<double>, vector<unsigned>>        calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build);
-        string                      _ancestral_species_name;
-        vector<double>              _vector_prior;
-        double                      _theta_mean;
 
     public:
 
@@ -228,7 +224,6 @@ class Forest {
         _cum_height = 0.0;
         _nleaves=_ntaxa;
         _ninternals=0;
-        _increments.clear();
         _depths.clear();
         _nincrements = 0;
         _preorder.clear();
@@ -1086,9 +1081,6 @@ class Forest {
         _data               = other._data;
         _nspecies           = other._nspecies;
         _ntaxa              = other._ntaxa;
-        _index_of_choice    = other._index_of_choice;
-        _node_choices = other._node_choices;
-        _log_likelihood_choices = other._log_likelihood_choices;
         _species_joined = other._species_joined;
         _hybrid_species_joined = other._hybrid_species_joined;
         _migration_rate = other._migration_rate;
@@ -1105,7 +1097,6 @@ class Forest {
         _outgroup = other._outgroup;
         _run_on_empty = other._run_on_empty;
         _start_mode = other._start_mode;
-        _increments = other._increments;
         _depths = other._depths;
         _nincrements = other._nincrements;
         _preorder.resize(other._preorder.size());
@@ -1284,7 +1275,6 @@ class Forest {
             // lorad only works if all topologies the same - then don't include the prior on joins b/c it is fixed
             double increment_prior = (log(rate)-_last_edge_length*rate);
                         
-            _increments.push_back(make_pair(_last_edge_length, increment_prior));
             _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior)); // do not include constrained factor in increment prior
         }
         else {
@@ -1301,7 +1291,6 @@ class Forest {
             double log_prob_join = log(2/nChooseTwo);
             double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
 
-            _increments.push_back(make_pair(_last_edge_length, increment_prior));
             _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior));
 
         }
@@ -1382,9 +1371,11 @@ class Forest {
         
         updateNodeVector (_lineages, subtree1, subtree2, new_nd);
 
+#if defined (DEBUG_MODE)
         if (_lineages.size() > 1) {
             _species_joined = make_pair(subtree1, subtree2); // last step just joins remaining two
         }
+#endif
         
         calcTopologyPrior((int) _lineages.size()+1);
 
@@ -1625,8 +1616,6 @@ class Forest {
     }
 
     inline void Forest::allowCoalescence(string species_name, double increment, Lot::SharedPtr lot) {
-        _log_likelihood_choices.clear();
-        _node_choices.clear();
         double prev_log_likelihood = _gene_tree_log_likelihood;
             
         Node *subtree1 = nullptr;
@@ -3048,6 +3037,7 @@ class Forest {
             assert (gamma_b.size() == q_b.size());
         }
         
+        _species_partition.clear(); // avoid having to copy extra nodes by clearing this since it will be reset
         return make_pair(gamma_b, q_b);
     }
 
