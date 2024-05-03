@@ -228,7 +228,7 @@ def createGetSVDQHeight():
 	s += '		if count == 3:\n'
 	s += '			height = float(line[39:49])\n'
 	s += '			lamda = numerator / height\n'
-	s += '			new_f.write("," + str(lamda))\n'
+	s += '			new_f.write(str(lamda)+"\\n")\n'
 	s += '			break\n'
 	s += "	i += 1\n"
 	svdqf = open(svdqfn, 'w')
@@ -852,6 +852,31 @@ def createRplot():
     plotf.write(plotstuff)
     plotf.close()
 
+def createReplaceBash():
+    replacefn = os.path.join(dirname, 'rreplace.sh')
+    replacebash = '#!/bin/bash\n'
+
+    for rep in range(nreps):
+        repdirpath = createRepDirName(rep)
+        replacebash += '\n'
+        replacebash += 'cd %s\n' % os.path.join(repdirpath, 'smc')
+        replacebash += "sed '17s/.*/replacement-line/' proj.conf > proj2.conf\n"
+        #replacebash += "sed '17s/.*/replacement-line/' rep"
+        #replacebash += str(rep+1)
+        #replacebash += '/smc/proj.conf > rep'
+        #replacebash += str(rep+1)
+        #replacebash += "/smc/proj2.conf\n"
+        #replacebash += "sed '17s/.*/replacement-line/' rep1/smc/proj.conf > rep1/smc/proj2.conf\n"
+        replacebash += 'rm proj.conf\n'
+        replacebash += 'mv proj2.conf proj.conf\n'
+        replacebash += "cd ../.."
+        
+
+    replacef = open(replacefn, 'w')
+    replacef.write(replacebash)
+    replacef.close()
+
+
 def createSimBash():
     simfn = os.path.join(dirname, 'simulate.sh')
     simbash = '#!/bin/bash\n'
@@ -1341,6 +1366,7 @@ if __name__ == '__main__':
     createCrunch()
     writeDeepCoalFile()
     createGetSVDQHeight()
+    createReplaceBash()
     #createPAUP('smc', smctreefname, 1)
     #createPAUP('beast', beasttreefname, 2)
     createTreeDist('smc', smctreefname, 1)
