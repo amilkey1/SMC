@@ -204,6 +204,34 @@ def createSMCDir(rep_index):
 def createBeastDir(rep_index):
     beastdirpath = createBeastDirPath(rep_index)
     os.mkdir(beastdirpath)
+    
+def createGetSVDQHeight():
+	svdqfn = os.path.join(dirname, 'get-svdq-heights.py')
+	s = "i = 1\n"
+	s += 'new_f = open("svdq_height.txt", "x")\n'
+	s += "for rep in range(%12d):\n" % nreps
+	s += "	name = 'rep' + str(i)\n"
+	s += '	count = 0\n'
+	s += '	found = False\n'
+	s += '	height = 0.0\n'
+	s += "	name = 'rep' + str(i) + '/sim' + '/svdout.txt'\n"
+	#s += "	lines = open(name+'/sim'+'/svdout.txt', 'r').readlines()[1:]\n"
+	#s += '	for line in reversed(list(open(name+'/sim'+'/svdout.txt'))):\n'
+	#s += '	for line in reversed(list(open("svdout.txt"))):\n'
+	s += '	for line in reversed(list(open(name))):\n'
+	s += '		if line.startswith("Sum"):\n'
+	s += '			count += 1\n'
+	s += '			found = True\n'
+	s += '		elif found:\n'
+	s += '			count += 1\n'
+	s += '		if count == 3:\n'
+	s += '			height = line[39:49]\n'
+	s += '			new_f.write("," + height)\n'
+	s += '			break\n'
+	s += "	i += 1\n"
+	svdqf = open(svdqfn, 'w')
+	svdqf.write(s)
+	svdqf.close()
 
 def createSimConf(rep_index):
     theta = thetas[rep_index]
@@ -236,6 +264,7 @@ def createSimConf(rep_index):
     outf = open(fn, 'w')
     outf.write(s)
     outf.close()
+    
 def createSMCConf(rep_index):
     theta = thetas[rep_index]
     lamda = lambdas[rep_index]
@@ -1304,6 +1333,7 @@ if __name__ == '__main__':
     createCopyDataPy()
     createCrunch()
     writeDeepCoalFile()
+    createGetSVDQHeight()
     #createPAUP('smc', smctreefname, 1)
     #createPAUP('beast', beasttreefname, 2)
     createTreeDist('smc', smctreefname, 1)
