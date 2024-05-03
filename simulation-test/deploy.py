@@ -22,8 +22,8 @@ nloci          = 10          # number of loci (conditionally independent given s
 seqlen         = 100       # number of sites in each gene
 nreps          = 3          # number of simulation replicates
 nparticles     = 6250       # number of particles to use for SMC
-simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
-smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
+simprogname    = 'smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
+smcprogname    = 'smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 smctreefname   = 'species_trees.trees' # name of species tree file for SMC
 beasttreefname = 'species.trees'           # name of species tree file for BEAST
@@ -254,6 +254,10 @@ def createSMCConf(rep_index):
         cum += seqlen
     s += 'theta  = %.2f\n' % theta
     s += 'lambda = %.2f\n' % lamda
+    s += '\n'
+    s += '\n'
+    s += 'theta_proposal_mean = 1.0\n'
+    s += 'theta_prior_mean = 1.0\n'
     s += '\n'
     s += '\n'
     s += 'nparticles = %d\n' % nparticles
@@ -1223,8 +1227,13 @@ def create3DRPlot():
 		s += 'T = [%s]\n' % ','.join(Tstr)
 		thetastr = ['%g' % q for q in thetas]
 		s += 'theta = [%s]\n' % ','.join(thetastr)
+	elif method == 'grid':
+		Tstr = ['%g' % t for t in Tvect]
+		s += 'T = [%s]\n' % ','.join(Tstr)
+		thetastr = ['%g' % q for q in thetas]
+		s += 'theta = [%s]\n' % ','.join(thetastr)
 	else:
-		assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
+		assert False, 'method should be either "lognorm" or "uniform" or "grid" but you specified "%s"' % method
 	s += 'RF_smc = [float(i) for i in rf_smc]\n'
 	s += 'RF_beast = [float(i) for i in rf_beast]\n'
 	s += 'KF_smc = [float(i) for i in kf_smc]\n'
