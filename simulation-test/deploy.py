@@ -25,6 +25,7 @@ nparticles     = 6250       # number of particles to use for SMC
 simprogname    = 'smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
+paupprogname = 'paup4a168_osx'    #name of PAUP*
 smctreefname   = 'species_trees.trees' # name of species tree file for SMC
 beasttreefname = 'species.trees'           # name of species tree file for BEAST
 username       = 'aam21005'  # name of user on UConn HPC cluster
@@ -824,6 +825,7 @@ def createSimBash():
         simbash += '\n'
         simbash += 'cd %s\n' % os.path.join(repdirpath, 'sim')
         simbash += '%s\n' % simprogname
+        simbash += '%s svd-qage.nex\n' % paupprogname
         simbash += 'cd ~-\n'
 
     simf = open(simfn, 'w')
@@ -1133,7 +1135,6 @@ def writeThetaFile():
 	thetaf = open(thetafn, 'w')
 	thetaf.write(s)
 	thetaf.close()
-
 
 def writeTimeFile():
 	timefn = os.path.join(dirname, 'get-times.py')
