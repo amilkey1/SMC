@@ -206,18 +206,19 @@ def createBeastDir(rep_index):
     os.mkdir(beastdirpath)
     
 def createGetSVDQHeight():
-	svdqfn = os.path.join(dirname, 'get-svdq-heights.py')
+	svdqfn = os.path.join(dirname, 'get-svdq-lamdas.py')
+		
 	s = "i = 1\n"
-	s += 'new_f = open("svdq_height.txt", "x")\n'
+	s += 'new_f = open("svdq_lambdas.txt", "x")\n'
 	s += "for rep in range(%12d):\n" % nreps
 	s += "	name = 'rep' + str(i)\n"
 	s += '	count = 0\n'
 	s += '	found = False\n'
-	s += '	height = 0.0\n'
+	s += '	numerator = 0.0\n'
 	s += "	name = 'rep' + str(i) + '/sim' + '/svdout.txt'\n"
-	#s += "	lines = open(name+'/sim'+'/svdout.txt', 'r').readlines()[1:]\n"
-	#s += '	for line in reversed(list(open(name+'/sim'+'/svdout.txt'))):\n'
-	#s += '	for line in reversed(list(open("svdout.txt"))):\n'
+	s += "	for a in range(%d+1):\n" % nspecies
+	s += "		if a > 1:\n"
+	s += "			numerator += 1. / a\n"
 	s += '	for line in reversed(list(open(name))):\n'
 	s += '		if line.startswith("Sum"):\n'
 	s += '			count += 1\n'
@@ -225,13 +226,15 @@ def createGetSVDQHeight():
 	s += '		elif found:\n'
 	s += '			count += 1\n'
 	s += '		if count == 3:\n'
-	s += '			height = line[39:49]\n'
-	s += '			new_f.write("," + height)\n'
+	s += '			height = float(line[39:49])\n'
+	s += '			lamda = numerator / height\n'
+	s += '			new_f.write("," + str(lamda))\n'
 	s += '			break\n'
 	s += "	i += 1\n"
 	svdqf = open(svdqfn, 'w')
 	svdqf.write(s)
 	svdqf.close()
+
 
 def createSimConf(rep_index):
     theta = thetas[rep_index]
@@ -659,7 +662,7 @@ def createREADME():
     readme += '\n'
     readme += '3. Get SVD Quartets heights of each simulation:\n'
     readme += '\n'
-    readme += 'python3 get-svdq-heights.py\n'
+    readme += 'python3 get-svdq-lamdas.py\n'
     readme += '\n'
     readme += '4. Start SMC runs:\n'
     readme += '\n'
