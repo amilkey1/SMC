@@ -170,6 +170,7 @@ class Forest {
         double                      getTreeLength();
         double                      getSpeciesTreeIncrement();
         double                      getLineageHeight(Node* nd);
+        double                      getLineageHeightLogScale(Node* nd);
         double                      getTotalLineageHeight(Node* nd);
         void                        addIncrement(double increment);
         void                        simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
@@ -415,7 +416,7 @@ class Forest {
         else if (_index == 0) {
             cout << " species tree: " << endl;
         }
-        cout << " " << makeNewick(9, true) << "\n";
+        cout << " " << makeNewick(15, true) << "\n";
         cout << "\n";
     }
 
@@ -1426,6 +1427,7 @@ class Forest {
         for (auto &nd:_nodes) {
             count++;
             assert (!nd._left_child);
+//            if (!nd._left_child) {
             string species_name = taxon_map[nd._name];
             _species_partition[species_name].push_back(&nd);
             if (count == Forest::_ntaxa) {
@@ -2884,7 +2886,7 @@ class Forest {
         return make_pair(gamma_b, q_b);
     }
 
-    inline pair<vector<double>, vector<unsigned>> Forest::calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build) {
+    inline pair<vector<double>, vector<unsigned>> Forest::calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build) { // TODO: issues when newicks read in have very small branch lengths
         vector<double> gamma_b; // contains gamma_b by species
         vector<unsigned> q_b; // contains q_b by species
         
@@ -2954,7 +2956,7 @@ class Forest {
                                 
                                 if (coalescence) {
                                     if (s.second.size() == 1) {
-                                        q_b.clear(); // don't push back to q_b because it is full of ints
+                                        q_b.clear(); // don't push back to q_b because it is full of doubles
                                         gamma_b.clear();
                                         gamma_b.push_back(neg_inf);
                                         done = true;
@@ -2976,7 +2978,7 @@ class Forest {
                                                 updateNodeList(s.second, search_nd, search_nd->_right_sib, search_nd->_parent); // update the species lineage
                                             }
                                             else {
-                                                q_b.clear(); // don't push back to q_b because it is full of ints
+                                                q_b.clear(); // don't push back to q_b because it is full of doubles
                                                 gamma_b.clear();
                                                 gamma_b.push_back(neg_inf);
                                                 done = true;
@@ -3001,7 +3003,6 @@ class Forest {
             }
         }
         
-//        showForest();
         if (gamma_b.back() != neg_inf) {
             assert (q_b.back() == 0.0);
             assert (gamma_b.back() == 0);
@@ -3182,6 +3183,55 @@ class Forest {
         // sort heights_and_nodes so that smallest heights will be first
         sort(heights_and_nodes.begin(), heights_and_nodes.end());
         return(heights_and_nodes);
+    }
+
+    inline double Forest::getLineageHeightLogScale(Node* nd) {
+    //        double running_sum = 0.0;
+    //        double log_weight_choices_sum = 0.0;
+    //        double log_max_weight = *max_element(log_weight_choices.begin(), log_weight_choices.end());
+    //        for (auto & i:log_weight_choices) {
+    //            running_sum += exp(i - log_max_weight);
+    //        }
+    //        log_weight_choices_sum = log(running_sum) + log_max_weight;
+    //        return log_weight_choices_sum;
+        
+        if (nd != nullptr) {
+            double running_sum = 0.0;
+            double log_sum_height = 0.0;
+            vector<double> log_edge_lengths_to_add;
+            
+            log_edge_lengths_to_add.push_back(log(nd->getEdgeLength()));
+            if (nd->_left_child) {
+                for (Node* child = nd->_left_child; child; child=child->_left_child) {
+                    log_edge_lengths_to_add.push_back(log(child->getEdgeLength()));
+                }
+            }
+            
+            double log_max_weight = *max_element(log_edge_lengths_to_add.begin(), log_edge_lengths_to_add.end());
+            for (auto & i:log_edge_lengths_to_add) {
+                running_sum += exp(i - log_max_weight);
+            }
+            log_sum_height = log(running_sum) + log_max_weight;
+    //            return log_sum_height;
+            
+            double sum_height = 0.0;
+
+            sum_height += (nd->getEdgeLength());
+            if (nd->_left_child) {
+                for (Node* child = nd->_left_child; child; child=child->_left_child) {
+                    sum_height += (child->getEdgeLength());
+                }
+            }
+    //            cout << "sum height is " << sum_height << endl;
+    //            cout << "e^log sum height is: " << exp(log_sum_height) << endl;
+    //        cout << "log sum height of node " << nd->_parent->_name << " is: "<< (log_sum_height) << endl;
+    //            return log(log_sum_height);
+            return log_sum_height;
+        }
+        
+        else {
+            return 1.0;
+        }
     }
 
     inline double Forest::getLineageHeight(Node* nd) {
@@ -3662,9 +3712,13 @@ class Forest {
         // remove parent from new last node
         _nodes.front()._parent = NULL;
         
+//        _nodes.sort(
+//             [this](Node& lhs, Node& rhs) {
+//                 return getLineageHeightLogScale(lhs._left_child) < getLineageHeightLogScale(rhs._left_child); } );
+//
         _nodes.sort(
              [this](Node& lhs, Node& rhs) {
-                 return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } ); // TODO: this isn't working?
+                 return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
         _lineages.clear();
         
         _lineages.push_back(&_nodes.back());

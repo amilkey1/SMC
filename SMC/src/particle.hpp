@@ -495,6 +495,7 @@ inline vector<double> Particle::getVectorPrior() {
             
             if (total_rate > 0.0) {
                 double gene_increment = -log(1.0 - _lot->uniform())/total_rate;
+//                cout << "\tincrement is : " << gene_increment << endl;
                 
                 if (gene_increment > speciation_time && speciation_time != -1) {
                     _deep_coal = true;
@@ -658,6 +659,12 @@ inline vector<double> Particle::getVectorPrior() {
                 
 //                assert (_forests[1]._theta_prior_mean > 0.0);
 //                assert (_forests[1]._theta_proposal_mean > 0.0);
+                if (_forests[1]._theta_mean == 0.0) {
+                    assert (_forests[1]._theta > 0.0);
+                    for (int i=1; i<_forests.size(); i++) {
+                        _forests[i]._theta_mean = _forests[1]._theta;
+                    }
+                }
                 assert (_forests[1]._theta_mean > 0.0);
                 
 //                assert (_forests[1]._theta_mean == _forests[10]._theta_mean);
@@ -681,6 +688,8 @@ inline vector<double> Particle::getVectorPrior() {
             
             
             _prev_forest_number = forest_number;
+            
+//            cout << "joining taxa in gene: " << forest_number << endl;
             
             }
         _generation++;

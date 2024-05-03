@@ -3,13 +3,13 @@ from scipy.stats import randint,uniform,lognorm,describe
 from math import log,exp,sqrt,pow
 
 # Settings you can change
-method           = 'uniform' # should be either 'uniform' or 'lognorm'
+method           = 'grid' # should be either 'uniform' or 'lognorm' or 'grid'
 ntax           = [2,2,2,2,2] # number of taxa in each species
 
-# These used only if method == 'uniform' 
-T_low            = 0.1       # smallest tree height (T) value 
+# These used only if method == 'uniform' or 'grid'
+T_low            = 0.0       # smallest tree height (T) value 
 T_high           = 1.0       # largest tree height (T) value
-half_theta_low   = 0.005       # smallest theta/2 value
+half_theta_low   = 0.0       # smallest theta/2 value
 half_theta_high  = 0.5       # largest theta/2 value
 
 # These used only if method == 'lornorm' 
@@ -20,7 +20,7 @@ Rsd              = 0.2       # standard deviation of theta/T ratios
 
 nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100       # number of sites in each gene
-nreps          = 2          # number of simulation replicates
+nreps          = 3          # number of simulation replicates
 nparticles     = 6250       # number of particles to use for SMC
 simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
@@ -90,8 +90,16 @@ elif method == 'uniform':
     phi = sum([1./k for k in range(2, nspp + 1)])
     lambdas = [phi/t for t in Tvect]
     lambdad = describe(lambdas, 0, 1)
+elif method == 'grid':
+    thetas = [half_theta_low + (x+1)*(half_theta_high-half_theta_low)/nreps for x in range(nreps)]
+    thetad = describe(thetas, 0, 1)
+    Tvect = thetas
+    nspp = len(ntax)
+    
+    lambdas = [T_low + (x+1)*(T_high-T_low)/nreps for x in range(nreps)]
+    lambdad = describe(lambdas, 0, 1)
 else:
-    assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
+    assert False, 'method should be either "lognorm" or "uniform" or "grid" but you specified "%s"' % method
 
 def inventName(k, lower_case):
     # If   0 <= k < 26, returns A, B, ..., Z,
@@ -531,6 +539,21 @@ def createREADME():
         readme += '  min  = %.5f\n' % (min(lambdas),)
         readme += '  max  = %.5f\n' % (max(lambdas),)
         readme += '\n'
+    elif method == 'grid':
+        readme += 'theta:\n'
+        readme += '  nobs = %d\n' % thetad.nobs
+        readme += '  mean = %.5f\n' % thetad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(thetad.variance),)
+        readme += '  min  = %.5f\n' % (min(thetas),)
+        readme += '  max  = %.5f\n' % (max(thetas),)
+        readme += '\n'
+        readme += 'lambda:\n'
+        readme += '  nobs = %d\n' % lambdad.nobs
+        readme += '  mean = %.5f\n' % lambdad.mean
+        readme += '  s.d. = %.5f\n' % (sqrt(lambdad.variance),)
+        readme += '  min  = %.5f\n' % (min(lambdas),)
+        readme += '  max  = %.5f\n' % (max(lambdas),)
+        readme += '\n'
     else:
         assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
 
@@ -667,6 +690,14 @@ def createRplot():
 
         plotstuff += 'plot(theta, lambda, type="p", pch=19, main="Simulation conditions", xlab="theta", ylab="lambda")\n'
     elif method == 'uniform':
+        Tstr = ['%g' % t for t in Tvect]
+        plotstuff += 'T = c(%s)\n' % ','.join(Tstr)
+
+        thetastr = ['%g' % q for q in thetas]
+        plotstuff += 'theta = c(%s)\n' % ','.join(thetastr)
+
+        plotstuff += 'plot(theta/2, T, type="p", pch=19, main="Simulation conditions", xlab="theta/2", ylab="T")\n'
+    elif method == 'grid':
         Tstr = ['%g' % t for t in Tvect]
         plotstuff += 'T = c(%s)\n' % ','.join(Tstr)
 

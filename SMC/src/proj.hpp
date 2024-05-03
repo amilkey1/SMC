@@ -1004,7 +1004,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         
         unsigned count = 0;
         for (auto &p:my_vec) {
-            // TODO: process gene newicks
             vector<string> particle_newicks;
             for (int i = 0; i<newicks.size(); i++) {
                 particle_newicks.push_back(newicks[i][count]);
