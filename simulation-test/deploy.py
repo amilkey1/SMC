@@ -1,6 +1,7 @@
 import sys, os, re, subprocess as sub, shutil, numpy as np
 from scipy.stats import randint,uniform,lognorm,describe
 from math import log,exp,sqrt,pow
+import math
 
 # Settings you can change
 method           = 'grid' # should be either 'uniform' or 'lognorm' or 'grid'
@@ -20,7 +21,7 @@ Rsd              = 0.2       # standard deviation of theta/T ratios
 
 nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100       # number of sites in each gene
-nreps          = 3          # number of simulation replicates
+nreps          = 9          # number of simulation replicates
 nparticles     = 6250       # number of particles to use for SMC
 simprogname    = 'smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
@@ -92,13 +93,33 @@ elif method == 'uniform':
     lambdas = [phi/t for t in Tvect]
     lambdad = describe(lambdas, 0, 1)
 elif method == 'grid':
-    thetas = [half_theta_low + (x+1)*(half_theta_high-half_theta_low)/nreps for x in range(nreps)]
-    thetad = describe(thetas, 0, 1)
-    Tvect = thetas
-    nspp = len(ntax)
+    nreps_to_use = math.isqrt(nreps)
+    if (nreps_to_use.is_integer() == False):
+        assert False, 'if choosing grid method, nreps must be a square of an int'
+    thetas_placeholder = [half_theta_low + (x+1)*(half_theta_high-half_theta_low)/nreps_to_use for x in range(nreps_to_use)]
+    lambdas_placeholder = [T_low + (x+1)*(T_high-T_low)/nreps_to_use for x in range(nreps_to_use)]
     
-    lambdas = [T_low + (x+1)*(T_high-T_low)/nreps for x in range(nreps)]
+    thetas = []
+    Tvect = []
+    
+    # create grid
+    for i in range(len(thetas_placeholder)):
+        for x in range(len(thetas_placeholder)):
+            thetas.append(thetas_placeholder[i])
+
+    count = 0
+    while (count < nreps_to_use):
+        for i in range(len(lambdas_placeholder)):
+            Tvect.append(lambdas_placeholder[i])
+        count += 1
+    
+    thetad = describe(thetas, 0, 1)
+    Td = describe(Tvect, 0, 1)
+    nspp = len(ntax)
+    phi = sum([1./k for k in range(2, nspp + 1)])
+    lambdas = [phi/t for t in Tvect]
     lambdad = describe(lambdas, 0, 1)
+
 else:
     assert False, 'method should be either "lognorm" or "uniform" or "grid" but you specified "%s"' % method
 
