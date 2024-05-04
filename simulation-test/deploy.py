@@ -871,7 +871,7 @@ def createReplacePy():
 	s += "		os.rename(fout.name, fname)\n"
 	s += "		i += 1\n"
 	s += "\n"
-	s += "for i in range(           3):\n"
+	s += "for i in range(%12d):\n" % nreps
 	s += "	fname = 'rep' + str(i+1) + '/beast/starbeast.xml'\n"
 	s += "	with open(fname) as fin, NamedTemporaryFile(dir='.', delete=False) as fout:\n"
 	s += "		for line in fin:\n"
