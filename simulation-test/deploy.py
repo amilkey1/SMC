@@ -852,29 +852,26 @@ def createRplot():
     plotf.write(plotstuff)
     plotf.close()
 
-def createReplaceBash():
-    replacefn = os.path.join(dirname, 'rreplace.sh')
-    replacebash = '#!/bin/bash\n'
-
-    for rep in range(nreps):
-        repdirpath = createRepDirName(rep)
-        replacebash += '\n'
-        replacebash += 'cd %s\n' % os.path.join(repdirpath, 'smc')
-        replacebash += "sed '17s/.*/replacement-line/' proj.conf > proj2.conf\n"
-        #replacebash += "sed '17s/.*/replacement-line/' rep"
-        #replacebash += str(rep+1)
-        #replacebash += '/smc/proj.conf > rep'
-        #replacebash += str(rep+1)
-        #replacebash += "/smc/proj2.conf\n"
-        #replacebash += "sed '17s/.*/replacement-line/' rep1/smc/proj.conf > rep1/smc/proj2.conf\n"
-        replacebash += 'rm proj.conf\n'
-        replacebash += 'mv proj2.conf proj.conf\n'
-        replacebash += "cd ../.."
-        
-
-    replacef = open(replacefn, 'w')
-    replacef.write(replacebash)
-    replacef.close()
+def createReplacePy():
+	replacefn = os.path.join(dirname, 'rreplace.py')
+	s = "import os\n"
+	s += "from tempfile import NamedTemporaryFile\n"
+	s += "svdq_lamdas = []\n"
+	s += "lines = open('svdq_lambdas.txt', 'r').readlines()\n"
+	s += "for line in lines:\n"
+	s += "	svdq_lamdas.append(line)\n"
+	s += "for i in range(%12d):\n" % nreps
+	s += "	fname = 'rep' + str(i+1) + '/smc/proj.conf'\n"
+	s += "	with open(fname) as fin, NamedTemporaryFile(dir='.', delete=False) as fout:\n"
+	s += "		for line in fin:\n"
+	s += "			if line.startswith('lambda ='):\n"
+	s += "				line = 'lambda = ' + str(svdq_lamdas[i])\n"
+	s += "			fout.write(line.encode('utf8'))\n"
+	s += "		os.rename(fout.name, fname)\n"
+	s += "		i += 1\n"
+	replacef = open(replacefn, 'w')
+	replacef.write(s)
+	replacef.close()
 
 
 def createSimBash():
@@ -1366,7 +1363,7 @@ if __name__ == '__main__':
     createCrunch()
     writeDeepCoalFile()
     createGetSVDQHeight()
-    createReplaceBash()
+    createReplacePy()
     #createPAUP('smc', smctreefname, 1)
     #createPAUP('beast', beasttreefname, 2)
     createTreeDist('smc', smctreefname, 1)
