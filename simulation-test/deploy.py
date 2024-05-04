@@ -369,7 +369,7 @@ def createBeastXML(rep_index):
     s += '        <init id="SBI" spec="starbeast3.core.StarBeastStartState" estimate="false" popMean="@popMean" speciesTree="@Tree.t:Species">\n'
     for gene in range(1,nloci+1):
         s += '            <gene idref="Tree.t:gene%d"/>\n' % gene
-    s += '            <parameter id="speciationRate.t:Species" spec="parameter.RealParameter" estimate="false" lower="0.0" name="birthRate">1.0</parameter>\n'
+    s += '                        <parameter id="speciationRate.t:Species" spec="parameter.RealParameter" estimate="false" lower="SVDQLAMBDA" name="birthRate" upper="SVDQLAMBDA">SVDQLAMBDA</parameter>\n'
     s += '            <speciesTreePrior id="SpeciesTreePopSize.Species" spec="starbeast3.evolution.speciation.SpeciesTreePrior" bottomPopSize="@popSize" gammaParameter="@popMean" taxonset="@taxonsuperset" tree="@Tree.t:Species">\n'
     s += '                <populationModel id="speciesTreePopulationModel" spec="starbeast3.evolution.speciation.ConstantPopulations" populationSizes="@popSize" speciesTree="@Tree.t:Species"/>\n'
     s += '                <treePrior id="YuleModel.t:Species" spec="beast.base.evolution.speciation.YuleModel" birthDiffRate="@speciationRate.t:Species" tree="@Tree.t:Species"/>\n'
@@ -660,7 +660,7 @@ def createREADME():
     readme += '\n'
     readme += 'python3 copydata.py\n'
     readme += '\n'
-    readme += '3. Get SVD Quartets heights of each simulation and replace the true lambda in the smc conf file:\n'
+    readme += '3. Get SVD Quartets heights of each simulation and replace the true lambda in the smc conf file and beast xml file:\n'
     readme += '\n'
     readme += 'python3 get-svdq-lamdas.py\n'
     readme += 'python3 rreplace.py\n'
@@ -867,6 +867,22 @@ def createReplacePy():
 	s += "		for line in fin:\n"
 	s += "			if line.startswith('lambda ='):\n"
 	s += "				line = 'lambda = ' + str(svdq_lamdas[i])\n"
+	s += "			fout.write(line.encode('utf8'))\n"
+	s += "		os.rename(fout.name, fname)\n"
+	s += "		i += 1\n"
+	s += "\n"
+	s += "for i in range(           3):\n"
+	s += "	fname = 'rep' + str(i+1) + '/beast/starbeast.xml'\n"
+	s += "	with open(fname) as fin, NamedTemporaryFile(dir='.', delete=False) as fout:\n"
+	s += "		for line in fin:\n"
+	s += "			if 'SVDQLAMBDA' in line: #if line contains placeholder\n"
+	s += "				to_replace = str(svdq_lamdas[i])\n"
+	s += "				to_replace = to_replace.strip()\n"
+	s += '				line = "			'
+	s += "<parameter id='speciationRate.t:Species' spec='parameter.RealParameter' estimate='false' lower='%s' name='birthRate' upper='%s'>%s</parameter>\\n	"
+	s += '"'
+	s += ' % (to_replace, to_replace, to_replace)\n'
+#	s += "				line = '<parameter id='speciationRate.t:Species' spec='parameter.RealParameter' estimate='false' lower='%s' name='birthRate' upper='%s'>'%s'</parameter>\\n' % (to_replace, to_replace, to_replace)\n"
 	s += "			fout.write(line.encode('utf8'))\n"
 	s += "		os.rename(fout.name, fname)\n"
 	s += "		i += 1\n"
