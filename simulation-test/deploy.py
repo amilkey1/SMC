@@ -94,9 +94,11 @@ elif method == 'uniform':
     lambdad = describe(lambdas, 0, 1)
 elif method == 'grid':
     nreps_to_use = math.isqrt(nreps)
-    if (nreps_to_use.is_integer() == False):
-        assert False, 'if choosing grid method, nreps must be a square of an int'
+#    if (nreps_to_use.is_integer() == False):
+#        assert False, 'if choosing grid method, nreps must be a square of an int'
     thetas_placeholder = [half_theta_low + (x+1)*(half_theta_high-half_theta_low)/nreps_to_use for x in range(nreps_to_use)]
+    thetas_placeholder = [i * 2.0 for i in thetas_placeholder]
+    print(thetas_placeholder)
     lambdas_placeholder = [T_low + (x+1)*(T_high-T_low)/nreps_to_use for x in range(nreps_to_use)]
     
     thetas = []
