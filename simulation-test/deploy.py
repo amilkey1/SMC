@@ -98,7 +98,6 @@ elif method == 'grid':
 #        assert False, 'if choosing grid method, nreps must be a square of an int'
     thetas_placeholder = [half_theta_low + (x+1)*(half_theta_high-half_theta_low)/nreps_to_use for x in range(nreps_to_use)]
     thetas_placeholder = [i * 2.0 for i in thetas_placeholder]
-    print(thetas_placeholder)
     lambdas_placeholder = [T_low + (x+1)*(T_high-T_low)/nreps_to_use for x in range(nreps_to_use)]
     
     thetas = []
@@ -1275,6 +1274,8 @@ def create3DRPlot():
 	s += "import pandas as pd\n"
 	s += "import math, random, sys, os\n"
 	s += "import scipy,numpy\n"
+	s += "import numpy as np\n"
+	s += "from scipy.interpolate import griddata\n"
 	s += "\n"
 	s += "file = open('kf-summary.txt','r')\n"
 	s += "lines = file.readlines()\n"
@@ -1306,6 +1307,7 @@ def create3DRPlot():
 	s += "\n"
 	s += "plot_type = 'scatterplot'\n"
 	s += "#plot_type = 'meshplot'\n"
+	s += "plot_type = 'surface'\n"
 	s += "\n"
 	s += "plot_saved_to_file = False\n"
 	s += "plotting_filename = '%s.png' % plot_type\n"
@@ -1366,6 +1368,18 @@ def create3DRPlot():
 	s += '		intensity=RFabsdiff,\n'
 	s += '		color="firebrick"\n'
 	s += '	)])\n'
+	s += 'elif plot_type == "surface":\n'
+	s += 'x = np.linspace(min(halfT), max(halfT), num=100)\n'
+	s += 'y = np.linspace(min(theta), max(theta), num=100)\n'
+	s += 'x_grid, y_grid = np.meshgrid(x,y)\n'
+	s += 'z_grid = griddata((halfT,theta),RFdiff,(x_grid,y_grid),method="cubic")\n'
+	s += '\n'
+	s += 'fig = go.Figure(data=[go.Surface(\n'
+	s += '	x=x_grid,\n'
+	s += '	y=y_grid,\n'
+	s += '	z = z_grid\n'
+	s += ')])\n'
+	s += '\n'
 	s += '# tight layout\n'
 	s += 'fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))\n'
 	s += 'if plot_saved_to_file:\n'
