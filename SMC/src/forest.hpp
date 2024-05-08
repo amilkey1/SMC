@@ -2481,13 +2481,14 @@ class Forest {
 //        _theta_mean = lot->gamma(1, 10); // mean = 10, equivalent to exponential(0.1)
 
         
-        double scale = 1 / _theta_mean;
+//        double scale = 1 / _theta_mean;
+        double scale = (2.01 - 1.0) / (_theta_mean);
         assert (scale > 0.0);
         for (auto &name:species_names) {
             double new_theta = 0.0;
             if (new_theta < _small_enough) {
-//                new_theta = 1 / (lot->gamma(2.00001, scale));
-                new_theta = 1 / (lot->gamma(2.0, scale));
+                new_theta = 1 / (lot->gamma(2.01, scale)); // TODO: adjust scale so mean stays the same
+//                new_theta = 1 / (lot->gamma(2.0, scale));
                 assert (new_theta > 0.0);
                 _theta_map[name] = new_theta;
             }
