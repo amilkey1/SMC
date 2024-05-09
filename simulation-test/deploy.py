@@ -1266,6 +1266,76 @@ def writeTimeFile():
 	timef.write(s)
 	timef.close()
 
+def creatergl3DPLOT():
+	plotfn = os.path.join(dirname, 'rgl.R')
+	s = "library(rgl)\n"
+	if method == 'lognorm':
+		Tstr = ['%g' % t for t in Tvect]
+		s += 'T = c(%s)\n' % ','.join(Tstr)
+
+		Rstr = ['%g' % r for r in Rvect]
+		s += 'R = c(%s)\n' % ','.join(Rstr)
+
+		thetastr = ['%g' % q for q in thetas]
+		s += 'theta = c(%s)\n' % ','.join(thetastr)
+
+		lambdastr = ['%g' % l for l in lambdas]
+		s += 'lambda = c(%s)\n' % ','.join(lambdastr)
+
+		s += 'plot(theta, lambda, type="p", pch=19, main="Simulation conditions", xlab="theta", ylab="lambda")\n'
+	elif method == 'uniform':
+		Tstr = ['%g' % t for t in Tvect]
+		s += 'T = c(%s)\n' % ','.join(Tstr)
+
+		thetastr = ['%g' % q for q in thetas]
+		s += 'theta = c(%s)\n' % ','.join(thetastr)
+
+		s += 'plot(theta/2, T, type="p", pch=19, main="Simulation conditions", xlab="theta/2", ylab="T")\n'
+	elif method == 'grid':
+		Tstr = ['%g' % t for t in Tvect]
+		s += 'T = c(%s)\n' % ','.join(Tstr)
+
+		thetastr = ['%g' % q for q in thetas]
+		s += 'theta = c(%s)\n' % ','.join(thetastr)
+
+		s += 'plot(theta/2, T, type="p", pch=19, main="Simulation conditions", xlab="theta/2", ylab="T")\n'
+	else:
+		assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
+	s += '\n'
+	s += 'rf <- read.table(file="rf-summary.txt")\n'
+	s += 'RF_smc <- rf$V3\n'
+	s += 'RF_beast <- rf$V6\n'
+	s += '\n'
+	s += 'kf <- read.table(file="kf-summary.txt")\n'
+	s += 'KF_smc <- kf$V3\n'
+	s += 'KF_beast <- kf$V6\n'
+	s += '\n'
+	s += 'theta_over_two <- theta/2\n'
+	s += '\n'
+	s += '#plot smc\n'
+	s += 'open3d()\n'
+	s += 'plot3d(x=theta_over_two, y=T, z=RF_smc, type="h", col="navy", size=1, lwd=1, xlab="theta/2", ylab="T", zlab="RF", box=FALSE, zlim = c(0,8))\n'
+	s += 'spheres3d(x=theta_over_two, y=T, z=RF_smc, radius=.05, col="navy")\n'
+	s += 'grd <- expand.grid(x=c(0, max(theta_over_two)), y=c(0,max(T)), z=0)\n'
+	s += '\n'
+	s += '# prediction surface\n'
+	s += 'material3d(color = "red")\n'
+	s += 'persp3d(x=unique(grd[[1]]), y=unique(grd[[2]]), z=matrix(grd[[3]],2,2), add=TRUE)\n'
+	s += '\n'
+	s += '# plot beast\n'
+	s += 'open3d()\n'
+	s += 'plot3d(x=theta_over_two, y=T, z=RF_beast, type="h", col="navy", size=1, lwd=1, xlab="theta/2", ylab="T", zlab="RF", box=FALSE, zlim = c(0,8))\n'
+	s += 'spheres3d(x=theta_over_two, y=T, z=RF_beast, radius=.05, col="navy")\n'
+	s += 'grd <- expand.grid(x=c(0, max(theta_over_two)), y=c(0,max(T)), z=0)\n'
+	s += '\n'
+	s += '# prediction surface\n'
+	s += 'material3d(color = "red")\n'
+	s += 'persp3d(x=unique(grd[[1]]), y=unique(grd[[2]]), z=matrix(grd[[3]],2,2), add=TRUE)\n'
+	plotf = open(plotfn, 'w')
+	plotf.write(s)
+	plotf.close()
+
+
 def create3DRPlot():
 	plotfn = os.path.join(dirname, 'plotdistances.py')
 	s = "import plotly.express as px\n"
@@ -1388,9 +1458,6 @@ def create3DRPlot():
 	s += '	fig.show(renderer="browser") # this opens your browser to show you the plot now\n'
 	s += '# Named colors\n'
 	s += '# aliceblue, antiquewhite, aqua, aquamarine, azure, beige, bisque, black, blanchedalmond, blue, blueviolet, brown, burlywood, cadetblue, chartreuse, chocolate, coral, cornflowerblue, cornsilk, crimson, cyan, darkblue, darkcyan, darkgoldenrod, darkgray, darkgrey, darkgreen, darkkhaki, darkmagenta, darkolivegreen, darkorange, darkorchid, darkred, darksalmon, darkseagreen, darkslateblue, darkslategray, darkslategrey, darkturquoise, darkviolet, deeppink, deepskyblue, dimgray, dimgrey, dodgerblue, firebrick, floralwhite, forestgreen, fuchsia, gainsboro, ghostwhite, gold, goldenrod, gray, grey, green, greenyellow, honeydew, hotpink, indianred, indigo, ivory, khaki, lavender, lavenderblush, lawngreen, lemonchiffon, lightblue, lightcoral, lightcyan, lightgoldenrodyellow, lightgray, lightgrey, lightgreen, lightpink, lightsalmon, lightseagreen, lightskyblue, lightslategray, lightslategrey, lightsteelblue, lightyellow, lime, limegreen, linen, magenta, maroon, mediumaquamarine, mediumblue, mediumorchid, mediumpurple, mediumseagreen, mediumslateblue, mediumspringgreen, mediumturquoise, mediumvioletred, midnightblue, mintcream, mistyrose, moccasin, navajowhite, navy, oldlace, olive, olivedrab, orange, orangered, orchid, palegoldenrod, palegreen, paleturquoise, palevioletred, papayawhip, peachpuff, peru, pink, plum, powderblue, purple, red, rosybrown, royalblue, rebeccapurple, saddlebrown, salmon, sandybrown, seagreen, seashell, sienna, silver, skyblue, slateblue, slategray, slategrey, snow, springgreen, steelblue, tan, teal, thistle, tomato, turquoise, violet, wheat, white, whitesmoke, yellow, yellowgreen\n'
-
-
-
 	plotf = open(plotfn, 'w')
 	plotf.write(s)
 	plotf.close()
@@ -1426,3 +1493,4 @@ if __name__ == '__main__':
     writeTimeFile()
     writeThetaFile()
     create3DRPlot()
+    creatergl3DPLOT()
