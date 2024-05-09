@@ -722,10 +722,14 @@ def createREADME():
     readme += 'Plotting results on local computer\n'
     readme += '-----------------------------------------\n'
     readme += 'Transfer the following files to local computer: \n'
-    readme += '		rf-summary.txt\n'
-    readme += '		kf-summary.txt\n'
-    readme += '		simcond.R\n'
-    readme += '		deep_coal.txt\n'
+    readme += '	rf-summary.txt\n'
+    readme += '	kf-summary.txt\n'
+    readme += '	simcond.R\n'
+    readme += '	deep_coal.txt\n'
+    readme += 'Run the following scripts to create plots:\n'
+    readme += '	Rscript simcond.R\n'
+    readme += '	Rscript rgl.R\n'
+    readme += '	python3 plotdistances.py\n'
     readme += '\n'
     
     readmef = open(readmefn, 'w')
