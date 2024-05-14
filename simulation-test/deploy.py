@@ -35,7 +35,8 @@ nodechoice     = 0          # 0-offset index into nodechoices
 #partition      = 'general'   # specifies partition to use for HPC: either 'general' or 'priority'
 #constraint     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
-rnseed         = 1235      # overall pseudorandom number seed
+rnseed         = 12357      # overall pseudorandom number seed for everything except setting sim conf file
+rnsimseed      = 123       # overall pseudorandom number seed for setting sim conf file
 mcmciter       = 50000000      # chain length for Beast MCMC
 saveevery      = 1000         # MCMC storeevery modulus
 preburnin      = 0        # MCMC burn in
@@ -46,6 +47,12 @@ spptreeevery   = 1000          # species tree save modulus (mcmciter/spptreeever
 
 # Settings you can change but probably shouldn't
 maxsimult   = None        # maximum number of jobs to run simultaneously (set to None if there is no maximum)
+
+# Values obtained from settings
+np.random.seed(seed=rnsimseed)
+
+# Set up random variable for choosing seeds for each simulation
+rnsimseeds = randint.rvs(1, 1000000, size=nreps)
 
 # Values obtained from settings
 np.random.seed(seed=rnseed)
@@ -267,7 +274,7 @@ def createSimConf(rep_index):
     s  = ''
     s += 'filename  = sim.nex\n'
     s += 'startmode = sim\n'
-    s += 'seed    = %d\n' % rnseeds[rep_index]
+    s += 'seed    = %d\n' % rnsimseeds[rep_index]
     s += '\n'
     cum = 0
     for g in range(nloci):
