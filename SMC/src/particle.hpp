@@ -415,7 +415,9 @@ inline vector<double> Particle::getVectorPrior() {
         return log_likelihood;
     }
 
-    inline void Particle::proposal() {        
+    inline void Particle::proposal() {
+        double inv_gamma_modifier = 0.0;
+        
         _species_join_proposed = false;
         bool done = false;
                 
@@ -645,6 +647,21 @@ inline vector<double> Particle::getVectorPrior() {
                 assert (forest_number == 0);
                 
                 speciesProposal();
+                
+#if defined (INV_GAMMA_PRIOR_TWO)
+                double theta_mean = _forests[1]._theta_mean;
+                double eps = 0.01;
+                double a = 2.0;
+                
+                inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
+                
+                // new theta drawn for the new population
+                string new_spp = _forests[0]._lineages.back()->_name;
+                double y = _forests[1]._theta_map[new_spp];
+                
+                inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
+#endif
+                
                 _species_join_proposed = true;
                 assert (increment > 0.0);
             }
@@ -657,8 +674,6 @@ inline vector<double> Particle::getVectorPrior() {
 
                 _log_weight = log_speciation_term + log_likelihood_term;
                 
-//                assert (_forests[1]._theta_prior_mean > 0.0);
-//                assert (_forests[1]._theta_proposal_mean > 0.0);
                 if (_forests[1]._theta_mean == 0.0) {
                     assert (_forests[1]._theta > 0.0);
                     for (int i=1; i<_forests.size(); i++) {
@@ -667,8 +682,6 @@ inline vector<double> Particle::getVectorPrior() {
                 }
                 assert (_forests[1]._theta_mean > 0.0);
                 
-//                assert (_forests[1]._theta_mean == _forests[10]._theta_mean);
-                
                 // modifier only happens on first round
                 if (_generation == 0 && _forests[1]._theta_prior_mean > 0.0 && _forests[1]._theta_proposal_mean > 0.0) {
                     double prior_rate = 1.0/_forests[1]._theta_prior_mean;
@@ -676,30 +689,40 @@ inline vector<double> Particle::getVectorPrior() {
                     double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
                     
                     _log_weight += log_weight_modifier;
-                    
+                }
+                
 #if defined (INV_GAMMA_PRIOR_TWO)
-                    double inv_gamma_modifier = 0.0;
+                if (_generation == 0) {
+                    inv_gamma_modifier = 0.0;
                     double theta_mean = _forests[1]._theta_mean;
-                    double y = theta_mean; // TODO: ?
                     double eps = 0.01;
                     double a = 2.0;
-//                    double test = eps * (log(y) - log(theta_mean));
-//                    double test2 = theta_mean * eps / y + a * log(a - 1.0);
-                    inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + eps * (log(y) - log(theta_mean)) + theta_mean * eps / y + a * log(a - 1.0) - (a + eps) * log(a + eps - 1.0);
-                    _log_weight += inv_gamma_modifier;
-#endif
+                    
+                    inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
+                    
+                    // for first step, new theta drawn for each tip population
+                    for (int i=0; i<Forest::_nspecies; i++) {
+                        auto it = _forests[1]._theta_map.begin();
+                        std::advance(it, i);
+                        double y = it->second;
+                        
+                        inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
+                        
+                    }
                 }
+#endif
        
                 
                 done = true;
             }
-                  
+            
             if (Forest::_run_on_empty) {
                 _log_weight = 0.0;
             }
             
             
             _prev_forest_number = forest_number;
+            _log_weight += inv_gamma_modifier;
             
 //            cout << "joining taxa in gene: " << forest_number << endl;
             
