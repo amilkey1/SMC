@@ -676,6 +676,18 @@ inline vector<double> Particle::getVectorPrior() {
                     double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
                     
                     _log_weight += log_weight_modifier;
+                    
+#if defined (INV_GAMMA_PRIOR_TWO)
+                    double inv_gamma_modifier = 0.0;
+                    double theta_mean = _forests[1]._theta_mean;
+                    double y = theta_mean; // TODO: ?
+                    double eps = 0.01;
+                    double a = 2.0;
+//                    double test = eps * (log(y) - log(theta_mean));
+//                    double test2 = theta_mean * eps / y + a * log(a - 1.0);
+                    inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + eps * (log(y) - log(theta_mean)) + theta_mean * eps / y + a * log(a - 1.0) - (a + eps) * log(a + eps - 1.0);
+                    _log_weight += inv_gamma_modifier;
+#endif
                 }
        
                 

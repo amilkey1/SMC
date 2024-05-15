@@ -21,23 +21,24 @@ Rsd              = 0.2       # standard deviation of theta/T ratios
 
 nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100       # number of sites in each gene
-nreps          = 9          # number of simulation replicates
-nparticles     = 6250       # number of particles to use for SMC
+nreps          = 4          # number of simulation replicates
+nparticles     = 100       # number of particles to use for SMC
 simprogname    = 'smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 paupprogname = 'paup4a168_osx'    #name of PAUP*
 smctreefname   = 'species_trees.trees' # name of species tree file for SMC
 beasttreefname = 'species.trees'           # name of species tree file for BEAST
+svdqtreefname = 'svd.tre'           # name of species tree file for BEAST
 username       = 'aam21005'  # name of user on UConn HPC cluster
 nodechoices    = [('general', 'epyc128'), ('priority','skylake')]
 nodechoice     = 0          # 0-offset index into nodechoices
 #partition      = 'general'   # specifies partition to use for HPC: either 'general' or 'priority'
 #constraint     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
-rnseed         = 12357      # overall pseudorandom number seed for everything except setting sim conf file
+rnseed         = 123579      # overall pseudorandom number seed for everything except setting sim conf file
 rnsimseed      = 123       # overall pseudorandom number seed for setting sim conf file
-mcmciter       = 50000000      # chain length for Beast MCMC
+mcmciter       = 5000      # chain length for Beast MCMC
 saveevery      = 1000         # MCMC storeevery modulus
 preburnin      = 0        # MCMC burn in
 storeevery     = 1000        # state storeevery modulus
@@ -327,9 +328,9 @@ def createSMCConf(rep_index):
     s += '\n'
     s += 'verbose = 1\n'
     s += 'run_on_empty = false\n'
-    s += 'particle_increase = 200\n'
-    s += 'thin=1.0\n'
-    s += 'save_every = 25\n'
+    s += 'particle_increase = 5\n'
+    s += 'thin=0.01\n'
+    s += 'save_every = 1\n'
     s += 'save_gene_trees = false\n'
 
     smcconff = open(smcconffn, 'w')
@@ -422,7 +423,7 @@ def createBeastXML(rep_index):
     s += '                <distribution idref="YuleModel.t:Species"/>\n'
     s += '                <prior id="popMean.prior" name="distribution" x="@popMean">\n'
     s += '                    <Exponential id="Exponential.11" name="distr">\n'
-    s += '                        <parameter id="RealParameter.0" spec="parameter.RealParameter" estimate="false" name="mean">1.0</parameter>\n'
+    s += '                        <parameter id="RealParameter.0" spec="parameter.RealParameter" estimate="false" name="mean">4.0</parameter>\n'
     s += '                    </Exponential>\n'
     s += '                </prior>\n'
     s += '            </distribution>\n'
@@ -1142,10 +1143,24 @@ def createCrunch():
     s  += '    print("kf: %12d %12d %12.5f %12.5f %12d %12.5f %12.5f" % (rep+1, dsmc_kf.count[rep], dsmc_kf.mean[rep], dsmc_kf.stdev[rep], dbeast_kf.count[rep], dbeast_kf.mean[rep], dbeast_kf.stdev[rep]))\n'
     s +=  '    kf.write("%12d %12d %12.5f %12.5f %12d %12.5f %12.5f \\n" % (rep+1, dsmc_kf.count[rep], dsmc_kf.mean[rep], dsmc_kf.stdev[rep], dbeast_kf.count[rep], dbeast_kf.mean[rep], dbeast_kf.stdev[rep]))\n'
     s +=  '    kf.close\n'
+
     s  += 'for rep in range(%d):\n' % nreps
     s  += '    print("rf: %12d %12d %12.5f %12.5f %12d %12.5f %12.5f" % (rep+1, dsmc_rf.count[rep], dsmc_rf.mean[rep], dsmc_rf.stdev[rep], dbeast_rf.count[rep], dbeast_rf.mean[rep], dbeast_rf.stdev[rep]))\n'
     s  += '    rf.write("%12d %12d %12.5f %12.5f %12d %12.5f %12.5f \\n" % (rep+1, dsmc_rf.count[rep], dsmc_rf.mean[rep], dsmc_rf.stdev[rep], dbeast_rf.count[rep], dbeast_rf.mean[rep], dbeast_rf.stdev[rep]))\n'
     s  += '    rf.close\n'
+
+#    s  += 'dsvdq_kf = getKFDistances("svdqdists")\n'
+#    s  += 'dsvdq_rf = getRFDistances("svdqdists")\n'
+#    s  += 'print("%12s %38s %38s %38s" % ("replicate", "----------------- SMC ----------------", "---------------- BEAST ---------------", ---------------- SVDQ ---------------"))\n'
+#    s  += 'print("%12s %12s %12s %12s %12s %12s %12s %12s %12s %12s" % ("replicate", "count", "mean", "stdev", "count", "mean", "stdev", "count", "mean", "stdev"))\n'
+#    s  += 'for rep in range(%d):\n' % nreps
+#    s  += '    print("kf: %12d %12d %12.5f %12.5f %12d %12.5f %12.5f" % (rep+1, dsmc_kf.count[rep], dsmc_kf.mean[rep], dsmc_kf.stdev[rep], dbeast_kf.count[rep], dbeast_kf.mean[rep], dbeast_kf.stdev[rep]))\n'
+#    s +=  '    kf.write("%12d %12d %12.5f %12.5f %12d %12.5f %12.5f \\n" % (rep+1, dsmc_kf.count[rep], dsmc_kf.mean[rep], dsmc_kf.stdev[rep], dbeast_kf.count[rep], dbeast_kf.mean[rep], dbeast_kf.stdev[rep]))\n'
+#    s +=  '    kf.close\n'
+#    s  += 'for rep in range(%d):\n' % nreps
+#    s  += '    print("rf: %12d %12d %12.5f %12.5f %12d %12.5f %12.5f %12d %12.5f %12.5f" % (rep+1, dsmc_rf.count[rep], dsmc_rf.mean[rep], dsmc_rf.stdev[rep], dbeast_rf.count[rep], dbeast_rf.mean[rep], dbeast_rf.stdev[rep], dsvdq_rf.count[rep], dsvdq_rf.mean[rep], dsvdq_rf.stdev[rep]))\n'
+#    s  += '    rf.write("%12d %12d %12.5f %12.5f %12d %12.5f %12.5f %12d %12.5f %12.5f \\n" % (rep+1, dsmc_rf.count[rep], dsmc_rf.mean[rep], dsmc_rf.stdev[rep], dbeast_rf.count[rep], dbeast_rf.mean[rep], dbeast_rf.stdev[rep], , dsvdq_rf.count[rep], dsvdq_rf.mean[rep], dsvdq_rf.stdev[rep]))\n'
+#    s  += '    rf.close\n'
     s  += 'print(" ")\n'
 
     crunchf = open(crunchfn, 'w')
@@ -1177,12 +1192,22 @@ def createPAUP(pathname, fn, startat):
 
 def createTreeDist(pathname, fn, startat):
     # see https://blog.ronin.cloud/slurm-job-arrays/
-    tdfn = os.path.join(dirname, '%std.sh' % pathname)
+    if (pathname == 'svdq') : #svdq tree files are in a different location
+        tdfn = os.path.join(dirname, '%std.sh' % pathname)
 
-    s   = '#!/bin/bash\n'
-    for rep in range(nreps):
-        s  += '\n\n### rep%d ###\n' % (rep+1,)
-        s  += 'td --reffile rep%d/sim/true-species-tree.tre --treefile rep%d/%s/%s --skip %d --reftree 1 --outfile %sdists%d.txt\n' % (rep+1,rep+1, pathname, fn, startat, pathname, rep+1)
+        s   = '#!/bin/bash\n'
+        for rep in range(nreps):
+            s  += '\n\n### rep%d ###\n' % (rep+1,)
+            s  += 'td --reffile rep%d/sim/true-species-tree.tre --treefile rep%d/sim/%s --skip %d --reftree 1 --outfile %sdists%d.txt\n' % (rep+1,rep+1, fn, startat, pathname, rep+1)
+
+    
+    else :
+        tdfn = os.path.join(dirname, '%std.sh' % pathname)
+
+        s   = '#!/bin/bash\n'
+        for rep in range(nreps):
+            s  += '\n\n### rep%d ###\n' % (rep+1,)
+            s  += 'td --reffile rep%d/sim/true-species-tree.tre --treefile rep%d/%s/%s --skip %d --reftree 1 --outfile %sdists%d.txt\n' % (rep+1,rep+1, pathname, fn, startat, pathname, rep+1)
 
     tdf = open(tdfn, 'w')
     tdf.write(s)
@@ -1500,6 +1525,7 @@ if __name__ == '__main__':
     #createPAUP('beast', beasttreefname, 2)
     createTreeDist('smc', smctreefname, 1)
     createTreeDist('beast', beasttreefname, 2)
+    createTreeDist('svdq', svdqtreefname, 0)
     createANOVAPy()
     writeTimeFile()
     writeThetaFile()

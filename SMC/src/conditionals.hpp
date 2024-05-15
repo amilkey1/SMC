@@ -23,3 +23,5 @@
 #define PARALLELIZE_BY_GROUP
 
 //#define DEBUG_MODE
+
+#define INV_GAMMA_PRIOR_TWO
