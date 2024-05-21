@@ -1886,7 +1886,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
         vector<Particle::SharedPtr> sim_vec(1);
         sim_vec[0] = Particle::SharedPtr(new Particle);
-        // set particle randon number seed
+        // set particle random number seed
         unsigned psuffix = 1;
         sim_vec[0]->setSeed(rng.randint(1,9999) + psuffix);
         psuffix += 2;
