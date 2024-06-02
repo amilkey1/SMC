@@ -2098,9 +2098,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                     //run through each generation of particles
 
                     unsigned nsteps = (ntaxa-1)*nsubsets;
-
-                string speciesfname = "proposed_species_increments.txt";
-                ofstream speciesf(speciesfname);
                 
                     for (unsigned g=0; g<nsteps; g++){
                         if (_verbose > 0) {
@@ -2147,24 +2144,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             filter = false;
                         }
                         
-//                        string filename = "increments" + to_string(g) + ".txt";
-//                        ofstream incrf(filename);
-//                        incrf << "proposed_gene_increment" << endl;
-                        
-//                        for (auto &p:my_vec) {
-//                            cout << "gene proposing join is " << p->getGeneIncrement().first << endl;
-//                            if (p->getGeneIncrement().first == 2) {
-//                                incrf << p->getGeneIncrement().second << endl;
-//                                p->showParticle();
-//                            }
-//                        }
-                        
                         if (filter) {
-                            for (auto &p:my_vec) {
-                                if (p->speciesJoinProposed()) {
-                                    speciesf << p->getSpeciesIncrement() << endl;
-                                }
-                            }
                             
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                             //if use_first is true, my_vec = my_vec_2
@@ -2184,20 +2164,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                                     }
                                 }
                             }
-                            
-                            for (auto &p:my_vec) {
-//                                cout << "gene accepting join is " << p->getGeneIncrement().first << endl;
-                                if (p->getGeneIncrement().first == 1) {
-//                                    incrf << p->getGeneIncrement().second << endl;
-//                                    p->showParticle();
-                                }
-                            }
-                            
-                            for (auto &p:my_vec) {
-                                if (p->speciesJoinProposed()) {
-//                                    p->showSpeciesTree();
-                                }
-                            }
 
                             if (_verbose > 1) {
                                 cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
@@ -2207,11 +2173,6 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         }
                 } // g loop
 
-    //            saveAllHybridNodes(my_vec);
-
-//                saveSpeciesTrees(my_vec);
-
-//                writeLoradFile(nsubsets, nspecies, ntaxa, my_vec);
                 if (_save_gene_trees) {
                     for (int i=1; i<nsubsets+1; i++) {
                         saveGeneTree(i, my_vec);
