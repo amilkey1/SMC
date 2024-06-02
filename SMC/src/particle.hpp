@@ -60,6 +60,7 @@ class Particle {
         double                                  calcHeight();
         double                                  getLogWeight() const {return _log_weight;}
         double                                  getSpeciesIncrement () {return _forests[0]._last_edge_length;}
+        pair<unsigned, double>                  getGeneIncrement() {return _gene_increment;}
         double                                  getSpeciesLogWeight() const {return _log_species_weight;}
         void                                    setLogWeight(double w){_log_weight = w;}
         void                                    setLogSpeciesWeight(double w){_log_species_weight = w;}
@@ -153,7 +154,9 @@ class Particle {
         bool                                    _deep_coal;
         double                                  _species_tree_height;
         unsigned                                _psuffix;
+        unsigned                                _next_species_number;
         vector<pair<tuple<string, string, string>, double>> _t;
+        pair<unsigned, double>                                  _gene_increment;
 };
 
     inline Particle::Particle() {
@@ -206,6 +209,7 @@ class Particle {
         _t.clear();
         _psuffix = 0;
         _deep_coal = false;
+        _next_species_number = Forest::_nspecies;
     }
 
     inline void Particle::showSpeciesTree() {
@@ -500,7 +504,19 @@ inline vector<double> Particle::getVectorPrior() {
 //                cout << "\tincrement is : " << gene_increment << endl;
                 
                 if (gene_increment > speciation_time && speciation_time != -1) {
+//                    showParticle();
                     _deep_coal = true;
+                    if (_forests[0]._lineages.size() <= Forest::_nspecies) {
+                        string name = boost::str(boost::format("node-%d")%_next_species_number);
+                        _forests[1].updateThetaMap(_lot, name);
+                        if (_forests.size() > 2) {
+                            for (int i=2; i<_forests.size(); i++) {
+                                _forests[i]._theta_map = _forests[1]._theta_map;
+                            }
+                        }
+                    }
+                    _next_species_number++;
+                    // TODO: if going beyond the tip species, draw new theta for new species
                     // num deep coalescences += (n-1), where n is number of lineages in each affected species lineage for all genes
                     // need to know which species joined to calculate this
                 }
@@ -534,10 +550,22 @@ inline vector<double> Particle::getVectorPrior() {
                 }
             }
             else {
+                // TODO: if going beyond the tip species, draw new theta for new species
                 forest_number = 0;
                 increment = speciation_time;
                 assert (increment != -1.0);
                 no_speciation = false;
+                
+                if (_forests[0]._lineages.size() <= Forest::_nspecies) {
+                    string name = boost::str(boost::format("node-%d")%_next_species_number);
+                    _forests[1].updateThetaMap(_lot, name);
+                }
+                if (_forests.size() > 2) {
+                    for (int i=2; i<_forests.size(); i++) {
+                        _forests[i]._theta_map = _forests[1]._theta_map;
+                    }
+                }
+                _next_species_number++;
             }
             
 #else
@@ -583,6 +611,7 @@ inline vector<double> Particle::getVectorPrior() {
             
             if (event_choice_name.size() == 1 && event_choice_name[0] == "species") {
                 // choose the speciation event
+                showParticle();
                 increment = speciation_time;
                 assert (speciation_time == increments[0]);
             }
@@ -1105,6 +1134,7 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline void Particle::geneProposal(vector<unsigned> event_choice_index, unsigned forest_number, vector<string> event_choice_name, double increment, string species_name) {
         _forests[forest_number].allowCoalescence(species_name, increment, _lot);
+        _gene_increment = make_pair(forest_number, increment);
     }
 
     inline void Particle::setNewTheta() {
@@ -1386,7 +1416,7 @@ inline vector<double> Particle::getVectorPrior() {
         double cum_prob = 0.0;
         unsigned index = 0;
         for (int i=0; i < (int) weight_vec.size(); i++) {
-            cum_prob += exp(weight_vec[i]);
+            cum_prob += exp(weight_vec[i]); // TODO: can leave weights on linear scale
             if (u <= cum_prob) {
                 index = i;
                 break;
@@ -1481,6 +1511,8 @@ inline vector<double> Particle::getVectorPrior() {
         _species_tree_height = other._species_tree_height;
         _t = other._t;
         _psuffix = other._psuffix;
+        _gene_increment = other._gene_increment;
+        _next_species_number = other._next_species_number;
     };
 }
 

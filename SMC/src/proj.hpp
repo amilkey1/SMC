@@ -37,6 +37,7 @@ namespace proj {
             void                run();
             void                saveAllForests(vector<Particle::SharedPtr> &v) const ;
             void                saveSpeciesTrees(vector<Particle::SharedPtr> &v) const;
+            void                saveSpeciesTreesAfterFirstRound(vector<Particle::SharedPtr> &v) const;
             void                saveSpeciesTreesHierarchical(vector<Particle::SharedPtr> &v, string filename1, string filename2) const;
             void                saveGeneTrees(unsigned ngenes, vector<Particle::SharedPtr> &v) const;
             void                saveGeneTree(unsigned gene_number, vector<Particle::SharedPtr> &v) const;
@@ -629,6 +630,30 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             treef.close();
     }
 
+    inline void Proj::saveSpeciesTreesAfterFirstRound(vector<Particle::SharedPtr> &v) const {
+        // save only unique species trees
+        if (!Forest::_run_on_empty) {
+            vector<vector<pair<double, double>>> unique_increments_and_priors;
+
+            ofstream unique_treef("unique_species_trees_after_first_round.trees");
+            unique_treef << "#nexus\n\n";
+            unique_treef << "begin trees;\n";
+            for (auto &p:v) {
+                vector<pair<double, double>> increments_and_priors = p->getSpeciesTreeIncrementPriors();
+                bool found = false;
+                if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
+                    found = true;
+                }
+                if (!found) {
+                    unique_increments_and_priors.push_back(increments_and_priors);
+                    unique_treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
+                }
+            }
+            unique_treef << "end;\n";
+            unique_treef.close();
+        }
+    }
+
     inline void Proj::saveSpeciesTrees(vector<Particle::SharedPtr> &v) const {
         // save only unique species trees
         if (!Forest::_run_on_empty) {
@@ -899,10 +924,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             Forest::_base_frequencies.push_back(f);
             sum +=f;
         }
-        assert (fabs(sum-1) < 0.000001);
         if (fabs(sum-1)>0.000001) {
             throw XProj(format("base frequencies (%s) don't add to 1")%Forest::_string_base_frequencies);
         }
+        assert (fabs(sum-1) < 0.000001);
     }
 
     inline void Proj::summarizeData(Data::SharedPtr) {
@@ -2074,6 +2099,9 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
                     unsigned nsteps = (ntaxa-1)*nsubsets;
 
+                string speciesfname = "proposed_species_increments.txt";
+                ofstream speciesf(speciesfname);
+                
                     for (unsigned g=0; g<nsteps; g++){
                         if (_verbose > 0) {
                             cout << "starting step " << g << " of " << nsteps-1 << endl;
@@ -2086,6 +2114,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         }
 
                         //taxon joining and reweighting step
+                        
                         if (Forest::_proposal == "prior-prior") {
                             proposeParticles(my_vec);
                         }
@@ -2117,7 +2146,26 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         if (Forest::_run_on_empty) {
                             filter = false;
                         }
+                        
+//                        string filename = "increments" + to_string(g) + ".txt";
+//                        ofstream incrf(filename);
+//                        incrf << "proposed_gene_increment" << endl;
+                        
+//                        for (auto &p:my_vec) {
+//                            cout << "gene proposing join is " << p->getGeneIncrement().first << endl;
+//                            if (p->getGeneIncrement().first == 2) {
+//                                incrf << p->getGeneIncrement().second << endl;
+//                                p->showParticle();
+//                            }
+//                        }
+                        
                         if (filter) {
+                            for (auto &p:my_vec) {
+                                if (p->speciesJoinProposed()) {
+                                    speciesf << p->getSpeciesIncrement() << endl;
+                                }
+                            }
+                            
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                             //if use_first is true, my_vec = my_vec_2
                             //if use_first is false, my_vec = my_vec_1
@@ -2128,12 +2176,26 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             use_first = !use_first;
 
                             unsigned species_count = 0;
-
+                            
                             if (_verbose > 1) {
                                 for (auto &p:my_vec) {
                                     if (p->speciesJoinProposed()) {
                                         species_count++;
                                     }
+                                }
+                            }
+                            
+                            for (auto &p:my_vec) {
+//                                cout << "gene accepting join is " << p->getGeneIncrement().first << endl;
+                                if (p->getGeneIncrement().first == 1) {
+//                                    incrf << p->getGeneIncrement().second << endl;
+//                                    p->showParticle();
+                                }
+                            }
+                            
+                            for (auto &p:my_vec) {
+                                if (p->speciesJoinProposed()) {
+//                                    p->showSpeciesTree();
                                 }
                             }
 
@@ -2167,6 +2229,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 #endif
 
 #if defined (HIERARCHICAL_FILTERING)
+                saveSpeciesTreesAfterFirstRound(my_vec);
+                
                 cout << "\n";
                 string filename1 = "species_trees.trees";
                 string filename2 = "unique_species_trees.trees";

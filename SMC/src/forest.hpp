@@ -106,6 +106,7 @@ class Forest {
         vector< pair<double, Node *>>      sortPreorder();
         void                        refreshPreorder();
         void                        createThetaMap(Lot::SharedPtr lot);
+        void                        updateThetaMap(Lot::SharedPtr lot, string new_species_name);
         void                        resetThetaMap(Lot::SharedPtr lot);
         void                        drawNewTheta(string new_species, Lot::SharedPtr lot);
         void                        buildFromNewick(const string newick, bool rooted, bool allow_polytomies);
@@ -2434,6 +2435,24 @@ class Forest {
         _vector_prior.push_back(log_inv_gamma_prior);
     }
 
+    inline void Forest::updateThetaMap(Lot::SharedPtr lot, string new_species_name) {
+        // add a new theta for the most recently drawn species
+        double scale = (2.01 - 1.0) / (_theta_mean);
+        assert (scale > 0.0);
+        double new_theta = 0.0;
+        if (new_theta < _small_enough) {
+            new_theta = 1 / (lot->gamma(2.01, scale));
+            assert (new_theta > 0.0);
+            _theta_map[new_species_name] = new_theta;
+        }
+        // pop mean = theta / 4
+        double a = 2.0;
+        double b = scale;
+        double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
+        double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
+        _vector_prior.push_back(log_inv_gamma_prior);
+    }
+
     inline void Forest::createThetaMap(Lot::SharedPtr lot) {
         // map should be 2*nspecies - 1 size
         unsigned number = 0;
@@ -2444,17 +2463,18 @@ class Forest {
             number++;
             _species_indices[s.first] = number - 1;
         }
-        for (int i=0; i<_nspecies-1; i++) {
-            string name = boost::str(boost::format("node-%d")%number);
-            number++;
-            species_names.push_back(name);
-            _species_indices[name] = number - 1;
-            if (i == _nspecies-2) {
-                _ancestral_species_name = name;
-            }
-        }
+//        for (int i=0; i<_nspecies-1; i++) { // TODO: draw these as you go, not all at the beginning
+//            string name = boost::str(boost::format("node-%d")%number);
+//            number++;
+//            species_names.push_back(name);
+//            _species_indices[name] = number - 1;
+//            if (i == _nspecies-2) {
+//                _ancestral_species_name = name;
+//            }
+//        }
         
-        assert (species_names.size() == 2*_nspecies - 1);
+//        assert (species_names.size() == 2*_nspecies - 1);
+        assert (species_names.size() == _nspecies);
         
         // gamma mean = shape * scale
         // draw mean from lognormal distribution
@@ -2488,6 +2508,9 @@ class Forest {
             double new_theta = 0.0;
             if (new_theta < _small_enough) {
                 new_theta = 1 / (lot->gamma(2.01, scale));
+//                ofstream tmpf("thetas.txt", ios::app);
+//                tmpf << new_theta << endl;
+//                tmpf.close();
 //                new_theta = 1 / (lot->gamma(2.0, scale));
                 assert (new_theta > 0.0);
                 _theta_map[name] = new_theta;

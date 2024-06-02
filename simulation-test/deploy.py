@@ -22,7 +22,7 @@ Rsd              = 0.2       # standard deviation of theta/T ratios
 nloci          = 10          # number of loci (conditionally independent given species tree)
 seqlen         = 100       # number of sites in each gene
 nreps          = 4          # number of simulation replicates
-nparticles     = 100       # number of particles to use for SMC
+nparticles     = 2000       # number of particles to use for SMC
 simprogname    = 'smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
@@ -1341,12 +1341,14 @@ def creatergl3DPLOT():
 	s += 'rf <- read.table(file="rf-summary.txt", header=FALSE)\n'
 	s += 'df <- c("particle", "col1", "rf_smc", "col3", "col4", "rf_beast", "col6")\n'
 	s += 'colnames(rf) <- df\n'
-	s += 'RF_smc <- rf$V3\n'
-	s += 'RF_beast <- rf$V6\n'
-	s += '\n'
-	s += 'kf <- read.table(file="kf-summary.txt")\n'
-	s += 'KF_smc <- kf$V3\n'
-	s += 'KF_beast <- kf$V6\n'
+	
+	s += 'T_vals <- seq(1/nrows, 1.0, 1/nrows)\n'
+	s += 'theta_vals <- seq(1/ncols, 1.0, 1/ncols)\n'
+	s += 'rf <- read.table(file="rf-summary.txt", header=FALSE)\n'
+	s += 'rfsmc <- expand.grid(T=T_vals, theta=theta_vals)\n'
+	s += 'rfsmc$rfsmc <- rf$rf_smc\n'
+	s += 'rfbeast <- expand.grid(T=T_vals, theta=theta_vals)\n'
+	s += 'rfbeast$rfbeast <- rf$rf_beast\n'
 	s += '\n'
 	s += 'theta_over_two <- theta/2\n'
 	s += '\n'
