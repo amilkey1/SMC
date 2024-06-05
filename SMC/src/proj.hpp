@@ -69,6 +69,7 @@ namespace proj {
             void                initializeParticles(vector<Particle::SharedPtr> &particles);
             void                initializeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
             void                handleGeneNewicks();
+            void                handleSpeciesNewick(vector<Particle::SharedPtr> particles);
 
         private:
 
@@ -111,6 +112,7 @@ namespace proj {
             unsigned                    _count; // counter for params output file
             bool                        _gene_newicks_specified;
             unsigned                    _ngenes_provided;
+            string                      _species_newick_name;
     };
 
     inline Proj::Proj() {
@@ -795,6 +797,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("ngenes", boost::program_options::value(&_ngenes_provided)->default_value(0), "number of gene newick files specified")
         ("theta_proposal_mean", boost::program_options::value(&Forest::_theta_proposal_mean)->default_value(0.0), "theta proposal mean")
         ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
+        ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -952,6 +955,35 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ntaxa = _data->getNumTaxa();
         Forest::setNumTaxa(ntaxa);
         return ntaxa;
+    }
+
+    inline void Proj::handleSpeciesNewick(vector<Particle::SharedPtr> particles) {
+        ifstream infile(_species_newick_name);
+        string newick_string;
+//        int size_before = (int) newicks.size();
+        string newick;
+//        while (getline(infile, newick)) { // file newicks must start with the word "tree"
+//        if (newick.find("tree") == 2) { // TODO: not sure why / if this works - switch to checking for parenthesis?
+//            // TODO: also need to start at the parenthesis?
+//                size_t pos = newick.find("("); //find location of parenthesis
+//                newick.erase(0,pos); //delete everything prior to location found
+//            newick_string = newick;
+//            }
+//        }
+        while (getline(infile, newick)) {
+            newick_string = newick;
+            break;
+        }
+//        int size_after = (int) newick.size();
+//        if (size_before == size_after) {
+//            throw XProj("cannot find gene newick file");
+//        }
+        
+        for (auto &p:particles) {
+            p->processSpeciesNewick(newick_string); // TODO: can do this once and copy to all particles
+            p->mapSpecies(_taxon_map, _species_names);
+        }
+        cout << "stop";
     }
 
     inline void Proj::handleGeneNewicks() {
@@ -2006,6 +2038,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             }
         }
         else {
+            
             _first_line = true;
             if (_verbose > 0) {
                 cout << "Starting..." << endl;
@@ -2067,6 +2100,10 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                 bool use_first = true;
 
                 initializeParticles(my_vec); // initialize in parallel with multithreading
+                
+                if (_species_newick_name != "null") {
+                    handleSpeciesNewick(my_vec);
+                }
 
                 // reset marginal likelihood
                 _log_marginal_likelihood = 0.0;

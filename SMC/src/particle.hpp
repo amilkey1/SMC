@@ -134,6 +134,7 @@ class Particle {
         void                                            setPsuffix(unsigned psuffix) {_psuffix = psuffix;}
         double                                          calcInitialCoalescentLikelihood();
         void                                            processGeneNewicks(vector<string> newicks);
+        void                                            processSpeciesNewick(string newick_string);
     
 //        static bool                                     _run_on_empty;
 
@@ -155,6 +156,7 @@ class Particle {
         double                                  _species_tree_height;
         unsigned                                _psuffix;
         unsigned                                _next_species_number;
+        vector<tuple<string, string, string>>   _species_order;
         vector<pair<tuple<string, string, string>, double>> _t;
         pair<unsigned, double>                                  _gene_increment;
 };
@@ -210,6 +212,7 @@ class Particle {
         _psuffix = 0;
         _deep_coal = false;
         _next_species_number = Forest::_nspecies;
+        _species_order.clear();
     }
 
     inline void Particle::showSpeciesTree() {
@@ -504,19 +507,20 @@ inline vector<double> Particle::getVectorPrior() {
 //                cout << "\tincrement is : " << gene_increment << endl;
                 
                 if (gene_increment > speciation_time && speciation_time != -1) {
-//                    showParticle();
                     _deep_coal = true;
+//#if defined (DRAW_NEW_THETA)
                     if (_forests[0]._lineages.size() <= Forest::_nspecies) {
                         string name = boost::str(boost::format("node-%d")%_next_species_number);
+#if defined (DRAW_NEW_THETA)
                         _forests[1].updateThetaMap(_lot, name);
                         if (_forests.size() > 2) {
                             for (int i=2; i<_forests.size(); i++) {
                                 _forests[i]._theta_map = _forests[1]._theta_map;
                             }
                         }
+#endif
                     }
                     _next_species_number++;
-                    // TODO: if going beyond the tip species, draw new theta for new species
                     // num deep coalescences += (n-1), where n is number of lineages in each affected species lineage for all genes
                     // need to know which species joined to calculate this
                 }
@@ -550,12 +554,12 @@ inline vector<double> Particle::getVectorPrior() {
                 }
             }
             else {
-                // TODO: if going beyond the tip species, draw new theta for new species
                 forest_number = 0;
                 increment = speciation_time;
                 assert (increment != -1.0);
                 no_speciation = false;
                 
+#if defined (DRAW_NEW_THETA)
                 if (_forests[0]._lineages.size() <= Forest::_nspecies) {
                     string name = boost::str(boost::format("node-%d")%_next_species_number);
                     _forests[1].updateThetaMap(_lot, name);
@@ -565,6 +569,7 @@ inline vector<double> Particle::getVectorPrior() {
                         _forests[i]._theta_map = _forests[1]._theta_map;
                     }
                 }
+#endif
                 _next_species_number++;
             }
             
@@ -772,7 +777,15 @@ inline vector<double> Particle::getVectorPrior() {
     inline void Particle::speciesProposal() {
         // species tree proposal, need to update species partition in all gene forests
         assert (_lot != nullptr);
-        tuple <string, string, string> species_joined = _forests[0].speciesTreeProposal(_lot);
+        tuple <string, string, string> species_joined;
+        if (_species_order.size() > 0) {
+            species_joined = _forests[0].predeterminedSpeciesTreeProposal(_species_order[0]);
+            _species_order.erase(_species_order.begin());
+        }
+        else {
+            species_joined = _forests[0].speciesTreeProposal(_lot);
+        }
+        
         for (int i=1; i<_forests.size(); i++) {
             if (_deep_coal) {
                 // number of deep coalescences is (n-1) where n is the total number of lineages in the joining species
@@ -1466,6 +1479,13 @@ inline vector<double> Particle::getVectorPrior() {
         }
     }
 
+    inline void Particle::processSpeciesNewick(string newick_string) {
+        assert (newick_string != "");
+        _species_order = _forests[0].buildFromNewickTopology(newick_string);
+        _forests[0]._lineages.clear();
+        _species_order.erase(_species_order.begin()); // don't need "null", "null", "null"
+    }
+
     inline void Particle::processGeneNewicks(vector<string> newicks) {
         for (int i=1; i<_forests.size(); i++) {
 //            _forests[i]._nodes.clear();
@@ -1513,6 +1533,7 @@ inline vector<double> Particle::getVectorPrior() {
         _psuffix = other._psuffix;
         _gene_increment = other._gene_increment;
         _next_species_number = other._next_species_number;
+        _species_order = other._species_order;
     };
 }
 
