@@ -1976,6 +1976,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
         sim_vec[0]->mapSpecies(_taxon_map, _species_names);
 
+        sim_vec[0]->setNextSpeciesNumber(); // need to reset this now that number of species is known
+        
         sim_vec[0]->setNewTheta(_fix_theta_for_simulations); // TODO: fix theta mean as an option
 
         unsigned nsteps = (unsigned) (_taxon_map.size()-1)*nsubsets;

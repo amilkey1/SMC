@@ -135,6 +135,7 @@ class Particle {
         double                                          calcInitialCoalescentLikelihood();
         void                                            processGeneNewicks(vector<string> newicks);
         void                                            processSpeciesNewick(string newick_string);
+        void                                            setNextSpeciesNumber() {_next_species_number = Forest::_nspecies;}
     
 //        static bool                                     _run_on_empty;
 
