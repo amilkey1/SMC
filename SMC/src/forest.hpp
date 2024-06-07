@@ -2456,18 +2456,28 @@ class Forest {
             number++;
         }
         
+        // set ancestral species name for use in calculating panmictic coalescent likelihood
+//        number = _nspecies - 2;
+//        _ancestral_species_name = boost::str(boost::format("node-%d")%number);
+        
         for (int i=0; i<_nspecies-1; i++) {
             string name = boost::str(boost::format("node-%d")%number);
             number++;
             species_names.push_back(name);
         }
         
+        _ancestral_species_name = species_names.back();
+        
         assert (species_names.size() == 2*_nspecies - 1);
         
         // draw thetas for tips of species trees and ancestral population
         // for all other populations, theta = -1
         
-        assert (_theta_proposal_mean > 0.0);
+//        assert (_theta_proposal_mean > 0.0);
+        if (_theta_proposal_mean == 0.0) {
+            assert (_theta > 0.0);
+            _theta_proposal_mean = _theta;
+        }
         double scale = 1 / _theta_proposal_mean;
         
         unsigned count = 0;
@@ -2539,17 +2549,6 @@ class Forest {
             number++;
             _species_indices[s.first] = number - 1;
         }
-//        for (int i=0; i<_nspecies-1; i++) { // TODO: draw these as you go, not all at the beginning
-//            string name = boost::str(boost::format("node-%d")%number);
-//            number++;
-//            species_names.push_back(name);
-//            _species_indices[name] = number - 1;
-//            if (i == _nspecies-2) {
-//                _ancestral_species_name = name;
-//            }
-//        }
-        
-//        assert (species_names.size() == 2*_nspecies - 1);
         assert (species_names.size() == _nspecies);
         
         // gamma mean = shape * scale
@@ -2559,35 +2558,18 @@ class Forest {
         
         if (_theta_proposal_mean > 0.0) {
             assert (_theta_mean == 0.0);
-//            double exponential_rate = 1 / _theta_proposal_mean;
-//            _theta_mean = -log(1.0 - rng.uniform()) / exponential_rate;
-//            double mean = 1 / exponential_rate;
-//            _theta_mean = lot->gamma(1, mean); // mean = 10, equivalent to exponential(exponential_rate)
-            _theta_mean = lot->gamma(1, _theta_proposal_mean);
+            _theta_mean = lot->gamma(1, _theta_proposal_mean); // equivalent to exponential(exponential_rate)
         }
         else {
             _theta_mean = Forest::_theta; // if no proposal distribution specified, use one theta mean for all particles
         }
         
-//        if (_theta_mean == 0.0) { // TODO: cannot specify theta_mean and theta_proposal_mean / theta_prior_mean
-            // Draw _theta_mean from Exponential prior
-//            _theta_mean = -log(1.0 - rng.uniform())/exponential_prior_rate;
-//            _theta_proposal_mean = lot->logNormal(-4.6, 2.14); // TODO: mean = 0.1, sd = 1 --> make sd 0.1? - or try gamma
-//        }
-//        _theta_mean = lot->gamma(1, 10); // mean = 10, equivalent to exponential(0.1)
-
-        
-//        double scale = 1 / _theta_mean;
         double scale = (2.01 - 1.0) / (_theta_mean);
         assert (scale > 0.0);
         for (auto &name:species_names) {
             double new_theta = 0.0;
             if (new_theta < _small_enough) {
                 new_theta = 1 / (lot->gamma(2.01, scale));
-//                ofstream tmpf("thetas.txt", ios::app);
-//                tmpf << new_theta << endl;
-//                tmpf.close();
-//                new_theta = 1 / (lot->gamma(2.0, scale));
                 assert (new_theta > 0.0);
                 _theta_map[name] = new_theta;
             }

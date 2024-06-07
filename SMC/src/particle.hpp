@@ -127,7 +127,7 @@ class Particle {
         void                                            resetSpecies();
         void                                            setForest(Forest f, unsigned forest_number);
         Forest                                          getForest(unsigned i) {return _forests[i];} // TODO: should return a pointer?
-        void                                            setNewTheta();
+        void                                            setNewTheta(bool fix_theta);
         vector<double>                                  getThetaVector();
         double                                          getPopMean();
         pair<string, string>                            getSpeciesJoined(){return make_pair(_forests[0]._species_joined.first->_name, _forests[0]._species_joined.second->_name);}
@@ -1150,32 +1150,44 @@ inline vector<double> Particle::getVectorPrior() {
         _gene_increment = make_pair(forest_number, increment);
     }
 
-    inline void Particle::setNewTheta() {
-        // map should be 2*nspecies - 1 size
-        // create a theta map with all the same theta for simulations, set theta_mean to theta
-        unsigned number = 0;
-        vector<string> species_names;
-        map<string, double> theta_map;
-        
-        for (auto &s:_forests[1]._species_partition) {
-            species_names.push_back(s.first);
-            number++;
+    inline void Particle::setNewTheta(bool fix_theta) {
+        if (fix_theta) { // fix theta for all populations
+            // map should be 2*nspecies - 1 size
+            unsigned number = 0;
+            vector<string> species_names;
+            map<string, double> theta_map;
+            
+            for (auto &s:_forests[1]._species_partition) {
+                species_names.push_back(s.first);
+                number++;
+            }
+            for (int i=0; i<Forest::Forest::_nspecies-1; i++) {
+                string name = boost::str(boost::format("node-%d")%number);
+                number++;
+                species_names.push_back(name);
+            }
+            
+            assert (species_names.size() == 2*Forest::_nspecies - 1);
+            
+            for (auto &name:species_names) {
+                assert (Forest::_theta > 0.0);
+                theta_map[name] = Forest::_theta;         // create a theta map with all the same theta for simulations, set theta_mean to theta
+            }
+            
+            for (int i=1; i<_forests.size(); i++) {
+                _forests[i]._theta_map = theta_map;
+                _forests[i]._theta_mean = Forest::_theta;
+            }
+            
         }
-        for (int i=0; i<Forest::Forest::_nspecies-1; i++) {
-            string name = boost::str(boost::format("node-%d")%number);
-            number++;
-            species_names.push_back(name);
-        }
-        
-        assert (species_names.size() == 2*Forest::_nspecies - 1);
-        
-        for (auto &name:species_names) {
-            theta_map[name] = Forest::_theta;
-        }
-        
-        for (int i=1; i<_forests.size(); i++) {
-            _forests[i]._theta_map = theta_map;
-            _forests[i]._theta_mean = Forest::_theta;
+        else {
+            // create theta map
+            _forests[1].createThetaMap(_lot);
+            if (_forests.size() > 2) {
+                for (int i=2; i<_forests.size(); i++) {
+                    _forests[i]._theta_map = _forests[1]._theta_map;
+                }
+            }
         }
     }
     

@@ -113,6 +113,7 @@ namespace proj {
             bool                        _gene_newicks_specified;
             unsigned                    _ngenes_provided;
             string                      _species_newick_name;
+            bool                        _fix_theta_for_simulations;
     };
 
     inline Proj::Proj() {
@@ -798,6 +799,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
         ("theta_proposal_mean", boost::program_options::value(&Forest::_theta_proposal_mean)->default_value(0.0), "theta proposal mean")
         ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
         ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
+        ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(false), "set to true to fix one theta for all populations")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -869,8 +871,8 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             if (_sim_file_name == "") {
                 throw XProj("must specify name of file to write simulated data to; ex. filename = sim.nex");
             }
-            if (Forest::_theta == 0.0) {
-                throw XProj("must specify theta for simulations");
+            if (Forest::_theta == 0.0 && Forest::_theta_prior_mean == 0.0 && Forest::_theta_proposal_mean == 0.0) {
+                throw XProj("must specify theta or theta proposal / prior mean for simulations");
             }
         }
         else {
@@ -1974,7 +1976,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
         sim_vec[0]->mapSpecies(_taxon_map, _species_names);
 
-        sim_vec[0]->setNewTheta(); // TODO: for now, stick with one theta
+        sim_vec[0]->setNewTheta(_fix_theta_for_simulations); // TODO: fix theta mean as an option
 
         unsigned nsteps = (unsigned) (_taxon_map.size()-1)*nsubsets;
 
