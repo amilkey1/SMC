@@ -69,6 +69,7 @@ class Particle {
         void                                    operator=(const Particle & other);
         const vector<Forest> &                  getForest() const {return _forests;}
         vector<double>                          getThetaMap();
+        double                                  getThetaMean(){return _forests[1]._theta_mean;}
         string                                  saveForestNewick() {
             return _forests[0].makeNewick(8, true);}
             

@@ -507,9 +507,13 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
     inline void Proj::writeThetaFile(vector<Particle::SharedPtr> &v) {
         ofstream logf("simulated-thetas.txt");
         for (auto &p:v) {
+            double theta_mean = p->getThetaMean();
+            logf << "theta mean: " << theta_mean << "\n";
             vector<double> thetas = p->getThetaMap();
+            unsigned count = 1;
             for (auto &t:thetas) {
-                logf << t << "\n";
+                logf << "pop " << count << "\t" << t << "\n";
+                count++;
             }
         }
     }
