@@ -68,6 +68,7 @@ class Particle {
         void                                    setLogCoalescentLikelihood(double coalescent_like);
         void                                    operator=(const Particle & other);
         const vector<Forest> &                  getForest() const {return _forests;}
+        vector<double>                          getThetaMap();
         string                                  saveForestNewick() {
             return _forests[0].makeNewick(8, true);}
             
@@ -1490,6 +1491,14 @@ inline vector<double> Particle::getVectorPrior() {
             _forests[i].simulateData(_lot, starting_site, nsites);
             starting_site += sites_vector[i-1];
         }
+    }
+
+    inline vector<double> Particle::getThetaMap() {
+        vector<double> thetas;
+        for (auto &t:_forests[1]._theta_map) {
+            thetas.push_back(t.second);
+        }
+        return thetas;
     }
 
     inline void Particle::processSpeciesNewick(string newick_string) {

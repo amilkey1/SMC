@@ -44,6 +44,7 @@ namespace proj {
             void                writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                writeLoradFileAfterSpeciesFiltering(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                writeDeepCoalescenceFile(vector<Particle::SharedPtr> &v);
+            void                writeThetaFile(vector<Particle::SharedPtr> &v);
             void                writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v) const;
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
             void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
@@ -500,6 +501,16 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
             logf << "\n" << count;
             logf << "\t" << p->getNumDeepCoalescences();
             count++;
+        }
+    }
+
+    inline void Proj::writeThetaFile(vector<Particle::SharedPtr> &v) {
+        ofstream logf("simulated-thetas.txt");
+        for (auto &p:v) {
+            vector<double> thetas = p->getThetaMap();
+            for (auto &t:thetas) {
+                logf << t << "\n";
+            }
         }
     }
 
@@ -2012,6 +2023,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
 
         writePaupFile(sim_vec, taxpartition);
         writeDeepCoalescenceFile(sim_vec);
+        writeThetaFile(sim_vec);
     }
 
     inline void Proj::run() {
@@ -2213,7 +2225,7 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         resetWeights(my_vec);
                         }
                 } // g loop
-
+                
                 if (_save_gene_trees) {
                     for (int i=1; i<nsubsets+1; i++) {
                         saveGeneTree(i, my_vec);
