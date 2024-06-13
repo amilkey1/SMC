@@ -2184,6 +2184,11 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             }
                         }
 
+//                        cout << "\n";
+//                        for (auto &p:my_vec) {
+//                            cout << "coalescence proposed in gene: " << p->showPrevForestNumber() << endl;
+//                        }
+//                        cout << "\n";
                         normalizeWeights(my_vec);
 
                         if (_verbose > 1) {
@@ -2202,6 +2207,14 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                         }
                         
                         if (filter) {
+//                            for (auto &p:my_vec) {
+//                                if (p->showPrevForestNumber() == 7) {
+//                                    cout << "stop";
+//                                }
+//                            }
+//                            for (auto &p:my_vec) {
+//                                cout << "coalescence proposed in gene: " << p->showPrevForestNumber() << endl;
+//                            }
                             
                             resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
                             //if use_first is true, my_vec = my_vec_2
@@ -2225,6 +2238,13 @@ inline void Proj::saveAllForests(vector<Particle::SharedPtr> &v) const {
                             if (_verbose > 1) {
                                 cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
                                 cout << "\t" << "number of species join particles accepted = " << species_count << endl;
+                            }
+                            for (auto &p:my_vec) {
+//                                cout << "coalescence accepted in gene: " << p->showPrevForestNumber() << endl;
+//                                if (p->showPrevForestNumber() == 7) {
+//                                    cout << "stop";
+//                                    p->showParticle();
+//                                }
                             }
                         resetWeights(my_vec);
                         }

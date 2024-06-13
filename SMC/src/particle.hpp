@@ -138,6 +138,7 @@ class Particle {
         void                                            processGeneNewicks(vector<string> newicks);
         void                                            processSpeciesNewick(string newick_string);
         void                                            setNextSpeciesNumber() {_next_species_number = Forest::_nspecies;}
+        unsigned                                        showPrevForestNumber(){return _prev_forest_number;}
     
 //        static bool                                     _run_on_empty;
 
@@ -162,6 +163,7 @@ class Particle {
         vector<tuple<string, string, string>>   _species_order;
         vector<pair<tuple<string, string, string>, double>> _t;
         pair<unsigned, double>                                  _gene_increment;
+        vector<double>                          _starting_log_likelihoods;
 };
 
     inline Particle::Particle() {
@@ -216,6 +218,7 @@ class Particle {
         _deep_coal = false;
         _next_species_number = Forest::_nspecies;
         _species_order.clear();
+        _starting_log_likelihoods.clear();
     }
 
     inline void Particle::showSpeciesTree() {
@@ -295,6 +298,7 @@ class Particle {
             _forests[i]._gene_tree_log_likelihood = forest_log_likelihoods[i-1];
             total_log_likelihood += forest_log_likelihoods[i-1];
             _forests[i]._log_weight = forest_log_likelihoods[i-1];
+            _starting_log_likelihoods.push_back(forest_log_likelihoods[i-1]);
         }
         _log_likelihood = total_log_likelihood;
         _log_weight = total_log_likelihood;
@@ -759,11 +763,20 @@ inline vector<double> Particle::getVectorPrior() {
             
             
             _prev_forest_number = forest_number;
+            
             _log_weight += inv_gamma_modifier;
             
-//            cout << "joining taxa in gene: " << forest_number << endl;
-            
             }
+        
+#if defined (TESTING_UNEVEN_LIKELIHOOD_CORRECTION)
+        double total_starting_log_likelihood = 0.0;
+        for (auto &s:_starting_log_likelihoods) {
+            total_starting_log_likelihood += s;
+        }
+        
+        _log_weight = _log_weight / (_starting_log_likelihoods[_prev_forest_number-1] / total_starting_log_likelihood);
+#endif
+        
         _generation++;
     }
 
@@ -1557,6 +1570,7 @@ inline vector<double> Particle::getVectorPrior() {
         _gene_increment = other._gene_increment;
         _next_species_number = other._next_species_number;
         _species_order = other._species_order;
+        _starting_log_likelihoods = other._starting_log_likelihoods;
     };
 }
 
