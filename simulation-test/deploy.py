@@ -740,6 +740,23 @@ def createREADME():
     readme += '	python3 plotdistances.py\n'
     readme += '\n'
     
+    readme += 'running galax to assess dissonance\n'
+    readme += '-----------------------------------------\n'
+    readme += 'galax will assess dissonance on two independent runs.\n'
+    readme += 'Run two simulations, keeping the simulation seed the same and modifying the run seed.\n'
+    readme += 'Move both simulation directories to the same folder and rename them g1 and g2.\n'
+    readme += 'Make a new directory for galax output:\n'
+    readme += '	mkdir galax\n'
+    readme += '	cd galax\n'
+    readme += 'Move the following scripts from either g1 or g2 into galax:\n'
+    readme += '	mv ../g1/create-galax-script.py . \n'
+    readme += '	mv ../g1/search.py . \n'
+    readme += 'Run the following scripts to run galax and summarize the dissonance output:\n'
+    readme += '	python3 create-galax-script.py\n'
+    readme += '	python3 search.py\n'
+    readme += 'View the individual output in smcout* and beastout* files or the summary output in dissonance-summary.txt.\n'
+    readme += '\n'
+    
     readmef = open(readmefn, 'w')
     readmef.write(readme)
     readmef.close()
@@ -1044,6 +1061,86 @@ def createANOVAPy():
     anovaf = open(anovafn, 'w')
     anovaf.write(stuff)
     anovaf.close()
+    
+def createSearchFile():
+	searchfn = os.path.join(dirname, 'search.py')
+	current_nreps = int(nreps) + 1
+	s = ""
+	s += '# string to search in file\n'
+	s += 'outfname = "dissonance-summary.txt"\n'
+	s += 'f = open(outfname, "x")\n'
+	s += 'smc_dissonance = []\n'
+	s += 'beast_dissonance = []\n'
+	s += '\n'
+	s += 'word = "  merged   "\n'
+	s += '\n'
+	s += 'for i in range(1, %d):\n' % current_nreps
+	s += '	filename = "smcout" + str(i) + ".txt"\n'
+	s += '	with open(filename, 'r') as fp:\n'
+	s += '	# read all lines in a list\n'
+	s += '		lines = fp.readlines()\n'
+	s += '		for line in lines:\n'
+	s += '		# check if string present on a current line\n'
+	s += '		if line.find(word) != -1:\n'
+	s += '			smc_dissonance.append(line[122:130])\n'
+	s += '\n'
+	s += '	filename = "beastout" + str(i) + ".txt"\n'
+	s += '	with open(filename, "r") as fp:\n'
+	s += '		# read all lines in a list\n'
+	s += '		lines = fp.readlines()\n'
+	s += '		for line in lines:\n'
+	s += '			# check if string present on a current line\n'
+	s += '			if line.find(word) != -1:\n'
+	s += '				beast_dissonance.append(line[114:121])\n'
+	s += '\n'
+	s += 'print("%12s %12s %12s" % ("rep", "  SMC dissonance ", " BEAST dissonance"))\n'
+	s += 'for rep in range(%d):\n' % nreps
+	s += '	print("%12d %12.5f %12.5f" % (rep+1, float(smc_dissonance[rep]), float(beast_dissonance[rep])))\n'
+	s += '	f.write("%12d %12.5f %12.5f" % (rep+1, float(smc_dissonance[rep]), float(beast_dissonance[rep])))\n'
+	s += '	f.close\n'
+	s += '	print(" ")\n'
+	searchf = open(searchfn, "w")
+	searchf.write(s)
+	searchf.close()
+    
+def createDissonanceFile():
+	dissonancefn = os.path.join(dirname, 'create-galax-script.py')
+	current_nreps = int(nreps) + 1
+	s = ''
+	s += '# create file comparisons\n'
+	s += 'for i in range(1, %d):\n' % current_nreps
+	s += '	filename = "smcfile" + str(i) + ".txt"\n'
+	s += '	f = open(filename, "x")\n'
+	s += '	to_write = ("../g1/rep%d/smc/alt_species_trees.trees\\n") % i\n'
+	s += '	f.write(to_write)\n'
+	s += '	to_write = ("../g2/rep%d/smc/alt_species_trees.trees\\n") % i\n'
+	s += '	f.write(to_write)\n'
+	s += '	f.close()\n'
+	s += '\n'
+	s += '	filename = "beastfile" + str(i) + ".txt"\n'
+	s += '	f = open(filename, "x")\n'
+	s += '	to_write = ("../g1/rep%d/beast/species.trees\\n") % i\n'
+	s += '	f.write(to_write)\n'
+	s += '	to_write = ("../g2/rep%d/beast/species.trees\\n") % i\n'
+	s += '	f.write(to_write)\n'
+	s += '	f.close()\n'
+	s += '\n'
+	s += '# make galax file\n'
+	s += 'filename2 = "rungalax.sh"\n'
+	s += 'f = open(filename2, "x")\n'
+	s += 'for i in range(1, %d):\n' % current_nreps
+	s += '	fname = "smcfile" + str(i) + ".txt"\n'
+	s += '	outfname = "smcout" + str(i)\n'
+	s += '	to_write = "galax --listfile " + fname + " --rooted --outfile " + outfname + "\\n"\n'
+	s += '	f.write(to_write)\n'
+	s += '\n'
+	s += '	fname = "beastfile" + str(i) + ".txt"\n'
+	s += '	outfname = "beastout" + str(i)\n'
+	s += '	to_write = "galax --listfile " + fname + " --skip 1 --rooted --outfile " + outfname + "\\n"\n'
+	s += '	f.write(to_write)\n'
+	dissonancef = open(dissonancefn, "w")
+	dissonancef.write(s)
+	dissonancef.close()
 
 def createCrunch():
     # see https://blog.ronin.cloud/slurm-job-arrays/
@@ -1559,3 +1656,5 @@ if __name__ == '__main__':
     writeThetaFile()
     create3DRPlot()
     creatergl3DPLOT()
+    createDissonanceFile()
+    createSearchFile()
