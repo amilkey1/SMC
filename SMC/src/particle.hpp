@@ -72,6 +72,7 @@ class Particle {
         double                                  getThetaMean(){return _forests[1]._theta_mean;}
         string                                  saveForestNewick() {
             return _forests[0].makeNewick(8, true);}
+        string                                  saveForestNewickAlt() {return _forests[0].makeAltNewick(8, false);}
             
             string                             saveGeneNewick(unsigned i) {
             return _forests[i].makeNewick(8, true);}
@@ -139,6 +140,7 @@ class Particle {
         void                                            processSpeciesNewick(string newick_string);
         void                                            setNextSpeciesNumber() {_next_species_number = Forest::_nspecies;}
         unsigned                                        showPrevForestNumber(){return _prev_forest_number;}
+        string                                          getTranslateBlock();
     
 //        static bool                                     _run_on_empty;
 
@@ -774,7 +776,11 @@ inline vector<double> Particle::getVectorPrior() {
             total_starting_log_likelihood += s;
         }
         
-        _log_weight = _log_weight / (_starting_log_likelihoods[_prev_forest_number-1] / total_starting_log_likelihood);
+        double fraction = _starting_log_likelihoods[_prev_forest_number-1] / total_starting_log_likelihood;
+        _log_weight = _log_weight / (100 * fraction);
+        
+        
+//        _log_weight = _log_weight / (_starting_log_likelihoods[_prev_forest_number-1] / total_starting_log_likelihood);
 #endif
         
         _generation++;
@@ -1520,6 +1526,32 @@ inline vector<double> Particle::getVectorPrior() {
         _species_order = _forests[0].buildFromNewickTopology(newick_string);
         _forests[0]._lineages.clear();
         _species_order.erase(_species_order.begin()); // don't need "null", "null", "null"
+    }
+
+    inline string Particle::getTranslateBlock() {
+        string block = "";
+        block += "  Translate\n";
+        unsigned count = 1;
+        for (auto &nd:_forests[0]._nodes) {
+            if (count < Forest::_nspecies + 1) {
+                string name = nd._name;
+                block += to_string(count) + " ";
+                block += name;
+                if (count != Forest::_nspecies) {
+                    block += ",";
+                    block += "\n";
+                }
+                else {
+                    block += "\n";
+                }
+                count ++;
+            }
+            else {
+                break;
+            }
+        }
+        block += ";\n";
+        return block;
     }
 
     inline void Particle::processGeneNewicks(vector<string> newicks) {
