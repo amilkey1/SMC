@@ -118,6 +118,7 @@ class Forest {
         void                        renumberInternals();
         bool                        canHaveSibling(Node * nd, bool rooted, bool allow_polytomies);
         vector<tuple<string, string, string>>              buildFromNewickTopology(const string newick);
+        double                      tryCoalescence(string species_name, Lot::SharedPtr lot);
     
         map<string, double>         _theta_map;
 
@@ -162,6 +163,7 @@ class Forest {
         string                      _ancestral_species_name;
         vector<double>              _vector_prior;
         double                      _theta_mean;
+        pair<Node*, Node*>          _nodes_joined;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -1260,6 +1262,7 @@ class Forest {
         _taxon_map = other._taxon_map;
         _species_indices = other._species_indices;
         _vector_prior = other._vector_prior;
+        _nodes_joined = other._nodes_joined;
 
         // copy tree itself
 
@@ -1838,7 +1841,8 @@ class Forest {
 #endif
     }
 
-    inline void Forest::allowCoalescence(string species_name, double increment, Lot::SharedPtr lot) {
+    inline double Forest::tryCoalescence(string species_name, Lot::SharedPtr lot) {
+        // this function joins two random taxa in the specified species lineage, calculates a gene weight, and then unjoins them
         double prev_log_likelihood = _gene_tree_log_likelihood;
             
         Node *subtree1 = nullptr;
@@ -1853,22 +1857,20 @@ class Forest {
         }
         
         unsigned s = (unsigned) nodes.size();
-        calcTopologyPrior(s);
         
         assert (s > 1);
-        bool one_choice = false;
 
-            // prior-prior proposal
-            pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
-            auto it1 = std::next(nodes.begin(), t.first);
-            subtree1 = *it1;
+        // prior-prior proposal
+        pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
+        auto it1 = std::next(nodes.begin(), t.first);
+        subtree1 = *it1;
 
-            auto it2 = std::next(nodes.begin(), t.second);
-            subtree2 = *it2;
-            assert (t.first < nodes.size());
-            assert (t.second < nodes.size());
-        
-            assert (subtree1 != subtree2);
+        auto it2 = std::next(nodes.begin(), t.second);
+        subtree2 = *it2;
+        assert (t.first < nodes.size());
+        assert (t.second < nodes.size());
+    
+        assert (subtree1 != subtree2);
             
             //new node is always needed
             Node nd;
@@ -1878,7 +1880,7 @@ class Forest {
             new_nd->_parent=0;
             new_nd->_number=_nleaves+_ninternals;
             new_nd->_edge_length=0.0;
-            _ninternals++;
+//            _ninternals++;
             new_nd->_right_sib=0;
 
             new_nd->_left_child=subtree1;
@@ -1886,6 +1888,8 @@ class Forest {
 
             subtree1->_parent=new_nd;
             subtree2->_parent=new_nd;
+        
+        _nodes_joined = make_pair(subtree1, subtree2);
 
         if (!_run_on_empty) {
                 //always calculating partials now
@@ -1902,7 +1906,123 @@ class Forest {
                     }
                 }
                 calcPartialArray(new_nd);
-                
+        }
+
+        // do not update the species list because it will not affect the likelihood
+        // just update the _lineages vector
+        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+            
+        _gene_tree_log_likelihood = calcLogLikelihood();
+        double log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
+        
+        // reset log likelihood
+        _gene_tree_log_likelihood = prev_log_likelihood;
+        
+//        new_nd->_left_child->_right_sib = nullptr;
+//        showForest();
+//
+        // undo join
+        revertNodeVector(_lineages, subtree1, subtree2, new_nd);
+        
+        // reset new node partial?
+        new_nd->_partial = 0;
+        subtree1->_parent = 0;
+        subtree2->_parent = 0;
+        subtree1->_right_sib = 0;
+        subtree2->_right_sib = 0;
+        
+        // remove extra node from _nodes
+        _nodes.pop_back();
+        
+        // reset node numbers?
+        int n = 0;
+        for (auto &nd:_nodes) {
+            nd._number = n;
+            n++;
+        }
+        
+        // check the reversion worked
+        for (auto &s:_species_partition) {
+            for (auto &n:s.second) {
+                assert(_lineages[n->_position_in_lineages] == n);
+            }
+        }
+        
+        return log_weight;
+        
+    }
+
+    inline void Forest::allowCoalescence(string species_name, double increment, Lot::SharedPtr lot) {
+        double prev_log_likelihood = _gene_tree_log_likelihood;
+
+        Node *subtree1 = nullptr;
+        Node *subtree2 = nullptr;
+        list<Node*> nodes;
+
+        for (auto &s:_species_partition) {
+            if (s.first == species_name) {
+                nodes = s.second;
+                break;
+            }
+        }
+
+        unsigned s = (unsigned) nodes.size();
+        calcTopologyPrior(s);
+
+        assert (s > 1);
+        bool one_choice = false;
+
+#if defined (PRIOR_POST_ON_GENES)
+        subtree1 = _nodes_joined.first;
+        subtree2 = _nodes_joined.second;
+
+#else
+        // prior-prior proposal
+        pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
+        auto it1 = std::next(nodes.begin(), t.first);
+        subtree1 = *it1;
+
+        auto it2 = std::next(nodes.begin(), t.second);
+        subtree2 = *it2;
+        assert (t.first < nodes.size());
+        assert (t.second < nodes.size());
+#endif
+
+        assert (subtree1 != subtree2);
+
+        //new node is always needed
+        Node nd;
+        _nodes.push_back(nd);
+        Node* new_nd = &_nodes.back();
+
+        new_nd->_parent=0;
+        new_nd->_number=_nleaves+_ninternals;
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+        new_nd->_right_sib=0;
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+
+        if (!_run_on_empty) {
+                //always calculating partials now
+                assert (new_nd->_partial == nullptr);
+                new_nd->_partial=ps.getPartial(_npatterns*4);
+                assert(new_nd->_left_child->_right_sib);
+
+                if (_save_memory) {
+                    for (auto &nd:_lineages) {
+                        if (nd->_partial == nullptr) {
+                            nd->_partial = ps.getPartial(_npatterns*4);
+                            calcPartialArray(nd);
+                        }
+                    }
+                }
+                calcPartialArray(new_nd);
+
                 subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
                 subtree2->_partial=nullptr;
         }
@@ -1910,14 +2030,14 @@ class Forest {
             //update species list
             updateNodeList(nodes, subtree1, subtree2, new_nd);
             updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-            
+
             for (auto &s:_species_partition) {
                 if (s.first == species_name) {
                     s.second = nodes; // TODO: this should happen automatically
                     break;
                 }
             }
-            
+
             if ((_proposal == "prior-prior" || one_choice) && (!_run_on_empty) ) {
                 _gene_tree_log_likelihood = calcLogLikelihood();
                 _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
