@@ -50,6 +50,8 @@ namespace proj {
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
             void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
             void                normalizeWeights(vector<Particle::SharedPtr> & particles);
+            void                modifyWeights(vector<Particle::SharedPtr> & particles);
+            void                correctWeights(vector<Particle::SharedPtr> & particles);
             void                normalizeSpeciesWeights(vector<Particle::SharedPtr> & particles);
             void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                resampleSpeciesParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
@@ -116,6 +118,7 @@ namespace proj {
             unsigned                    _ngenes_provided;
             string                      _species_newick_name;
             bool                        _fix_theta_for_simulations;
+            double                      _phi;
     };
 
     inline Proj::Proj() {
@@ -135,6 +138,7 @@ namespace proj {
         _nparticles = 50000;
         _data = nullptr;
         _small_enough = 0.0000001;
+        _phi = 1.0;
     }
 
 //    inline void Proj::saveAllForests(const vector<Particle> &v) const {
@@ -839,6 +843,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
         ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
         ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
         ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(false), "set to true to fix one theta for all populations")
+        ("phi", boost::program_options::value(&_phi)->default_value(1.0), "correct weights by this number")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -1453,6 +1458,18 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
         }
 
         _log_species_tree_marginal_likelihood += log_particle_sum - log(_nparticles);
+    }
+
+    inline void Proj::modifyWeights(vector<Particle::SharedPtr> & particles) {
+        for (auto &p:particles) {
+            p->setLogWeight(p->getLogWeight()*_phi);
+        }
+    }
+
+    inline void Proj::correctWeights(vector<Particle::SharedPtr> & particles) {
+        for (auto &p:particles) {
+            p->setLogWeight(p->getLogWeight()*(1 / _phi));
+        }
     }
 
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles) {
@@ -2175,6 +2192,16 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
 
                 initializeParticles(my_vec); // initialize in parallel with multithreading
                 
+#if defined (TESTING_UNEVEN_SITE_CORRECTION)
+                vector<unsigned> nsites;
+                for (unsigned i=0; i<nsubsets; i++) {
+                    nsites.push_back(_data->calcSeqLenInSubset(i));
+                }
+                for (auto &p:my_vec) {
+                    p->setNSites(nsites);
+                }
+#endif
+                
                 if (_species_newick_name != "null") {
                     handleSpeciesNewick(my_vec);
                 }
@@ -2204,6 +2231,10 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
                     my_vec[0]->clearPartials(); // all other particles should have no partials
                 }
 
+#if defined (WEIGHT_CORRECTION)
+                    modifyWeights(my_vec);
+#endif
+                
                     normalizeWeights(my_vec); // initialize marginal likelihood
 
                     //run through each generation of particles
@@ -2243,6 +2274,9 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
 //                            cout << "coalescence proposed in gene: " << p->showPrevForestNumber() << endl;
 //                        }
 //                        cout << "\n";
+#if defined (WEIGHT_CORRECTION)
+                    modifyWeights(my_vec);
+#endif
                         normalizeWeights(my_vec);
 
                         if (_verbose > 1) {
@@ -2295,10 +2329,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
                             }
                             for (auto &p:my_vec) {
 //                                cout << "coalescence accepted in gene: " << p->showPrevForestNumber() << endl;
-//                                if (p->showPrevForestNumber() == 7) {
-//                                    cout << "stop";
-//                                    p->showParticle();
-//                                }
                             }
                         resetWeights(my_vec);
                         }

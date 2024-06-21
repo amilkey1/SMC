@@ -142,6 +142,7 @@ class Particle {
         void                                            setNextSpeciesNumber() {_next_species_number = Forest::_nspecies;}
         unsigned                                        showPrevForestNumber(){return _prev_forest_number;}
         string                                          getTranslateBlock();
+        void                                            setNSites(vector<unsigned> nsites) {_nsites_per_gene = nsites;}
     
 //        static bool                                     _run_on_empty;
 
@@ -167,6 +168,7 @@ class Particle {
         vector<pair<tuple<string, string, string>, double>> _t;
         pair<unsigned, double>                                  _gene_increment;
         vector<double>                          _starting_log_likelihoods;
+        vector<unsigned>                        _nsites_per_gene;
 };
 
     inline Particle::Particle() {
@@ -222,6 +224,7 @@ class Particle {
         _next_species_number = Forest::_nspecies;
         _species_order.clear();
         _starting_log_likelihoods.clear();
+        _nsites_per_gene.clear();
     }
 
     inline void Particle::showSpeciesTree() {
@@ -601,7 +604,9 @@ inline vector<double> Particle::getVectorPrior() {
                     gene_weights[w] -= running_sum;
                 }
 //                , forest_number, increment, species_name
-                unsigned index_of_choice = selectEvent(gene_weights);
+//                unsigned index_of_choice = selectEvent(gene_weights);
+                unsigned n = gene_weights.size();
+                unsigned index_of_choice = rand()%n;
                 forest_number = forest_numbers[index_of_choice];
                 species_name = species_choices[index_of_choice];
             }
@@ -1088,6 +1093,22 @@ inline vector<double> Particle::getVectorPrior() {
         
         
 //        _log_weight = _log_weight / (_starting_log_likelihoods[_prev_forest_number-1] / total_starting_log_likelihood);
+#endif
+        
+#if defined (TESTING_UNEVEN_SITE_CORRECTION)
+        double nsites = _nsites_per_gene[_prev_forest_number - 1];
+        double total_sites = 0;
+        for (auto &n:_nsites_per_gene) {
+            total_sites += n;
+        }
+        
+//        double fraction = nsites / total_sites;
+//        _log_weight = _log_weight / (100 * fraction);
+//        _log_weight = _log_weight - nsites;
+        _log_weight = _log_weight / nsites;
+        _log_weight = _log_weight * total_sites;
+//        cout << "stop";
+    
 #endif
         
         _generation++;
@@ -1911,6 +1932,7 @@ inline vector<double> Particle::getVectorPrior() {
         _next_species_number = other._next_species_number;
         _species_order = other._species_order;
         _starting_log_likelihoods = other._starting_log_likelihoods;
+        _nsites_per_gene = other._nsites_per_gene;
     };
 }
 
