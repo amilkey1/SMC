@@ -119,6 +119,7 @@ namespace proj {
             string                      _species_newick_name;
             bool                        _fix_theta_for_simulations;
             double                      _phi;
+            bool                        _start_from_species_tree_prior;
     };
 
     inline Proj::Proj() {
@@ -844,6 +845,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
         ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
         ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(false), "set to true to fix one theta for all populations")
         ("phi", boost::program_options::value(&_phi)->default_value(1.0), "correct weights by this number")
+        ("start_from_species_tree_prior", boost::program_options::value(&_start_from_species_tree_prior)->default_value(false), "if true, start by sampling from species tree prior")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -881,6 +883,11 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
         if (vm.count("base_frequencies") > 0) {
             handleBaseFrequencies();
         }
+        
+        if (vm.count("start_from_species_tree_prior")) {
+            _start_from_species_tree_prior = true;
+        }
+            
         // if user specified "ntaxaperspecies" in conf file, convert them to a vector<unsigned>
         if (vm.count("ntaxaperspecies") > 0 && _start_mode == "sim") {
             handleNTaxaPerSpecies();
@@ -1004,32 +1011,39 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
     }
 
     inline void Proj::handleSpeciesNewick(vector<Particle::SharedPtr> particles) {
-        ifstream infile(_species_newick_name);
-        string newick_string;
-//        int size_before = (int) newicks.size();
-        string newick;
-//        while (getline(infile, newick)) { // file newicks must start with the word "tree"
-//        if (newick.find("tree") == 2) { // TODO: not sure why / if this works - switch to checking for parenthesis?
-//            // TODO: also need to start at the parenthesis?
-//                size_t pos = newick.find("("); //find location of parenthesis
-//                newick.erase(0,pos); //delete everything prior to location found
-//            newick_string = newick;
-//            }
-//        }
-        while (getline(infile, newick)) {
-            newick_string = newick;
-            break;
+        if (_start_from_species_tree_prior) {
+            for (auto &p:particles) {
+                p->buildEntireSpeciesTree();
+            }
         }
-//        int size_after = (int) newick.size();
-//        if (size_before == size_after) {
-//            throw XProj("cannot find gene newick file");
-//        }
         
-        for (auto &p:particles) {
-            p->processSpeciesNewick(newick_string); // TODO: can do this once and copy to all particles
-            p->mapSpecies(_taxon_map, _species_names);
+        else {
+            ifstream infile(_species_newick_name);
+            string newick_string;
+    //        int size_before = (int) newicks.size();
+            string newick;
+    //        while (getline(infile, newick)) { // file newicks must start with the word "tree"
+    //        if (newick.find("tree") == 2) { // TODO: not sure why / if this works - switch to checking for parenthesis?
+    //            // TODO: also need to start at the parenthesis?
+    //                size_t pos = newick.find("("); //find location of parenthesis
+    //                newick.erase(0,pos); //delete everything prior to location found
+    //            newick_string = newick;
+    //            }
+    //        }
+            while (getline(infile, newick)) {
+                newick_string = newick;
+                break;
+            }
+    //        int size_after = (int) newick.size();
+    //        if (size_before == size_after) {
+    //            throw XProj("cannot find gene newick file");
+    //        }
+            
+            for (auto &p:particles) {
+                p->processSpeciesNewick(newick_string); // TODO: can do this once and copy to all particles
+                p->mapSpecies(_taxon_map, _species_names);
+            }
         }
-        cout << "stop";
     }
 
     inline void Proj::handleGeneNewicks() {
@@ -2203,7 +2217,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
                 }
 #endif
                 
-                if (_species_newick_name != "null") {
+                if (_species_newick_name != "null" || _start_from_species_tree_prior) {
                     handleSpeciesNewick(my_vec);
                 }
 
@@ -2240,7 +2254,8 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
 
                     //run through each generation of particles
 
-                    unsigned nsteps = (ntaxa-1)*nsubsets;
+//                    unsigned nsteps = (ntaxa-1)*nsubsets;
+                unsigned nsteps = (ntaxa - 1);
                 
                     for (unsigned g=0; g<nsteps; g++){
                         if (_verbose > 0) {
