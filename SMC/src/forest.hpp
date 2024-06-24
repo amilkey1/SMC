@@ -1881,6 +1881,33 @@ class Forest {
     }
 
 
+//    inline void Forest::resetDepthVector(tuple<string, string, string> species_joined) {
+//        // this function replaces species names with new species name after a join
+//        for (auto &d:_depths) {
+//            bool match1 = false;
+//            bool match2 = false;
+//            if (d.second.first == get<0>(species_joined) || d.second.first == get<1>(species_joined)) {
+//                match1 = true;
+//            }
+//            if (d.second.second == get<0>(species_joined) || d.second.second == get<1>(species_joined)) {
+//                match2 = true;
+//            }
+//            if (match1) {
+//                d.second.first = get<2>(species_joined);
+//            }
+//            if (match2) {
+//                d.second.second = get<2>(species_joined);
+//            }
+//        }
+//        for (unsigned i=0; i < _depths.size(); i++) {
+//            if (_depths[i].second.first == _depths[i].second.second) {
+//                // species have already been joined in the speceis tree, so they are no longer a constraint
+//                _depths.erase(_depths.begin()+i);
+//            }
+//        }
+//        assert (_depths.size() > 0);
+//    }
+
     inline void Forest::resetDepthVector(tuple<string, string, string> species_joined) {
         // this function replaces species names with new species name after a join
         for (auto &d:_depths) {
@@ -1899,11 +1926,18 @@ class Forest {
                 d.second.second = get<2>(species_joined);
             }
         }
-        for (unsigned i=0; i < _depths.size(); i++) {
+
+        vector<unsigned> indices_to_erase;
+        for (int i=0; i<_depths.size(); i++) {
             if (_depths[i].second.first == _depths[i].second.second) {
-                // species have already been joined in the speceis tree, so they are no longer a constraint
-                _depths.erase(_depths.begin()+i);
+    //                // species have already been joined in the species tree, so they are no longer a constraint
+                indices_to_erase.push_back(i);
             }
+        }
+
+        for (unsigned i= (unsigned) indices_to_erase.size() - 1; i != -1; i--) {
+            unsigned num = indices_to_erase[i];
+            _depths.erase(_depths.begin() + num);
         }
         assert (_depths.size() > 0);
     }
