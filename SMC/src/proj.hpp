@@ -1462,7 +1462,8 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
 
     inline void Proj::modifyWeights(vector<Particle::SharedPtr> & particles) {
         for (auto &p:particles) {
-            p->setLogWeight(p->getLogWeight()*_phi);
+            double new_weight = p->getLogWeight() * _phi;
+            p->setLogWeight(new_weight);
         }
     }
 
@@ -2293,6 +2294,9 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
                         if (Forest::_run_on_empty) {
                             filter = false;
                         }
+//                        if (g % 3 != 0) {
+//                            filter = false; // TODO: testing
+//                        }
                         
                         if (filter) {
 //                            for (auto &p:my_vec) {

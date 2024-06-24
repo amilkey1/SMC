@@ -1089,7 +1089,8 @@ inline vector<double> Particle::getVectorPrior() {
         }
         
         double fraction = _starting_log_likelihoods[_prev_forest_number-1] / total_starting_log_likelihood;
-        _log_weight = _log_weight / (100 * fraction);
+//        _log_weight = _log_weight / (100 * fraction);
+        _log_weight = _log_weight / fraction;
         
         
 //        _log_weight = _log_weight / (_starting_log_likelihoods[_prev_forest_number-1] / total_starting_log_likelihood);
@@ -1098,15 +1099,24 @@ inline vector<double> Particle::getVectorPrior() {
 #if defined (TESTING_UNEVEN_SITE_CORRECTION)
         double nsites = _nsites_per_gene[_prev_forest_number - 1];
         double total_sites = 0;
+        unsigned forest_number = 1;
         for (auto &n:_nsites_per_gene) {
-            total_sites += n;
+//            if (_forests[forest_number]._lineages.size() > 1) {
+                total_sites += n;
+//            }
         }
         
 //        double fraction = nsites / total_sites;
 //        _log_weight = _log_weight / (100 * fraction);
-//        _log_weight = _log_weight - nsites;
+//        _log_weight = _log_weight - nsites + total_sites;
+//        _log_weight = _log_weight + log(nsites / total_sites);
+        
         _log_weight = _log_weight / nsites;
         _log_weight = _log_weight * total_sites;
+        
+//        _log_weight = _log_weight - (total_sites / nsites);
+//        _log_weight = _log_weight * nsites / total_sites;
+//        _log_weight = _log_weight - log(nsites) + log(total_sites);
 //        cout << "stop";
     
 #endif
