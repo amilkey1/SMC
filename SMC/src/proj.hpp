@@ -2218,6 +2218,12 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
 #endif
                 
                 if (_species_newick_name != "null" || _start_from_species_tree_prior) {
+                    // set particle random number seeds
+                    unsigned psuffix = 1;
+                    for (auto &p:my_vec) {
+                        p->setSeed(rng.randint(1,9999) + psuffix);
+                        psuffix += 2;
+                    }
                     handleSpeciesNewick(my_vec);
                 }
 

@@ -750,6 +750,7 @@ inline vector<double> Particle::getVectorPrior() {
         proposalPriorPostGenes();
 #else
         if (_generation == 0) {
+//            _forests[0].showForest();
             // make a separate species tree information vector for each gene
             for (unsigned i=1; i<_forests.size(); i++) {
                 _t_by_gene.push_back(_t);
@@ -805,8 +806,11 @@ inline vector<double> Particle::getVectorPrior() {
                 else {
                     // carry out speciation event
                     assert (_forests[i]._species_partition.size() > 1);
-                    _forests[i].updateSpeciesPartition(_t_by_gene[i-1][next_species_index].first);
+//                    _forests[0].showForest();
+//                    _forests[i].showForest();
                     _forests[i].addIncrement(species_increment);
+                    _forests[i].updateSpeciesPartition(_t_by_gene[i-1][next_species_index+1].first);
+//                    _forests[i].updateSpeciesPartition(_t_by_gene[i-1][next_species_index].first);
                     assert (next_species_index < _t_by_gene[i-1].size());
                     _t_by_gene[i-1][next_species_index].second -= species_increment; // update species tree increments
                     assert (_t_by_gene[i-1][next_species_index].second == 0.0);
@@ -814,7 +818,7 @@ inline vector<double> Particle::getVectorPrior() {
                         _next_species_number_by_gene[i-1]++;
                     }
                 }
-                
+//                _forests[i].showForest();
                 if (calc_weight) {
                     _gene_weights.push_back(_forests[i]._log_weight);
                     done = true; // reset done bool for next gene
@@ -1966,7 +1970,7 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::buildEntireSpeciesTree() {
-        _forests[0].chooseSpeciesIncrement(_lot);
+        _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
         double edge_len = _forests[0]._last_edge_length;
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
@@ -1977,12 +1981,13 @@ inline vector<double> Particle::getVectorPrior() {
                 species_joined = _forests[0].speciesTreeProposal(_lot);
                 
                 // if the species tree is not finished, add another species increment
-                if (_forests[0]._lineages.size()>1) {
-                    _forests[0].addSpeciesIncrement();
-                }
+//                if (_forests[0]._lineages.size()>1) {
+//                    _forests[0].addSpeciesIncrement();
+//                }
                 
                 double edge_len = 0.0;
                 if (_forests[0]._lineages.size() > 1) {
+                    _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
                     edge_len = _forests[0]._last_edge_length;
                 }
                 _t.push_back(make_pair(species_joined, edge_len));
