@@ -883,10 +883,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
         if (vm.count("base_frequencies") > 0) {
             handleBaseFrequencies();
         }
-        
-        if (vm.count("start_from_species_tree_prior")) {
-            _start_from_species_tree_prior = true;
-        }
             
         // if user specified "ntaxaperspecies" in conf file, convert them to a vector<unsigned>
         if (vm.count("ntaxaperspecies") > 0 && _start_mode == "sim") {
@@ -2315,16 +2311,8 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
                         if (Forest::_run_on_empty) {
                             filter = false;
                         }
-//                        if (g % 3 != 0) {
-//                            filter = false; // TODO: testing
-//                        }
                         
                         if (filter) {
-//                            for (auto &p:my_vec) {
-//                                if (p->showPrevForestNumber() == 7) {
-//                                    cout << "stop";
-//                                }
-//                            }
 //                            for (auto &p:my_vec) {
 //                                cout << "coalescence proposed in gene: " << p->showPrevForestNumber() << endl;
 //                            }
