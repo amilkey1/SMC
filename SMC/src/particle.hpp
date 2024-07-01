@@ -731,7 +731,8 @@ inline vector<double> Particle::getVectorPrior() {
         }
         
         double fraction = _starting_log_likelihoods[_prev_forest_number-1] / total_starting_log_likelihood;
-        _log_weight = _log_weight / (100 * fraction);
+//        _log_weight = _log_weight / (100 * fraction);
+        _log_weight = _log_weight / (fraction);
         
         
     //        _log_weight = _log_weight / (_starting_log_likelihoods[_prev_forest_number-1] / total_starting_log_likelihood);
