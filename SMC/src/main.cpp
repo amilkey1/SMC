@@ -34,12 +34,13 @@ double Forest::_kappa = 1.0;
 vector<double> Forest::_base_frequencies;
 string Forest::_string_base_frequencies;
 double Forest::_migration_rate;
-double Forest::_hybridization_rate;
 bool Forest::_run_on_empty;
 bool Forest::_save_memory;
 double Forest::_ploidy = 2.0;
 double Forest::_theta_proposal_mean = 0.0;
 double Forest::_theta_prior_mean = 0.0;
+unsigned Bundle::_ngene_particles = 1;
+unsigned Bundle::_ngenes = 1;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT
