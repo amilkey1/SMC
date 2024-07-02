@@ -153,9 +153,6 @@ class Bundle {
                 }
             }
             
-//            for (unsigned g=0; g<_ngenes; g++) {
-//                filterLocus(g);
-//            }
         filterLoci();
 //        }
         
@@ -170,7 +167,6 @@ class Bundle {
     }
 
     inline void Bundle::filterLoci() {
-//        output(format("Filtering gene trees for all loci in bundle %d\n") % _bundle_index, G::VDEBUG);
         for (unsigned l = 0; l<_ngenes; l++) {
             // Copy log weights for all particles in this locus to prob vector
             vector<double> probs(_ngene_particles, 0.0);
@@ -244,101 +240,6 @@ class Bundle {
             }
         }
     }
-
-//    inline void Bundle::filterAllGeneTrees(unsigned step) {
-////        output(format("Filtering gene trees for all loci in bundle %d\n") % _bundle_index, G::VDEBUG);
-//        for (G::_locus = 0; G::_locus < G::_nloci; G::_locus++) {
-//            output(format("    Gene %d\n") % G::_locus, G::VDEBUG);
-//
-//            // Copy log weights for all particles in this locus to prob vector
-//            vector<double> probs(G::_ngparticles, 0.0);
-//            for (G::_particle = 0; G::_particle < G::_ngparticles; G::_particle++) {
-//                probs[G::_particle] = _locus_vect[G::_locus][G::_particle].getLogWeight();
-//                //output(format(" %6d %12.5f\n") % G::_particle % probs[G::_particle], G::VDEBUG);
-//            }
-//
-//            // Normalize log_weights to create discrete probability distribution
-//            double log_sum_weights = G::calcLogSum(probs);
-//            transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
-//
-//            // Compute component of the log marginal likelihood due to this step
-//            _prev_log_marg_like[G::_locus] = _log_marg_like[G::_locus];
-//            _log_marg_like[G::_locus] += log_sum_weights - log(G::_ngparticles);
-//
-//            // Compute cumulative probabilities
-//            partial_sum(probs.begin(), probs.end(), probs.begin());
-//
-//            // Initialize vector of counts storing number of darts hitting each particle
-//            vector<unsigned> counts(G::_ngparticles, 0);
-//
-//            // Throw _nparticles darts
-//            for (unsigned i = 0; i < G::_ngparticles; ++i) {
-//                double u = rng->uniform();
-//                auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
-//                assert(it != probs.end());
-//                unsigned which = (unsigned)distance(probs.begin(), it);
-//                counts[which]++;
-//            }
-//
-//            // Copy particles
-//            // Locate first donor
-//            unsigned donor = 0;
-//            while (counts[donor] < 2) {
-//                donor++;
-//            }
-//
-//            // Locate first recipient
-//            unsigned recipient = 0;
-//            while (counts[recipient] != 0) {
-//                recipient++;
-//            }
-//
-//            // Count number of cells that need copying to
-//            unsigned nzeros = 0;
-//            for (unsigned i = 0; i < G::_ngparticles; i++) {
-//                if (counts[i] == 0)
-//                    nzeros++;
-//            }
-//
-//            while (nzeros > 0) {
-//                assert(donor < G::_ngparticles);
-//                assert(recipient < G::_ngparticles);
-//                _locus_vect[G::_locus][recipient] = _locus_vect[G::_locus][donor];
-//                counts[donor]--;
-//                counts[recipient]++;
-//                nzeros--;
-//                if (counts[donor] == 1) {
-//                    // Move donor to next slot with count > 1
-//                    donor++;
-//                    while (donor < G::_ngparticles && counts[donor] < 2) {
-//                        donor++;
-//                    }
-//                }
-//
-//                // Move recipient to next slot with count equal to 0
-//                recipient++;
-//                while (recipient < G::_ngparticles && counts[recipient] > 0) {
-//                    recipient++;
-//                }
-//            }
-//        }
-//    }
-
-//    inline void Bundle::filterLocus(unsigned g) {
-////        vector<Particle::SharedPtr> particles = _gene_particles[g];
-//        normalizeWeights(_gene_particles[g], g);
-//
-//        resampleParticles(_gene_particles[g], _use_first ? _my_vec_2[g]:_my_vec_1[g]);
-//        //if use_first is true, my_vec = my_vec_2
-//        //if use_first is false, my_vec = my_vec_1
-//
-//        _gene_particles[g] = _use_first ? _my_vec_2[g]:_my_vec_1[g];
-//
-//        //change use_first from true to false or false to true
-//        _use_first = !_use_first;
-//
-//        resetWeights(_gene_particles[g]);
-//    }
 
     inline void Bundle::normalizeWeights(vector<Particle::SharedPtr> particles, unsigned g) {
         unsigned i = 0;
