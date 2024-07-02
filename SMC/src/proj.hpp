@@ -36,18 +36,19 @@ namespace proj {
             void                clear();
             void                processCommandLineOptions(int argc, const char * argv[]);
             void                run();
-            void                saveSpeciesTrees(vector<Bundle::SharedPtr> &b) const;
-            void                saveGeneTrees(unsigned ngenes, vector<Bundle::SharedPtr> &v) const;
-            void                saveGeneTree(unsigned gene_number, vector<Bundle::SharedPtr> &b) const;
-            void                normalizeWeights(vector<Particle::SharedPtr> & particles);
-            void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
-            void                resetWeights(vector<Particle::SharedPtr> & particles);
+            void                saveSpeciesTrees(vector<Bundle> &b) const;
+            void                saveGeneTrees(unsigned ngenes, vector<Bundle> &v) const;
+            void                saveGeneTree(unsigned gene_number, vector<Bundle> &b) const;
+            void                normalizeWeights(vector<Bundle::SharedPtr> & bundles);
+//            void                resampleBundles(vector<Bundle::SharedPtr> & from_bundles, vector<Bundle::SharedPtr> & to_bundles);
+            void                resetWeights(vector<Bundle::SharedPtr> & bundles);
             void                createSpeciesMap(Data::SharedPtr);
             void                simSpeciesMap();
             string              inventName(unsigned k, bool lower_case);
             void                showFinal(vector<Particle::SharedPtr> my_vec);
             void                writePaupFile(vector<Particle::SharedPtr> particles, vector<string> taxpartition);
-            void                initializeBundles(vector<Bundle::SharedPtr> &particles);
+            void                initializeBundles(vector<Bundle> &particles);
+            void                filterBundles(unsigned step, vector<Bundle> & bundles);
 
         private:
 
@@ -117,7 +118,7 @@ namespace proj {
         _nbundles = 1.0;
     }
 
-    inline void Proj::saveSpeciesTrees(vector<Bundle::SharedPtr> &b) const {
+    inline void Proj::saveSpeciesTrees(vector<Bundle> &b) const {
         // save only unique species trees
         if (!Forest::_run_on_empty) {
             vector<vector<pair<double, double>>> unique_increments_and_priors;
@@ -126,7 +127,7 @@ namespace proj {
             unique_treef << "#nexus\n\n";
             unique_treef << "begin trees;\n";
             for (auto &p:b) {
-                vector<pair<double, double>> increments_and_priors = p->getSpeciesTreeIncrementPriors();
+                vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
                 
                 bool found = false;
                 if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
@@ -134,7 +135,7 @@ namespace proj {
                 }
                 if (!found) {
                     unique_increments_and_priors.push_back(increments_and_priors);
-                    unique_treef << "  tree test = [&R] " << p->saveSpeciesNewick()  << ";\n";
+                    unique_treef << "  tree test = [&R] " << p.saveSpeciesNewick()  << ";\n";
                 }
             }
             unique_treef << "end;\n";
@@ -147,7 +148,7 @@ namespace proj {
             treef << "#nexus\n\n";
             treef << "begin trees;\n";
             for (auto &p:b) {
-                treef << "  tree test = [&R] " << p->saveSpeciesNewick()  << ";\n";
+                treef << "  tree test = [&R] " << p.saveSpeciesNewick()  << ";\n";
             }
             treef << "end;\n";
             treef.close();
@@ -167,14 +168,14 @@ namespace proj {
         }
 
 
-    inline void Proj::saveGeneTrees(unsigned ngenes, vector<Bundle::SharedPtr> &b) const {
+    inline void Proj::saveGeneTrees(unsigned ngenes, vector<Bundle> &b) const {
         if (_start_mode == "smc") {
             ofstream treef("gene_trees.trees");
             treef << "#nexus\n\n";
             treef << "begin trees;\n";
             for (auto &p:b) {
                     for (unsigned i=0; i<ngenes; i++) {
-                        treef << "tree gene" << i << " = [&R] " << p->saveGeneNewick(i)  << ";\n";
+                        treef << "tree gene" << i << " = [&R] " << p.saveGeneNewick(i)  << ";\n";
                 }
                 treef << endl;
             }
@@ -189,7 +190,7 @@ namespace proj {
             treef << "begin trees;\n";
             for (auto &p:b) {
                     for (unsigned i=0; i<ngenes; i++) {
-                        treef << "tree gene" << i << " = [&R] " << p->saveGeneNewick(i)  << ";\n";
+                        treef << "tree gene" << i << " = [&R] " << p.saveGeneNewick(i)  << ";\n";
                 }
                 treef << endl;
             }
@@ -198,13 +199,13 @@ namespace proj {
         }
     }
 
-    inline void Proj::saveGeneTree(unsigned gene_number, vector<Bundle::SharedPtr> &b) const {
+    inline void Proj::saveGeneTree(unsigned gene_number, vector<Bundle> &b) const {
         string name = "gene" + to_string(gene_number+1) + ".trees";
         ofstream treef(name);
         treef << "#nexus\n\n";
         treef << "begin trees;\n";
         for (auto &p:b) {
-            treef << "  tree test = [&R] " << p->saveGeneNewick(gene_number)  << ";\n";
+            treef << "  tree test = [&R] " << p.saveGeneNewick(gene_number)  << ";\n";
             treef << endl;
         }
         treef << "end;\n";
@@ -426,11 +427,11 @@ namespace proj {
         return log_particle_sum;
     }
 
-    inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles) {
+    inline void Proj::normalizeWeights(vector<Bundle::SharedPtr> & bundles) {
         unsigned i = 0;
-        vector<double> log_weight_vec(particles.size());
-        for (auto & p : particles) {
-            log_weight_vec[i++] = p->getLogWeight();
+        vector<double> log_weight_vec(bundles.size());
+        for (auto & b : bundles) {
+            log_weight_vec[i++] = b->getBundleLogWeight();
         }
 
         double log_particle_sum = getRunningSum(log_weight_vec);
@@ -443,68 +444,144 @@ namespace proj {
             cout << "\t" << "min weight = " << min << endl;;
         }
 
-        for (auto & p : particles) {
-            p->setLogWeight(p->getLogWeight() - log_particle_sum);
+        for (auto & b : bundles) {
+            b->setBundleLogWeight(b->getBundleLogWeight() - log_particle_sum);
         }
 
         _log_marginal_likelihood += log_particle_sum - log(_nparticles);
     }
 
-    inline void Proj::resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles) {
-         assert (from_particles.size() == _nparticles);
-         assert (to_particles.size() == _nparticles);
-
-         vector<pair<double, double>> cum_probs;
-             // Create vector of pairs p, with p.first = log weight and p.second = particle index
-         cum_probs.resize(_nparticles);
-         unsigned i = 0;
-
-         for (unsigned p=0; p < _nparticles; p++) {
-             cum_probs[i].first = from_particles[p]->getLogWeight();
-             cum_probs[i].second = i;
-             ++i;
-             }
-
-             // Sort cum_probs vector so that largest log weights come first
-             sort(cum_probs.begin(), cum_probs.end(), greater< pair<double,unsigned> >());
-
-             // Convert vector from storing log weights to storing cumulative weights
-             double cumpr = 0.0;
-             for (auto & w : cum_probs) {
-                 cumpr += exp(w.first);
-                 w.first = cumpr;
-             }
-
-             // Last element in cum_probs should hold 1.0 if weights were indeed normalized coming in
-             assert( fabs( 1.0 - cum_probs[_nparticles-1].first ) < Proj::_small_enough);
-
-
-         // Draw new set of particles by sampling with replacement according to cum_probs
-         to_particles.resize(_nparticles);
-         for(unsigned i = 0; i < _nparticles; i++) {
-
-             // Select a particle to copy to the ith slot in to_particles
-             int sel_index = -1;
-             double u = rng.uniform();
-             for(unsigned j = 0; j < _nparticles; j++) {
-                 if (u < cum_probs[j].first) {
-                     sel_index = cum_probs[j].second;
-                     break;
-                 }
-             }
-             assert(sel_index > -1);
-
-             Particle::SharedPtr p0 = from_particles[sel_index];
-             to_particles[i]=Particle::SharedPtr(new Particle(*p0));
-
-             assert(_nparticles == to_particles.size());
-             }
+    inline void Proj::filterBundles(unsigned step, vector<Bundle> & bundles) {
+        // Copy log weights for all bundles to prob vector
+        vector<double> probs(_nbundles, 0.0);
+        
+        for (unsigned b=0; b < _nbundles; b++) {
+            probs[b] = bundles[b].getBundleLogWeight();
         }
 
-    inline void Proj::resetWeights(vector<Particle::SharedPtr> & particles) {
-        double logw = -log(particles.size());
-        for (auto & p : particles) {
-            p->setLogWeight(logw);
+        // Normalize log_weights to create discrete probability distribution
+        double log_sum_weights = getRunningSum(probs);
+        
+        transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
+
+        // Compute cumulative probabilities
+        partial_sum(probs.begin(), probs.end(), probs.begin());
+
+        // Initialize vector of counts storing number of darts hitting each particle
+        vector<unsigned> counts (_nbundles, 0);
+
+        // Throw _nparticles darts
+        for (unsigned i=0; i<_nbundles; i++) {
+            double u = rng.uniform();
+            auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
+            assert(it != probs.end());
+            unsigned which = (unsigned)std::distance(probs.begin(), it);
+            counts[which]++;
+        }
+        
+        // Copy particles
+
+        // Locate first donor
+        unsigned donor = 0;
+        while (counts[donor] < 2) {
+            donor++;
+        }
+
+        // Locate first recipient
+        unsigned recipient = 0;
+        while (counts[recipient] != 0) {
+            recipient++;
+        }
+
+        // Count number of cells with zero count that can serve as copy recipients
+        unsigned nzeros = 0;
+        for (unsigned i = 0; i < _nbundles; i++) {
+            if (counts[i] == 0)
+                nzeros++;
+        }
+
+        while (nzeros > 0) {
+            assert(donor < _nbundles);
+            assert(recipient < _nbundles);
+
+            // Copy donor to recipient
+            bundles[recipient] = bundles[donor];
+
+            counts[donor]--;
+            counts[recipient]++;
+            nzeros--;
+
+            if (counts[donor] == 1) {
+                // Move donor to next slot with count > 1
+                donor++;
+                while (donor < _nbundles && counts[donor] < 2) {
+                    donor++;
+                }
+            }
+
+            // Move recipient to next slot with count equal to 0
+            recipient++;
+            while (recipient < _nbundles && counts[recipient] > 0) {
+                recipient++;
+            }
+        }
+    }
+
+//    inline void Proj::resampleBundles(vector<Bundle> & from_bundles, vector<Bundle> & to_bundles) {
+//          assert (from_bundles.size() == _nbundles);
+//         assert (to_bundles.size() == _nbundles);
+//
+//         vector<pair<double, double>> cum_probs;
+//             // Create vector of pairs p, with p.first = log weight and p.second = particle index
+//         cum_probs.resize(_nbundles);
+//         unsigned i = 0;
+//
+//         for (unsigned b=0; b < _nbundles; b++) {
+//             cum_probs[i].first = from_bundles[b]->getBundleLogWeight();
+//             cum_probs[i].second = i;
+//             ++i;
+//             }
+//
+//             // Sort cum_probs vector so that largest log weights come first
+//             sort(cum_probs.begin(), cum_probs.end(), greater< pair<double,unsigned> >());
+//
+//             // Convert vector from storing log weights to storing cumulative weights
+//             double cumpr = 0.0;
+//             for (auto & w : cum_probs) {
+//                 cumpr += exp(w.first);
+//                 w.first = cumpr;
+//             }
+//
+//             // Last element in cum_probs should hold 1.0 if weights were indeed normalized coming in
+//             assert( fabs( 1.0 - cum_probs[_nbundles-1].first ) < Proj::_small_enough);
+//
+//
+//         // Draw new set of particles by sampling with replacement according to cum_probs
+//         to_bundles.resize(_nbundles);
+//         for (unsigned i = 0; i < _nbundles; i++) {
+//
+//             // Select a particle to copy to the ith slot in to_particles
+//             int sel_index = -1;
+//             double u = rng.uniform();
+//             for(unsigned j = 0; j < _nbundles; j++) {
+//                 if (u < cum_probs[j].first) {
+//                     sel_index = cum_probs[j].second;
+//                     break;
+//                 }
+//             }
+//             assert(sel_index > -1);
+//             
+//             Bundle::SharedPtr b0 = from_bundles[sel_index];
+//             to_bundles[i] = Bundle::SharedPtr(new Bundle(*b0));
+//
+//             assert(_nbundles == to_bundles.size());
+//             }
+//        }
+
+    inline void Proj::resetWeights(vector<Bundle::SharedPtr> & bundles) {
+        double logw = -log(bundles.size());
+        for (auto & b : bundles) {
+            b->setBundleLogWeight(logw);
         }
     }
 
@@ -598,7 +675,7 @@ namespace proj {
         cout << "speciation rate = " << Forest::_lambda << endl;
     }
 
-    inline void Proj::initializeBundles(vector<Bundle::SharedPtr> &bundles) {
+    inline void Proj::initializeBundles(vector<Bundle> &bundles) {
         // set partials for first particle under save_memory setting for initial marginal likelihood calculation
         assert (_nthreads > 0);
 
@@ -610,10 +687,10 @@ namespace proj {
 
         assert(_nthreads == 1);
         for (auto & b:bundles ) { // TODO: can initialize some of these things in parallel?
-            b->setNGeneParticles(_nparticles);
-            b->setData(_data, _taxon_map, partials);
+            b.setNGeneParticles(_nparticles);
+            b.setData(_data, _taxon_map, partials);
             partials = false;
-            b->mapSpecies(_taxon_map, _species_names);
+            b.mapSpecies(_taxon_map, _species_names);
         }
     }
 
@@ -689,32 +766,72 @@ namespace proj {
     //          create vector of bundles
                 unsigned nsubsets = _data->getNumSubsets();
                 
-                vector<Bundle::SharedPtr> bundle_vec_1(_nbundles);
-                vector<Bundle::SharedPtr> bundle_vec_2(_nbundles);
-                vector<Bundle::SharedPtr> &bundle_vec = bundle_vec_1;
-
-                for (unsigned i=0; i < _nbundles; i++) {
-                    bundle_vec_1[i] = Bundle::SharedPtr(new Bundle);
-                    bundle_vec_2[i] = Bundle::SharedPtr(new Bundle);
-                }
+                vector<Bundle> bundle_vec;
+                bundle_vec.resize(_nbundles);
+                
+//                vector<Bundle::SharedPtr> bundle_vec_1(_nbundles);
+//                vector<Bundle::SharedPtr> bundle_vec_2(_nbundles);
+//                vector<Bundle::SharedPtr> &bundle_vec = bundle_vec_1;
+//
+//                for (unsigned i=0; i < _nbundles; i++) {
+//                    bundle_vec_1[i] = Bundle::SharedPtr(new Bundle);
+//                    bundle_vec_2[i] = Bundle::SharedPtr(new Bundle);
+//                }
 
                 Bundle::setNumGenes(nsubsets);
 
+                bool use_first = true;
+                
                 initializeBundles(bundle_vec); // initialize in parallel with multithreading
                 
-                unsigned n = 1;
-                for (auto &b:bundle_vec) {
-                    // set bundle random number seeds
-                    unsigned psuffix = 1;
-                    b->setSeed(rng.randint(1,9999) + psuffix);
-                    psuffix += 2;
-                    cout << "growing bundle " << n << endl;
-                    b->runBundle(); // for now, run each bundle separately and filter trees separately within each bundle
-                    n++;
+                unsigned nsteps = ntaxa - 1;
+                
+                for (unsigned s=0; s<nsteps; s++) {
+                    cout << "beginning step " << s << endl;
+
+                    unsigned n = 1;
+                    for (auto &b:bundle_vec) {
+                        // set bundle random number seeds
+                        unsigned psuffix = 1;
+                        b.setSeed(rng.randint(1,9999) + psuffix);
+                        psuffix += 2;
+//                        cout << "growing bundle " << n << endl;
+                        b.runBundle(); // for now, run each bundle separately and filter trees separately within each bundle
+                        n++;
+                    }
+                    
+                    filterBundles(s, bundle_vec);
+                    
+//                    normalizeWeights(bundle_vec);
+                    
+//                    double ess_inverse = 0.0;
+                    
+//                    if (_verbose > 1) {
+//                        for (auto & b:bundle_vec) {
+//                            ess_inverse += exp(2.0*b->getBundleLogWeight());
+//                        }
+//
+//                        double ess = 1.0/ess_inverse;
+//                            cout << "\t" << "ESS is : " << ess << endl;
+//                    }
+                    
+//                    resampleBundles(bundle_vec, use_first ? bundle_vec_2:bundle_vec_1); // TODO: bundles seem to not be copying correctly
+                    //if use_first is true, bundle_vec = bundle_vec_2
+                    //if use_first is false, bundle_vec = bundle_vec_1
+                    
+//                    bundle_vec = use_first ? bundle_vec_2:bundle_vec_1;
+                    
+                    //change use_first from true to false or false to true
+//                    use_first = !use_first;
+                    
+//                    resetWeights(bundle_vec);
+                    
+//                    for (auto &b:bundle_vec) {
+//                        cout << b->saveGeneNewick(0) << endl;
+//                    }
+                
                 }
-                
-                // TODO: filter among bundles - need marginal likelihood for this
-                
+                                
                 saveSpeciesTrees(bundle_vec);
 //                saveGeneTrees(nsubsets, bundle_vec);
                 for (unsigned i=0; i<nsubsets; i++) {

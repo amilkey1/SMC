@@ -334,14 +334,8 @@ class Particle {
                 assert (gene_increment > 0.0);
             }
             
-//            double species_increment = -1.0;
-//            if (_forest._species_partition.size() > 1) {
-                double species_increment = _t[_current_species].second;
-//            }
-//            if (species_increment == -1.0) {
-//                cout << "stop";
-//            }
-            
+            double species_increment = _t[_current_species].second;
+
             if ((gene_increment < species_increment || _forest._species_partition.size() == 1) && gene_increment != -1.0) {
                 // if the species forest is done, don't choose a speciation event
                 assert (gene_increment > 0.0);
