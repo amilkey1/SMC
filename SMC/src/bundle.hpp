@@ -11,52 +11,55 @@ using namespace boost;
 
 extern proj::Lot rng;
 
-namespace proj {
+    namespace proj {
 
-class Bundle {
-    public:
-    
-        Bundle();
-        Bundle(const Bundle & other);
-        typedef std::shared_ptr<Bundle>               SharedPtr;
-        Lot::SharedPtr getLot() const {return _lot;}
-    
-        void setSeed(unsigned seed) const {_lot->setSeed(seed);}
-        void                                            clear();
-        static void                                     setNumGenes(unsigned nsubsets){_ngenes = nsubsets;}
-        void                                            operator=(const Bundle & other);
-        void                                            setData(Data::SharedPtr d, map<string, string> &taxon_map, bool partials);
-        void                                            mapSpecies(map<string, string> &taxon_map, vector<string> &species_names);
-        void                                            setNGeneParticles(unsigned nparticles) {_ngene_particles = nparticles;}
-        void                                            runBundle();
-        void                                            filterLocus(unsigned g);
-        void                                            filterLoci();
-        void                                            normalizeWeights(vector<Particle::SharedPtr> particles, unsigned g);
-        double                                          getRunningSum(vector<double> log_weight_vec);
-        void                                            resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
-        void                                            resetWeights(vector<Particle::SharedPtr> & particles);
-        vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
-        string                                          saveSpeciesNewick(){return _species_particle->saveForestNewick();}
-        string                                          saveGeneNewick(unsigned i){return _gene_particles[i][0].saveForestNewick();} // TODO: for now, just saving first gene tree - later, save all of them?
-        double                                          getBundleLogWeight(){return _bundle_log_weight;}
-        void                                            setBundleLogWeight(double w) {_bundle_log_weight = w;}
-    
-    private:
-    
-        vector<vector<Particle>>                                            _gene_particles;
-//        vector<vector<Particle::SharedPtr>>                             _my_vec_1;
-//        vector<vector<Particle::SharedPtr>>                             _my_vec_2;
-        Particle::SharedPtr                                             _species_particle;
-        mutable                                                         Lot::SharedPtr _lot;
-        static unsigned                                                 _ngenes;
-        static unsigned                                                 _ngene_particles;
-        vector<double>                                                  _log_marginal_likelihood_by_gene;
-        bool                                                            _use_first;
-        double                                                          _small_enough;
-        unsigned                                                        _generation;
-        double                                                          _bundle_log_weight;
-        vector<double>                                                  _prev_log_marginal_likelihood_by_gene;
-};
+    class Bundle {
+        public:
+        
+            Bundle();
+            Bundle(const Bundle & other);
+            typedef std::shared_ptr<Bundle>               SharedPtr;
+            Lot::SharedPtr getLot() const {return _lot;}
+        
+            void setSeed(unsigned seed) const {_lot->setSeed(seed);}
+            void                                            clear();
+            static void                                     setNumGenes(unsigned nsubsets){_ngenes = nsubsets;}
+            void                                            operator=(const Bundle & other);
+            void                                            setData(Data::SharedPtr d, map<string, string> &taxon_map, bool partials);
+            void                                            mapSpecies(map<string, string> &taxon_map, vector<string> &species_names);
+            void                                            setNGeneParticles(unsigned nparticles) {_ngene_particles = nparticles;}
+            void                                            runBundle();
+            void                                            filterLocus(unsigned g);
+            void                                            filterLoci();
+            void                                            filterSpecies();
+            void                                            normalizeWeights(vector<Particle::SharedPtr> particles, unsigned g);
+            double                                          getRunningSum(vector<double> log_weight_vec);
+            void                                            resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
+            void                                            resetWeights(vector<Particle> & particles);
+            vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
+            string                                          saveSpeciesNewick(){return _species_particle.saveForestNewick();}
+            string                                          saveGeneNewick(unsigned i){return _gene_particles[i][0].saveForestNewick();} // TODO: for now, just saving first gene tree - later, save all of them?
+            double                                          getBundleLogWeight(){return _bundle_log_weight;}
+            void                                            setBundleLogWeight(double w) {_bundle_log_weight = w;}
+            void                                            clearPartials();
+            void                                            resetSpecies();
+            void                                            proposeSpeciesParticles();
+        
+        private:
+        
+            vector<vector<Particle>>                                        _gene_particles;
+            Particle                                                        _species_particle;
+            mutable                                                         Lot::SharedPtr _lot;
+            static unsigned                                                 _ngenes;
+            static unsigned                                                 _ngene_particles;
+            vector<double>                                                  _log_marginal_likelihood_by_gene;
+            bool                                                            _use_first;
+            double                                                          _small_enough;
+            unsigned                                                        _generation;
+            double                                                          _bundle_log_weight;
+            vector<double>                                                  _prev_log_marginal_likelihood_by_gene;
+            double                                                          _prev_log_coalescent_likelihood;
+    };
 
     inline Bundle::Bundle() {
         _lot.reset(new Lot());
@@ -67,7 +70,7 @@ class Bundle {
         _ngenes = 1;
         _ngene_particles = 1;
         _gene_particles.clear();
-        _species_particle = nullptr;
+//        _species_particle = nullptr;
         _use_first = true;
 //        _my_vec_1.clear();
 //        _my_vec_2.clear();
@@ -76,6 +79,7 @@ class Bundle {
         _bundle_log_weight = 0.0;
         _prev_log_marginal_likelihood_by_gene.clear();
         _log_marginal_likelihood_by_gene.clear();
+        _prev_log_coalescent_likelihood = 0.0;
     }
 
     inline Bundle::Bundle(const Bundle & other) {
@@ -100,8 +104,8 @@ class Bundle {
             }
             index++;
         }
-        _species_particle = Particle::SharedPtr(new Particle);
-        _species_particle->setData(d, taxon_map, partials, "species", index);
+        _species_particle = Particle(*new Particle); // TODO: why * ?
+        _species_particle.setData(d, taxon_map, partials, "species", index);
     }
 
     inline void Bundle::mapSpecies(map<string, string> &taxon_map, vector<string> &species_names) {
@@ -110,7 +114,7 @@ class Bundle {
                 _gene_particles[g][i].mapSpecies(taxon_map, species_names, "gene");
             }
         }
-        _species_particle->mapSpecies(taxon_map, species_names, "species");
+        _species_particle.mapSpecies(taxon_map, species_names, "species");
     }
 
     inline void Bundle::runBundle() {
@@ -120,14 +124,14 @@ class Bundle {
 
             // TODO: draw a species increment to start with - for now, build entire species tree from the start
     //        _species_particle->drawFirstSpeciesIncrement();
-            _species_particle->setLot(_lot);
-            _species_particle->buildEntireSpeciesTree();
+            _species_particle.setLot(_lot);
+            _species_particle.buildEntireSpeciesTree();
 
             // set a starting likelihood for each gene particle  - // TODO: can copy some of this later
             for (unsigned g=0; g<_ngenes; g++) {
                 for (unsigned i=0; i<_ngene_particles; i++) {
                     _gene_particles[g][i].setLot(_lot); // TODO: set lot or rnseed?
-                    _gene_particles[g][i]._t = _species_particle->_t;
+                    _gene_particles[g][i]._t = _species_particle._t;
                     _gene_particles[g][i].calcLogLikelihood();
                 }
             }
@@ -154,6 +158,10 @@ class Bundle {
             }
             
         filterLoci();
+        
+        for (unsigned g=0; g<_ngenes; g++) {
+            resetWeights(_gene_particles[g]);
+        }
 //        }
         
         double log_weight = 0.0;
@@ -321,16 +329,94 @@ class Bundle {
              }
         }
 
-    inline void Bundle::resetWeights(vector<Particle::SharedPtr> & particles) {
+    inline void Bundle::resetWeights(vector<Particle> & particles) {
         double logw = -log(particles.size());
         for (auto & p : particles) {
-            p->setLogWeight(logw);
+            p.setLogWeight(logw);
         }
     }
 
     inline vector<pair<double, double>> Bundle::getSpeciesTreeIncrementPriors() {
-        return _species_particle->getSpeciesTreeIncrementPriors();
+        return _species_particle.getSpeciesTreeIncrementPriors();
     }
+
+    inline void Bundle::clearPartials() {
+        // TODO: for now, just condition on first particle of each gene
+        for (unsigned g=0; g<_ngenes; g++) {
+            _gene_particles[g][0].clearPartials();
+        }
+    }
+
+    inline void Bundle::resetSpecies() {
+        _generation = 0;
+        // TODO: for now, just condition on first particle of each gene
+        for (unsigned g=0; g<_ngenes; g++) {
+            _gene_particles[g][0].resetSpecies();
+        }
+        _species_particle.resetSpecies();
+    }
+    
+    inline void Bundle::proposeSpeciesParticles() {
+        if (_generation == 0) {
+            for (unsigned g=0; g<_ngenes; g++) {
+                _gene_particles[g][0].setUpSpeciesOnlyProposal();
+            }
+        }
+        
+        unsigned psuffix = 1;
+        
+        for (unsigned g=0; g<_ngenes; g++) {
+            for (unsigned i=0; i<_ngene_particles; i++) {
+                
+                // set particle random number seeds
+                _gene_particles[g][i].setSeed(rng.randint(1,9999) + psuffix);
+                psuffix += 2;
+            }
+        }
+        
+        _species_particle.setSeed(rng.randint(1,9999) + psuffix);
+        
+//        double prev_log_coalescent_likelihood = _species_particle._log_coalescent_likelihood;
+        
+        vector<double> max_depths;
+        
+        tuple<string, string, string> species_joined = _species_particle.speciesJoinProposal();
+        
+        bool reset = true;
+        
+        if (_species_particle._forest._lineages.size() == 1) {
+            reset = false;
+        }
+        for (unsigned g=0; g<_ngenes; g++) {
+            max_depths.push_back(_gene_particles[g][0].getMaxDepth(species_joined, reset));
+        }
+        
+        double max_depth = _species_particle.speciesOnlyProposal(max_depths);
+        
+        double log_coalescent_likelihood = 0.0;
+        for (unsigned g=0; g<_ngenes; g++) {
+            log_coalescent_likelihood += _gene_particles[g][0].calcLogCoalescentLikelihood(_species_particle._forest._last_edge_length, species_joined, _species_particle._forest._species_tree_height); // TODO: double check species tree height - don't need it in both forest and particle
+        }
+        
+        _bundle_log_weight = log_coalescent_likelihood - _prev_log_coalescent_likelihood;
+        
+        _prev_log_coalescent_likelihood = log_coalescent_likelihood;
+        
+#if !defined (UNCONSTRAINED_PROPOSAL)
+            double test = 1/_bundle_log_weight;
+            assert(test != -0); // assert coalescent likelihood is not -inf
+        if (max_depth > 0.0) {
+            _bundle_log_weight += _species_particle.calcConstrainedWeightFactor(max_depth);
+        }
+#endif
+        
+        if (_species_particle._forest._lineages.size() == 2) {
+            _species_particle.speciesJoinProposal(); // join remaining species - no change in coalescent likelihood
+        }
+        _generation++;
+        
+    }
+
 
     inline void Bundle::operator=(const Bundle & other) {
 //        _gene_particles = other._gene_particles;
@@ -338,13 +424,12 @@ class Bundle {
         _ngenes = other._ngenes;
         _ngene_particles = other._ngene_particles;
         _log_marginal_likelihood_by_gene = other._log_marginal_likelihood_by_gene;
-//        _my_vec_1 = other._my_vec_1;
-//        _my_vec_2 = other._my_vec_2;
         _use_first = other._use_first;
         _generation = other._generation;
         _bundle_log_weight = other._bundle_log_weight;
         _small_enough = other._small_enough;
         _prev_log_marginal_likelihood_by_gene = other._prev_log_marginal_likelihood_by_gene;
+        _prev_log_coalescent_likelihood = other._prev_log_coalescent_likelihood;
         
         // copy particles // TODO: is this necessary?
         _gene_particles.resize(_ngenes);
@@ -354,24 +439,6 @@ class Bundle {
                 _gene_particles[g][i] = other._gene_particles[g][i];
             }
         }
-        
-        // copy particles
-//        _my_vec_1.resize(_ngenes);
-//        for (unsigned g=0; g<_ngenes; g++) {
-//            for (unsigned i=0; i <_ngene_particles; i++) {
-//                _my_vec_1[g].resize(_ngene_particles);
-//                _my_vec_1[g][i] = other._gene_particles[g][i];
-//            }
-//        }
-        
-        // copy particles
-//        _my_vec_2.resize(_ngenes);
-//        for (unsigned g=0; g<_ngenes; g++) {
-//            for (unsigned i=0; i <_ngene_particles; i++) {
-//                _my_vec_2[g].resize(_ngene_particles);
-//                _my_vec_2[g][i] = other._gene_particles[g][i];
-//            }
-//        }
     };
 
 }

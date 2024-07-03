@@ -37,9 +37,10 @@ namespace proj {
             void                processCommandLineOptions(int argc, const char * argv[]);
             void                run();
             void                saveSpeciesTrees(vector<Bundle> &b) const;
+            void                saveSpeciesTreesHierarchical(vector<Bundle> &b, string filename1) const;
             void                saveGeneTrees(unsigned ngenes, vector<Bundle> &v) const;
             void                saveGeneTree(unsigned gene_number, vector<Bundle> &b) const;
-            void                resetWeights(vector<Bundle::SharedPtr> & bundles);
+            void                resetWeights(vector<Bundle> & bundles);
             void                createSpeciesMap(Data::SharedPtr);
             void                simSpeciesMap();
             string              inventName(unsigned k, bool lower_case);
@@ -114,6 +115,21 @@ namespace proj {
         _small_enough = 0.0000001;
         _phi = 1.0;
         _nbundles = 1.0;
+    }
+
+    inline void Proj::saveSpeciesTreesHierarchical(vector<Bundle> &b, string filename1) const {
+          assert (_start_mode != "sim");
+
+          unsigned count = 0;
+          // save all species trees
+          std::ofstream treef;
+
+          treef.open(filename1, std::ios_base::app);
+          for (auto &p:b) {
+              treef << "  tree test = [&R] " << p.saveSpeciesNewick()  << ";\n";
+              count++;
+          }
+          treef.close();
     }
 
     inline void Proj::saveSpeciesTrees(vector<Bundle> &b) const {
@@ -501,10 +517,10 @@ namespace proj {
         }
     }
 
-    inline void Proj::resetWeights(vector<Bundle::SharedPtr> & bundles) {
+    inline void Proj::resetWeights(vector<Bundle> & bundles) {
         double logw = -log(bundles.size());
         for (auto & b : bundles) {
-            b->setBundleLogWeight(logw);
+            b.setBundleLogWeight(logw);
         }
     }
 
@@ -714,13 +730,116 @@ namespace proj {
                     }
                     
                     filterBundles(s, bundle_vec);
+                    resetWeights(bundle_vec);
                 
                 }
                                 
-                saveSpeciesTrees(bundle_vec);
+//                saveSpeciesTrees(bundle_vec);
                 for (unsigned i=0; i<nsubsets; i++) {
                     saveGeneTree(i, bundle_vec); // TODO: for now, saving 1 gene per bundle
                 }
+
+#if defined (HIERARCHICAL_FILTERING)
+                string filename1 = "species_trees.trees";
+                
+                if (filesystem::remove(filename1)) {
+                    ofstream speciestrf(filename1);
+                    speciestrf << "#nexus\n\n";
+                    speciestrf << "begin trees;\n";
+                    if (_verbose > 0) {
+                        cout << "existing file " << filename1 << " removed and replaced\n";
+                    }
+                }
+                
+                unsigned ngroups = round(_nbundles * _thin);
+                if (ngroups == 0) {
+                    ngroups = 1;
+                    cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
+                } // TODO: no thinning for now
+
+                random_shuffle(bundle_vec.begin(), bundle_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
+                // delete first (1-_thin) % of particles
+                bundle_vec.erase(next(bundle_vec.begin(), 0), next(bundle_vec.begin(), (_nbundles-ngroups)));
+                assert(bundle_vec.size() == ngroups);
+
+
+                for (auto &b:bundle_vec) {
+                    // reset forest species partitions
+                    b.clearPartials(); // no more likelihood calculations
+                    b.resetSpecies();
+                    b.mapSpecies(_taxon_map, _species_names);
+                }
+
+                vector<Particle::SharedPtr> new_vec;
+
+                _nparticles = _particle_increase; // TODO: unsure
+                _nbundles = _particle_increase;
+                unsigned index = 0;
+                
+// no parallelization for now
+                for (unsigned a=0; a < ngroups; a++) {
+                    // TODO: for now, take 1 set of gene trees from each bundle
+                    vector<Bundle> use_vec;
+                    
+                    Bundle chosen_bundle = bundle_vec[a]; // bundle to copy
+                    
+                    for (unsigned i=0; i<_particle_increase; i++) {
+                        use_vec.push_back(*new Bundle(chosen_bundle)); // TODO: why * ?
+                    }
+
+                    assert(use_vec.size() == _particle_increase);
+
+                    index += _particle_increase;
+
+                    if (_verbose > 0) {
+                        cout << "beginning species tree proposals for subset " << a+1 << endl;
+                    }
+                    
+                    for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
+                        if (_verbose > 0) {
+                            cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
+                        }
+
+                        // set particle random number seeds
+                        unsigned psuffix = 1;
+                        for (auto &b:use_vec) {
+                            b.setSeed(rng.randint(1,9999) + psuffix);
+                            psuffix += 2;
+                        }
+
+                        for (auto &b:use_vec) {
+                            b.proposeSpeciesParticles();
+                        }
+                        
+                        filterBundles(s, use_vec);
+//                        resetWeights(bundle_vec);
+                    } // s loop
+                    
+                    if (_save_every > 1.0) { // thin sample for output by taking a random sample
+                        unsigned sample_size = round (double (_particle_increase) / double(_save_every));
+                        if (sample_size == 0) {
+                            cout << "\n";
+                            cout << "current settings would save 0 species trees; saving every species tree\n";
+                            cout << "\n";
+                            sample_size = _particle_increase;
+                        }
+
+                        random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
+                        // delete first (1-_thin) % of particles
+                        use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
+                        assert (use_vec.size() == sample_size);
+                        
+                    }
+                    saveSpeciesTreesHierarchical(use_vec, filename1);
+                }
+
+                // finish species tree file
+                std::ofstream treef;
+                treef.open(filename1, std::ios_base::app);
+                treef << "end;\n";
+                treef.close();
+
+#endif
 
             }
 

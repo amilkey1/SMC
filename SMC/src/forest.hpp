@@ -137,6 +137,7 @@ class Forest {
         double                      _log_weight;
         string                      _ancestral_species_name;
         pair<Node*, Node*>          _nodes_joined;
+        double                      _species_tree_height;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -208,6 +209,7 @@ class Forest {
         _species_build.clear();
         _taxon_map.clear();
         _species_indices.clear();
+        _species_tree_height = 0.0;
         
     }
 
@@ -1035,6 +1037,7 @@ class Forest {
         _taxon_map = other._taxon_map;
         _species_indices = other._species_indices;
         _nodes_joined = other._nodes_joined;
+        _species_tree_height = other._species_tree_height;
 
         // copy tree itself
 
@@ -1180,6 +1183,8 @@ class Forest {
         else {
             _species_build.back().second = _last_edge_length;
         }
+        
+        _species_tree_height += _last_edge_length;
     }
 
 

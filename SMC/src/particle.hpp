@@ -41,6 +41,7 @@ class Particle {
         void                                    saveForest(std::string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
+        double                                  calcConstrainedWeightFactor(double max_depth);
         double                                  getLogLikelihood();
         double                                  calcGeneTreeLogLikelihood();
         double                                  calcHeight();
@@ -78,12 +79,13 @@ class Particle {
         vector<pair<double, double>>                    getIncrementPriors(unsigned i);
         vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
         double                                          getCoalescentLikelihood(unsigned g);
-        bool                                            speciesJoinProposed();
         void                                            clear();
         vector<double>                                  chooseIncrements(vector<double> event_choice_rates);
-        void                                            speciesProposal();
-        void                                            speciesOnlyProposal();
-        void                                            speciesOnlyProposalIntegratingOutTheta();
+        double                                          speciesOnlyProposal(vector<double> max_depth_vector);
+        double                                          calcLogCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
+        tuple<string, string, string>                   speciesJoinProposal();
+        double                                          getMaxDepth(tuple<string, string, string> species_joined, bool reset);
+        void                                            setUpSpeciesOnlyProposal();
         void                                            clearPartials();
         Lot::SharedPtr getLot() const {return _lot;}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
@@ -220,6 +222,135 @@ class Particle {
 
     inline void Particle::clearPartials() {
         _forest.clearPartials();
+    }
+
+    inline void Particle::setUpSpeciesOnlyProposal() {
+        assert (_generation == 0);
+        assert (_type == "gene");
+        _forest.refreshPreorder();
+        _forest.calcMinDepth();
+        _forest._nincrements = 0;
+    }
+
+    inline tuple<string, string, string> Particle::speciesJoinProposal() {
+        assert (_type == "species");
+        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+        
+        if (_forest._last_edge_length > 0.0) {
+        // choose species to join if past the first species generation for each forest vector
+            species_joined = _forest.speciesTreeProposal(_lot);
+        }
+        
+        return species_joined;
+    }
+
+    inline double Particle::getMaxDepth(tuple<string, string, string> species_joined, bool reset) {
+        assert (_type == "gene");
+        
+        string species1 = get<0>(species_joined);
+        string species2 = get<1>(species_joined);
+        
+        if (species1 != "null") {
+            _forest.updateSpeciesPartition(species_joined); // if using Jones formula, this will happen in coalescent likelihood calculation
+        }
+        
+        if (reset && species1 != "null") {
+            _forest.resetDepthVector(species_joined);
+        }
+        double max_depth = (_forest.getMinDepths())[0].first;
+        
+        return max_depth;
+    }
+
+    inline double Particle::speciesOnlyProposal(vector<double> max_depth_vector) {
+        assert (_type == "species");
+        
+        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+        double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
+        
+//            if (_forest._last_edge_length > 0.0) {
+//            // choose species to join if past the first species generation for each forest vector
+//                species_joined = _forest.speciesTreeProposal(_lot);
+//            }
+        
+                double max_depth = 0.0;
+        
+                if (_forest._lineages.size() > 1) {
+                    max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
+                    max_depth -= _forest.getTreeHeight();
+                    // choose a species tree increment
+                }
+                
+                if (_forest._lineages.size() > 1) {
+    #if !defined (UNCONSTRAINED_PROPOSAL)
+                    assert (max_depth > 0.0);
+                    _forest.chooseSpeciesIncrementOnly(_lot, max_depth);
+    #else
+                    _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
+    #endif
+                    _species_tree_height += _forest._last_edge_length;
+                }
+                if (_forest._lineages.size() == 1) {
+                    _forest._last_edge_length = 0.0;
+                }
+        
+                _t.push_back(make_pair(species_joined, _forest._last_edge_length));
+        
+//        if (_forest._last_edge_length > max_depth) {
+//            _log_coalescent_likelihood = -1*numeric_limits<double>::infinity();
+//        }
+//        else {
+//            for (int i = 1; i<_forests.size(); i++) { // TODO: need to do this separately for each gene particle
+//                _forest.calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
+//                _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
+//            }
+//        }
+        
+//        if (_forests[0]._lineages.size() == 2) {
+//            // join remaining species lineages, no change in coalescent likelihood, just need to add panmictic coalescent for each gene tree (to avoid total recalculation)
+//            // no need to draw a new theta because we are at the ancestral population now
+//            species_joined = _forests[0].speciesTreeProposal(_lot);
+//            for (int i=1; i<_forests.size(); i++) {
+//                _forests[i]._log_coalescent_likelihood += _forests[i]._panmictic_coalescent_likelihood;
+//                _forests[i]._panmictic_coalescent_likelihood = 0.0; // for clarity, reset to 0
+//            }
+//        }
+        
+        double constrained_factor = 0.0;
+//    #if !defined (UNCONSTRAINED_PROPOSAL)
+//        assert (max_depth > 0.0);
+//        double nlineages = _forests[0]._lineages.size();
+//        constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
+//    #endif
+            _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
+    #if !defined (UNCONSTRAINED_PROPOSAL)
+//            double test = 1/_log_species_weight;
+//            assert(test != -0); // assert coalescent likelihood is not -inf
+    #endif
+//        double neg_inf = -1*numeric_limits<double>::infinity();
+//        if (_log_coalescent_likelihood == neg_inf) {
+//            assert (_forests[0]._last_edge_length > max_depth);
+//        }
+        
+        _generation++;
+//    #endif
+        return max_depth;
+    }
+
+    inline double Particle::calcConstrainedWeightFactor(double max_depth) {
+        assert (max_depth > 0.0);
+        double nlineages = _forest._lineages.size();
+        double constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
+        return constrained_factor;
+    }
+
+    inline double Particle::calcLogCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {
+        // TODO: update species partition?
+//        _forest.showForest();
+        _forest.calcCoalescentLikelihood(species_increment, species_joined, species_tree_height);
+        _log_coalescent_likelihood = _forest._log_coalescent_likelihood + _forest._panmictic_coalescent_likelihood;
+        return _log_coalescent_likelihood;
+
     }
 
     inline void Particle::setLogCoalescentLikelihood(double log_coal_like) {
@@ -523,13 +654,25 @@ class Particle {
 #endif
     }
 
-    inline bool Particle::speciesJoinProposed() {
-        if (_species_join_proposed) {
-            return true;
+    inline void Particle::resetSpecies() {
+        if (_type == "species" ) {
+            _forest.clear();
+            setLogWeight(0.0);
+            _species_tree_height = 0.0;
+            _log_coalescent_likelihood = 0.0;
+            _forest._last_edge_length = 0.0;
+            _forest._increments_and_priors.clear();
+            _forest._species_tree_height = 0.0;
         }
+        
         else {
-            return false;
+            _forest._log_coalescent_likelihood = 0.0;
+            _forest._data = nullptr;
+            _forest._log_weight = 0.0;
         }
+        
+        _t.clear();
+        _generation = 0;
     }
 
     inline void Particle::operator=(const Particle & other) {
