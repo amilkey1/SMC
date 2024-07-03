@@ -29,12 +29,9 @@ extern proj::Lot rng;
             void                                            mapSpecies(map<string, string> &taxon_map, vector<string> &species_names);
             void                                            setNGeneParticles(unsigned nparticles) {_ngene_particles = nparticles;}
             void                                            runBundle();
-            void                                            filterLocus(unsigned g);
             void                                            filterLoci();
             void                                            filterSpecies();
-            void                                            normalizeWeights(vector<Particle::SharedPtr> particles, unsigned g);
             double                                          getRunningSum(vector<double> log_weight_vec);
-            void                                            resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                                            resetWeights(vector<Particle> & particles);
             vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
             string                                          saveSpeciesNewick(){return _species_particle.saveForestNewick();}
@@ -70,10 +67,7 @@ extern proj::Lot rng;
         _ngenes = 1;
         _ngene_particles = 1;
         _gene_particles.clear();
-//        _species_particle = nullptr;
         _use_first = true;
-//        _my_vec_1.clear();
-//        _my_vec_2.clear();
         _small_enough = 0.0000001;
         _generation = 0;
         _bundle_log_weight = 0.0;
@@ -92,9 +86,6 @@ extern proj::Lot rng;
         for (auto &g:_gene_particles) {
             g.resize(_ngene_particles);
         }
-        
-//        _my_vec_1 = _gene_particles;
-//        _my_vec_2 = _gene_particles;
         
         unsigned index = 1;
         for (unsigned g=0; g<_ngenes; g++) {
@@ -123,7 +114,8 @@ extern proj::Lot rng;
         if (_generation == 0) {
 
             // TODO: draw a species increment to start with - for now, build entire species tree from the start
-    //        _species_particle->drawFirstSpeciesIncrement();
+//            _species_particle->drawFirstSpeciesIncrement();
+            
             _species_particle.setLot(_lot);
             _species_particle.buildEntireSpeciesTree();
 
@@ -139,9 +131,6 @@ extern proj::Lot rng;
             _log_marginal_likelihood_by_gene.resize(_ngenes);
             _prev_log_marginal_likelihood_by_gene.resize(_ngenes);
         }
-        
-//        for (unsigned n=0; n<nsteps; n++) {
-//            cout << "beginning step " << n << endl;
             
             unsigned psuffix = 1;
             
@@ -162,7 +151,6 @@ extern proj::Lot rng;
         for (unsigned g=0; g<_ngenes; g++) {
             resetWeights(_gene_particles[g]);
         }
-//        }
         
         double log_weight = 0.0;
         for (auto &m:_log_marginal_likelihood_by_gene) {
@@ -249,22 +237,6 @@ extern proj::Lot rng;
         }
     }
 
-    inline void Bundle::normalizeWeights(vector<Particle::SharedPtr> particles, unsigned g) {
-        unsigned i = 0;
-        vector<double> log_weight_vec(particles.size());
-        for (auto & p : particles) {
-            log_weight_vec[i++] = p->getLogWeight();
-        }
-
-        double log_particle_sum = getRunningSum(log_weight_vec);
-
-        for (auto & p : particles) {
-            p->setLogWeight(p->getLogWeight() - log_particle_sum);
-        }
-
-        _log_marginal_likelihood_by_gene[g] += log_particle_sum - log(_ngene_particles);
-    }
-
     inline double Bundle::getRunningSum(vector<double> log_weight_vec) {
         double running_sum = 0.0;
         double log_particle_sum = 0.0;
@@ -277,57 +249,6 @@ extern proj::Lot rng;
 
         return log_particle_sum;
     }
-
-    inline void Bundle::resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles) {
-         assert (from_particles.size() == _ngene_particles);
-         assert (to_particles.size() == _ngene_particles);
-
-         vector<pair<double, double>> cum_probs;
-             // Create vector of pairs p, with p.first = log weight and p.second = particle index
-         cum_probs.resize(_ngene_particles);
-         unsigned i = 0;
-
-        for (unsigned p=0; p < _ngene_particles; p++) {
-             cum_probs[i].first = from_particles[p]->getLogWeight();
-             cum_probs[i].second = i;
-             ++i;
-             }
-
-             // Sort cum_probs vector so that largest log weights come first
-             sort(cum_probs.begin(), cum_probs.end(), greater< pair<double,unsigned> >());
-
-             // Convert vector from storing log weights to storing cumulative weights
-             double cumpr = 0.0;
-             for (auto & w : cum_probs) {
-                 cumpr += exp(w.first);
-                 w.first = cumpr;
-             }
-
-             // Last element in cum_probs should hold 1.0 if weights were indeed normalized coming in
-             assert( fabs( 1.0 - cum_probs[_ngene_particles-1].first ) < _small_enough);
-
-
-         // Draw new set of particles by sampling with replacement according to cum_probs
-         to_particles.resize(_ngene_particles);
-         for(unsigned i = 0; i < _ngene_particles; i++) {
-
-             // Select a particle to copy to the ith slot in to_particles
-             int sel_index = -1;
-             double u = rng.uniform();
-             for(unsigned j = 0; j < _ngene_particles; j++) {
-                 if (u < cum_probs[j].first) {
-                     sel_index = cum_probs[j].second;
-                     break;
-                 }
-             }
-             assert(sel_index > -1);
-
-             Particle::SharedPtr p0 = from_particles[sel_index];
-             to_particles[i]=Particle::SharedPtr(new Particle(*p0));
-
-             assert(_ngene_particles == to_particles.size());
-             }
-        }
 
     inline void Bundle::resetWeights(vector<Particle> & particles) {
         double logw = -log(particles.size());
