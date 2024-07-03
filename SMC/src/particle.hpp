@@ -103,10 +103,10 @@ class Particle {
         pair<string, string>                            getSpeciesJoined(){return make_pair(_forest._species_joined.first->_name, _forest._species_joined.second->_name);}
         void                                            setPsuffix(unsigned psuffix) {_psuffix = psuffix;}
         unsigned                                        showPrevForestNumber(){return _prev_forest_number;}
-        void                                            setNSites(vector<unsigned> nsites) {_nsites_per_gene = nsites;}
         void                                            updateSpeciesPartition(pair<tuple<string, string, string>, double> species_info);
         void                                            buildEntireSpeciesTree();
         void                                            setLot(Lot::SharedPtr lot) {_lot = lot;}
+        void                                            updateSpeciesTree();
     
     private:
 
@@ -118,7 +118,6 @@ class Particle {
         double                                  _log_likelihood;
         int                                     _generation = 0;
         unsigned                                _prev_forest_number;
-        bool                                    _species_join_proposed;
         double                                  _log_coalescent_likelihood;
         mutable                                 Lot::SharedPtr _lot;
         unsigned                                _num_deep_coalescences;
@@ -128,7 +127,6 @@ class Particle {
         vector<pair<tuple<string, string, string>, double>> _t;
         pair<unsigned, double>                                  _gene_increment;
         vector<double>                          _starting_log_likelihoods;
-        vector<unsigned>                        _nsites_per_gene;
         string                                  _type;
         unsigned                                _current_species;
 };
@@ -167,7 +165,6 @@ class Particle {
         _nsubsets       = 0;
         _generation     = 0;
         _prev_forest_number = 0;
-        _species_join_proposed = false;
         _log_coalescent_likelihood = 0.0;
         _num_deep_coalescences = 0.0;
         _species_tree_height = 0.0;
@@ -175,7 +172,6 @@ class Particle {
         _psuffix = 0;
         _deep_coal = false;
         _starting_log_likelihoods.clear();
-        _nsites_per_gene.clear();
         _type = "null";
         _current_species = 0;
     }
@@ -268,11 +264,6 @@ class Particle {
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
         double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
         
-//            if (_forest._last_edge_length > 0.0) {
-//            // choose species to join if past the first species generation for each forest vector
-//                species_joined = _forest.speciesTreeProposal(_lot);
-//            }
-        
                 double max_depth = 0.0;
         
                 if (_forest._lineages.size() > 1) {
@@ -296,44 +287,10 @@ class Particle {
         
                 _t.push_back(make_pair(species_joined, _forest._last_edge_length));
         
-//        if (_forest._last_edge_length > max_depth) {
-//            _log_coalescent_likelihood = -1*numeric_limits<double>::infinity();
-//        }
-//        else {
-//            for (int i = 1; i<_forests.size(); i++) { // TODO: need to do this separately for each gene particle
-//                _forest.calcCoalescentLikelihood(_forests[0]._last_edge_length, species_joined, _species_tree_height);
-//                _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
-//            }
-//        }
-        
-//        if (_forests[0]._lineages.size() == 2) {
-//            // join remaining species lineages, no change in coalescent likelihood, just need to add panmictic coalescent for each gene tree (to avoid total recalculation)
-//            // no need to draw a new theta because we are at the ancestral population now
-//            species_joined = _forests[0].speciesTreeProposal(_lot);
-//            for (int i=1; i<_forests.size(); i++) {
-//                _forests[i]._log_coalescent_likelihood += _forests[i]._panmictic_coalescent_likelihood;
-//                _forests[i]._panmictic_coalescent_likelihood = 0.0; // for clarity, reset to 0
-//            }
-//        }
-        
         double constrained_factor = 0.0;
-//    #if !defined (UNCONSTRAINED_PROPOSAL)
-//        assert (max_depth > 0.0);
-//        double nlineages = _forests[0]._lineages.size();
-//        constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
-//    #endif
-            _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
-    #if !defined (UNCONSTRAINED_PROPOSAL)
-//            double test = 1/_log_species_weight;
-//            assert(test != -0); // assert coalescent likelihood is not -inf
-    #endif
-//        double neg_inf = -1*numeric_limits<double>::infinity();
-//        if (_log_coalescent_likelihood == neg_inf) {
-//            assert (_forests[0]._last_edge_length > max_depth);
-//        }
+        _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
         
         _generation++;
-//    #endif
         return max_depth;
     }
 
@@ -345,8 +302,6 @@ class Particle {
     }
 
     inline double Particle::calcLogCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {
-        // TODO: update species partition?
-//        _forest.showForest();
         _forest.calcCoalescentLikelihood(species_increment, species_joined, species_tree_height);
         _log_coalescent_likelihood = _forest._log_coalescent_likelihood + _forest._panmictic_coalescent_likelihood;
         return _log_coalescent_likelihood;
@@ -448,7 +403,6 @@ class Particle {
     }
 
     inline void Particle::proposal() {
-        _species_join_proposed = false;
         bool done = false;
                 
         while (!done) {
@@ -507,6 +461,16 @@ class Particle {
         _log_weight = _forest._log_weight;
         _generation++;
     }
+
+    inline void Particle::updateSpeciesTree() {
+        assert (_forest._lineages.size() > 1);
+        tuple<string, string, string> species_joined = _forest.speciesTreeProposal(_lot);
+        _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
+        double edge_len = _forest._last_edge_length;
+        _t.push_back(make_pair(species_joined, edge_len));
+    }
+
+
 
     vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {
         vector<double> increments;
@@ -684,7 +648,6 @@ class Particle {
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;
         _prev_forest_number = other._prev_forest_number;
-        _species_join_proposed = other._species_join_proposed;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _num_deep_coalescences = other._num_deep_coalescences;
         _deep_coal = other._deep_coal;
@@ -693,7 +656,6 @@ class Particle {
         _psuffix = other._psuffix;
         _gene_increment = other._gene_increment;
         _starting_log_likelihoods = other._starting_log_likelihoods;
-        _nsites_per_gene = other._nsites_per_gene;
         _type = other._type;
         _current_species = other._current_species;
     };

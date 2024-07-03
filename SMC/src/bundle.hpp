@@ -41,6 +41,7 @@ extern proj::Lot rng;
             void                                            clearPartials();
             void                                            resetSpecies();
             void                                            proposeSpeciesParticles();
+            void                                            deleteExtraGeneParticles();
         
         private:
         
@@ -114,7 +115,7 @@ extern proj::Lot rng;
         if (_generation == 0) {
 
             // TODO: draw a species increment to start with - for now, build entire species tree from the start
-//            _species_particle->drawFirstSpeciesIncrement();
+//            _species_particle.drawFirstSpeciesIncrement();
             
             _species_particle.setLot(_lot);
             _species_particle.buildEntireSpeciesTree();
@@ -131,6 +132,24 @@ extern proj::Lot rng;
             _log_marginal_likelihood_by_gene.resize(_ngenes);
             _prev_log_marginal_likelihood_by_gene.resize(_ngenes);
         }
+        
+        // TODO: erase / break down species tree as far as possible
+//        cout << "stop";
+        vector<unsigned> current_species;
+        for (unsigned g=0; g<_ngenes; g++) {
+            for (unsigned i=0; i<_ngene_particles; i++) {
+                current_species.push_back(_gene_particles[g][i]._current_species);
+            }
+        }
+        
+        unsigned max_current_species = *max_element(current_species.begin(), current_species.end());
+        if (max_current_species > 0) {
+//            cout << "stop";
+            // TODO: un-join species tree back to this point
+            // TODO: erase last elements of _t in species tree
+            // TODO: rebuild the species tree after that point
+            // TODO: update _t in all the gene particles after the rebuilding point
+        }
             
             unsigned psuffix = 1;
             
@@ -142,11 +161,15 @@ extern proj::Lot rng;
                     psuffix += 2;
                     
                     _gene_particles[g][i].proposal(); // TODO: make this random, not sequential
+//                    if (_gene_particles[g][i]._speciation_event_next) {
+//                        _species_particle.updateSpeciesTree();
+//                    }
 
                 }
             }
             
         filterLoci();
+        
         
         for (unsigned g=0; g<_ngenes; g++) {
             resetWeights(_gene_particles[g]);
@@ -296,9 +319,7 @@ extern proj::Lot rng;
         }
         
         _species_particle.setSeed(rng.randint(1,9999) + psuffix);
-        
-//        double prev_log_coalescent_likelihood = _species_particle._log_coalescent_likelihood;
-        
+                
         vector<double> max_depths;
         
         tuple<string, string, string> species_joined = _species_particle.speciesJoinProposal();
@@ -336,6 +357,16 @@ extern proj::Lot rng;
         }
         _generation++;
         
+    }
+    
+    inline void Bundle::deleteExtraGeneParticles() {
+        for (unsigned g=0; g<_ngenes; g++) {
+            _gene_particles[g].erase(_gene_particles[g].begin(), _gene_particles[g].end() - 1);
+//            for (unsigned i=1; i<_ngene_particles; i++) {
+//                _gene_particles[g][i].clear();
+//            }
+        }
+        _ngene_particles = 1;
     }
 
 

@@ -764,6 +764,7 @@ namespace proj {
 
 
                 for (auto &b:bundle_vec) {
+                    b.deleteExtraGeneParticles(); // delete all of the gene particles except the first one since we will only condition on one set per bundle
                     // reset forest species partitions
                     b.clearPartials(); // no more likelihood calculations
                     b.resetSpecies();
@@ -781,8 +782,7 @@ namespace proj {
                     // TODO: for now, take 1 set of gene trees from each bundle
                     vector<Bundle> use_vec;
                     
-                    Bundle chosen_bundle = bundle_vec[a]; // bundle to copy
-                    
+                    Bundle chosen_bundle = bundle_vec[a]; // bundle to copy // TODO: do not copy all the gene particles
                     for (unsigned i=0; i<_particle_increase; i++) {
                         use_vec.push_back(*new Bundle(chosen_bundle)); // TODO: why * ?
                     }
