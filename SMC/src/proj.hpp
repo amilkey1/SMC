@@ -48,6 +48,8 @@ namespace proj {
             void                writePaupFile(vector<Particle::SharedPtr> particles, vector<string> taxpartition);
             void                initializeBundles(vector<Bundle> &particles);
             void                filterBundles(unsigned step, vector<Bundle> & bundles);
+            void                runBundles(vector<Bundle> &b);
+            void                runBundlesRange(unsigned first, unsigned last, vector<Bundle> &bundles);
 
         private:
 
@@ -440,6 +442,49 @@ namespace proj {
         return log_particle_sum;
     }
 
+    inline void Proj::runBundlesRange(unsigned first, unsigned last, vector<Bundle> &bundles) {
+           for (unsigned i=first; i<last; i++){
+               bundles[i].runBundle();
+           }
+       }
+
+    inline void Proj::runBundles(vector<Bundle> &bundles) {
+        assert(_nthreads > 0);
+        if (_nthreads == 1) {
+          for (auto & b : bundles) {
+              b.runBundle();
+          }
+        }
+        else {
+          // divide up the particles as evenly as possible across threads
+          unsigned first = 0;
+          unsigned incr = _nbundles/_nthreads + (_nbundles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
+          unsigned last = incr;
+
+          // need a vector of threads because we have to wait for each one to finish
+          vector<thread> threads;
+
+            while (true) {
+            // create a thread to handle particles first through last - 1
+              threads.push_back(thread(&Proj::runBundlesRange, this, first, last, std::ref(bundles)));
+            // update first and last
+            first = last;
+            last += incr;
+            if (last > _nbundles) {
+              last = _nbundles;
+              }
+            if (first>=_nbundles) {
+                break;
+            }
+          }
+
+          // the join function causes this loop to pause until the ith thread finishes
+          for (unsigned i = 0; i < threads.size(); i++) {
+            threads[i].join();
+          }
+        }
+    }
+
     inline void Proj::filterBundles(unsigned step, vector<Bundle> & bundles) {
         // Copy log weights for all bundles to prob vector
         vector<double> probs(_nbundles, 0.0);
@@ -623,7 +668,6 @@ namespace proj {
             Forest::_save_memory = true;
         }
 
-        assert(_nthreads == 1);
         for (auto & b:bundles ) { // TODO: can initialize some of these things in parallel?
             b.setNGeneParticles(_nparticles);
             b.setData(_data, _taxon_map, partials);
@@ -723,11 +767,11 @@ namespace proj {
                         unsigned psuffix = 1;
                         b.setSeed(rng.randint(1,9999) + psuffix);
                         psuffix += 2;
-//                        cout << "growing bundle " << n << endl;
-                        b.runBundle(); // for now, run each bundle separately and filter trees separately within each bundle
-//                        cout << b.saveSpeciesNewick() << endl;
+//                        b.runBundle(); // for now, run each bundle separately and filter trees separately within each bundle
                         n++;
                     }
+                    
+                    runBundles(bundle_vec);
                     
                     filterBundles(s, bundle_vec);
                     resetWeights(bundle_vec);

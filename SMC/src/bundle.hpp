@@ -158,17 +158,12 @@ extern proj::Lot rng;
                         _gene_particles[g][i]._t.pop_back();
                     }
                     assert (_gene_particles[g][i]._t.size() > 0); // _t should never be completely removed because first increments always count
-//                    _gene_particles[g][i]._t.erase(_gene_particles[g][i]._t.begin() - max_current_species-1, _gene_particles[g][i]._t.end());
-                    
-//                    cout << "stop";
                     
                     for (unsigned s=max_current_species + 1; s < Forest::_nspecies; s++) {
                         _gene_particles[g][i]._t.push_back(_species_particle._t[s]);
                     }
                 }
-//                cout << "max cur species is " << max_current_species << endl;
             }
-//        }
             
             unsigned psuffix = 1;
             
