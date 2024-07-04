@@ -52,7 +52,8 @@ namespace proj {
             void                runBundlesRange(unsigned first, unsigned last, vector<Bundle> &bundles);
             void                proposeSpeciesParticles(vector<Bundle> &b);
             void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<Bundle> &bundles);
-
+            void                proposeSpeciesGroups(vector<Bundle> bundle_vec, unsigned ngroups, unsigned nsubsets, unsigned ntaxa, string filename1);
+            void                proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Bundle> &bundles, unsigned ngroups, string filename1, unsigned nsubsets, unsigned ntaxa);
         private:
 
             std::string                 _data_file_name;
@@ -442,6 +443,98 @@ namespace proj {
         log_particle_sum = log(running_sum) + log_max_weight;
 
         return log_particle_sum;
+    }
+
+    inline void Proj::proposeSpeciesGroups(vector<Bundle> bundles, unsigned ngroups, unsigned nsubsets, unsigned ntaxa, string filename1) {
+        // ngroups = number of species SMCs to do (i.e. 100 particles for first round, thin = 1.0 means ngroups = 100 for this round)
+          assert (_nthreads > 1);
+          
+          // divide up groups as evenly as possible across threads
+          unsigned first = 0;
+          unsigned incr = ngroups/_nthreads + (ngroups % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of groups
+          unsigned last = incr;
+          
+          // need a vector of threads because we have to wait for each one to finish
+          vector<thread> threads;
+
+            while (true) {
+            // create a thread to handle particles first through last - 1
+              threads.push_back(thread(&Proj::proposeSpeciesGroupRange, this, first, last, std::ref(bundles), ngroups, filename1, nsubsets, ntaxa));
+            // update first and last
+            first = last;
+            last += incr;
+            if (last > ngroups) {
+              last = ngroups;
+              }
+            if (first >= ngroups) {
+                break;
+            }
+          }
+
+          // the join function causes this loop to pause until the ith thread finishes
+          for (unsigned i = 0; i < threads.size(); i++) {
+            threads[i].join();
+          }
+    }
+
+    inline void Proj::proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Bundle> &bundles, unsigned ngroups, string filename1, unsigned nsubsets, unsigned ntaxa) {
+        
+        unsigned nspecies = (unsigned) _species_names.size();
+           
+           for (unsigned i=first; i<last; i++){
+               vector<Bundle> use_vec;
+               
+               Bundle chosen_bundle = bundles[i]; // bundle to copy
+               
+               for (unsigned a=0; a<_particle_increase; a++) {
+                   use_vec.push_back(*new Bundle(chosen_bundle)); // TODO: why * ?
+               }
+
+               assert(use_vec.size() == _particle_increase);
+
+               if (_verbose > 0) {
+                   cout << "beginning species tree proposals for subset " << i+1 << endl;
+               }
+               for (unsigned s = 0; s < nspecies-1; s++) {  // skip last round of filtering because weights are always 0
+
+                   // set particle random number seeds
+                   unsigned psuffix = 1;
+                   for (auto &b:use_vec) {
+                       b.setSeed(rng.randint(1,9999) + psuffix);
+                       psuffix += 2;
+                   }
+
+                   proposeSpeciesParticles(use_vec);
+                   filterBundles(s, use_vec);
+                   resetWeights(use_vec);
+
+
+               } // s loop
+               
+               if (_verbose > 0) {
+                   cout << "finished with species tree proposals for subset " << i+1 << endl;
+               }
+               
+               if (_save_every > 1.0) { // thin sample for output by taking a random sample
+                   unsigned sample_size = round (double (_particle_increase) / double(_save_every));
+                   if (sample_size == 0) {
+                       cout << "\n";
+                       cout << "current settings would save 0 species trees; saving every species tree\n";
+                       cout << "\n";
+                       sample_size = _particle_increase;
+                   }
+
+                   random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
+                   // delete first (1-_thin) % of particles
+                   use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
+                   assert (use_vec.size() == sample_size);
+               }
+
+               mtx.lock(); // TODO: does this slow things down?
+               saveSpeciesTreesHierarchical(use_vec, filename1);
+               _count++;
+               mtx.unlock();
+           }
     }
 
     inline void Proj::proposeSpeciesParticles(vector<Bundle> &bundles) {
@@ -862,11 +955,30 @@ namespace proj {
 
                 vector<Particle::SharedPtr> new_vec;
 
-                _nparticles = _particle_increase; // TODO: unsure
+                _nparticles = _particle_increase;
                 _nbundles = _particle_increase;
                 unsigned index = 0;
                 
-// no parallelization for now
+                bool parallelize_by_group = false;
+                
+                if (_nthreads > 1) {
+        #if defined PARALLELIZE_BY_GROUP
+                    parallelize_by_group = true;
+        #endif
+                }
+                
+                if (parallelize_by_group) {
+                    string filename = "species_trees.trees";
+                    // don't bother with this if not multithreading
+                        proposeSpeciesGroups(bundle_vec, ngroups, nsubsets, ntaxa, filename1);
+                        ofstream strees;
+                        strees.open("species_trees.trees", std::ios::app);
+                        strees << "end;" << endl;
+                        strees.close();
+                }
+                
+                else {
+    // no parallelization for now
                 for (unsigned a=0; a < ngroups; a++) {
                     // TODO: for now, take 1 set of gene trees from each bundle
                     vector<Bundle> use_vec;
@@ -895,14 +1007,10 @@ namespace proj {
                             b.setSeed(rng.randint(1,9999) + psuffix);
                             psuffix += 2;
                         }
-
-//                        for (auto &b:use_vec) {
-//                            b.proposeSpeciesParticles();
-//                        }
                         proposeSpeciesParticles(use_vec);
                         
                         filterBundles(s, use_vec);
-//                        resetWeights(bundle_vec);
+                        resetWeights(use_vec);
                     } // s loop
                     
                     if (_save_every > 1.0) { // thin sample for output by taking a random sample
@@ -923,11 +1031,12 @@ namespace proj {
                     saveSpeciesTreesHierarchical(use_vec, filename1);
                 }
 
-                // finish species tree file
-                std::ofstream treef;
-                treef.open(filename1, std::ios_base::app);
-                treef << "end;\n";
-                treef.close();
+                    // finish species tree file
+                    std::ofstream treef;
+                    treef.open(filename1, std::ios_base::app);
+                    treef << "end;\n";
+                    treef.close();
+                }
 
 #endif
 
