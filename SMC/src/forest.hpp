@@ -95,6 +95,7 @@ class Forest {
         void                        renumberInternals();
         bool                        canHaveSibling(Node * nd, bool rooted, bool allow_polytomies);
         vector<tuple<string, string, string>>              buildFromNewickTopology(const string newick);
+        void                        revertSpeciesTreeOneJoin(double edge_len);
     
         map<string, double>         _theta_map;
 
@@ -118,7 +119,6 @@ class Forest {
         map<string, list<Node*> >   _species_partition;
         double                      _gene_tree_log_likelihood;
         pair<Node*, Node*>          _species_joined;
-        string                      _last_direction;
         double                      _log_joining_prob;
         vector<pair<double, double>> _increments_and_priors;
         bool                        _done;
@@ -166,7 +166,6 @@ class Forest {
         static double               _kappa;
         static vector<double>       _base_frequencies;
         static string               _string_base_frequencies;
-        static double               _migration_rate;
         static bool                 _save_memory;
         static string               _outgroup;
         static bool                 _run_on_empty;
@@ -1010,8 +1009,6 @@ class Forest {
         _nspecies           = other._nspecies;
         _ntaxa              = other._ntaxa;
         _species_joined = other._species_joined;
-        _migration_rate = other._migration_rate;
-        _last_direction = other._last_direction;
         _gamma = other._gamma;
         _log_weight = other._log_weight;
         _log_joining_prob = other._log_joining_prob;
@@ -1687,6 +1684,21 @@ class Forest {
         cout << "   _nleaves " << _nleaves << " ";
         cout << "   _ninternals " << _ninternals << " ";
         cout << endl;
+    }
+
+    inline void Forest::revertSpeciesTreeOneJoin(double edge_len) {
+        for (auto &nd:_lineages) {
+            nd->_edge_length -= edge_len;
+        }
+        
+        Node *add1 = _lineages.back()->_left_child;
+        Node *add2 = _lineages.back()->_left_child->_right_sib;
+        revertNodeVector(_lineages, add1, add2, _lineages.back());
+        _nodes.pop_back();
+        add1->_parent = nullptr;
+        add2->_parent = nullptr;
+        add1->_right_sib = nullptr;
+        add2->_right_sib = nullptr;
     }
 
     inline void Forest::updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode) {

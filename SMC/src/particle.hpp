@@ -105,8 +105,10 @@ class Particle {
         unsigned                                        showPrevForestNumber(){return _prev_forest_number;}
         void                                            updateSpeciesPartition(pair<tuple<string, string, string>, double> species_info);
         void                                            buildEntireSpeciesTree();
+        void                                            rebuildEntireSpeciesTree();
         void                                            setLot(Lot::SharedPtr lot) {_lot = lot;}
         void                                            updateSpeciesTree();
+        void                                            unJoinSpecies(unsigned max_current_species);
     
     private:
 
@@ -470,7 +472,14 @@ class Particle {
         _t.push_back(make_pair(species_joined, edge_len));
     }
 
-
+    inline void Particle::unJoinSpecies(unsigned max_species_count) {
+        unsigned nsteps_to_revert = Forest::_nspecies - max_species_count - 1; // -1 because gene trees use current_species + 1 when updating species partitions
+        for (unsigned i=0; i<nsteps_to_revert; i++) {
+            _forest.revertSpeciesTreeOneJoin(_t.back().second);
+            _t.pop_back(); // edge length to use is one back from species join (going through _t backwards)?
+            _forest._ninternals--;
+        }
+    }
 
     vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {
         vector<double> increments;
@@ -491,6 +500,29 @@ class Particle {
         _forest.updateSpeciesPartition(species_info.first);
     }
 
+    inline void Particle::rebuildEntireSpeciesTree() {
+        unsigned current_size = (unsigned) _t.size();
+        double edge_len = 0.0;
+        
+        for (unsigned i=current_size; i < _forest._nspecies; i++) {
+            if (_forest._lineages.size() > 2) {
+                tuple<string, string, string> species_joined = _forest.speciesTreeProposal(_lot);
+                
+//                if (_forest._lineages.size() > 1) {
+                    _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
+                    edge_len = _forest._last_edge_length;
+//                }
+                _t.push_back(make_pair(species_joined, edge_len));
+            }
+            else {
+                // join remaining species
+                tuple<string, string, string> species_joined = _forest.speciesTreeProposal(_lot);
+                edge_len = 0.0;
+                _t.push_back(make_pair(species_joined, edge_len));
+            }
+        }
+        assert (_forest._lineages.size() == 1);
+    }
     inline void Particle::buildEntireSpeciesTree() {
         _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
         double edge_len = _forest._last_edge_length;

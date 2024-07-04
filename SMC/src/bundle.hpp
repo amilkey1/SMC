@@ -142,14 +142,33 @@ extern proj::Lot rng;
             }
         }
         
-        unsigned max_current_species = *max_element(current_species.begin(), current_species.end());
-        if (max_current_species > 0) {
-//            cout << "stop";
-            // TODO: un-join species tree back to this point
-            // TODO: erase last elements of _t in species tree
-            // TODO: rebuild the species tree after that point
-            // TODO: update _t in all the gene particles after the rebuilding point
-        }
+        unsigned max_current_species = *max_element(current_species.begin(), current_species.end()); // TODO: rebuild at each step for as much variation as possible
+//        if (max_current_species > 0) {
+            _species_particle.unJoinSpecies(max_current_species); // this function will unjoin species back to the max current species
+            // i.e. if max_current_species = 1, this function will erase so only _t[0] remains
+            // i.e. if max_current_species = 3, this function will erase so _t[0] through _t[2] remain
+            _species_particle.rebuildEntireSpeciesTree();
+            
+            for (unsigned g=0; g<_ngenes; g++) {
+                for (unsigned i=0; i<_ngene_particles; i++) {
+                    unsigned t_size = (unsigned) _gene_particles[g][i]._t.size();
+                    unsigned n_to_remove = t_size - max_current_species - 1; // -1 because gene trees use current_species + 1 when updating species partitions
+                    
+                    for (unsigned a=0; a<n_to_remove; a++) {
+                        _gene_particles[g][i]._t.pop_back();
+                    }
+                    assert (_gene_particles[g][i]._t.size() > 0); // _t should never be completely removed because first increments always count
+//                    _gene_particles[g][i]._t.erase(_gene_particles[g][i]._t.begin() - max_current_species-1, _gene_particles[g][i]._t.end());
+                    
+//                    cout << "stop";
+                    
+                    for (unsigned s=max_current_species + 1; s < Forest::_nspecies; s++) {
+                        _gene_particles[g][i]._t.push_back(_species_particle._t[s]);
+                    }
+                }
+//                cout << "max cur species is " << max_current_species << endl;
+            }
+//        }
             
             unsigned psuffix = 1;
             
@@ -161,9 +180,6 @@ extern proj::Lot rng;
                     psuffix += 2;
                     
                     _gene_particles[g][i].proposal(); // TODO: make this random, not sequential
-//                    if (_gene_particles[g][i]._speciation_event_next) {
-//                        _species_particle.updateSpeciesTree();
-//                    }
 
                 }
             }
@@ -362,9 +378,6 @@ extern proj::Lot rng;
     inline void Bundle::deleteExtraGeneParticles() {
         for (unsigned g=0; g<_ngenes; g++) {
             _gene_particles[g].erase(_gene_particles[g].begin(), _gene_particles[g].end() - 1);
-//            for (unsigned i=1; i<_ngene_particles; i++) {
-//                _gene_particles[g][i].clear();
-//            }
         }
         _ngene_particles = 1;
     }

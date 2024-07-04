@@ -248,7 +248,6 @@ namespace proj {
         ("kappa",  boost::program_options::value(&Forest::_kappa)->default_value(1.0), "value of kappa")
         ("base_frequencies", boost::program_options::value(&Forest::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ("nthreads",  boost::program_options::value(&_nthreads)->default_value(1), "number of threads for multi threading")
-        ("migration_rate", boost::program_options::value(&Forest::_migration_rate)->default_value(0.0), "migration rate")
         ("run_on_empty", boost::program_options::value(&Forest::_run_on_empty)->default_value(false), "run program without data")
         ("verbose", boost::program_options::value(&_verbose)->default_value(1), "set amount of output printed")
         ("save_memory", boost::program_options::value(&Forest::_save_memory)->default_value(false), "save memory at the expense of time")
@@ -726,6 +725,7 @@ namespace proj {
                         psuffix += 2;
 //                        cout << "growing bundle " << n << endl;
                         b.runBundle(); // for now, run each bundle separately and filter trees separately within each bundle
+//                        cout << b.saveSpeciesNewick() << endl;
                         n++;
                     }
                     
@@ -734,7 +734,7 @@ namespace proj {
                 
                 }
                                 
-//                saveSpeciesTrees(bundle_vec);
+                saveSpeciesTrees(bundle_vec);
                 for (unsigned i=0; i<nsubsets; i++) {
                     saveGeneTree(i, bundle_vec); // TODO: for now, saving 1 gene per bundle
                 }
@@ -755,7 +755,7 @@ namespace proj {
                 if (ngroups == 0) {
                     ngroups = 1;
                     cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
-                } // TODO: no thinning for now
+                }
 
                 random_shuffle(bundle_vec.begin(), bundle_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
                 // delete first (1-_thin) % of particles
@@ -782,7 +782,7 @@ namespace proj {
                     // TODO: for now, take 1 set of gene trees from each bundle
                     vector<Bundle> use_vec;
                     
-                    Bundle chosen_bundle = bundle_vec[a]; // bundle to copy // TODO: do not copy all the gene particles
+                    Bundle chosen_bundle = bundle_vec[a]; // bundle to copy
                     for (unsigned i=0; i<_particle_increase; i++) {
                         use_vec.push_back(*new Bundle(chosen_bundle)); // TODO: why * ?
                     }
