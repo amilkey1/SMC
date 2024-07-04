@@ -50,6 +50,8 @@ namespace proj {
             void                filterBundles(unsigned step, vector<Bundle> & bundles);
             void                runBundles(vector<Bundle> &b);
             void                runBundlesRange(unsigned first, unsigned last, vector<Bundle> &bundles);
+            void                proposeSpeciesParticles(vector<Bundle> &b);
+            void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<Bundle> &bundles);
 
         private:
 
@@ -442,11 +444,54 @@ namespace proj {
         return log_particle_sum;
     }
 
-    inline void Proj::runBundlesRange(unsigned first, unsigned last, vector<Bundle> &bundles) {
-           for (unsigned i=first; i<last; i++){
-               bundles[i].runBundle();
-           }
+    inline void Proj::proposeSpeciesParticles(vector<Bundle> &bundles) {
+        assert(_nthreads > 0);
+       if (_nthreads == 1) {
+         for (auto & b : bundles) {
+             b.proposeSpeciesParticles();
+         }
        }
+       else {
+         // divide up the particles as evenly as possible across threads
+         unsigned first = 0;
+         unsigned incr = _nparticles/_nthreads + (_nparticles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
+         unsigned last = incr;
+
+         // need a vector of threads because we have to wait for each one to finish
+         vector<thread> threads;
+
+           while (true) {
+           // create a thread to handle particles first through last - 1
+             threads.push_back(thread(&Proj::proposeSpeciesParticleRange, this, first, last, std::ref(bundles)));
+           // update first and last
+           first = last;
+           last += incr;
+           if (last > _nparticles) {
+             last = _nparticles;
+             }
+           if (first>=_nparticles) {
+               break;
+           }
+         }
+
+         // the join function causes this loop to pause until the ith thread finishes
+         for (unsigned i = 0; i < threads.size(); i++) {
+           threads[i].join();
+         }
+       }
+    }
+
+    inline void Proj::proposeSpeciesParticleRange(unsigned first, unsigned last, vector<Bundle> &bundles) {
+        for (unsigned i=first; i<last; i++){
+              bundles[i].proposeSpeciesParticles();
+          }
+    }
+
+    inline void Proj::runBundlesRange(unsigned first, unsigned last, vector<Bundle> &bundles) {
+       for (unsigned i=first; i<last; i++){
+           bundles[i].runBundle();
+       }
+   }
 
     inline void Proj::runBundles(vector<Bundle> &bundles) {
         assert(_nthreads > 0);
@@ -851,9 +896,10 @@ namespace proj {
                             psuffix += 2;
                         }
 
-                        for (auto &b:use_vec) {
-                            b.proposeSpeciesParticles();
-                        }
+//                        for (auto &b:use_vec) {
+//                            b.proposeSpeciesParticles();
+//                        }
+                        proposeSpeciesParticles(use_vec);
                         
                         filterBundles(s, use_vec);
 //                        resetWeights(bundle_vec);
