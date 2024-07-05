@@ -96,6 +96,7 @@ class Forest {
         bool                        canHaveSibling(Node * nd, bool rooted, bool allow_polytomies);
         vector<tuple<string, string, string>>              buildFromNewickTopology(const string newick);
         void                        revertSpeciesTreeOneJoin(double edge_len);
+        void                        trimTree(double amount_to_trim);
     
         map<string, double>         _theta_map;
 
@@ -1684,6 +1685,13 @@ class Forest {
         cout << "   _nleaves " << _nleaves << " ";
         cout << "   _ninternals " << _ninternals << " ";
         cout << endl;
+    }
+
+    inline void Forest::trimTree(double amount_to_trim) {
+        for (auto &nd:_lineages) {
+            nd->_edge_length -= amount_to_trim;
+        }
+        _species_tree_height -= amount_to_trim;
     }
 
     inline void Forest::revertSpeciesTreeOneJoin(double edge_len) {

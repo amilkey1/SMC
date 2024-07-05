@@ -38,6 +38,7 @@ class Particle {
                                                 }
         void                                    mapSpecies(map<string, string> &taxon_map, vector<string> &species_names, string type);
         void                                    drawFirstSpeciesIncrement();
+        double                                  addNewIncrement();
         void                                    saveForest(std::string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
@@ -109,6 +110,7 @@ class Particle {
         void                                            setLot(Lot::SharedPtr lot) {_lot = lot;}
         void                                            updateSpeciesTree();
         void                                            unJoinSpecies(unsigned max_current_species);
+        void                                            trimSpeciesTree(double amount_to_trim);
     
     private:
 
@@ -124,7 +126,6 @@ class Particle {
         mutable                                 Lot::SharedPtr _lot;
         unsigned                                _num_deep_coalescences;
         bool                                    _deep_coal;
-        double                                  _species_tree_height;
         unsigned                                _psuffix;
         vector<pair<tuple<string, string, string>, double>> _t;
         pair<unsigned, double>                                  _gene_increment;
@@ -169,7 +170,6 @@ class Particle {
         _prev_forest_number = 0;
         _log_coalescent_likelihood = 0.0;
         _num_deep_coalescences = 0.0;
-        _species_tree_height = 0.0;
         _t.clear();
         _psuffix = 0;
         _deep_coal = false;
@@ -281,7 +281,7 @@ class Particle {
     #else
                     _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
     #endif
-                    _species_tree_height += _forest._last_edge_length;
+//                    _species_tree_height += _forest._last_edge_length;
                 }
                 if (_forest._lineages.size() == 1) {
                     _forest._last_edge_length = 0.0;
@@ -481,6 +481,20 @@ class Particle {
         }
     }
 
+    inline void Particle::trimSpeciesTree(double amount_to_trim) {
+        assert (_type == "species");
+//        double current_height = _forest.getTreeHeight();
+//        double amount_to_trim = current_height - deepest_coalescent_event;
+//        if (amount_to_trim > 0.0) {
+            _forest.trimTree(amount_to_trim);
+            _t.back().second -= amount_to_trim;
+        
+//            assert (fabs(_forest.getTreeHeight() - deepest_coalescent_event) < 0.0000001);
+//        }
+        // else, the gene trees are below the species tree
+//        return amount_to_trim;
+    }
+
     vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {
         vector<double> increments;
         increments.resize(event_choice_rates.size());
@@ -489,6 +503,13 @@ class Particle {
             increments[p] = -log(1.0 - _lot->uniform())/event_choice_rates[p];
         }
         return increments;
+    }
+
+    inline double Particle::addNewIncrement() {
+        _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
+        _t.back().second += _forest._last_edge_length;
+        
+        return _forest._last_edge_length;
     }
 
     inline void Particle::drawFirstSpeciesIncrement() {
@@ -654,7 +675,6 @@ class Particle {
         if (_type == "species" ) {
             _forest.clear();
             setLogWeight(0.0);
-            _species_tree_height = 0.0;
             _log_coalescent_likelihood = 0.0;
             _forest._last_edge_length = 0.0;
             _forest._increments_and_priors.clear();
@@ -683,7 +703,6 @@ class Particle {
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _num_deep_coalescences = other._num_deep_coalescences;
         _deep_coal = other._deep_coal;
-        _species_tree_height = other._species_tree_height;
         _t = other._t;
         _psuffix = other._psuffix;
         _gene_increment = other._gene_increment;
