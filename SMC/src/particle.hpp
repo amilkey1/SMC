@@ -111,6 +111,9 @@ class Particle {
         void                                            updateSpeciesTree();
         void                                            unJoinSpecies(unsigned max_current_species);
         void                                            trimSpeciesTree(double amount_to_trim);
+        void                                            drawTheta();
+        vector<string>                                  getExistingSpeciesNames();
+        void                                            rebuildThetaMap();
     
     private:
 
@@ -146,6 +149,15 @@ class Particle {
         cout << " _log_likelihood: " << _log_likelihood << "\n";
         cout << " _log_coalescent_likelihood: " << _log_coalescent_likelihood << "\n";
         cout << "  _forest: " << "\n";
+        cout << "\n";
+        
+#if defined (DRAW_NEW_THETA)
+        unsigned a = 1;
+        for (auto &t:_forest._theta_map) {
+            cout << "theta " << a << " = " << t.second << endl;
+            a++;
+        }
+#endif
         cout << "\n";
         _forest.showForest();
     }
@@ -448,6 +460,7 @@ class Particle {
             }
             else {
                 // carry out speciation event
+                
                 assert (_forest._species_partition.size() > 1);
                 _forest.addIncrement(species_increment);
                 _forest.updateSpeciesPartition(_t[_current_species+1].first);
@@ -480,6 +493,44 @@ class Particle {
             _forest._ninternals--;
         }
     }
+
+    inline vector<string> Particle::getExistingSpeciesNames() {
+        assert (_type == "species");
+        return _forest.getExistingSpeciesNames();
+    }
+
+    inline void Particle::rebuildThetaMap() {
+//        assert (_type == "gene");
+        _forest.rebuildThetaMap(_lot);
+    }
+
+    inline void Particle::drawTheta() {
+        // create map for one forest, then copy it to all forests
+        assert (_type == "gene");
+        _forest.createThetaMap(_lot);
+    }
+
+//    inline void Particle::drawTheta() {
+//        // set seed first
+//    //        assert (_psuffix > 0);
+//    //        setSeed(rng.randint(1,9999) + _psuffix);
+//
+//        _forests[1].createThetaMap(_lot); // create map for one forest, then copy it to all forests
+//        double theta_mean = _forests[1]._theta_mean;
+//        double theta_proposal_mean = _forests[1]._theta_proposal_mean;
+//        double theta_prior_mean = _forests[1]._theta_prior_mean;
+//        map<string, double> theta_map = _forests[1]._theta_map;
+//        map<string, unsigned> species_indices = _forests[1]._species_indices;
+//        if (_forests.size() > 2) {
+//            for (int i=2; i<_forests.size(); i++) {
+//                _forests[i]._theta_map = theta_map;
+//                _forests[i]._species_indices = species_indices;
+//                _forests[i]._theta_mean = theta_mean;
+//                _forests[i]._theta_proposal_mean = theta_proposal_mean;
+//                _forests[i]._theta_prior_mean = theta_prior_mean;
+//            }
+//        }
+//    }
 
     inline void Particle::trimSpeciesTree(double amount_to_trim) {
         assert (_type == "species");
@@ -529,10 +580,8 @@ class Particle {
             if (_forest._lineages.size() > 2) {
                 tuple<string, string, string> species_joined = _forest.speciesTreeProposal(_lot);
                 
-//                if (_forest._lineages.size() > 1) {
-                    _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
-                    edge_len = _forest._last_edge_length;
-//                }
+                _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
+                edge_len = _forest._last_edge_length;
                 _t.push_back(make_pair(species_joined, edge_len));
             }
             else {

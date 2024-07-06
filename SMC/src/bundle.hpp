@@ -36,12 +36,15 @@ extern proj::Lot rng;
             vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
             string                                          saveSpeciesNewick(){return _species_particle.saveForestNewick();}
             string                                          saveGeneNewick(unsigned i){return _gene_particles[i][0].saveForestNewick();} // TODO: for now, just saving first gene tree - later, save all of them?
+            void                                            showGeneNewick(unsigned i) {_gene_particles[i][0].showParticle();} // TODO: for now, just saving first gene tree - later, save all of them?
             double                                          getBundleLogWeight(){return _bundle_log_weight;}
             void                                            setBundleLogWeight(double w) {_bundle_log_weight = w;}
             void                                            clearPartials();
             void                                            resetSpecies();
             void                                            proposeSpeciesParticles();
             void                                            deleteExtraGeneParticles();
+            vector<double>                                  getLogLikelihoods();
+            void                                            drawTheta();
         
         private:
         
@@ -91,12 +94,12 @@ extern proj::Lot rng;
         unsigned index = 1;
         for (unsigned g=0; g<_ngenes; g++) {
             for (unsigned i=0; i<_ngene_particles; i++) {
-                _gene_particles[g][i] = Particle(*new Particle); // TODO: why * ?
+                _gene_particles[g][i] = Particle(*new Particle);
                 _gene_particles[g][i].setData(d, taxon_map, partials, "gene", index);
             }
             index++;
         }
-        _species_particle = Particle(*new Particle); // TODO: why * ?
+        _species_particle = Particle(*new Particle);
         _species_particle.setData(d, taxon_map, partials, "species", index);
     }
 
@@ -110,6 +113,7 @@ extern proj::Lot rng;
     }
 
     inline void Bundle::runBundle() {
+        // TODO: create full theta map, then erase and rebuild at each step as needed
 //        unsigned nsteps = Forest::_ntaxa - 1;
         if (_generation == 0) {
 
@@ -129,6 +133,24 @@ extern proj::Lot rng;
             
             _log_marginal_likelihood_by_gene.resize(_ngenes);
             _prev_log_marginal_likelihood_by_gene.resize(_ngenes);
+        }
+        
+        else {
+            // don't do this for first gen
+            unsigned species_tree_size = (unsigned) _species_particle._forest._lineages.size();
+            // TODO: erase members of theta map that aren't needed
+            // TODO: rebuild theta map as needed
+            vector<string> existing_species = _species_particle.getExistingSpeciesNames();
+            
+            _species_particle.rebuildThetaMap();
+//            _gene_particles[0][0].rebuildThetaMap(existing_species); // TODO: do this in species particle, then copy to gene particles
+            
+            map<string, double> theta_map = _gene_particles[0][0]._forest._theta_map;
+            for (unsigned g=0; g<_ngenes; g++) {
+                for (unsigned i=0; i<_ngene_particles; i++) {
+                    _gene_particles[g][i]._forest._theta_map = theta_map;
+                }
+            }
         }
         
         vector<unsigned> current_species;
@@ -403,6 +425,7 @@ extern proj::Lot rng;
             max_depths.push_back(_gene_particles[g][0].getMaxDepth(species_joined, reset));
         }
         
+        // TODO: switch to jones coalescent likelihood or draw new thetas for second round of species only filtering
         double max_depth = _species_particle.speciesOnlyProposal(max_depths);
         
         double log_coalescent_likelihood = 0.0;
@@ -435,7 +458,50 @@ extern proj::Lot rng;
         }
         _ngene_particles = 1;
     }
-
+    
+    inline vector<double> Bundle::getLogLikelihoods() {
+        vector<double> log_likelihoods;
+            for (unsigned i=0; i<_ngene_particles; i++) { // TODO: this function return likelihoods by gene, not by particle
+                for (unsigned g=0; g<_ngenes; g++) {
+                    log_likelihoods.push_back(_gene_particles[g][i].getLogLikelihood());
+            }
+        }
+        return log_likelihoods;
+    }
+    
+    inline void Bundle::drawTheta() { // TODO: should probably make some functions to do this rather than setting _forest directly from bundle
+        _gene_particles[0][0].drawTheta(); // create theta map, then copy to all particles
+        
+        double theta_mean = _gene_particles[0][0]._forest._theta_mean;
+        double theta_proposal_mean = _gene_particles[0][0]._forest._theta_proposal_mean;
+        double theta_prior_mean = _gene_particles[0][0]._forest._theta_prior_mean;
+        
+        map<string, double> theta_map = _gene_particles[0][0]._forest._theta_map;
+        map<string, unsigned> species_indices = _gene_particles[0][0]._forest._species_indices;
+        string ancestral_spp_name = _gene_particles[0][0]._forest._ancestral_species_name;
+        
+        for (unsigned g=0; g<_ngenes; g++) {
+            for (unsigned i=0; i<_ngene_particles; i++) {
+//                if (g != 0 && i != 0) {
+                if (g != 0 || i != 0) {
+                        // don't need to do this for first particle
+                        _gene_particles[g][i]._forest._theta_map = theta_map;
+                        _gene_particles[g][i]._forest._species_indices = species_indices;
+                        _gene_particles[g][i]._forest._theta_mean = theta_mean;
+                        _gene_particles[g][i]._forest._theta_proposal_mean = theta_proposal_mean;
+                        _gene_particles[g][i]._forest._theta_prior_mean = theta_prior_mean;
+                        _gene_particles[g][i]._forest._ancestral_species_name = ancestral_spp_name;
+                }
+            }
+        }
+        
+        _species_particle._forest._theta_map = theta_map;
+        _species_particle._forest._species_indices = species_indices;
+        _species_particle._forest._theta_mean = theta_mean;
+        _species_particle._forest._theta_proposal_mean = theta_proposal_mean;
+        _species_particle._forest._theta_prior_mean = theta_prior_mean;
+        _species_particle._forest._ancestral_species_name = ancestral_spp_name;
+    }
 
     inline void Bundle::operator=(const Bundle & other) {
 //        _gene_particles = other._gene_particles;

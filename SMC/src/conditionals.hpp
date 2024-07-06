@@ -5,12 +5,7 @@
 
 //#define NDEBUG // disable asserts for efficiency / memory improvement
 
-//#define USE_TOTAL_RATE
-
-//#define SIM_TEST // simulated example with 2 taxa, 2 species - 1 taxon per species
-//#define SIM_TEST3 // simulated example with 3 species, 3 taxa
-
-#define HIERARCHICAL_FILTERING
+//#define HIERARCHICAL_FILTERING
 
 //#define UNCONSTRAINED_PROPOSAL 
 
@@ -19,3 +14,5 @@
 #define PARALLELIZE_BY_GROUP
 
 //#define DEBUG_MODE
+
+#define DRAW_NEW_THETA

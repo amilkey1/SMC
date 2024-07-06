@@ -97,6 +97,14 @@ class Forest {
         vector<tuple<string, string, string>>              buildFromNewickTopology(const string newick);
         void                        revertSpeciesTreeOneJoin(double edge_len);
         void                        trimTree(double amount_to_trim);
+        void                        rebuildThetaMap(Lot::SharedPtr lot);
+        void                        createThetaMap(Lot::SharedPtr lot);
+        void                        updateThetaMap(Lot::SharedPtr lot, string new_species_name);
+        void                        resetThetaMap(Lot::SharedPtr lot);
+        void                        drawNewTheta(string new_species, Lot::SharedPtr lot);
+        vector<string>              getExistingSpeciesNames();
+
+    
     
         map<string, double>         _theta_map;
 
@@ -139,6 +147,8 @@ class Forest {
         string                      _ancestral_species_name;
         pair<Node*, Node*>          _nodes_joined;
         double                      _species_tree_height;
+        double                      _theta_mean;
+        vector<double>              _vector_prior;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -210,7 +220,7 @@ class Forest {
         _taxon_map.clear();
         _species_indices.clear();
         _species_tree_height = 0.0;
-        
+        _vector_prior.clear();
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -1036,6 +1046,8 @@ class Forest {
         _species_indices = other._species_indices;
         _nodes_joined = other._nodes_joined;
         _species_tree_height = other._species_tree_height;
+        _theta_mean = other._theta_mean;
+        _vector_prior = other._vector_prior;
 
         // copy tree itself
 
@@ -1687,6 +1699,233 @@ class Forest {
         cout << endl;
     }
 
+    inline void Forest::resetThetaMap(Lot::SharedPtr lot) { // TODO: not sure if this works if not doing jones coalescent likelihood - double check
+        assert (_theta_map.size() == 0);
+        // map should be 2*nspecies - 1 size
+        unsigned number = 0;
+        vector<string> species_names;
+        
+        for (auto &s:_species_partition) {
+            species_names.push_back(s.first);
+            number++;
+        }
+        
+        // set ancestral species name for use in calculating panmictic coalescent likelihood
+    //        number = _nspecies - 2;
+    //        _ancestral_species_name = boost::str(boost::format("node-%d")%number);
+        
+        for (int i=0; i<_nspecies-1; i++) {
+            string name = boost::str(boost::format("node-%d")%number);
+            number++;
+            species_names.push_back(name);
+        }
+        
+        _ancestral_species_name = species_names.back();
+        
+        assert (species_names.size() == 2*_nspecies - 1);
+        
+        // draw thetas for tips of species trees and ancestral population
+        // for all other populations, theta = -1
+        
+    //        assert (_theta_proposal_mean > 0.0);
+        if (_theta_proposal_mean == 0.0) {
+            assert (_theta > 0.0);
+            _theta_proposal_mean = _theta;
+        }
+        double scale = 1 / _theta_proposal_mean;
+        
+        unsigned count = 0;
+        for (auto &name:species_names) {
+            if (count < _nspecies || count == 2*_nspecies-2) {
+                double new_theta = 0.0;
+                if (new_theta < _small_enough) {
+                    new_theta = 1 / (lot->gamma(2.0, scale));
+                    assert (new_theta > 0.0);
+                    _theta_map[name] = new_theta;
+                }
+                // pop mean = theta / 4
+                double a = 2.0;
+                double b = scale;
+                double x = new_theta;
+                double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
+                _vector_prior.push_back(log_inv_gamma_prior);
+            }
+            else {
+                _theta_map[name] = -1;
+            }
+            count++;
+        }
+    }
+
+    inline vector<string> Forest::getExistingSpeciesNames() {
+        vector<string> names;
+        for (auto &nd:_lineages) {
+            names.push_back(nd->_name);
+        }
+        return names;
+    }
+
+    inline void Forest::rebuildThetaMap(Lot::SharedPtr lot) {
+        vector<string> existing_species_names;
+        for (auto &nd:_lineages) {
+            existing_species_names.push_back(nd->_name);
+        }
+        
+        vector<string> species_names_to_remove;
+        for (auto &m:_theta_map) {
+            if (find(existing_species_names.begin(), existing_species_names.end(), m.first) != existing_species_names.end()) {
+                // do nothing
+            }
+            else {
+                species_names_to_remove.push_back(m.first);
+            }
+        }
+        
+        double scale = 1 / _theta_mean;
+        double new_theta = 0.0;
+        
+        for (auto &s:species_names_to_remove) {
+            // draw new theta and replace in map
+            new_theta = 1 / lot->gamma(2.0, scale);
+            _theta_map[s] = new_theta;
+            assert (new_theta > _small_enough);
+        }
+    }
+
+    inline void Forest::drawNewTheta(string new_species, Lot::SharedPtr lot) {
+        // draw a new theta for the newest species population
+        double scale = 1 / _theta_mean;
+        double new_theta = 0.0;
+        if (new_theta < _small_enough) {
+    //            new_theta = 1 / rng.gamma(2.0, scale);
+            new_theta = 1 / lot->gamma(2.0, scale);
+            _theta_map[new_species] = new_theta;
+        }
+        // pop mean = theta / 4
+        double a = 2.0;
+        double b = scale;
+    //            double x = new_theta / 4.0;
+        double x = new_theta;
+        double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
+        _vector_prior.push_back(log_inv_gamma_prior);
+    }
+
+    inline void Forest::updateThetaMap(Lot::SharedPtr lot, string new_species_name) {
+        // add a new theta for the most recently drawn species
+        double scale = (2.01 - 1.0) / (_theta_mean);
+        assert (scale > 0.0);
+        double new_theta = 0.0;
+        if (new_theta < _small_enough) {
+            new_theta = 1 / (lot->gamma(2.01, scale));
+            assert (new_theta > 0.0);
+            _theta_map[new_species_name] = new_theta;
+        }
+        // pop mean = theta / 4
+        double a = 2.0;
+        double b = scale;
+        double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
+        double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
+        _vector_prior.push_back(log_inv_gamma_prior);
+    }
+
+//    inline void Forest::createThetaMap(Lot::SharedPtr lot) {
+//        // map should be 2*nspecies - 1 size
+//        unsigned number = 0;
+//        vector<string> species_names;
+//
+//        for (auto &s:_species_partition) {
+//            species_names.push_back(s.first);
+//            number++;
+//            _species_indices[s.first] = number - 1;
+//        }
+//        assert (species_names.size() == _nspecies);
+//
+//        // gamma mean = shape * scale
+//        // draw mean from lognormal distribution
+//        // shape = 2.0 to be consistent with starbeast3
+//        // scale = 1 / mean;
+//
+//        if (_theta_proposal_mean > 0.0) {
+//            assert (_theta_mean == 0.0);
+//            _theta_mean = lot->gamma(1, _theta_proposal_mean); // equivalent to exponential(exponential_rate)
+//        }
+//        else {
+//            _theta_mean = Forest::_theta; // if no proposal distribution specified, use one theta mean for all particles
+//        }
+//
+//        double scale = (2.01 - 1.0) / (_theta_mean);
+//        assert (scale > 0.0);
+//        for (auto &name:species_names) {
+//            double new_theta = 0.0;
+//            if (new_theta < _small_enough) {
+//                new_theta = 1 / (lot->gamma(2.01, scale));
+//                assert (new_theta > 0.0);
+//                _theta_map[name] = new_theta;
+//            }
+//            // pop mean = theta / 4
+//            double a = 2.0;
+//            double b = scale;
+//            double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
+//            double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
+//            _vector_prior.push_back(log_inv_gamma_prior);
+//
+//        }
+//    }
+
+    inline void Forest::createThetaMap(Lot::SharedPtr lot) {
+         // map should be 2*nspecies - 1 size
+         unsigned number = 0;
+         vector<string> species_names;
+         
+         for (auto &s:_species_partition) {
+             species_names.push_back(s.first);
+             number++;
+             _species_indices[s.first] = number - 1;
+         }
+         for (int i=0; i<_nspecies-1; i++) {
+             string name = boost::str(boost::format("node-%d")%number);
+             number++;
+             species_names.push_back(name);
+             _species_indices[name] = number - 1;
+             if (i == _nspecies-2) {
+                 _ancestral_species_name = name;
+             }
+         }
+         
+         assert (species_names.size() == 2*_nspecies - 1);
+         
+         // gamma mean = shape * scale
+         // draw mean from lognormal distribution
+         // shape = 2.0 to be consistent with starbeast3
+         // scale = 1 / mean;
+         
+         if (_theta_proposal_mean > 0.0) {
+//             assert (_theta_mean == 0.0);
+             _theta_mean = lot->gamma(1, _theta_proposal_mean);
+         }
+         else {
+             _theta_mean = Forest::_theta; // if no proposal distribution specified, use one theta mean for all particles
+         }
+        
+         double scale = (2.01 - 1.0) / (_theta_mean);
+         assert (scale > 0.0);
+         for (auto &name:species_names) {
+             double new_theta = 0.0;
+             if (new_theta < _small_enough) {
+                 new_theta = 1 / (lot->gamma(2.01, scale));
+                 assert (new_theta > 0.0);
+                 _theta_map[name] = new_theta;
+             }
+             // pop mean = theta / 4
+             double a = 2.0;
+             double b = scale;
+             double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
+             double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
+             _vector_prior.push_back(log_inv_gamma_prior);
+
+         }
+     }
+
     inline void Forest::trimTree(double amount_to_trim) {
         for (auto &nd:_lineages) {
             nd->_edge_length -= amount_to_trim;
@@ -1890,8 +2129,6 @@ class Forest {
                             double log_prob_join = log(2/nChooseTwo);
                             log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
 
-    //                            cout << "pr coalescence = " << log_prob_join + log(coalescence_rate) - (increment * coalescence_rate) << endl;
-
                             bool found = (find(s.second.begin(), s.second.end(), node->_right_sib) != s.second.end());
 
                             if (found) {
@@ -1914,8 +2151,6 @@ class Forest {
                             double coalescence_rate = nlineages*(nlineages-1) / _theta;
 #endif
                             log_coalescent_likelihood -= increment * coalescence_rate;
-
-    //                            cout << "pr no coalescence = " << -1 * increment * coalescence_rate << endl;
                         }
                     }
 
@@ -1933,8 +2168,6 @@ class Forest {
                 double coalescence_rate = nlineages*(nlineages-1) / _theta;
 #endif
                 log_coalescent_likelihood -= remaining_chunk_of_branch * coalescence_rate;
-
-    //                cout << "pr no coalescence = " << -1 * remaining_chunk_of_branch * coalescence_rate << endl;
             }
             _nincrements += a;
         }

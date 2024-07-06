@@ -42,10 +42,7 @@ namespace proj {
             void                saveGeneTree(unsigned gene_number, vector<Bundle> &b) const;
             void                resetWeights(vector<Bundle> & bundles);
             void                createSpeciesMap(Data::SharedPtr);
-            void                simSpeciesMap();
-            string              inventName(unsigned k, bool lower_case);
             void                showFinal(vector<Particle::SharedPtr> my_vec);
-            void                writePaupFile(vector<Particle::SharedPtr> particles, vector<string> taxpartition);
             void                initializeBundles(vector<Bundle> &particles);
             void                filterBundles(unsigned step, vector<Bundle> & bundles);
             void                runBundles(vector<Bundle> &b);
@@ -54,6 +51,7 @@ namespace proj {
             void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<Bundle> &bundles);
             void                proposeSpeciesGroups(vector<Bundle> bundle_vec, unsigned ngroups, unsigned nsubsets, unsigned ntaxa, string filename1);
             void                proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Bundle> &bundles, unsigned ngroups, string filename1, unsigned nsubsets, unsigned ntaxa);
+            void                writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Bundle> &b) const;
         private:
 
             std::string                 _data_file_name;
@@ -172,19 +170,53 @@ namespace proj {
             treef << "end;\n";
             treef.close();
         }
-//        else {
-//            // save true species tree
-//            ofstream treef("true-species-tree.tre");
-//            treef << "#nexus\n\n";
-//            treef << "begin trees;\n";
-//            for (auto &p:v) {
-//                treef << "  tree test = [&R] " << p->saveForestNewick()  << ";\n";
-//            }
-//            treef << "end;\n";
-//            treef.close();
-//        }
+    }
 
+    inline void Proj::writeParamsFileForBeastComparison(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Bundle> &bundles) const {
+        
+        // this function creates a params file that is comparable to output from starbeast3
+        string filename1 = "params-beast-comparison.log"; // TODO: for now, just return gene likelihoods
+        
+        if (filesystem::remove(filename1)) {
+            if (_verbose > 0) {
+                cout << "existing file " << filename1 << " removed and replaced\n";
+            }
         }
+        
+        ofstream logf(filename1);
+        logf << "iter";
+        for (unsigned i=1; i<ngenes+1; i++) {
+            logf << "\t" << "Tree.t:gene" + to_string(i) + "likelihood";
+        }
+        logf << endl;
+        
+        unsigned iter = 0;
+        
+        logf << iter << "\t";
+        iter++;
+        
+        for (auto &b:bundles) {
+            vector<double> log_likelihoods = b.getLogLikelihoods();
+        
+            unsigned gene_count = 0;
+            
+            for (unsigned p=0; p<log_likelihoods.size(); p++) {
+                logf << log_likelihoods[p] << "\t";
+                
+                gene_count++;
+                if (gene_count == ngenes) {
+                    logf << endl;
+                    gene_count = 0;
+                    if (iter < _nparticles * _nbundles) { // don't add this for last one
+                        logf << iter << "\t";
+                        iter++;
+                    }
+                }
+            }
+        }
+        
+        logf.close();
+    }
 
 
     inline void Proj::saveGeneTrees(unsigned ngenes, vector<Bundle> &b) const {
@@ -487,7 +519,7 @@ namespace proj {
                Bundle chosen_bundle = bundles[i]; // bundle to copy
                
                for (unsigned a=0; a<_particle_increase; a++) {
-                   use_vec.push_back(*new Bundle(chosen_bundle)); // TODO: why * ?
+                   use_vec.push_back(*new Bundle(chosen_bundle));
                }
 
                assert(use_vec.size() == _particle_increase);
@@ -706,54 +738,6 @@ namespace proj {
         }
     }
 
-    inline string Proj::inventName(unsigned k, bool lower_case) {
-        // If   0 <= k < 26, returns A, B, ..., Z,
-        // If  26 <= k < 702, returns AA, AB, ..., ZZ,
-        // If 702 <= k < 18278, returns AAA, AAB, ..., ZZZ, and so on.
-        //
-        // For example, k = 19009 yields ABCD:
-        // ABCD 19009 = 26 + 26*26 + 26*26*26 + 0*26*26*26 + 1*26*26 + 2*26 + 3
-        //              <------- base ------>   ^first       ^second   ^third ^fourth
-        // base = (26^4 - 1)/25 - 1 = 18278
-        //   26^1 + 26^2 + 26^3 = 26^0 + 26^1 + 26^2 + 26^3 - 1 = (q^n - 1)/(q - 1) - 1, where q = 26, n = 4
-        //   n = 1 + floor(log(19009)/log(26))
-        // fourth = ((19009 - 18278                           )/26^0) % 26 = 3
-        // third  = ((19009 - 18278 - 3*26^0                  )/26^1) % 26 = 2
-        // second = ((19009 - 18278 - 3*26^0 - 2*26^1         )/26^2) % 26 = 1
-        // first  = ((19009 - 18278 - 3*26^0 - 2*26^1 - 1*26^2)/26^3) % 26 = 0
-
-        // Find how long a species name string must be
-        double logibase26 = log(k)/log(26);
-        unsigned n = 1 + (unsigned)floor(logibase26);
-        vector<char> letters;
-        unsigned base = (unsigned)((pow(26,n) - 1)/25.0 - 1);
-        unsigned cum = 0;
-        int ordA = (unsigned)(lower_case ? 'a' : 'A');
-        for (unsigned i = 0; i < n; ++i) {
-            unsigned ordi = (unsigned)((k - base - cum)/pow(26,i)) % 26;
-            letters.push_back(char(ordA + ordi));
-            cum += (unsigned)(ordi*pow(26,i));
-        }
-        string species_name(letters.rbegin(), letters.rend());
-        return species_name;
-    }
-
-    inline void Proj::simSpeciesMap() {
-        // nspecies is _sim_nspecies
-        // ntaxa vector is _ntaxaperspecies
-        unsigned count = 0;
-        for (int s=0; s<_sim_nspecies; s++) {
-            string species_name;
-            species_name = inventName(s, false);
-            for (int t=0; t<_ntaxaperspecies[s]; t++) {
-                string taxon_name = inventName(count, true) + "^" + species_name;
-                _taxon_map.insert({taxon_name, species_name});
-                count++;
-            }
-            _species_names.push_back(species_name);
-        }
-    }
-
     inline void Proj::createSpeciesMap(Data::SharedPtr d) {
         // TODO: this only works if names are in taxon^species format (no _)
         const vector<string> &names = d->getTaxonNames();
@@ -824,25 +808,6 @@ namespace proj {
         }
     }
 
-    inline void Proj::writePaupFile(vector<Particle::SharedPtr> particles, vector<string> taxpartition) {
-        // Output a PAUP* command file for estimating the species tree using
-        // svd quartets and qage
-        cout << "  PAUP* commands saved in file \"svd-qage.nex\"\n";
-        ofstream paupf("svd-qage.nex");
-        paupf << "#NEXUS\n\n";
-        paupf << "begin paup;\n";
-        paupf << "  log start file=svdout.txt replace;\n";
-        paupf << "  exe " + _sim_file_name + ";\n";
-        paupf << "  taxpartition species (vector) = " << join(taxpartition," ") << ";\n";
-        paupf << "  svd taxpartition=species;\n";
-        paupf << "  roottrees;\n";
-        paupf << "  qage taxpartition=species patprob=exactjc outUnits=substitutions treefile=svd.tre replace;\n";
-        paupf << "  log stop;\n";
-        paupf << "  quit;\n";
-        paupf << "end;\n";
-        paupf.close();
-    }
-
     inline void Proj::run() {
             _first_line = true;
             if (_verbose > 0) {
@@ -851,6 +816,11 @@ namespace proj {
                 cout << "Random seed: " << _random_seed << endl;
                 cout << "Theta: " << Forest::_theta << endl;
                 cout << "Number of threads: " << _nthreads << endl;
+#if defined (DRAW_NEW_THETA)
+                cout << "drawing new theta for each particle " << endl;
+#else
+                cout << "Theta: " << Forest::_theta << endl;
+#endif
             }
 
             if (Forest::_run_on_empty) { // if running with no data, choose taxa to join at random
@@ -894,6 +864,18 @@ namespace proj {
                 
                 initializeBundles(bundle_vec); // initialize in parallel with multithreading
                 
+#if defined (DRAW_NEW_THETA)
+                unsigned psuffix = 1;
+                for (auto &b:bundle_vec) {
+                    b.setSeed(rng.randint(1,9999) + psuffix);
+                    psuffix += 2;
+                }
+                
+                for (auto &b:bundle_vec) {
+                    b.drawTheta();
+                }
+#endif
+                
                 unsigned nsteps = ntaxa - 1;
                 
                 for (unsigned s=0; s<nsteps; s++) {
@@ -905,7 +887,6 @@ namespace proj {
                         unsigned psuffix = 1;
                         b.setSeed(rng.randint(1,9999) + psuffix);
                         psuffix += 2;
-//                        b.runBundle(); // for now, run each bundle separately and filter trees separately within each bundle
                         n++;
                     }
                     
@@ -920,6 +901,8 @@ namespace proj {
                 for (unsigned i=0; i<nsubsets; i++) {
                     saveGeneTree(i, bundle_vec); // TODO: for now, saving 1 gene per bundle
                 }
+                
+                writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, bundle_vec);
 
 #if defined (HIERARCHICAL_FILTERING)
                 string filename1 = "species_trees.trees";
@@ -985,7 +968,7 @@ namespace proj {
                     
                     Bundle chosen_bundle = bundle_vec[a]; // bundle to copy
                     for (unsigned i=0; i<_particle_increase; i++) {
-                        use_vec.push_back(*new Bundle(chosen_bundle)); // TODO: why * ?
+                        use_vec.push_back(*new Bundle(chosen_bundle));
                     }
 
                     assert(use_vec.size() == _particle_increase);
