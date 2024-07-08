@@ -117,6 +117,7 @@ extern proj::Lot rng;
     inline void Bundle::runBundle() {
         // TODO: create full theta map, then erase and rebuild at each step as needed
 //        unsigned nsteps = Forest::_ntaxa - 1;
+
         if (_generation == 0) {
             
             _species_particle.setLot(_lot);
@@ -136,6 +137,7 @@ extern proj::Lot rng;
         }
         
         else {
+#if defined (DRAW_NEW_THETA)
             // don't do this for first gen
 //            unsigned species_tree_size = (unsigned) _species_particle._forest._lineages.size();
             // TODO: erase members of theta map that aren't needed
@@ -151,6 +153,7 @@ extern proj::Lot rng;
                     _gene_particles[g][i]._forest._theta_map = theta_map;
                 }
             }
+#endif
         }
         
         vector<unsigned> current_species;
@@ -190,7 +193,7 @@ extern proj::Lot rng;
             for (unsigned i=0; i<_ngene_particles; i++) {
                 
                 // set particle random number seeds
-                _gene_particles[g][i].setSeed(rng.randint(1,9999) + psuffix);
+                _gene_particles[g][i].setLot(_lot);
                 psuffix += 2;
                 
                 _gene_particles[g][i].proposal(); // TODO: make this random, not sequential
@@ -199,8 +202,7 @@ extern proj::Lot rng;
         }
             
         filterLoci();
-        
-        
+                
         for (unsigned g=0; g<_ngenes; g++) {
             resetWeights(_gene_particles[g]);
         }
@@ -404,13 +406,15 @@ extern proj::Lot rng;
         for (unsigned g=0; g<_ngenes; g++) {
             for (unsigned i=0; i<_ngene_particles; i++) {
                 
-                // set particle random number seeds
-                _gene_particles[g][i].setSeed(rng.randint(1,9999) + psuffix);
+                // set particle lots
+                _gene_particles[g][i].setLot(_lot);
+//                _gene_particles[g][i].setSeed(rng.randint(1,9999) + psuffix);
                 psuffix += 2;
             }
         }
         
-        _species_particle.setSeed(rng.randint(1,9999) + psuffix);
+        _species_particle.setLot(_lot);
+//        _species_particle.setSeed(rng.randint(1,9999) + psuffix);
                 
         vector<double> max_depths;
         

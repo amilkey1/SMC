@@ -1771,7 +1771,7 @@ class Forest {
             existing_species_names.push_back(nd._name);
         }
         
-        vector<string> species_names_to_remove; // TODO: this malfunctions when threading?
+        vector<string> species_names_to_remove;
         for (auto &m:_theta_map) {
             if (find(existing_species_names.begin(), existing_species_names.end(), m.first) != existing_species_names.end()) {
                 // do nothing

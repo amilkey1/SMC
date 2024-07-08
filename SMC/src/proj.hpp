@@ -900,27 +900,19 @@ namespace proj {
                 
                 for (unsigned s=0; s<nsteps; s++) {
                     cout << "beginning step " << s << endl;
-
-                    unsigned n = 1;
+                    
+                    unsigned psuffix = 1;
                     for (auto &b:bundle_vec) {
                         // set bundle random number seeds
-                        unsigned psuffix = 1;
                         b.setSeed(rng.randint(1,9999) + psuffix);
                         psuffix += 2;
-                        n++;
                     }
                     
                     runBundles(bundle_vec);
                     
-//                    if (s == 13) {
-//                        for (auto &b:bundle_vec) {
-//                            cout << "new bundle" << endl;
-//                            for (auto &t:b.getThetas()) {
-//                                cout << t << endl;
-//                            }
-//                            cout << endl;
-//                        }
-//                    }
+                    for (auto &b:bundle_vec) {
+//                        cout << b.saveSpeciesNewick() << endl;
+                    }
                     
                     filterBundles(s, bundle_vec);
                     resetWeights(bundle_vec);
