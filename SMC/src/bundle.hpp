@@ -477,6 +477,7 @@ extern proj::Lot rng;
             _species_particle.speciesJoinProposal(); // join remaining species - no change in coalescent likelihood
         }
         _generation++;
+        // TODO: weight corrections for inv gamma & prior vs proposal
         
     }
     
