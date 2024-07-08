@@ -137,7 +137,7 @@ extern proj::Lot rng;
         
         else {
             // don't do this for first gen
-            unsigned species_tree_size = (unsigned) _species_particle._forest._lineages.size();
+//            unsigned species_tree_size = (unsigned) _species_particle._forest._lineages.size();
             // TODO: erase members of theta map that aren't needed
             // TODO: rebuild theta map as needed
             vector<string> existing_species = _species_particle.getExistingSpeciesNames();
@@ -469,7 +469,16 @@ extern proj::Lot rng;
         return log_likelihoods;
     }
     
-    inline void Bundle::drawTheta() { // TODO: should probably make some functions to do this rather than setting _forest directly from bundle
+    inline void Bundle::drawTheta() {
+        // set seeds first
+        for (unsigned g=0; g<_ngenes; g++) {
+            for (unsigned i=0; i<_ngene_particles; i++) {
+                _gene_particles[g][i].setLot(_lot); // TODO: set lot or rnseed?
+            }
+        }
+        _species_particle.setLot(_lot); // TODO: set lot or rnseed?
+        
+        // TODO: should probably make some functions to do this rather than setting _forest directly from bundle
         _gene_particles[0][0].drawTheta(); // create theta map, then copy to all particles
         
         double theta_mean = _gene_particles[0][0]._forest._theta_mean;

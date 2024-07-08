@@ -912,6 +912,16 @@ namespace proj {
                     
                     runBundles(bundle_vec);
                     
+//                    if (s == 13) {
+//                        for (auto &b:bundle_vec) {
+//                            cout << "new bundle" << endl;
+//                            for (auto &t:b.getThetas()) {
+//                                cout << t << endl;
+//                            }
+//                            cout << endl;
+//                        }
+//                    }
+                    
                     filterBundles(s, bundle_vec);
                     resetWeights(bundle_vec);
                 
