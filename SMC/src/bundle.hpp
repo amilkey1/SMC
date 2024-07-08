@@ -83,7 +83,7 @@ extern proj::Lot rng;
     }
 
     inline Bundle::Bundle(const Bundle & other) {
-        _lot.reset(new Lot()); // TODO: reset lot or not?
+        _lot.reset(new Lot());
         *this = other;
     }
 
@@ -115,9 +115,6 @@ extern proj::Lot rng;
     }
 
     inline void Bundle::runBundle() {
-        // TODO: create full theta map, then erase and rebuild at each step as needed
-//        unsigned nsteps = Forest::_ntaxa - 1;
-
         if (_generation == 0) {
             
             _species_particle.setLot(_lot);
@@ -126,7 +123,7 @@ extern proj::Lot rng;
             // set a starting likelihood for each gene particle  - // TODO: can copy some of this later
             for (unsigned g=0; g<_ngenes; g++) {
                 for (unsigned i=0; i<_ngene_particles; i++) {
-                    _gene_particles[g][i].setLot(_lot); // TODO: set lot or rnseed?
+                    _gene_particles[g][i].setLot(_lot);
                     _gene_particles[g][i]._t = _species_particle._t;
                     _gene_particles[g][i].calcLogLikelihood();
                 }
@@ -139,13 +136,9 @@ extern proj::Lot rng;
         else {
 #if defined (DRAW_NEW_THETA)
             // don't do this for first gen
-//            unsigned species_tree_size = (unsigned) _species_particle._forest._lineages.size();
-            // TODO: erase members of theta map that aren't needed
-            // TODO: rebuild theta map as needed
             vector<string> existing_species = _species_particle.getExistingSpeciesNames();
             
             _species_particle.rebuildThetaMap();
-//            _gene_particles[0][0].rebuildThetaMap(existing_species); // TODO: do this in species particle, then copy to gene particles
             
             map<string, double> theta_map = _gene_particles[0][0]._forest._theta_map;
             for (unsigned g=0; g<_ngenes; g++) {
@@ -236,7 +229,7 @@ extern proj::Lot rng;
             for (int t=0; t<max_current_species+1; t++) {
                 current_height += _species_particle._t[t].second;
             }
-//           current_height = _species_particle._forest.getTreeHeight();
+
             double deepest_coalescent_event = *max_element(gene_tree_heights.begin(), gene_tree_heights.end());
             double amount_to_trim = current_height - deepest_coalescent_event;
             
@@ -244,23 +237,14 @@ extern proj::Lot rng;
             
                 _species_particle.unJoinSpecies(max_current_species); // this function will unjoin species back to the max current species
                 
-//                vector<double> gene_tree_heights;
-//                for (unsigned g=0; g<_ngenes; g++) {
-//                    for (unsigned i=0; i<_ngene_particles; i++) {
-//                        gene_tree_heights.push_back(_gene_particles[g][i].getGeneTreeHeight());
-//                    }
-//                }
-                
-    //            double max_height = *max_element(gene_tree_heights.begin(), gene_tree_heights.end());
-    //            double amount_to_trim = _species_particle.trimSpeciesTree(max_height);
                 _species_particle.trimSpeciesTree(amount_to_trim);
                 double new_increment = _species_particle.addNewIncrement();
                 
                 double increment_difference = -amount_to_trim + new_increment;
                 unsigned species_tree_size = (unsigned) _species_particle._t.size();
                 
-                // TODO: trim gene tree _t back to species_tree_size
-                // TODO: then add new_increment to _t.back() in all gene trees
+                // trim gene tree _t back to species_tree_size
+                // then add new_increment to _t.back() in all gene trees
                 
                 for (unsigned g=0; g<_ngenes; g++) {
                     for (unsigned i=0; i<_ngene_particles; i++) {
@@ -399,7 +383,35 @@ extern proj::Lot rng;
             for (unsigned g=0; g<_ngenes; g++) {
                 _gene_particles[g][0].setUpSpeciesOnlyProposal();
             }
+            
+#if defined (DRAW_NEW_THETA)
+            // make new theta map and update as needed
+            string ancestral_spp_name = _gene_particles[0][0]._forest._ancestral_species_name; // this got wiped away when resetting species
+            assert  (ancestral_spp_name != "");
+            _species_particle._forest._ancestral_species_name = ancestral_spp_name;
+            
+            _species_particle._forest.createThetaMapSpeciesFiltering(_lot);
+            _species_particle._forest.updateThetaMap(_lot, _species_particle._forest._ancestral_species_name); // TODO: can do this right in create theta map
+            
+            map<string, double> theta_map = _species_particle._forest._theta_map;
+            
+            double theta_mean = _species_particle._forest._theta_mean;
+            double theta_proposal_mean = _species_particle._forest._theta_proposal_mean;
+            double theta_prior_mean = _species_particle._forest._theta_prior_mean;
+            map<string, unsigned> species_indices = _species_particle._forest._species_indices;
+            
+            for (unsigned g=0; g<_ngenes; g++) {
+                for (unsigned i=0; i<_ngene_particles; i++) {
+                    _gene_particles[g][i]._forest._theta_map = theta_map;
+                    _gene_particles[g][i]._forest._theta_proposal_mean = theta_proposal_mean;
+                    _gene_particles[g][i]._forest._theta_prior_mean = theta_prior_mean;
+                    _gene_particles[g][i]._forest._species_indices = species_indices;
+                    _gene_particles[g][i]._forest._theta_mean = theta_mean;
+                }
+            }
+            
         }
+#endif
         
         unsigned psuffix = 1;
         
@@ -408,17 +420,29 @@ extern proj::Lot rng;
                 
                 // set particle lots
                 _gene_particles[g][i].setLot(_lot);
-//                _gene_particles[g][i].setSeed(rng.randint(1,9999) + psuffix);
                 psuffix += 2;
             }
         }
         
         _species_particle.setLot(_lot);
-//        _species_particle.setSeed(rng.randint(1,9999) + psuffix);
                 
         vector<double> max_depths;
         
         tuple<string, string, string> species_joined = _species_particle.speciesJoinProposal();
+        
+#if defined (DRAW_NEW_THETA)
+        if (_generation > 0) { // no new species in gen 0
+            _species_particle._forest.updateThetaMap(_lot, get<2> (species_joined));
+            
+            map<string, double> theta_map = _species_particle._forest._theta_map;
+            
+            for (unsigned g=0; g<_ngenes; g++) {
+                for (unsigned i=0; i<_ngene_particles; i++) {
+                    _gene_particles[g][i]._forest._theta_map = theta_map;
+                }
+            }
+        }
+#endif
         
         bool reset = true;
         
@@ -434,7 +458,7 @@ extern proj::Lot rng;
         
         double log_coalescent_likelihood = 0.0;
         for (unsigned g=0; g<_ngenes; g++) {
-            log_coalescent_likelihood += _gene_particles[g][0].calcLogCoalescentLikelihood(_species_particle._forest._last_edge_length, species_joined, _species_particle._forest._species_tree_height); // TODO: double check species tree height - don't need it in both forest and particle
+            log_coalescent_likelihood += _gene_particles[g][0].calcLogCoalescentLikelihood(_species_particle._forest._last_edge_length, species_joined, _species_particle._forest._species_tree_height);
         }
         
         _bundle_log_weight = log_coalescent_likelihood - _prev_log_coalescent_likelihood;
@@ -477,10 +501,10 @@ extern proj::Lot rng;
         // set seeds first
         for (unsigned g=0; g<_ngenes; g++) {
             for (unsigned i=0; i<_ngene_particles; i++) {
-                _gene_particles[g][i].setLot(_lot); // TODO: set lot or rnseed?
+                _gene_particles[g][i].setLot(_lot);
             }
         }
-        _species_particle.setLot(_lot); // TODO: set lot or rnseed?
+        _species_particle.setLot(_lot);
         
         // TODO: should probably make some functions to do this rather than setting _forest directly from bundle
         _gene_particles[0][0].drawTheta(); // create theta map, then copy to all particles

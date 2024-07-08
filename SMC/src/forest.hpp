@@ -99,6 +99,7 @@ class Forest {
         void                        trimTree(double amount_to_trim);
         void                        rebuildThetaMap(Lot::SharedPtr lot);
         void                        createThetaMap(Lot::SharedPtr lot);
+        void                        createThetaMapSpeciesFiltering(Lot::SharedPtr lot);
         void                        updateThetaMap(Lot::SharedPtr lot, string new_species_name);
         void                        resetThetaMap(Lot::SharedPtr lot);
         void                        drawNewTheta(string new_species, Lot::SharedPtr lot);
@@ -1828,49 +1829,51 @@ class Forest {
         _vector_prior.push_back(log_inv_gamma_prior);
     }
 
-//    inline void Forest::createThetaMap(Lot::SharedPtr lot) {
-//        // map should be 2*nspecies - 1 size
-//        unsigned number = 0;
-//        vector<string> species_names;
-//
-//        for (auto &s:_species_partition) {
-//            species_names.push_back(s.first);
-//            number++;
-//            _species_indices[s.first] = number - 1;
-//        }
-//        assert (species_names.size() == _nspecies);
-//
-//        // gamma mean = shape * scale
-//        // draw mean from lognormal distribution
-//        // shape = 2.0 to be consistent with starbeast3
-//        // scale = 1 / mean;
-//
-//        if (_theta_proposal_mean > 0.0) {
-//            assert (_theta_mean == 0.0);
-//            _theta_mean = lot->gamma(1, _theta_proposal_mean); // equivalent to exponential(exponential_rate)
-//        }
-//        else {
-//            _theta_mean = Forest::_theta; // if no proposal distribution specified, use one theta mean for all particles
-//        }
-//
-//        double scale = (2.01 - 1.0) / (_theta_mean);
-//        assert (scale > 0.0);
-//        for (auto &name:species_names) {
-//            double new_theta = 0.0;
-//            if (new_theta < _small_enough) {
-//                new_theta = 1 / (lot->gamma(2.01, scale));
-//                assert (new_theta > 0.0);
-//                _theta_map[name] = new_theta;
-//            }
-//            // pop mean = theta / 4
-//            double a = 2.0;
-//            double b = scale;
-//            double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
-//            double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
-//            _vector_prior.push_back(log_inv_gamma_prior);
-//
-//        }
-//    }
+    inline void Forest::createThetaMapSpeciesFiltering(Lot::SharedPtr lot) {
+        // map should be nspecies size - only create map for tips, then update as needed
+        unsigned number = 0;
+        vector<string> species_names;
+        _species_indices.clear();
+        _vector_prior.clear();
+
+        for (auto &nd:_lineages) {
+            species_names.push_back(nd->_name);
+            number++;
+            _species_indices[nd->_name] = number - 1;
+        }
+        
+        assert (species_names.size() == _nspecies);
+
+        // gamma mean = shape * scale
+        // draw mean from lognormal distribution
+        // shape = 2.0 to be consistent with starbeast3
+        // scale = 1 / mean;
+
+        if (_theta_proposal_mean > 0.0) {
+            _theta_mean = lot->gamma(1, _theta_proposal_mean); // equivalent to exponential(exponential_rate)
+        }
+        else {
+            _theta_mean = Forest::_theta; // if no proposal distribution specified, use one theta mean for all particles
+        }
+
+        double scale = (2.01 - 1.0) / (_theta_mean);
+        assert (scale > 0.0);
+        for (auto &name:species_names) {
+            double new_theta = 0.0;
+            if (new_theta < _small_enough) {
+                new_theta = 1 / (lot->gamma(2.01, scale));
+                assert (new_theta > 0.0);
+                _theta_map[name] = new_theta;
+            }
+            // pop mean = theta / 4
+            double a = 2.0;
+            double b = scale;
+            double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
+            double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
+            _vector_prior.push_back(log_inv_gamma_prior);
+
+        }
+    }
 
     inline void Forest::createThetaMap(Lot::SharedPtr lot) {
          // map should be 2*nspecies - 1 size

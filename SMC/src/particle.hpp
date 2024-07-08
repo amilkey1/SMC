@@ -293,7 +293,6 @@ class Particle {
     #else
                     _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
     #endif
-//                    _species_tree_height += _forest._last_edge_length;
                 }
                 if (_forest._lineages.size() == 1) {
                     _forest._last_edge_length = 0.0;
@@ -510,28 +509,6 @@ class Particle {
         _forest.createThetaMap(_lot);
     }
 
-//    inline void Particle::drawTheta() {
-//        // set seed first
-//    //        assert (_psuffix > 0);
-//    //        setSeed(rng.randint(1,9999) + _psuffix);
-//
-//        _forests[1].createThetaMap(_lot); // create map for one forest, then copy it to all forests
-//        double theta_mean = _forests[1]._theta_mean;
-//        double theta_proposal_mean = _forests[1]._theta_proposal_mean;
-//        double theta_prior_mean = _forests[1]._theta_prior_mean;
-//        map<string, double> theta_map = _forests[1]._theta_map;
-//        map<string, unsigned> species_indices = _forests[1]._species_indices;
-//        if (_forests.size() > 2) {
-//            for (int i=2; i<_forests.size(); i++) {
-//                _forests[i]._theta_map = theta_map;
-//                _forests[i]._species_indices = species_indices;
-//                _forests[i]._theta_mean = theta_mean;
-//                _forests[i]._theta_proposal_mean = theta_proposal_mean;
-//                _forests[i]._theta_prior_mean = theta_prior_mean;
-//            }
-//        }
-//    }
-
     inline void Particle::trimSpeciesTree(double amount_to_trim) {
         assert (_type == "species");
 //        double current_height = _forest.getTreeHeight();
@@ -728,6 +705,10 @@ class Particle {
             _forest._last_edge_length = 0.0;
             _forest._increments_and_priors.clear();
             _forest._species_tree_height = 0.0;
+#if defined (DRAW_NEW_THETA)
+            _forest._theta_map.clear(); // clear old thetas
+            
+#endif
         }
         
         else {
