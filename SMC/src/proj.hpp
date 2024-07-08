@@ -188,6 +188,13 @@ namespace proj {
         for (unsigned i=1; i<ngenes+1; i++) {
             logf << "\t" << "Tree.t:gene" + to_string(i) + "likelihood";
         }
+
+        logf << "\t" << "popMean";
+        
+        for (unsigned s=0; s<nspecies*2 - 1; s++) {
+            logf << "\t" << "popMean." << s+1;
+        }
+        
         logf << endl;
         
         unsigned iter = 0;
@@ -205,8 +212,21 @@ namespace proj {
                 
                 gene_count++;
                 if (gene_count == ngenes) {
+                    logf << b.getThetaMean() / 4.0 << "\t";
+                    
+#if defined (DRAW_NEW_THETA)
+                    for (auto &t:b.getThetas()) {
+                        logf << t / 4.0 << "\t"; // theta / 4 to be consistent with *beast3 output
+                    }
+#else
+                    for (unsigned t=0; t<nspecies*2 - 1; t++) {
+                        logf << Forest::_theta / 4 << "\t"; // theta / 4 to be consistent with *beast3 output
+                    }
+#endif
+                    
                     logf << endl;
                     gene_count = 0;
+                    
                     if (iter < _nparticles * _nbundles) { // don't add this for last one
                         logf << iter << "\t";
                         iter++;

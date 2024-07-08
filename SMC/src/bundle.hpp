@@ -45,6 +45,8 @@ extern proj::Lot rng;
             void                                            deleteExtraGeneParticles();
             vector<double>                                  getLogLikelihoods();
             void                                            drawTheta();
+            vector<double>                                  getThetas();
+            double                                          getThetaMean();
         
         private:
         
@@ -116,8 +118,6 @@ extern proj::Lot rng;
         // TODO: create full theta map, then erase and rebuild at each step as needed
 //        unsigned nsteps = Forest::_ntaxa - 1;
         if (_generation == 0) {
-
-//            _species_particle.drawFirstSpeciesIncrement();
             
             _species_particle.setLot(_lot);
             _species_particle.buildEntireSpeciesTree();
@@ -474,7 +474,7 @@ extern proj::Lot rng;
         
         double theta_mean = _gene_particles[0][0]._forest._theta_mean;
         double theta_proposal_mean = _gene_particles[0][0]._forest._theta_proposal_mean;
-        double theta_prior_mean = _gene_particles[0][0]._forest._theta_prior_mean;
+        double theta_prior_mean = _gene_particles[0][0]._forest._theta_prior_mean; // TODO: do this in speices particle, not first gene particle
         
         map<string, double> theta_map = _gene_particles[0][0]._forest._theta_map;
         map<string, unsigned> species_indices = _gene_particles[0][0]._forest._species_indices;
@@ -501,6 +501,22 @@ extern proj::Lot rng;
         _species_particle._forest._theta_proposal_mean = theta_proposal_mean;
         _species_particle._forest._theta_prior_mean = theta_prior_mean;
         _species_particle._forest._ancestral_species_name = ancestral_spp_name;
+    }
+    
+    inline vector<double> Bundle::getThetas() {
+        vector<double> thetas;
+        for (auto &t:_species_particle._forest._theta_map) {
+            thetas.push_back(t.second);
+        }
+        return thetas;
+    }
+    
+    inline double Bundle::getThetaMean() {
+#if defined (DRAW_NEW_THETA)
+        return _species_particle._forest._theta_mean;
+#else
+        return Forest::_theta;
+#endif
     }
 
     inline void Bundle::operator=(const Bundle & other) {
