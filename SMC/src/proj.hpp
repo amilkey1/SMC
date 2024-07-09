@@ -65,7 +65,6 @@ namespace proj {
             unsigned                    _nparticles;
             unsigned                    _random_seed;
 
-
             static string               _program_name;
             static unsigned             _major_version;
             static unsigned             _minor_version;
@@ -77,15 +76,10 @@ namespace proj {
             map<string, string>         _taxon_map;
             unsigned                    _nthreads;
             void                        handleBaseFrequencies();
-            void                        handleNTaxaPerSpecies();
             void                        checkOutgroupName();
             void                        debugSpeciesTree(vector<Particle::SharedPtr> &particles);
             double                      _small_enough;
             unsigned                    _verbose;
-            unsigned                    _sim_nspecies;
-            vector<unsigned>            _ntaxaperspecies;
-            string                      _string_ntaxaperspecies;
-            string                      _sim_file_name;
             unsigned                    _particle_increase;
             double                      _thin;
             unsigned                    _save_every;
@@ -95,7 +89,6 @@ namespace proj {
             bool                        _gene_newicks_specified;
             unsigned                    _ngenes_provided;
             string                      _species_newick_name;
-            bool                        _fix_theta_for_simulations;
             double                      _phi;
             unsigned                    _nbundles;
     };
@@ -402,9 +395,6 @@ namespace proj {
         ("save_memory", boost::program_options::value(&Forest::_save_memory)->default_value(false), "save memory at the expense of time")
         ("outgroup", boost::program_options::value(&Forest::_outgroup)->default_value("none"), "a string defining the outgroup")
         ("startmode", boost::program_options::value(&_start_mode)->default_value("smc"), "a string defining whether to simulate data or perform smc")
-        ("nspecies", boost::program_options::value(&_sim_nspecies)->default_value(0), "number of species to simulate")
-        ("ntaxaperspecies", boost::program_options::value(&_string_ntaxaperspecies)->default_value(""), "number of taxa per species to simulate")
-        ("filename", boost::program_options::value(&_sim_file_name), "name of file to write simulated data to")
         ("particle_increase", boost::program_options::value(&_particle_increase)->default_value(1), "how much to increase particles for species filtering")
         ("thin", boost::program_options::value(&_thin)->default_value(1.0), "take this portion of particles for hierarchical species filtering")
         ("save_every", boost::program_options::value(&_save_every)->default_value(1.0), "take this portion of particles for output")
@@ -414,7 +404,6 @@ namespace proj {
         ("theta_proposal_mean", boost::program_options::value(&Forest::_theta_proposal_mean)->default_value(0.0), "theta proposal mean")
         ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
         ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
-        ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(false), "set to true to fix one theta for all populations")
         ("phi", boost::program_options::value(&_phi)->default_value(1.0), "correct weights by this number")
         ("nbundles", boost::program_options::value(&_nbundles)->default_value(1), "number of bundles")
         ;
@@ -454,10 +443,6 @@ namespace proj {
         if (vm.count("base_frequencies") > 0) {
             handleBaseFrequencies();
         }
-        // if user specified "ntaxaperspecies" in conf file, convert them to a vector<unsigned>
-        if (vm.count("ntaxaperspecies") > 0 && _start_mode == "sim") {
-            handleNTaxaPerSpecies();
-        }
         
         // if save_every > particle_increase, quit
         if (_save_every > _particle_increase) {
@@ -475,19 +460,11 @@ namespace proj {
             if (_data_file_name != "") {
                 cout << "\nIgnoring data file name for simulation\n";
             }
-            if (_sim_nspecies == 0) {
-                throw XProj("must specify number of species for which to simulate data");
-            }
-            
-            if (_ntaxaperspecies.size() != 1 && _ntaxaperspecies.size() != _sim_nspecies) {
-                throw XProj("ntaxaperspecies must be one number for all species or must match the total number of species specified; ex: ntaxaperspecies = 5 or ntaxaperspecies = 5, 2, 3 if nspecies = 3");
-            }
+
             if (Forest::_run_on_empty) {
                 cout << "\nIgnoring start_mode = run_on_empty and simulating data\n";
             }
-            if (_sim_file_name == "") {
-                throw XProj("must specify name of file to write simulated data to; ex. filename = sim.nex");
-            }
+
             if (Forest::_theta == 0.0 && Forest::_theta_prior_mean == 0.0 && Forest::_theta_proposal_mean == 0.0) {
                 throw XProj("must specify theta or theta proposal / prior mean for simulations");
             }
@@ -520,19 +497,6 @@ namespace proj {
         }
         if (!found) {
             throw XProj(format("outgroup name does not match any species name"));
-        }
-    }
-
-    inline void Proj::handleNTaxaPerSpecies() {
-        vector<string> temp;
-        split(temp, _string_ntaxaperspecies, is_any_of(","));
-        // iterate throgh temp
-        if (temp[0] == "") {
-            throw XProj("must specify number of taxa per species");
-        }
-        for (auto &i:temp) {
-            double f = stof(i);
-            _ntaxaperspecies.push_back(f);
         }
     }
 

@@ -117,7 +117,6 @@ class Particle {
         int                                     _generation = 0;
         double                                  _log_coalescent_likelihood;
         mutable                                 Lot::SharedPtr _lot;
-        unsigned                                _num_deep_coalescences;
         unsigned                                _psuffix;
         vector<pair<tuple<string, string, string>, double>> _t;
         string                                  _type;
@@ -167,7 +166,6 @@ class Particle {
         _nsubsets       = 0;
         _generation     = 0;
         _log_coalescent_likelihood = 0.0;
-        _num_deep_coalescences = 0.0;
         _t.clear();
         _psuffix = 0;
         _type = "null";
@@ -759,7 +757,6 @@ class Particle {
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
-        _num_deep_coalescences = other._num_deep_coalescences;
         _t = other._t;
         _psuffix = other._psuffix;
         _type = other._type;
