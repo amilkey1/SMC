@@ -416,6 +416,7 @@ class Particle {
     }
 
     inline void Particle::proposal() {
+        double inv_gamma_modifier = 0.0;
         bool done = false;
                 
         while (!done) {
@@ -470,9 +471,59 @@ class Particle {
                 if (_forest._species_partition.size() > 1) {
                     _current_species++;
                 }
+                
+#if defined (INV_GAMMA_PRIOR_TWO) // modifier each time a new theta is drawn
+                double theta_mean = _forest._theta_mean;
+                double eps = 0.01;
+                double a = 2.0;
+                
+                inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
+                
+                // new theta drawn for the new population
+                string new_spp = get<2> (_t[_current_species].first);
+                double y = _forest._theta_map[new_spp];
+                assert (y > 0.0);
+            
+                inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
+#endif
+                }
             }
+        
+#if defined (INV_GAMMA_PRIOR_TWO)
+            if (_generation == 0) { // modifier for each theta drawn for each tip // TODO: is this for every gene or just once for the whole particle? if just once, how does it affect the weights?
+                inv_gamma_modifier = 0.0;
+                double theta_mean = _forest._theta_mean;
+                double eps = 0.01;
+                double a = 2.0;
+                
+                inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
+                
+                // for first step, new theta drawn for each tip population
+                for (int i=0; i<Forest::_nspecies; i++) {
+                    auto it = _forest._theta_map.begin();
+                    std::advance(it, i);
+                    double y = it->second;
+                    
+                    inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
+                }
             }
+#endif
+        
         _log_weight = _forest._log_weight;
+        
+#if defined (DRAW_NEW_THETA)
+        // modifier only happens on first round
+        if (_generation == 0 && _forest._theta_prior_mean > 0.0 && _forest._theta_proposal_mean > 0.0) {
+            double prior_rate = 1.0/_forest._theta_prior_mean;
+            double proposal_rate = 1.0/_forest._theta_proposal_mean;
+            double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forest._theta_mean;
+            
+            _log_weight += log_weight_modifier;
+        }
+#endif
+        
+        _log_weight += inv_gamma_modifier;
+        
         _generation++;
     }
 

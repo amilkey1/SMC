@@ -252,6 +252,10 @@ namespace proj {
 #if !defined (PARALLELIZE_BY_GROUP)
             logf << "iter";
 #endif
+            if (_nthreads == 1) {
+                logf << "iter";
+            }
+            
             for (unsigned i=1; i<ngenes+1; i++) {
                 logf << "\t" << "Tree.t:gene" + to_string(i) + "likelihood";
             }
@@ -266,20 +270,36 @@ namespace proj {
             
         }
                 
+        unsigned iter = 0;
 #if !defined (PARALLELIZE_BY_GROUP)
         unsigned sample_size = round(double (_particle_increase) / double(_save_every) );
         if (sample_size == 0) {
             sample_size = _particle_increase;
         }
         
-        unsigned iter = group_number * sample_size;
+        iter = group_number * sample_size;
 #endif
+        
+        if (_nthreads == 1) {
+            unsigned sample_size = round(double (_particle_increase) / double(_save_every) );
+            if (sample_size == 0) {
+                sample_size = _particle_increase;
+            }
+            
+           iter = group_number * sample_size;
+        }
         
         for (auto &b:bundles) {
 #if !defined (PARALLELIZE_BY_GROUP)
             logf << iter << "\t";
             iter++;
 #endif
+            
+            if (_nthreads == 1) {
+                logf << iter << "\t";
+                iter++;
+            }
+            
             vector<double> log_likelihoods = b.getLogLikelihoods();
         
             unsigned gene_count = 0;
@@ -303,13 +323,6 @@ namespace proj {
                     
                     logf << endl;
                     gene_count = 0;
-                    
-//#if !defined (PARALLELIZE_BY_GROUP)
-//                    if (iter < _nparticles * _nbundles) { // don't add this for last one
-//                        logf << iter << "\t";
-//                        iter++;
-//                    }
-//#endif
                 }
             }
         }

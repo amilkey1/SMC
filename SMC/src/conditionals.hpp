@@ -16,3 +16,6 @@
 //#define DEBUG_MODE
 
 #define DRAW_NEW_THETA
+
+#define INV_GAMMA_PRIOR_TWO // if DRAW_NEW_THETA turned off, INV_GAMMA_PRIOR_TWO needs to also be turned off
+
