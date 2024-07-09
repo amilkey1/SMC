@@ -160,9 +160,9 @@ extern proj::Lot rng;
         _species_particle.unJoinSpecies(max_current_species); // this function will unjoin species back to the max current species
         // i.e. if max_current_species = 1, this function will erase so only _t[0] through _t[1] remain
         // i.e. if max_current_species = 3, this function will erase so _t[0] through _t[3] remain
-        if (_generation > 0) {
+//        if (_generation > 0) {
             _species_particle.rebuildEntireSpeciesTree();
-        }
+//        }
                     
         for (unsigned g=0; g<_ngenes; g++) {
             for (unsigned i=0; i<_ngene_particles; i++) {
@@ -383,23 +383,23 @@ extern proj::Lot rng;
             for (unsigned g=0; g<_ngenes; g++) {
                 _gene_particles[g][0].setUpSpeciesOnlyProposal();
             }
-            
+
 #if defined (DRAW_NEW_THETA)
             // make new theta map and update as needed
             string ancestral_spp_name = _gene_particles[0][0]._forest._ancestral_species_name; // this got wiped away when resetting species
             assert  (ancestral_spp_name != "");
             _species_particle._forest._ancestral_species_name = ancestral_spp_name;
-            
+
             _species_particle._forest.createThetaMapSpeciesFiltering(_lot);
             _species_particle._forest.updateThetaMap(_lot, _species_particle._forest._ancestral_species_name); // TODO: can do this right in create theta map
-            
+
             map<string, double> theta_map = _species_particle._forest._theta_map;
-            
+
             double theta_mean = _species_particle._forest._theta_mean;
             double theta_proposal_mean = _species_particle._forest._theta_proposal_mean;
             double theta_prior_mean = _species_particle._forest._theta_prior_mean;
             map<string, unsigned> species_indices = _species_particle._forest._species_indices;
-            
+
             for (unsigned g=0; g<_ngenes; g++) {
                 for (unsigned i=0; i<_ngene_particles; i++) {
                     _gene_particles[g][i]._forest._theta_map = theta_map;
@@ -409,33 +409,32 @@ extern proj::Lot rng;
                     _gene_particles[g][i]._forest._theta_mean = theta_mean;
                 }
             }
-            
-        }
 #endif
-        
+        }
+
         unsigned psuffix = 1;
-        
+
         for (unsigned g=0; g<_ngenes; g++) {
             for (unsigned i=0; i<_ngene_particles; i++) {
-                
+
                 // set particle lots
                 _gene_particles[g][i].setLot(_lot);
                 psuffix += 2;
             }
         }
-        
+
         _species_particle.setLot(_lot);
-                
+
         vector<double> max_depths;
-        
+
         tuple<string, string, string> species_joined = _species_particle.speciesJoinProposal();
-        
+
 #if defined (DRAW_NEW_THETA)
         if (_generation > 0) { // no new species in gen 0
             _species_particle._forest.updateThetaMap(_lot, get<2> (species_joined));
-            
+
             map<string, double> theta_map = _species_particle._forest._theta_map;
-            
+
             for (unsigned g=0; g<_ngenes; g++) {
                 for (unsigned i=0; i<_ngene_particles; i++) {
                     _gene_particles[g][i]._forest._theta_map = theta_map;
@@ -443,29 +442,29 @@ extern proj::Lot rng;
             }
         }
 #endif
-        
+
         bool reset = true;
-        
+
         if (_species_particle._forest._lineages.size() == 1) {
             reset = false;
         }
         for (unsigned g=0; g<_ngenes; g++) {
             max_depths.push_back(_gene_particles[g][0].getMaxDepth(species_joined, reset));
         }
-        
+
         // TODO: switch to jones coalescent likelihood or draw new thetas for second round of species only filtering
         double max_depth = _species_particle.speciesOnlyProposal(max_depths);
-        
+
         double log_coalescent_likelihood = 0.0;
         for (unsigned g=0; g<_ngenes; g++) {
             log_coalescent_likelihood += _gene_particles[g][0].calcLogCoalescentLikelihood(_species_particle._forest._last_edge_length, species_joined, _species_particle._forest._species_tree_height);
             log_coalescent_likelihood += _gene_particles[g][0]._constrained_factor; // include weight correction for constrained proposal
         }
-        
+
         _bundle_log_weight = log_coalescent_likelihood - _prev_log_coalescent_likelihood;
-        
+
         _prev_log_coalescent_likelihood = log_coalescent_likelihood;
-        
+
 #if !defined (UNCONSTRAINED_PROPOSAL)
         double test = 1/_bundle_log_weight;
         assert(test != -0); // assert coalescent likelihood is not -inf
@@ -473,13 +472,13 @@ extern proj::Lot rng;
             _bundle_log_weight += _species_particle.calcConstrainedWeightFactor(max_depth);
         }
 #endif
-        
+
         if (_species_particle._forest._lineages.size() == 2) {
             _species_particle.speciesJoinProposal(); // join remaining species - no change in coalescent likelihood
         }
         _generation++;
         // TODO: weight corrections for inv gamma & prior vs proposal
-        
+
     }
     
     inline void Bundle::deleteExtraGeneParticles() {
