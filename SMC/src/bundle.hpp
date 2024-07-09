@@ -157,7 +157,7 @@ extern proj::Lot rng;
         }
         
         unsigned max_current_species = *max_element(current_species.begin(), current_species.end());
-//        _species_particle.unJoinSpecies(max_current_species); // this function will unjoin species back to the max current species
+        _species_particle.unJoinSpecies(max_current_species); // this function will unjoin species back to the max current species
         // i.e. if max_current_species = 1, this function will erase so only _t[0] through _t[1] remain
         // i.e. if max_current_species = 3, this function will erase so _t[0] through _t[3] remain
         if (_generation > 0) {
@@ -166,13 +166,13 @@ extern proj::Lot rng;
                     
         for (unsigned g=0; g<_ngenes; g++) {
             for (unsigned i=0; i<_ngene_particles; i++) {
-//                unsigned t_size = (unsigned) _gene_particles[g][i]._t.size();
-//                unsigned n_to_remove = t_size - max_current_species - 1; // -1 because gene trees use current_species + 1 when updating species partitions
+                unsigned t_size = (unsigned) _gene_particles[g][i]._t.size();
+                unsigned n_to_remove = t_size - max_current_species - 1; // -1 because gene trees use current_species + 1 when updating species partitions
                 
-//                for (unsigned a=0; a<n_to_remove; a++) {
-//                    _gene_particles[g][i]._t.pop_back();
-//                }
-//                assert (_gene_particles[g][i]._t.size() > 0); // _t should never be completely removed because first increments always count
+                for (unsigned a=0; a<n_to_remove; a++) {
+                    _gene_particles[g][i]._t.pop_back();
+                }
+                assert (_gene_particles[g][i]._t.size() > 0); // _t should never be completely removed because first increments always count
                 
                 for (unsigned s=max_current_species + 1; s < Forest::_nspecies; s++) {
                     _gene_particles[g][i]._t.push_back(_species_particle._t[s]);
@@ -208,58 +208,58 @@ extern proj::Lot rng;
         _bundle_log_weight = log_weight;
         
         
-        if (_generation < Forest::_ntaxa - 2) {
-            current_species.clear();
-            for (unsigned g=0; g<_ngenes; g++) {
-                for (unsigned i=0; i<_ngene_particles; i++) {
-                    current_species.push_back(_gene_particles[g][i]._current_species);
-                }
-            }
-            
-            max_current_species = *max_element(current_species.begin(), current_species.end());
-            
-            vector<double> gene_tree_heights;
-            for (unsigned g=0; g<_ngenes; g++) {
-                for (unsigned i=0; i<_ngene_particles; i++) {
-                    gene_tree_heights.push_back(_gene_particles[g][i].getGeneTreeHeight());
-                }
-            }
-            
-            double current_height = 0.0;
-            for (int t=0; t<max_current_species+1; t++) {
-                current_height += _species_particle._t[t].second;
-            }
-
-            double deepest_coalescent_event = *max_element(gene_tree_heights.begin(), gene_tree_heights.end());
-            double amount_to_trim = current_height - deepest_coalescent_event;
-            
-            if (amount_to_trim > 0.0) {
-            
-                _species_particle.unJoinSpecies(max_current_species); // this function will unjoin species back to the max current species
-                
-                _species_particle.trimSpeciesTree(amount_to_trim);
-                double new_increment = _species_particle.addNewIncrement();
-                
-                double increment_difference = -amount_to_trim + new_increment;
-                unsigned species_tree_size = (unsigned) _species_particle._t.size();
-                
-                // trim gene tree _t back to species_tree_size
-                // then add new_increment to _t.back() in all gene trees
-                
-                for (unsigned g=0; g<_ngenes; g++) {
-                    for (unsigned i=0; i<_ngene_particles; i++) {
-                        unsigned t_size = (unsigned) _gene_particles[g][i]._t.size();
-                        unsigned n_to_remove = t_size - species_tree_size; // -1 because gene trees use current_species + 1 when updating species partitions ???
-                        
-                        for (unsigned a=0; a<n_to_remove; a++) {
-                            _gene_particles[g][i]._t.pop_back();
-                        }
-                        assert (_gene_particles[g][i]._t.size() == species_tree_size);
-                        _gene_particles[g][i]._t.back().second += increment_difference;
-                    }
-                }
-            }
-        }
+//        if (_generation < Forest::_ntaxa - 2) {
+//            current_species.clear();
+//            for (unsigned g=0; g<_ngenes; g++) {
+//                for (unsigned i=0; i<_ngene_particles; i++) {
+//                    current_species.push_back(_gene_particles[g][i]._current_species);
+//                }
+//            }
+//
+//            max_current_species = *max_element(current_species.begin(), current_species.end());
+//
+//            vector<double> gene_tree_heights;
+//            for (unsigned g=0; g<_ngenes; g++) {
+//                for (unsigned i=0; i<_ngene_particles; i++) {
+//                    gene_tree_heights.push_back(_gene_particles[g][i].getGeneTreeHeight());
+//                }
+//            }
+//
+//            double current_height = 0.0;
+//            for (int t=0; t<max_current_species+1; t++) {
+//                current_height += _species_particle._t[t].second;
+//            }
+//
+//            double deepest_coalescent_event = *max_element(gene_tree_heights.begin(), gene_tree_heights.end());
+//            double amount_to_trim = current_height - deepest_coalescent_event;
+//
+//            if (amount_to_trim > 0.0) {
+//
+//                _species_particle.unJoinSpecies(max_current_species); // this function will unjoin species back to the max current species
+//
+//                _species_particle.trimSpeciesTree(amount_to_trim);
+//                double new_increment = _species_particle.addNewIncrement();
+//
+//                double increment_difference = -amount_to_trim + new_increment;
+//                unsigned species_tree_size = (unsigned) _species_particle._t.size();
+//
+//                // trim gene tree _t back to species_tree_size
+//                // then add new_increment to _t.back() in all gene trees
+//
+//                for (unsigned g=0; g<_ngenes; g++) {
+//                    for (unsigned i=0; i<_ngene_particles; i++) {
+//                        unsigned t_size = (unsigned) _gene_particles[g][i]._t.size();
+//                        unsigned n_to_remove = t_size - species_tree_size; // -1 because gene trees use current_species + 1 when updating species partitions ???
+//
+//                        for (unsigned a=0; a<n_to_remove; a++) {
+//                            _gene_particles[g][i]._t.pop_back();
+//                        }
+//                        assert (_gene_particles[g][i]._t.size() == species_tree_size);
+//                        _gene_particles[g][i]._t.back().second += increment_difference;
+//                    }
+//                }
+//            }
+//        }
         _generation++;
     }
 
