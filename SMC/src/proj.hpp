@@ -868,7 +868,7 @@ namespace proj {
         for (auto & b:bundles ) { // TODO: can initialize some of these things in parallel?
             b.setNGeneParticles(_nparticles);
             b.setData(_data, _taxon_map, partials);
-            partials = false;
+//            partials = false; // TODO: can copy over partials instead of re calculating?
             b.mapSpecies(_taxon_map, _species_names);
         }
     }
