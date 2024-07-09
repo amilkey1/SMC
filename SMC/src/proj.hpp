@@ -89,7 +89,6 @@ namespace proj {
             bool                        _gene_newicks_specified;
             unsigned                    _ngenes_provided;
             string                      _species_newick_name;
-            double                      _phi;
             unsigned                    _nbundles;
     };
 
@@ -110,7 +109,6 @@ namespace proj {
         _nparticles = 50000;
         _data = nullptr;
         _small_enough = 0.0000001;
-        _phi = 1.0;
         _nbundles = 1.0;
     }
 
@@ -404,7 +402,6 @@ namespace proj {
         ("theta_proposal_mean", boost::program_options::value(&Forest::_theta_proposal_mean)->default_value(0.0), "theta proposal mean")
         ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
         ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
-        ("phi", boost::program_options::value(&_phi)->default_value(1.0), "correct weights by this number")
         ("nbundles", boost::program_options::value(&_nbundles)->default_value(1), "number of bundles")
         ;
 
@@ -974,8 +971,10 @@ namespace proj {
                 }
                                 
                 saveSpeciesTrees(bundle_vec);
-                for (unsigned i=0; i<nsubsets; i++) {
-                    saveGeneTree(i, bundle_vec); // TODO: for now, saving 1 gene per bundle
+                if (_save_gene_trees) {
+                    for (unsigned i=0; i<nsubsets; i++) {
+                        saveGeneTree(i, bundle_vec); // TODO: for now, saving 1 gene per bundle
+                    }
                 }
                 
                 writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, bundle_vec);
@@ -992,10 +991,12 @@ namespace proj {
                         cout << "existing file " << filename1 << " removed and replaced\n";
                     }
                 }
-                
-                if (filesystem::remove(filename2)) {
+                else {
+                    ofstream speciestrf(filename1);
+                    speciestrf << "#nexus\n\n";
+                    speciestrf << "begin trees;\n";
                     if (_verbose > 0) {
-                        cout << "existing file " << filename2 << " removed and replaced\n";
+                        cout << "created new file " << filename1 << "\n";
                     }
                 }
                 
