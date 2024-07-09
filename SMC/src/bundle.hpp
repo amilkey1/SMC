@@ -124,8 +124,8 @@ extern proj::Lot rng;
             for (unsigned g=0; g<_ngenes; g++) {
                 for (unsigned i=0; i<_ngene_particles; i++) {
                     _gene_particles[g][i].setLot(_lot);
-                    _gene_particles[g][i]._t = _species_particle._t;
-                    _gene_particles[g][i].calcLogLikelihood();
+                    _gene_particles[g][i]._t = _species_particle._t; // TODO: can start at 0 now?
+//                    _gene_particles[g][i].calcLogLikelihood();
                 }
             }
             

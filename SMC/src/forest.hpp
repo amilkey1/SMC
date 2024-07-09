@@ -111,7 +111,6 @@ class Forest {
         unsigned                    _npatterns;
         unsigned                    _nstates;
         double                      _last_edge_length;
-        vector<double>              _gamma;
 
         Data::SharedPtr             _data;
         static unsigned             _nspecies;
@@ -128,7 +127,6 @@ class Forest {
         double                      _panmictic_coalescent_likelihood;
         double                      _log_coalescent_likelihood_increment;
         double                      _cum_height;
-        string                      _start_mode;
         vector<pair<double, pair<string, string>>>              _depths;
         unsigned                    _nincrements = 0;
         vector<Node*>               _preorder;
@@ -706,7 +704,7 @@ class Forest {
         
         if (!new_nd->_left_child) {
             auto &data_matrix=_data->getDataMatrix();
-            assert (_save_memory || _start_mode == "sim");
+            assert (_save_memory);
             if (!new_nd->_left_child) {
                 new_nd->_partial=ps.getPartial(_npatterns*4);
                 for (unsigned p=0; p<_npatterns; p++) {
@@ -923,7 +921,6 @@ class Forest {
         _nspecies           = other._nspecies;
         _ntaxa              = other._ntaxa;
         _species_joined = other._species_joined;
-        _gamma = other._gamma;
         _log_weight = other._log_weight;
         _log_joining_prob = other._log_joining_prob;
         _increments_and_priors = other._increments_and_priors;
@@ -933,7 +930,6 @@ class Forest {
         _cum_height = other._cum_height;
         _outgroup = other._outgroup;
         _run_on_empty = other._run_on_empty;
-        _start_mode = other._start_mode;
         _depths = other._depths;
         _nincrements = other._nincrements;
         _preorder.resize(other._preorder.size());
@@ -1259,13 +1255,7 @@ class Forest {
         calcTopologyPrior(s);
 
         assert (s > 1);
-        bool one_choice = false;
 
-#if defined (PRIOR_POST_ON_GENES)
-        subtree1 = _nodes_joined.first;
-        subtree2 = _nodes_joined.second;
-
-#else
         // prior-prior proposal
         pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
         auto it1 = std::next(nodes.begin(), t.first);
@@ -1275,7 +1265,6 @@ class Forest {
         subtree2 = *it2;
         assert (t.first < nodes.size());
         assert (t.second < nodes.size());
-#endif
 
         assert (subtree1 != subtree2);
 
@@ -1327,7 +1316,7 @@ class Forest {
                 }
             }
 
-            if ((_proposal == "prior-prior" || one_choice) && (!_run_on_empty) ) {
+            if (!_run_on_empty) {
                 _gene_tree_log_likelihood = calcLogLikelihood();
                 _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
             }

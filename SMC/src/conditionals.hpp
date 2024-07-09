@@ -5,7 +5,7 @@
 
 //#define NDEBUG // disable asserts for efficiency / memory improvement
 
-#define HIERARCHICAL_FILTERING
+//#define HIERARCHICAL_FILTERING
 
 //#define UNCONSTRAINED_PROPOSAL 
 
