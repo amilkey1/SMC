@@ -459,6 +459,7 @@ extern proj::Lot rng;
         double log_coalescent_likelihood = 0.0;
         for (unsigned g=0; g<_ngenes; g++) {
             log_coalescent_likelihood += _gene_particles[g][0].calcLogCoalescentLikelihood(_species_particle._forest._last_edge_length, species_joined, _species_particle._forest._species_tree_height);
+            log_coalescent_likelihood += _gene_particles[g][0]._constrained_factor; // include weight correction for constrained proposal
         }
         
         _bundle_log_weight = log_coalescent_likelihood - _prev_log_coalescent_likelihood;
@@ -466,8 +467,8 @@ extern proj::Lot rng;
         _prev_log_coalescent_likelihood = log_coalescent_likelihood;
         
 #if !defined (UNCONSTRAINED_PROPOSAL)
-            double test = 1/_bundle_log_weight;
-            assert(test != -0); // assert coalescent likelihood is not -inf
+        double test = 1/_bundle_log_weight;
+        assert(test != -0); // assert coalescent likelihood is not -inf
         if (max_depth > 0.0) {
             _bundle_log_weight += _species_particle.calcConstrainedWeightFactor(max_depth);
         }

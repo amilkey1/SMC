@@ -37,7 +37,6 @@ class Particle {
                                                     }
                                                 }
         void                                    mapSpecies(map<string, string> &taxon_map, vector<string> &species_names, string type);
-        void                                    drawFirstSpeciesIncrement();
         double                                  addNewIncrement();
         void                                    saveForest(std::string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
@@ -47,11 +46,7 @@ class Particle {
         double                                  calcGeneTreeLogLikelihood();
         double                                  calcHeight();
         double                                  getLogWeight() const {return _log_weight;}
-        double                                  getSpeciesIncrement () {return _forest._last_edge_length;}
-        pair<unsigned, double>                  getGeneIncrement() {return _gene_increment;}
-        double                                  getSpeciesLogWeight() const {return _log_species_weight;}
         void                                    setLogWeight(double w){_log_weight = w;}
-        void                                    setLogSpeciesWeight(double w){_log_species_weight = w;}
         void                                    setLogLikelihood(double forest_likelihood);
         void                                    setLogCoalescentLikelihood(double coalescent_like);
         void                                    operator=(const Particle & other);
@@ -59,7 +54,7 @@ class Particle {
         string                                  saveForestNewick() {
             return _forest.makeNewick(8, true);}
             
-            string                             saveGeneNewick(unsigned i) {
+        string                             saveGeneNewick(unsigned i) {
             return _forest.makeNewick(8, true);}
     
         bool operator<(const Particle::SharedPtr & other) const {
@@ -71,7 +66,6 @@ class Particle {
         }
 
         static void                                     setNumSubsets(unsigned n);
-        Forest &                                        getForests() {return _forest;}
         void                                            showSpeciesIncrement();
         void                                            showSpeciesJoined();
         void                                            showSpeciesTree();
@@ -90,7 +84,6 @@ class Particle {
         void                                            clearPartials();
         Lot::SharedPtr getLot() const {return _lot;}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
-        double                                          getRunningSumChoices(vector<double> choices);
         double                                          getSpeciesTreeHeight();
         double                                          getSpeciesTreeLength();
         double                                          getGeneTreeHeight();
@@ -103,7 +96,6 @@ class Particle {
         Forest                                          getForest() {return _forest;} // TODO: should return a pointer?
         pair<string, string>                            getSpeciesJoined(){return make_pair(_forest._species_joined.first->_name, _forest._species_joined.second->_name);}
         void                                            setPsuffix(unsigned psuffix) {_psuffix = psuffix;}
-        unsigned                                        showPrevForestNumber(){return _prev_forest_number;}
         void                                            updateSpeciesPartition(pair<tuple<string, string, string>, double> species_info);
         void                                            buildEntireSpeciesTree();
         void                                            rebuildEntireSpeciesTree();
@@ -120,21 +112,17 @@ class Particle {
         static unsigned                         _nsubsets;
         Forest                                  _forest;
         double                                  _log_weight;
-        double                                  _log_species_weight;
         Data::SharedPtr                         _data;
         double                                  _log_likelihood;
         int                                     _generation = 0;
-        unsigned                                _prev_forest_number;
         double                                  _log_coalescent_likelihood;
         mutable                                 Lot::SharedPtr _lot;
         unsigned                                _num_deep_coalescences;
-        bool                                    _deep_coal;
         unsigned                                _psuffix;
         vector<pair<tuple<string, string, string>, double>> _t;
-        pair<unsigned, double>                                  _gene_increment;
-        vector<double>                          _starting_log_likelihoods;
         string                                  _type;
         unsigned                                _current_species;
+        double                                  _constrained_factor;
 };
 
     inline Particle::Particle() {
@@ -163,9 +151,9 @@ class Particle {
     }
 
     inline void Particle::showSpeciesParticle() {
+        assert (_type == "species");
         //print out weight of each species forest part of the particle
         cout << "\nParticle:\n";
-        cout << " _log_species_weight: " << _log_species_weight << "\n";
         cout << "  _forest: " << "\n";
         cout << "\n";
         _forest.showForest();
@@ -173,21 +161,18 @@ class Particle {
 
     inline void Particle::clear() {
         _log_weight     = 0.0;
-        _log_species_weight = 0.0;
         _log_likelihood = 0.0;
         _forest.clear();
         _data           = nullptr;
         _nsubsets       = 0;
         _generation     = 0;
-        _prev_forest_number = 0;
         _log_coalescent_likelihood = 0.0;
         _num_deep_coalescences = 0.0;
         _t.clear();
         _psuffix = 0;
-        _deep_coal = false;
-        _starting_log_likelihoods.clear();
         _type = "null";
         _current_species = 0;
+        _constrained_factor = 0.0;
     }
 
     inline void Particle::showSpeciesTree() {
@@ -300,8 +285,19 @@ class Particle {
         
                 _t.push_back(make_pair(species_joined, _forest._last_edge_length));
         
-        double constrained_factor = 0.0;
-        _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
+        _constrained_factor = 0.0;
+#if !defined (UNCONSTRAINED_PROPOSAL)
+        if (!Forest::_run_on_empty) {
+            assert (max_depth > 0.0);
+            double nlineages = _forest._lineages.size();
+            if (nlineages == 1) {
+                nlineages = 2; // for last step, constraint was before final two species were joined
+            }
+            _constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
+        }
+        
+#endif
+//        _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
         
         _generation++;
         return max_depth;
@@ -323,23 +319,11 @@ class Particle {
 
     inline void Particle::setLogCoalescentLikelihood(double log_coal_like) {
         _log_coalescent_likelihood = log_coal_like;
-        _log_species_weight = _log_coalescent_likelihood;
     }
 
     inline void Particle::setLogLikelihood(double forest_log_likelihood) {
         _log_likelihood = forest_log_likelihood;
         _log_weight = forest_log_likelihood;
-    }
-
-    inline double Particle::getRunningSumChoices(vector<double> choices) {
-        double running_sum = 0.0;
-        double log_weight_choices_sum = 0.0;
-        double log_max_weight = *max_element(choices.begin(), choices.end());
-        for (auto & i:choices) {
-            running_sum += exp(i - log_max_weight);
-        }
-        log_weight_choices_sum = log(running_sum) + log_max_weight;
-        return log_weight_choices_sum;
     }
 
     inline double Particle::getSpeciesTreeHeight() {
@@ -591,11 +575,6 @@ class Particle {
         return _forest._last_edge_length;
     }
 
-    inline void Particle::drawFirstSpeciesIncrement() {
-        _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
-        _t.push_back(make_pair((make_tuple("null", "null", "null")), _forest._last_edge_length));
-    }
-
     inline void Particle::updateSpeciesPartition(pair<tuple<string, string, string>, double> species_info) {
         _forest.updateSpeciesPartition(species_info.first);
     }
@@ -774,22 +753,18 @@ class Particle {
 
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
-        _log_species_weight = other._log_species_weight;
         _log_likelihood = other._log_likelihood;
         _forest         = other._forest;
         _data           = other._data;
         _nsubsets       = other._nsubsets;
         _generation     = other._generation;
-        _prev_forest_number = other._prev_forest_number;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _num_deep_coalescences = other._num_deep_coalescences;
-        _deep_coal = other._deep_coal;
         _t = other._t;
         _psuffix = other._psuffix;
-        _gene_increment = other._gene_increment;
-        _starting_log_likelihoods = other._starting_log_likelihoods;
         _type = other._type;
         _current_species = other._current_species;
+        _constrained_factor = other._constrained_factor;
     };
 }
 
