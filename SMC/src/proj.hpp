@@ -86,10 +86,10 @@ namespace proj {
             bool                        _save_gene_trees;
             bool                        _first_line;
             unsigned                    _count; // counter for params output file
-            bool                        _gene_newicks_specified;
             unsigned                    _ngenes_provided;
             string                      _species_newick_name;
             unsigned                    _nbundles;
+            bool                        _save_params_file_after_first_round;
     };
 
     inline Proj::Proj() {
@@ -396,12 +396,12 @@ namespace proj {
         ("thin", boost::program_options::value(&_thin)->default_value(1.0), "take this portion of particles for hierarchical species filtering")
         ("save_every", boost::program_options::value(&_save_every)->default_value(1.0), "take this portion of particles for output")
         ("save_gene_trees", boost::program_options::value(&_save_gene_trees)->default_value(true), "turn this off to not save gene trees and speed up program")
-        ("gene_newicks", boost::program_options::value(&_gene_newicks_specified)->default_value(false), "set true if user is specifying gene tree files")
         ("ngenes", boost::program_options::value(&_ngenes_provided)->default_value(0), "number of gene newick files specified")
         ("theta_proposal_mean", boost::program_options::value(&Forest::_theta_proposal_mean)->default_value(0.0), "theta proposal mean")
         ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
         ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
         ("nbundles", boost::program_options::value(&_nbundles)->default_value(1), "number of bundles")
+        ("save_params_file_after_first_round", boost::program_options::value(&_save_params_file_after_first_round)->default_value(true), "save params file after first round")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -582,7 +582,7 @@ namespace proj {
     }
 
     inline void Proj::proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Bundle> &bundles, unsigned ngroups, string filename1, unsigned nsubsets, unsigned ntaxa, string filename2) {
-        
+        // TODO: output changes with each run because bundles go into this function in different orders each time, and it matters because each bundle comes in with a different set of gene trees
         unsigned nspecies = (unsigned) _species_names.size();
            
            for (unsigned i=first; i<last; i++){
@@ -609,7 +609,12 @@ namespace proj {
                    }
 
                    proposeSpeciesParticles(use_vec);
+//                   use_vec[0].showGeneNewick(0);
+//                   cout << use_vec[0].saveSpeciesNewick() << endl;
+//                    cout << use_vec[1].saveSpeciesNewick() << endl;
                    filterBundles(s, use_vec);
+//                  cout << use_vec[0].saveSpeciesNewick() << endl;
+//                   cout << use_vec[1].saveSpeciesNewick() << endl;
                    resetWeights(use_vec);
 
 
@@ -858,19 +863,14 @@ namespace proj {
         // set partials for first particle under save_memory setting for initial marginal likelihood calculation
         assert (_nthreads > 0);
 
-        bool partials = false;
-        if (_gene_newicks_specified) {
-            partials = false;
-            Forest::_save_memory = true;
-        }
+        bool partials = true;
 
         for (auto & b:bundles ) { // TODO: can initialize some of these things in parallel?
             b.setNGeneParticles(_nparticles);
             b.setData(_data, _taxon_map, partials);
-            partials = false;
+            partials = false; // TODO: can copy over partials instead of re calculating?
             b.mapSpecies(_taxon_map, _species_names);
-            // TODO: calculate likelihood for one particle, then delete those partials, set likelihood / weights for every other particle
-            // TODO: can start weights at 0 because every gene will get changed?
+            // TODO: calculate likelihood for one particle, then copy it over - or can start at 0 b/c each gene gets changed each time
         }
     }
 
@@ -966,7 +966,7 @@ namespace proj {
                     resetWeights(bundle_vec);
                 
                 }
-                                
+                          
                 saveSpeciesTrees(bundle_vec);
                 if (_save_gene_trees) {
                     for (unsigned i=0; i<nsubsets; i++) {
@@ -974,7 +974,9 @@ namespace proj {
                     }
                 }
                 
-                writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, bundle_vec);
+                if (_save_params_file_after_first_round) {
+                    writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, bundle_vec);
+                }
 
 #if defined (HIERARCHICAL_FILTERING)
                 string filename1 = "species_trees.trees";
@@ -1003,15 +1005,19 @@ namespace proj {
                     cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
                 }
 
+                for (auto &b:bundle_vec) { // TODO: can parallelize this
+                    b.deleteExtraGeneParticles(); // do this before random shuffle to waste less time moving unused gene particles around
+                }
+                
                 random_shuffle(bundle_vec.begin(), bundle_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
                 // delete first (1-_thin) % of particles
                 bundle_vec.erase(next(bundle_vec.begin(), 0), next(bundle_vec.begin(), (_nbundles-ngroups)));
                 assert(bundle_vec.size() == ngroups);
 
 
-                for (auto &b:bundle_vec) {
-                    b.deleteExtraGeneParticles(); // delete all of the gene particles except the first one since we will only condition on one set per bundle
-                    // reset forest species partitions
+                for (auto &b:bundle_vec) { // TODO: can parallelize this
+//                    b.deleteExtraGeneParticles(); // delete all of the gene particles except the first one since we will only condition on one set per bundle
+                    // reset forest species partitions // TODO: do this before random shuffle?
                     b.clearPartials(); // no more likelihood calculations
                     b.resetSpecies();
                     b.mapSpecies(_taxon_map, _species_names);
@@ -1020,7 +1026,7 @@ namespace proj {
                 vector<Particle::SharedPtr> new_vec;
 
                 _nparticles = _particle_increase;
-                _nbundles = _particle_increase; // TODO: this might be necessary?
+                _nbundles = _particle_increase;
                 unsigned index = 0;
                 
                 bool parallelize_by_group = false;
@@ -1033,6 +1039,7 @@ namespace proj {
                 
                 if (parallelize_by_group) {
                     // don't bother with this if not multithreading
+                    
                         proposeSpeciesGroups(bundle_vec, ngroups, nsubsets, ntaxa, filename1, filename2);
                     
                     // formatting output files

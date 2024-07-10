@@ -160,9 +160,7 @@ extern proj::Lot rng;
         _species_particle.unJoinSpecies(max_current_species); // this function will unjoin species back to the max current species
         // i.e. if max_current_species = 1, this function will erase so only _t[0] through _t[1] remain
         // i.e. if max_current_species = 3, this function will erase so _t[0] through _t[3] remain
-//        if (_generation > 0) {
             _species_particle.rebuildEntireSpeciesTree();
-//        }
                     
         for (unsigned g=0; g<_ngenes; g++) {
             for (unsigned i=0; i<_ngene_particles; i++) {
@@ -179,16 +177,9 @@ extern proj::Lot rng;
                 }
             }
         }
-            
-        unsigned psuffix = 1;
-            
+                        
         for (unsigned g=0; g<_ngenes; g++) {
             for (unsigned i=0; i<_ngene_particles; i++) {
-                
-                // set particle random number seeds
-                _gene_particles[g][i].setLot(_lot);
-                psuffix += 2;
-                
                 _gene_particles[g][i].proposal(); // TODO: make this random, not sequential
 
             }
@@ -508,7 +499,7 @@ extern proj::Lot rng;
         _species_particle.setLot(_lot);
         
         // TODO: should probably make some functions to do this rather than setting _forest directly from bundle
-        _gene_particles[0][0].drawTheta(); // create theta map, then copy to all particles
+        _gene_particles[0][0].drawTheta(); // create theta map, then copy to all particles - can't do this in species particle because
         
         double theta_mean = _gene_particles[0][0]._forest._theta_mean;
         double theta_proposal_mean = _gene_particles[0][0]._forest._theta_proposal_mean;
@@ -520,15 +511,14 @@ extern proj::Lot rng;
         
         for (unsigned g=0; g<_ngenes; g++) {
             for (unsigned i=0; i<_ngene_particles; i++) {
-//                if (g != 0 && i != 0) {
                 if (g != 0 || i != 0) {
-                        // don't need to do this for first particle
-                        _gene_particles[g][i]._forest._theta_map = theta_map;
-                        _gene_particles[g][i]._forest._species_indices = species_indices;
-                        _gene_particles[g][i]._forest._theta_mean = theta_mean;
-                        _gene_particles[g][i]._forest._theta_proposal_mean = theta_proposal_mean;
-                        _gene_particles[g][i]._forest._theta_prior_mean = theta_prior_mean;
-                        _gene_particles[g][i]._forest._ancestral_species_name = ancestral_spp_name;
+                    // don't need to do this for first particle
+                    _gene_particles[g][i]._forest._theta_map = theta_map;
+                    _gene_particles[g][i]._forest._species_indices = species_indices;
+                    _gene_particles[g][i]._forest._theta_mean = theta_mean;
+                    _gene_particles[g][i]._forest._theta_proposal_mean = theta_proposal_mean;
+                    _gene_particles[g][i]._forest._theta_prior_mean = theta_prior_mean;
+                    _gene_particles[g][i]._forest._ancestral_species_name = ancestral_spp_name;
                 }
             }
         }

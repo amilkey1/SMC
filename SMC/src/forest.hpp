@@ -1119,7 +1119,6 @@ class Forest {
         
         while (!done) {
         
-    //        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
             assert (lot != nullptr);
             pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
             assert (t.first != t.second);
@@ -1541,6 +1540,8 @@ class Forest {
         add2->_parent = nullptr;
         add1->_right_sib = nullptr;
         add2->_right_sib = nullptr;
+        
+        _species_tree_height -= edge_len;
     }
 
     inline void Forest::updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode) {
@@ -1667,13 +1668,14 @@ class Forest {
     }
 
     inline void Forest::addIncrement(double increment) {
+        assert (_index > 0);
         for (auto &nd:_lineages) {
             nd->_edge_length += increment;
         }
-        if (_index == 0) {
-            _last_edge_length = increment;
-            _cum_height += increment;
-        }
+//        if (_index == 0) {
+//            _last_edge_length = increment;
+//            _cum_height += increment;
+//        }
     }
 
     inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {
