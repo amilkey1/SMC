@@ -5,7 +5,7 @@
 
 //#define NDEBUG // disable asserts for efficiency / memory improvement
 
-#define HIERARCHICAL_FILTERING
+//#define HIERARCHICAL_FILTERING
 
 //#define UNCONSTRAINED_PROPOSAL 
 
@@ -15,7 +15,7 @@
 
 //#define DEBUG_MODE
 
-#define DRAW_NEW_THETA
+//#define DRAW_NEW_THETA
 
-#define INV_GAMMA_PRIOR_TWO // if DRAW_NEW_THETA turned off, INV_GAMMA_PRIOR_TWO needs to also be turned off
+//#define INV_GAMMA_PRIOR_TWO // if DRAW_NEW_THETA turned off, INV_GAMMA_PRIOR_TWO needs to also be turned off
 

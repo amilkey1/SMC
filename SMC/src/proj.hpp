@@ -999,6 +999,12 @@ namespace proj {
                     }
                 }
                 
+                if (filesystem::remove(filename2)) {
+                    if (_verbose > 0) {
+                        cout << "existing file " << filename2 << " removed and replaced\n";
+                    }
+                }
+                
                 unsigned ngroups = round(_nbundles * _thin);
                 if (ngroups == 0) {
                     ngroups = 1;

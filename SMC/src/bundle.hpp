@@ -149,44 +149,46 @@ extern proj::Lot rng;
 #endif
         }
         
-        vector<unsigned> current_species;
-        for (unsigned g=0; g<_ngenes; g++) {
-            for (unsigned i=0; i<_ngene_particles; i++) {
-                current_species.push_back(_gene_particles[g][i]._current_species);
-            }
-        }
-        
-        unsigned max_current_species = *max_element(current_species.begin(), current_species.end());
-        _species_particle.unJoinSpecies(max_current_species); // this function will unjoin species back to the max current species
-        // i.e. if max_current_species = 1, this function will erase so only _t[0] through _t[1] remain
-        // i.e. if max_current_species = 3, this function will erase so _t[0] through _t[3] remain
-            _species_particle.rebuildEntireSpeciesTree();
-                    
-        for (unsigned g=0; g<_ngenes; g++) {
-            for (unsigned i=0; i<_ngene_particles; i++) {
-                unsigned t_size = (unsigned) _gene_particles[g][i]._t.size();
-                unsigned n_to_remove = t_size - max_current_species - 1; // -1 because gene trees use current_species + 1 when updating species partitions
-                
-                for (unsigned a=0; a<n_to_remove; a++) {
-                    _gene_particles[g][i]._t.pop_back();
+        if (_generation > 0) { // for gen 0, species tree is already built and does not need to be erased and rebuilt
+            vector<unsigned> current_species;
+            for (unsigned g=0; g<_ngenes; g++) {
+                for (unsigned i=0; i<_ngene_particles; i++) {
+                    current_species.push_back(_gene_particles[g][i]._current_species);
                 }
-                assert (_gene_particles[g][i]._t.size() > 0); // _t should never be completely removed because first increments always count
-                
-                for (unsigned s=max_current_species + 1; s < Forest::_nspecies; s++) {
-                    _gene_particles[g][i]._t.push_back(_species_particle._t[s]);
+            }
+            
+            unsigned max_current_species = *max_element(current_species.begin(), current_species.end());
+            _species_particle.unJoinSpecies(max_current_species); // this function will unjoin species back to the max current species
+            // i.e. if max_current_species = 1, this function will erase so only _t[0] through _t[1] remain
+            // i.e. if max_current_species = 3, this function will erase so _t[0] through _t[3] remain
+                _species_particle.rebuildEntireSpeciesTree();
+                        
+            for (unsigned g=0; g<_ngenes; g++) {
+                for (unsigned i=0; i<_ngene_particles; i++) {
+                    unsigned t_size = (unsigned) _gene_particles[g][i]._t.size();
+                    unsigned n_to_remove = t_size - max_current_species - 1; // -1 because gene trees use current_species + 1 when updating species partitions
+                    
+                    for (unsigned a=0; a<n_to_remove; a++) {
+                        _gene_particles[g][i]._t.pop_back();
+                    }
+                    assert (_gene_particles[g][i]._t.size() > 0); // _t should never be completely removed because first increments always count
+                    
+                    for (unsigned s=max_current_species + 1; s < Forest::_nspecies; s++) {
+                        _gene_particles[g][i]._t.push_back(_species_particle._t[s]);
+                    }
                 }
             }
         }
                         
         for (unsigned g=0; g<_ngenes; g++) {
             for (unsigned i=0; i<_ngene_particles; i++) {
-                _gene_particles[g][i].proposal(); // TODO: make this random, not sequential
+                _gene_particles[g][i].proposal(); // TODO: doesn't matter if this is random or sequential because the species tree is already built and will be erased back to the same point regardless
 
             }
         }
             
         filterLoci();
-                
+                        
         for (unsigned g=0; g<_ngenes; g++) {
             resetWeights(_gene_particles[g]);
         }
