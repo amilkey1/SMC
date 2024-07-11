@@ -205,6 +205,7 @@ class Particle {
         if (_generation == 0 && !Forest::_run_on_empty) {
             _log_weight = log_likelihood;
         }
+        _log_likelihood = log_likelihood;
 
         return log_likelihood;
     }

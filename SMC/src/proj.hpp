@@ -868,9 +868,9 @@ namespace proj {
         for (auto & b:bundles ) { // TODO: can initialize some of these things in parallel?
             b.setNGeneParticles(_nparticles);
             b.setData(_data, _taxon_map, partials);
-            partials = false; // TODO: can copy over partials instead of re calculating?
+            partials = true;
             b.mapSpecies(_taxon_map, _species_names);
-            // TODO: calculate likelihood for one particle, then copy it over - or can start at 0 b/c each gene gets changed each time
+            // TODO: calculate likelihood for one particle, then copy it over - or can start at 0 b/c each gene gets changed each time?
         }
     }
 
@@ -963,7 +963,7 @@ namespace proj {
                     runBundles(bundle_vec);
                     
                     filterBundles(s, bundle_vec);
-                    resetWeights(bundle_vec);
+//                    resetWeights(bundle_vec);
                 
                 }
                           
@@ -1122,7 +1122,7 @@ namespace proj {
                             proposeSpeciesParticles(use_vec);
                             
                             filterBundles(s, use_vec);
-                            resetWeights(use_vec);
+//                            resetWeights(use_vec);
                         } // s loop
                         
                         if (_save_every > 1.0) { // thin sample for output by taking a random sample

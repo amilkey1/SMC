@@ -125,12 +125,16 @@ extern proj::Lot rng;
                 for (unsigned i=0; i<_ngene_particles; i++) {
                     _gene_particles[g][i].setLot(_lot);
                     _gene_particles[g][i]._t = _species_particle._t; // TODO: can start at 0 now?
-//                    _gene_particles[g][i].calcLogLikelihood();
+                    _gene_particles[g][i].calcLogLikelihood();
                 }
             }
             
             _log_marginal_likelihood_by_gene.resize(_ngenes);
             _prev_log_marginal_likelihood_by_gene.resize(_ngenes);
+            
+//            for (unsigned i=0; i<_ngenes; i++) {
+//                _log_marginal_likelihood_by_gene[i] = _gene_particles[0][0]._log_likelihood;
+//            }
         }
         
         else {
@@ -190,7 +194,7 @@ extern proj::Lot rng;
         filterLoci();
                         
         for (unsigned g=0; g<_ngenes; g++) {
-            resetWeights(_gene_particles[g]);
+//            resetWeights(_gene_particles[g]);
         }
         
         double log_weight = 0.0;
