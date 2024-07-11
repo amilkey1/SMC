@@ -169,6 +169,7 @@ class Particle {
         pair<unsigned, double>                                  _gene_increment;
         vector<double>                          _starting_log_likelihoods;
         vector<unsigned>                        _nsites_per_gene;
+        bool                                    _fix_theta_sim; // for simulations only
 };
 
     inline Particle::Particle() {
@@ -225,6 +226,7 @@ class Particle {
         _species_order.clear();
         _starting_log_likelihoods.clear();
         _nsites_per_gene.clear();
+        _fix_theta_sim = false;
     }
 
     inline void Particle::showSpeciesTree() {
@@ -833,10 +835,20 @@ inline vector<double> Particle::getVectorPrior() {
                     if (_forests[0]._lineages.size() <= Forest::_nspecies) {
                         string name = boost::str(boost::format("node-%d")%_next_species_number);
 #if defined (DRAW_NEW_THETA)
-                        _forests[1].updateThetaMap(_lot, name);
-                        if (_forests.size() > 2) {
-                            for (int i=2; i<_forests.size(); i++) {
-                                _forests[i]._theta_map = _forests[1]._theta_map;
+                        if (!_fix_theta_sim) { // TODO: be careful - make sure fix_theta is always false when not simulating
+                            _forests[1].updateThetaMap(_lot, name);
+                            if (_forests.size() > 2) {
+                                for (int i=2; i<_forests.size(); i++) {
+                                    _forests[i]._theta_map = _forests[1]._theta_map;
+                                }
+                            }
+                        }
+                        else {
+                            _forests[1].updateThetaMapFixedThetaSim(name);
+                            if (_forests.size() > 2) {
+                                for (int i=2; i<_forests.size(); i++) {
+                                    _forests[i]._theta_map = _forests[1]._theta_map;
+                                }
                             }
                         }
 #endif
@@ -1513,6 +1525,7 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline void Particle::setNewTheta(bool fix_theta) {
         if (fix_theta) { // fix theta for all populations
+            _fix_theta_sim = true;
             // map should be 2*nspecies - 1 size
             unsigned number = 0;
             vector<string> species_names;
@@ -1943,6 +1956,7 @@ inline vector<double> Particle::getVectorPrior() {
         _species_order = other._species_order;
         _starting_log_likelihoods = other._starting_log_likelihoods;
         _nsites_per_gene = other._nsites_per_gene;
+        _fix_theta_sim = other._fix_theta_sim;
     };
 }
 

@@ -109,6 +109,7 @@ class Forest {
         void                        refreshPreorder();
         void                        createThetaMap(Lot::SharedPtr lot);
         void                        updateThetaMap(Lot::SharedPtr lot, string new_species_name);
+        void                        updateThetaMapFixedThetaSim(string new_species_name);
         void                        resetThetaMap(Lot::SharedPtr lot);
         void                        drawNewTheta(string new_species, Lot::SharedPtr lot);
         void                        buildFromNewick(const string newick, bool rooted, bool allow_polytomies);
@@ -2783,6 +2784,11 @@ class Forest {
         double x = new_theta;
         double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
         _vector_prior.push_back(log_inv_gamma_prior);
+    }
+
+    inline void Forest::updateThetaMapFixedThetaSim(string new_species_name) {
+        assert (Forest::_theta > 0.0);
+        _theta_map[new_species_name] = Forest::_theta;
     }
 
     inline void Forest::updateThetaMap(Lot::SharedPtr lot, string new_species_name) {
