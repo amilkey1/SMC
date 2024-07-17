@@ -480,6 +480,7 @@ extern proj::Lot rng;
     
     inline void Bundle::deleteExtraGeneParticles() {
         for (unsigned g=0; g<_ngenes; g++) {
+            random_shuffle(_gene_particles[g].begin(), _gene_particles[g].end()); // shuffle particles, random_shuffle will always shuffle in same order
             _gene_particles[g].erase(_gene_particles[g].begin(), _gene_particles[g].end() - 1);
         }
         _ngene_particles = 1;

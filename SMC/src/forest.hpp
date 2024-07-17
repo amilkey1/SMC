@@ -1321,7 +1321,8 @@ class Forest {
             }
         if (_save_memory) {
             for (auto &nd:_nodes) {
-                nd._partial=nullptr;
+//                nd._partial=nullptr;
+                nd._partial.reset(); // TODO: are these different?
             }
     }
 }
