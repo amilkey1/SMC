@@ -948,7 +948,8 @@ namespace proj {
                 }
 #endif
                 
-                unsigned nsteps = ntaxa - 1;
+//                unsigned nsteps = ntaxa - 1;
+                unsigned nsteps = (ntaxa - 1) * nsubsets;
                 
                 for (unsigned s=0; s<nsteps; s++) {
                     cout << "beginning step " << s << endl;

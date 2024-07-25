@@ -62,6 +62,7 @@ extern proj::Lot rng;
             double                                                          _bundle_log_weight;
             vector<double>                                                  _prev_log_marginal_likelihood_by_gene;
             double                                                          _prev_log_coalescent_likelihood;
+            unsigned                                                        _next_gene_number;
     };
 
     inline Bundle::Bundle() {
@@ -80,6 +81,7 @@ extern proj::Lot rng;
         _prev_log_marginal_likelihood_by_gene.clear();
         _log_marginal_likelihood_by_gene.clear();
         _prev_log_coalescent_likelihood = 0.0;
+        _next_gene_number = 0;
     }
 
     inline Bundle::Bundle(const Bundle & other) {
@@ -184,24 +186,32 @@ extern proj::Lot rng;
             }
         }
                         
-        for (unsigned g=0; g<_ngenes; g++) {
-            for (unsigned i=0; i<_ngene_particles; i++) {
-                _gene_particles[g][i].proposal(); // TODO: doesn't matter if this is random or sequential because the species tree is already built and will be erased back to the same point regardless
-
-            }
+        // TODO: choose random number and propose a join in that gene - but it needs to be the same in all bundles to compare fairly
+        // TODO: so do each gene as 1, 2, 3, etc?
+        
+        for (unsigned i=0; i<_ngene_particles;i ++) {
+            _gene_particles[_next_gene_number][i].proposal();
         }
+        
+//        for (unsigned g=0; g<_ngenes; g++) {
+//            for (unsigned i=0; i<_ngene_particles; i++) {
+//                _gene_particles[g][i].proposal(); // TODO: doesn't matter if this is random or sequential because the species tree is already built and will be erased back to the same point regardless
+//
+//            }
+//        }
             
         filterLoci();
                         
-        for (unsigned g=0; g<_ngenes; g++) {
+//        for (unsigned g=0; g<_ngenes; g++) {
 //            resetWeights(_gene_particles[g]);
-        }
+//        }
         
         double log_weight = 0.0;
-        for (auto &m:_log_marginal_likelihood_by_gene) {
-            assert (m != 0.0);
-            log_weight += m;
-        }
+        log_weight = _log_marginal_likelihood_by_gene[_next_gene_number];
+//        for (auto &m:_log_marginal_likelihood_by_gene) {
+//            assert (m != 0.0);
+//            log_weight += m;
+//        }
         _bundle_log_weight = log_weight;
         
         
@@ -258,10 +268,18 @@ extern proj::Lot rng;
 //            }
 //        }
         _generation++;
+        if (_next_gene_number < _ngenes -1) {
+            _next_gene_number++;
+        }
+        else {
+            _next_gene_number = 0;
+        }
     }
 
     inline void Bundle::filterLoci() {
-        for (unsigned l = 0; l<_ngenes; l++) {
+        unsigned l = _next_gene_number;
+        
+//        for (unsigned l = 0; l<_ngenes; l++) {
             // Copy log weights for all particles in this locus to prob vector
             vector<double> probs(_ngene_particles, 0.0);
             for (unsigned p=0; p<_ngene_particles; p++) {
@@ -274,7 +292,11 @@ extern proj::Lot rng;
 
             // Compute component of the log marginal likelihood due to this step
             _prev_log_marginal_likelihood_by_gene[l] = _log_marginal_likelihood_by_gene[l];
-            _log_marginal_likelihood_by_gene[l] += log_sum_weights - log(_ngene_particles);
+//            _log_marginal_likelihood_by_gene[l] += log_sum_weights - log(_ngene_particles);
+            
+//            if (l == _next_gene_number) {
+                _log_marginal_likelihood_by_gene[_next_gene_number] += log_sum_weights - log(_ngene_particles);
+//            }
 
             // Compute cumulative probabilities
             partial_sum(probs.begin(), probs.end(), probs.begin());
@@ -332,7 +354,7 @@ extern proj::Lot rng;
                     recipient++;
                 }
             }
-        }
+//        }
     }
 
     inline double Bundle::getRunningSum(vector<double> log_weight_vec) {
@@ -566,6 +588,7 @@ extern proj::Lot rng;
         _small_enough = other._small_enough;
         _prev_log_marginal_likelihood_by_gene = other._prev_log_marginal_likelihood_by_gene;
         _prev_log_coalescent_likelihood = other._prev_log_coalescent_likelihood;
+        _next_gene_number = other._next_gene_number;
         
         // copy particles // TODO: is this necessary?
         _gene_particles.resize(_ngenes);
