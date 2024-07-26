@@ -591,7 +591,8 @@ namespace proj {
                Bundle chosen_bundle = bundles[i]; // bundle to copy
                
                for (unsigned a=0; a<_particle_increase; a++) {
-                   use_vec.push_back(*new Bundle(chosen_bundle));
+//                   use_vec.push_back(*new Bundle(chosen_bundle));
+                   use_vec.push_back(Bundle(chosen_bundle));
                }
 
                assert(use_vec.size() == _particle_increase);
@@ -1097,7 +1098,11 @@ namespace proj {
                         
                         Bundle chosen_bundle = bundle_vec[a]; // bundle to copy
                         for (unsigned i=0; i<_particle_increase; i++) {
-                            use_vec.push_back(*new Bundle(chosen_bundle));
+                            use_vec.push_back(Bundle(chosen_bundle));
+//                            Particle sp;
+//                            _species_particle = sp;
+                            
+//                            use_vec.push_back(*new Bundle(chosen_bundle));
                         }
 
                         assert(use_vec.size() == _particle_increase);
