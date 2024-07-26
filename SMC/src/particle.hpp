@@ -28,7 +28,7 @@ class Particle {
         void                                    debugParticle(std::string name);
         void                                    showParticle();
         void                                    showSpeciesParticle();
-        void                                    proposal();
+        void                                    proposal(Lot::SharedPtr lot);
         void                                    setData(Data::SharedPtr d, map<string, string> &taxon_map, bool partials, string type, unsigned index) {
                                                     _type = type;
                                                     _data = d;
@@ -37,7 +37,7 @@ class Particle {
                                                     }
                                                 }
         void                                    mapSpecies(map<string, string> &taxon_map, vector<string> &species_names, string type);
-        double                                  addNewIncrement();
+        double                                  addNewIncrement(Lot::SharedPtr lot);
         void                                    saveForest(std::string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
@@ -69,21 +69,21 @@ class Particle {
         void                                            showSpeciesIncrement();
         void                                            showSpeciesJoined();
         void                                            showSpeciesTree();
-        int                                             selectEvent(vector<double> weight_vec);
+        int                                             selectEvent(vector<double> weight_vec, Lot::SharedPtr lot);
         double                                          getTopologyPrior(unsigned i);
         vector<pair<double, double>>                    getIncrementPriors(unsigned i);
         vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
         double                                          getCoalescentLikelihood(unsigned g);
         void                                            clear();
-        vector<double>                                  chooseIncrements(vector<double> event_choice_rates);
-        double                                          speciesOnlyProposal(vector<double> max_depth_vector);
+        vector<double>                                  chooseIncrements(vector<double> event_choice_rates, Lot::SharedPtr lot);
+        double                                          speciesOnlyProposal(vector<double> max_depth_vector, Lot::SharedPtr lot);
         double                                          calcLogCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
-        tuple<string, string, string>                   speciesJoinProposal();
+        tuple<string, string, string>                   speciesJoinProposal(Lot::SharedPtr lot);
         double                                          getMaxDepth(tuple<string, string, string> species_joined, bool reset);
         void                                            setUpSpeciesOnlyProposal();
         void                                            clearPartials();
-        Lot::SharedPtr getLot() const {return _lot;}
-        void setSeed(unsigned seed) const {_lot->setSeed(seed);}
+//        Lot::SharedPtr getLot() const {return _lot;}
+//        void setSeed(unsigned seed) const {_lot->setSeed(seed);}
         double                                          getSpeciesTreeHeight();
         double                                          getSpeciesTreeLength();
         double                                          getGeneTreeHeight();
@@ -97,15 +97,15 @@ class Particle {
         pair<string, string>                            getSpeciesJoined(){return make_pair(_forest._species_joined.first->_name, _forest._species_joined.second->_name);}
         void                                            setPsuffix(unsigned psuffix) {_psuffix = psuffix;}
         void                                            updateSpeciesPartition(pair<tuple<string, string, string>, double> species_info);
-        void                                            buildEntireSpeciesTree();
-        void                                            rebuildEntireSpeciesTree();
-        void                                            setLot(Lot::SharedPtr lot) {_lot = lot;}
-        void                                            updateSpeciesTree();
+        void                                            buildEntireSpeciesTree(Lot::SharedPtr lot);
+        void                                            rebuildEntireSpeciesTree(Lot::SharedPtr lot);
+//        void                                            setLot(Lot::SharedPtr lot) {_lot = lot;}
+        void                                            updateSpeciesTree(Lot::SharedPtr lot);
         void                                            unJoinSpecies(unsigned max_current_species);
         void                                            trimSpeciesTree(double amount_to_trim);
-        void                                            drawTheta();
+        void                                            drawTheta(Lot::SharedPtr lot);
         vector<string>                                  getExistingSpeciesNames();
-        void                                            rebuildThetaMap();
+        void                                            rebuildThetaMap(Lot::SharedPtr lot);
     
     private:
 
@@ -116,7 +116,7 @@ class Particle {
         double                                  _log_likelihood;
         int                                     _generation = 0;
         double                                  _log_coalescent_likelihood;
-        mutable                                 Lot::SharedPtr _lot;
+//        mutable                                 Lot::SharedPtr _lot;
         unsigned                                _psuffix;
         vector<pair<tuple<string, string, string>, double>> _t;
         string                                  _type;
@@ -124,8 +124,8 @@ class Particle {
         double                                  _constrained_factor;
 };
 
-    inline Particle::Particle() {
-        _lot.reset(new Lot());
+    inline Particle::Particle() { // TODO: why are there 2 copy constructors?
+//        _lot.reset(new Lot());
         clear();
     };
 
@@ -226,13 +226,13 @@ class Particle {
         _forest._nincrements = 0;
     }
 
-    inline tuple<string, string, string> Particle::speciesJoinProposal() {
+    inline tuple<string, string, string> Particle::speciesJoinProposal(Lot::SharedPtr lot) {
         assert (_type == "species");
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
         
         if (_forest._last_edge_length > 0.0) {
         // choose species to join if past the first species generation for each forest vector
-            species_joined = _forest.speciesTreeProposal(_lot);
+            species_joined = _forest.speciesTreeProposal(lot);
         }
         
         return species_joined;
@@ -256,7 +256,7 @@ class Particle {
         return max_depth;
     }
 
-    inline double Particle::speciesOnlyProposal(vector<double> max_depth_vector) {
+    inline double Particle::speciesOnlyProposal(vector<double> max_depth_vector, Lot::SharedPtr lot) {
         assert (_type == "species");
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
@@ -273,9 +273,9 @@ class Particle {
                 if (_forest._lineages.size() > 1) {
     #if !defined (UNCONSTRAINED_PROPOSAL)
                     assert (max_depth > 0.0);
-                    _forest.chooseSpeciesIncrementOnly(_lot, max_depth);
+                    _forest.chooseSpeciesIncrementOnly(lot, max_depth);
     #else
-                    _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
+                    _forest.chooseSpeciesIncrementOnly(lot, 0.0);
     #endif
                 }
                 if (_forest._lineages.size() == 1) {
@@ -398,13 +398,13 @@ class Particle {
         return log_likelihood;
     }
 
-    inline void Particle::proposal() {
+    inline void Particle::proposal(Lot::SharedPtr lot) {
         double inv_gamma_modifier = 0.0;
         bool done = false;
                 
         while (!done) {
             
-            vector<pair<double, string>> rates_by_species = _forest.calcForestRate(_lot);
+            vector<pair<double, string>> rates_by_species = _forest.calcForestRate(lot);
             double total_rate = 0.0;
             double gene_increment = -1.0;
             if (rates_by_species.size() > 0) {
@@ -412,7 +412,7 @@ class Particle {
                     total_rate += r.first;
                 }
                 assert (total_rate > 0.0);
-                gene_increment = -log(1.0 - _lot->uniform())/total_rate;
+                gene_increment = -log(1.0 - lot->uniform())/total_rate;
                 assert (gene_increment > 0.0);
             }
             
@@ -432,9 +432,9 @@ class Particle {
                      p = log(p/total_rate);
                  }
 
-                unsigned index = selectEvent(event_choice_rates);
+                unsigned index = selectEvent(event_choice_rates, lot);
                 string species_name = rates_by_species[index].second;
-                _forest.allowCoalescence(species_name, gene_increment, _lot);
+                _forest.allowCoalescence(species_name, gene_increment, lot);
                 
                 if (_forest._species_partition.size() > 1) { // otherwise, species tree is done and there is no need to update it further
                     _t[_current_species].second -= gene_increment;
@@ -510,10 +510,10 @@ class Particle {
         _generation++;
     }
 
-    inline void Particle::updateSpeciesTree() {
+    inline void Particle::updateSpeciesTree(Lot::SharedPtr lot) {
         assert (_forest._lineages.size() > 1);
-        tuple<string, string, string> species_joined = _forest.speciesTreeProposal(_lot);
-        _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
+        tuple<string, string, string> species_joined = _forest.speciesTreeProposal(lot);
+        _forest.chooseSpeciesIncrementOnly(lot, 0.0);
         double edge_len = _forest._last_edge_length;
         _t.push_back(make_pair(species_joined, edge_len));
     }
@@ -532,15 +532,15 @@ class Particle {
         return _forest.getExistingSpeciesNames();
     }
 
-    inline void Particle::rebuildThetaMap() {
+    inline void Particle::rebuildThetaMap(Lot::SharedPtr lot) {
 //        assert (_type == "gene");
-        _forest.rebuildThetaMap(_lot);
+        _forest.rebuildThetaMap(lot);
     }
 
-    inline void Particle::drawTheta() {
+    inline void Particle::drawTheta(Lot::SharedPtr lot) {
         // create map for one forest, then copy it to all forests
         assert (_type == "gene");
-        _forest.createThetaMap(_lot);
+        _forest.createThetaMap(lot);
     }
 
     inline void Particle::trimSpeciesTree(double amount_to_trim) {
@@ -557,18 +557,18 @@ class Particle {
 //        return amount_to_trim;
     }
 
-    vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {
+    vector<double> Particle::chooseIncrements(vector<double> event_choice_rates, Lot::SharedPtr lot) {
         vector<double> increments;
         increments.resize(event_choice_rates.size());
         
         for (int p=0; p<event_choice_rates.size(); p++) {
-            increments[p] = -log(1.0 - _lot->uniform())/event_choice_rates[p];
+            increments[p] = -log(1.0 - lot->uniform())/event_choice_rates[p];
         }
         return increments;
     }
 
-    inline double Particle::addNewIncrement() {
-        _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
+    inline double Particle::addNewIncrement(Lot::SharedPtr lot) {
+        _forest.chooseSpeciesIncrementOnly(lot, 0.0);
         _t.back().second += _forest._last_edge_length;
         
         return _forest._last_edge_length;
@@ -578,29 +578,29 @@ class Particle {
         _forest.updateSpeciesPartition(species_info.first);
     }
 
-    inline void Particle::rebuildEntireSpeciesTree() {
+    inline void Particle::rebuildEntireSpeciesTree(Lot::SharedPtr lot) {
         unsigned current_size = (unsigned) _t.size();
         double edge_len = 0.0;
         
         for (unsigned i=current_size; i < _forest._nspecies; i++) {
             if (_forest._lineages.size() > 2) {
-                tuple<string, string, string> species_joined = _forest.speciesTreeProposal(_lot);
+                tuple<string, string, string> species_joined = _forest.speciesTreeProposal(lot);
                 
-                _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
+                _forest.chooseSpeciesIncrementOnly(lot, 0.0);
                 edge_len = _forest._last_edge_length;
                 _t.push_back(make_pair(species_joined, edge_len));
             }
             else {
                 // join remaining species
-                tuple<string, string, string> species_joined = _forest.speciesTreeProposal(_lot);
+                tuple<string, string, string> species_joined = _forest.speciesTreeProposal(lot);
                 edge_len = 0.0;
                 _t.push_back(make_pair(species_joined, edge_len));
             }
         }
         assert (_forest._lineages.size() == 1);
     }
-    inline void Particle::buildEntireSpeciesTree() {
-        _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
+    inline void Particle::buildEntireSpeciesTree(Lot::SharedPtr lot) {
+        _forest.chooseSpeciesIncrementOnly(lot, 0.0);
         double edge_len = _forest._last_edge_length;
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
@@ -608,11 +608,11 @@ class Particle {
 
         for (unsigned i=0; i < _forest._nspecies-1; i++) {
             if (_forest._lineages.size() > 1) {
-                species_joined = _forest.speciesTreeProposal(_lot);
+                species_joined = _forest.speciesTreeProposal(lot);
                 
                 double edge_len = 0.0;
                 if (_forest._lineages.size() > 1) {
-                    _forest.chooseSpeciesIncrementOnly(_lot, 0.0);
+                    _forest.chooseSpeciesIncrementOnly(lot, 0.0);
                     edge_len = _forest._last_edge_length;
                 }
                 _t.push_back(make_pair(species_joined, edge_len));
@@ -621,7 +621,7 @@ class Particle {
     }
 
     inline Particle::Particle(const Particle & other) {
-        _lot.reset(new Lot());
+//        _lot.reset(new Lot());
         *this = other;
     }
 
@@ -686,9 +686,9 @@ class Particle {
         _forest.showSpeciesJoined();
     }
 
-    inline int Particle::selectEvent(vector<double> weight_vec) {
+    inline int Particle::selectEvent(vector<double> weight_vec, Lot::SharedPtr lot) {
         // choose a random number [0,1]
-        double u =  _lot->uniform();
+        double u =  lot->uniform();
         assert (u > 0.0);
         assert (u < 1.0);
         double cum_prob = 0.0;
