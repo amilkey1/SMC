@@ -863,8 +863,11 @@ inline vector<double> Particle::getVectorPrior() {
                     // need to know which species joined to calculate this
                 }
                 
+                // TODO: need species name before we can do this
                 if (gene_increment < speciation_time || speciation_time == -1) {
+//                if ((gene_increment < speciation_time || speciation_time == -1) && _forests[_gene_order[_generation]]._species_partition[species_name].size() != 1) {
                     // choose a coalescent event if coalescent increment < speciation increment or if species tree is finished
+                    // if the chosen gene is down to 1 lineage, need a speciation event next
                     increment = gene_increment;
                     if (event_choice_name[0] == "species") { // remove the speciation event from consideration
                         event_choice_index.erase(event_choice_index.begin() + 0);
@@ -883,6 +886,24 @@ inline vector<double> Particle::getVectorPrior() {
                     species_name = event_choice_name[index];
                     assert (species_name != "species");
                     assert (forest_number != 0);
+                    
+                    
+                    // TODO: testing this
+                    if (_forests[_gene_order[_generation]]._species_partition[species_name].size() == 1) {
+                        forest_number = 0;
+                        increment = speciation_time;
+                        assert (increment != -1.0);
+                        no_speciation = false;
+                        species_name = "species";
+                        
+//                        string name = boost::str(boost::format("node-%d")%_next_species_number);
+//                        _forests[1].updateThetaMap(_lot, name);
+//                        if (_forests.size() > 2) {
+//                            for (int i=2; i<_forests.size(); i++) {
+//                                _forests[i]._theta_map = _forests[1]._theta_map;
+//                            }
+//                        }
+                    }
                     
                 }
                 else {
@@ -957,7 +978,6 @@ inline vector<double> Particle::getVectorPrior() {
             
             if (event_choice_name.size() == 1 && event_choice_name[0] == "species") {
                 // choose the speciation event
-//                showParticle();
                 increment = speciation_time;
                 assert (speciation_time == increments[0]);
             }
@@ -1014,17 +1034,56 @@ inline vector<double> Particle::getVectorPrior() {
             // only calculate increment priors if not doing another round of species filtering
             calculateIncrementPriors(increment, species_name, forest_number, speciation, first_step);
 #endif
-            if (_forests[_gene_order[_generation]]._species_partition[species_name].size() == 1) {
-                species_name = "species";
-                forest_number = 0;
-            }
+            // TODO: this doesn't work because the increment added was the gene increment, not the species increment
+//            if (_forests[_gene_order[_generation]]._species_partition[species_name].size() == 1) { // if the chosen gene is down to 1 lineage, need a speciation event next
+//                species_name = "species";
+//                forest_number = 0;
+//                // TODO: added this, not sure if it will work
+//                string name = boost::str(boost::format("node-%d")%_next_species_number);
+//                _forests[1].updateThetaMap(_lot, name);
+//                if (_forests.size() > 2) {
+//                    for (int i=2; i<_forests.size(); i++) {
+//                        _forests[i]._theta_map = _forests[1]._theta_map;
+//                    }
+//                }
+//            }
             if (species_name == "species") {
+                // TODO: added this, not sure if it will work
+//                string name = boost::str(boost::format("node-%d")%_next_species_number);
+//                _forests[1].updateThetaMap(_lot, name);
+//                if (_forests.size() > 2) {
+//                    for (int i=2; i<_forests.size(); i++) {
+//                        _forests[i]._theta_map = _forests[1]._theta_map;
+//                    }
+//                }
                 unsigned n = (unsigned) _forests[0]._lineages.size();
                 assert (n > 1);
 //                assert (index == 0);
                 assert (forest_number == 0);
                 
+                // TODO: added this
+                
                 speciesProposal();
+                
+#if defined (DRAW_NEW_THETA)
+                unsigned next = _next_species_number - 1;
+                string name = boost::str(boost::format("node-%d")%next);
+                _forests[1].updateThetaMap(_lot, name);
+                if (_forests.size() > 2) {
+                    for (int i=2; i<_forests.size(); i++) {
+                        _forests[i]._theta_map = _forests[1]._theta_map;
+                    }
+                }
+#endif
+                
+                // TODO: added this
+//                string next_name = boost::str(boost::format("node-%d")%_next_species_number);
+//                _forests[1].updateThetaMap(_lot, next_name);
+//                if (_forests.size() > 2) {
+//                    for (int i=2; i<_forests.size(); i++) {
+//                        _forests[i]._theta_map = _forests[1]._theta_map;
+//                    }
+//                }
                 
 #if defined (INV_GAMMA_PRIOR_TWO)
                 double theta_mean = _forests[1]._theta_mean;
