@@ -2193,6 +2193,27 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
 
                 initializeParticles(my_vec); // initialize in parallel with multithreading
                 
+                // TODO: create gene_order vector
+                unsigned list_size = (ntaxa-1)*nsubsets;
+                vector<unsigned> gene_order;
+                
+                unsigned count = 1;
+                for (unsigned l=0; l<list_size; l++) {
+                    gene_order.push_back(count);
+                    count++;
+                    if (count > nsubsets) {
+                        count = 1;
+                    }
+                }
+                
+                assert (gene_order.size() == list_size);
+                
+//                random_shuffle(gene_order.begin(), gene_order.end()); // shuffle particles, random_shuffle will always shuffle in same order
+
+                for (auto &p:my_vec) {
+                    p->setGeneOrder(gene_order);
+                }
+                    
 #if defined (TESTING_UNEVEN_SITE_CORRECTION)
                 vector<unsigned> nsites;
                 for (unsigned i=0; i<nsubsets; i++) {

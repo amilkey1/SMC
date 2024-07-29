@@ -143,6 +143,7 @@ class Particle {
         unsigned                                        showPrevForestNumber(){return _prev_forest_number;}
         string                                          getTranslateBlock();
         void                                            setNSites(vector<unsigned> nsites) {_nsites_per_gene = nsites;}
+        void                                            setGeneOrder(vector<unsigned> gene_order) {_gene_order = gene_order;}
     
 //        static bool                                     _run_on_empty;
 
@@ -170,6 +171,7 @@ class Particle {
         vector<double>                          _starting_log_likelihoods;
         vector<unsigned>                        _nsites_per_gene;
         bool                                    _fix_theta_sim; // for simulations only
+        vector<unsigned>                        _gene_order;
 };
 
     inline Particle::Particle() {
@@ -227,6 +229,7 @@ class Particle {
         _starting_log_likelihoods.clear();
         _nsites_per_gene.clear();
         _fix_theta_sim = false;
+        _gene_order.clear();
     }
 
     inline void Particle::showSpeciesTree() {
@@ -873,7 +876,8 @@ inline vector<double> Particle::getVectorPrior() {
                     
                     index = selectEvent(event_choice_rates);
                                 
-                    forest_number = event_choice_index[index];
+//                    forest_number = event_choice_index[index];
+                    forest_number = _gene_order[_generation];
                     species_name = event_choice_name[index];
                     assert (species_name != "species");
                     assert (forest_number != 0);
@@ -926,6 +930,8 @@ inline vector<double> Particle::getVectorPrior() {
             }
         
             // if a gene forest coalescence is possible, do not pick a speciation event
+            // TODO: what if gene that has been pre-chosen only has 1 lineage left - must choose speciation event
+            // TODO: could this be problematic?
 //            bool no_speciation = false;
             if (event_choice_name[0] == "species" && event_choice_name.size() > 1) {
 //                 erase speciation event possibility
@@ -949,7 +955,7 @@ inline vector<double> Particle::getVectorPrior() {
             
             if (event_choice_name.size() == 1 && event_choice_name[0] == "species") {
                 // choose the speciation event
-                showParticle();
+//                showParticle();
                 increment = speciation_time;
                 assert (speciation_time == increments[0]);
             }
@@ -1006,11 +1012,14 @@ inline vector<double> Particle::getVectorPrior() {
             // only calculate increment priors if not doing another round of species filtering
             calculateIncrementPriors(increment, species_name, forest_number, speciation, first_step);
 #endif
-            
+            if (_forests[_gene_order[_generation]]._species_partition[species_name].size() == 1) {
+                species_name = "species";
+                forest_number = 0;
+            }
             if (species_name == "species") {
                 unsigned n = (unsigned) _forests[0]._lineages.size();
                 assert (n > 1);
-                assert (index == 0);
+//                assert (index == 0);
                 assert (forest_number == 0);
                 
                 speciesProposal();
@@ -1086,7 +1095,6 @@ inline vector<double> Particle::getVectorPrior() {
             if (Forest::_run_on_empty) {
                 _log_weight = 0.0;
             }
-            
             
             _prev_forest_number = forest_number;
             
@@ -1519,8 +1527,11 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::geneProposal(unsigned forest_number, double increment, string species_name) {
-        _forests[forest_number].allowCoalescence(species_name, increment, _lot);
-        _gene_increment = make_pair(forest_number, increment);
+        unsigned forest_number2 = _gene_order[_generation];
+        _forests[forest_number2].allowCoalescence(species_name, increment, _lot);
+
+//        _forests[forest_number].allowCoalescence(species_name, increment, _lot);
+        _gene_increment = make_pair(forest_number2, increment);
     }
 
     inline void Particle::setNewTheta(bool fix_theta) {
@@ -1957,6 +1968,7 @@ inline vector<double> Particle::getVectorPrior() {
         _starting_log_likelihoods = other._starting_log_likelihoods;
         _nsites_per_gene = other._nsites_per_gene;
         _fix_theta_sim = other._fix_theta_sim;
+        _gene_order = other._gene_order;
     };
 }
 
