@@ -67,6 +67,7 @@ namespace proj {
             void                proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets, unsigned ntaxa);
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle::SharedPtr> &particles);
             void                proposeParticles(vector<Particle::SharedPtr> &particles);
+            void                proposeSimParticles(vector<Particle::SharedPtr> &particles);
             void                saveAllHybridNodes(vector<Particle::SharedPtr> &v) const;
             void                simulateData();
             void                writePaupFile(vector<Particle::SharedPtr> particles, vector<string> taxpartition);
@@ -1939,6 +1940,12 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
         }
     }
 
+    inline void Proj::proposeSimParticles(vector<Particle::SharedPtr> &particles) {
+        for (auto &p:particles) {
+            p->simProposal();
+        }
+    }
+
     inline void Proj::proposeParticles(vector<Particle::SharedPtr> &particles) {
         assert(_nthreads > 0);
         if (_nthreads == 1) {
@@ -2070,7 +2077,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
         unsigned nsteps = (unsigned) (_taxon_map.size()-1)*nsubsets;
 
         for (unsigned g=0; g<nsteps; g++){
-            proposeParticles(sim_vec);
+            proposeSimParticles(sim_vec);
         }
 
         cout << "\nBuilding species tree and associated gene trees....\n";
