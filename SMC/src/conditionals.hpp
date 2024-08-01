@@ -3,8 +3,6 @@
 //#   include <mpi.h>
 //#endif
 
-//#define SNAKE
-
 //#define NDEBUG // disable asserts for efficiency / memory improvement
 
 #define USE_TOTAL_RATE

@@ -2205,9 +2205,20 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
                 vector<unsigned> gene_order;
                 
                 unsigned count = 1;
+                vector<unsigned> randomize;
                 for (unsigned l=0; l<list_size; l++) {
-                    gene_order.push_back(count);
+                    if (count == 1) {
+                        randomize.clear();
+                    }
+                    randomize.push_back(count);
+//                    gene_order.push_back(count);
                     count++;
+                    if (count > nsubsets) {
+                        random_shuffle(randomize.begin(), randomize.end()); // shuffle particles, random_shuffle will always shuffle in same order
+                        for (auto &r:randomize) {
+                            gene_order.push_back(r);
+                        }
+                    }
                     if (count > nsubsets) {
                         count = 1;
                     }
@@ -2215,8 +2226,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
                 
                 assert (gene_order.size() == list_size);
                 
-//                random_shuffle(gene_order.begin(), gene_order.end()); // shuffle particles, random_shuffle will always shuffle in same order
-
                 for (auto &p:my_vec) {
                     p->setGeneOrder(gene_order);
                 }

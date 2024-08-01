@@ -768,10 +768,6 @@ inline vector<double> Particle::getVectorPrior() {
                 
             for (int i=0; i<_forests.size(); i++) {
                 if (i > 0) {
-                    
-    #if defined (SNAKE)
-                    changeTheta(i);
-    #endif
                     vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate(_lot);
                     double total_gene_rate = 0.0;
                     for (auto &r:rates_by_species) {
@@ -783,10 +779,6 @@ inline vector<double> Particle::getVectorPrior() {
                     if (total_gene_rate > 0.0) {
                         forest_rates.push_back(total_gene_rate);
                     }
-                    
-    #if defined (SNAKE)
-                    Forest::_theta = 0.001;
-    #endif
                 }
                 else {
                     if (_forests[0]._lineages.size() > 1) {
@@ -895,14 +887,6 @@ inline vector<double> Particle::getVectorPrior() {
                         assert (increment != -1.0);
                         no_speciation = false;
                         species_name = "species";
-                        
-//                        string name = boost::str(boost::format("node-%d")%_next_species_number);
-//                        _forests[1].updateThetaMap(_lot, name);
-//                        if (_forests.size() > 2) {
-//                            for (int i=2; i<_forests.size(); i++) {
-//                                _forests[i]._theta_map = _forests[1]._theta_map;
-//                            }
-//                        }
                     }
                     
                 }
@@ -1034,34 +1018,11 @@ inline vector<double> Particle::getVectorPrior() {
             // only calculate increment priors if not doing another round of species filtering
             calculateIncrementPriors(increment, species_name, forest_number, speciation, first_step);
 #endif
-            // TODO: this doesn't work because the increment added was the gene increment, not the species increment
-//            if (_forests[_gene_order[_generation]]._species_partition[species_name].size() == 1) { // if the chosen gene is down to 1 lineage, need a speciation event next
-//                species_name = "species";
-//                forest_number = 0;
-//                // TODO: added this, not sure if it will work
-//                string name = boost::str(boost::format("node-%d")%_next_species_number);
-//                _forests[1].updateThetaMap(_lot, name);
-//                if (_forests.size() > 2) {
-//                    for (int i=2; i<_forests.size(); i++) {
-//                        _forests[i]._theta_map = _forests[1]._theta_map;
-//                    }
-//                }
-//            }
             if (species_name == "species") {
-                // TODO: added this, not sure if it will work
-//                string name = boost::str(boost::format("node-%d")%_next_species_number);
-//                _forests[1].updateThetaMap(_lot, name);
-//                if (_forests.size() > 2) {
-//                    for (int i=2; i<_forests.size(); i++) {
-//                        _forests[i]._theta_map = _forests[1]._theta_map;
-//                    }
-//                }
                 unsigned n = (unsigned) _forests[0]._lineages.size();
                 assert (n > 1);
 //                assert (index == 0);
                 assert (forest_number == 0);
-                
-                // TODO: added this
                 
                 speciesProposal();
                 
@@ -1075,15 +1036,6 @@ inline vector<double> Particle::getVectorPrior() {
                     }
                 }
 #endif
-                
-                // TODO: added this
-//                string next_name = boost::str(boost::format("node-%d")%_next_species_number);
-//                _forests[1].updateThetaMap(_lot, next_name);
-//                if (_forests.size() > 2) {
-//                    for (int i=2; i<_forests.size(); i++) {
-//                        _forests[i]._theta_map = _forests[1]._theta_map;
-//                    }
-//                }
                 
 #if defined (INV_GAMMA_PRIOR_TWO)
                 double theta_mean = _forests[1]._theta_mean;
