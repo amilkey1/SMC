@@ -536,16 +536,21 @@ inline vector<double> Particle::getVectorPrior() {
                         event_choice_rates.erase(event_choice_rates.begin() + 0);
                     }
                     
-                    for (auto &p:event_choice_rates) {
-                         p = log(p/total_rate);
-                     }
+//                    for (auto &p:event_choice_rates) { // TODO: don't think this is necessary
+//                         p = log(p/total_rate);
+//                     }
                     
+                    double gene_total_rate = 0.0;
+                    for (auto &g:chosen_gene_forest_rates) {
+                        gene_total_rate += g;
+                    }
                     for (auto &p:chosen_gene_forest_rates) {
-                         p = log(p/total_rate);
+                         p = log(p/gene_total_rate);
                      }
                     
                     index = selectEvent(chosen_gene_forest_rates); // only choose species from rates from the chosen gene
-                                
+                    // TODO: could do this on the log scale
+
                     forest_number = next_gene;
                     species_name = event_choice_name[index];
                     assert (species_name != "species");
