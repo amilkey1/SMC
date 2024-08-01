@@ -28,7 +28,6 @@ class Particle {
         void                                    showSpeciesParticle();
         void                                    proposal();
         void                                    simProposal();
-        void                                    proposalPriorPostGenes();
         void                                    setData(Data::SharedPtr d, map<string, string> &taxon_map, bool partials) {
                                                     _nsubsets = d->getNumSubsets();
                                                     _data = d;
@@ -442,315 +441,7 @@ inline vector<double> Particle::getVectorPrior() {
         return log_likelihood;
     }
 
-    inline void Particle::proposalPriorPostGenes() {
-        double inv_gamma_modifier = 0.0;
-        
-        _species_join_proposed = false;
-        bool done = false;
-                
-        while (!done) {
-
-            bool speciation = false;
-            
-        vector<double> forest_rates; // this vector contains total rate of species tree, gene 1, etc.
-        vector<vector<double>> gene_forest_rates; // this vector contains rates by species for each gene forest
-        gene_forest_rates.resize(_forests.size()-1);
-        vector<unsigned> event_choice_index;
-        vector<string> event_choice_name;
-            
-        for (int i=0; i<_forests.size(); i++) {
-            if (i > 0) {
-                
-                vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate(_lot);
-                double total_gene_rate = 0.0;
-                for (auto &r:rates_by_species) {
-                    gene_forest_rates[i-1].push_back(r.first);
-                    event_choice_name.push_back(r.second);
-                    total_gene_rate += r.first;
-                    event_choice_index.push_back(i);
-                }
-                if (total_gene_rate > 0.0) {
-                    forest_rates.push_back(total_gene_rate);
-                }
-            }
-            else {
-                if (_forests[0]._lineages.size() > 1) {
-                    forest_rates.push_back(Forest::_lambda * _forests[0]._lineages.size());
-                    event_choice_index.push_back(0);
-                    event_choice_name.push_back("species");
-                }
-                else {
-                    _forests[0]._done = true;
-                }
-            }
-        }
-            
-            vector<double> event_choice_rates;
-            if (_forests[0]._lineages.size() > 1) {
-                event_choice_rates.push_back(forest_rates[0]); // push back species tree rate
-            }
-            for (int i=0; i<gene_forest_rates.size(); i++) {
-                for (auto &r:gene_forest_rates[i]) {
-                    assert (r > 0.0);
-                    event_choice_rates.push_back(r);
-                }
-            }
-            
-            bool no_speciation = false;
-            double speciation_time = -1;
-            unsigned index = 0;
-            double increment = 0.0;
-            
-            unsigned forest_number = 0;
-            string species_name = "species";
-            double total_rate = 0.0;
-            
-            for (auto &r:event_choice_rates) {
-                total_rate += r;
-            }
-            
-            if (event_choice_name[0] == "species") {
-                total_rate -= event_choice_rates[0]; // remove speciation rate from total rate used for choosing increment
-                speciation_time = -log(1.0 - _lot->uniform()) / event_choice_rates[0];
-            }
-            
-            if (total_rate > 0.0) {
-                double gene_increment = -log(1.0 - _lot->uniform())/total_rate;
-    //                cout << "\tincrement is : " << gene_increment << endl;
-                
-                if (gene_increment > speciation_time && speciation_time != -1) {
-                    _deep_coal = true;
-                    if (_forests[0]._lineages.size() <= Forest::_nspecies) {
-                        string name = boost::str(boost::format("node-%d")%_next_species_number);
-    #if defined (DRAW_NEW_THETA)
-                        _forests[1].updateThetaMap(_lot, name);
-                        if (_forests.size() > 2) {
-                            for (int i=2; i<_forests.size(); i++) {
-                                _forests[i]._theta_map = _forests[1]._theta_map;
-                            }
-                        }
-    #endif
-                    }
-                    _next_species_number++;
-                    // num deep coalescences += (n-1), where n is number of lineages in each affected species lineage for all genes
-                    // need to know which species joined to calculate this
-                }
-                
-                if (gene_increment < speciation_time || speciation_time == -1) {
-                    // choose a coalescent event if coalescent increment < speciation increment or if species tree is finished
-                    increment = gene_increment;
-                    no_speciation = true;
-                }
-                else {
-                    forest_number = 0;
-                    increment = speciation_time;
-                    assert (increment != -1.0);
-                    no_speciation = false;
-                }
-            }
-            else {
-                forest_number = 0;
-                increment = speciation_time;
-                assert (increment != -1.0);
-                no_speciation = false;
-                
-    #if defined (DRAW_NEW_THETA)
-                if (_forests[0]._lineages.size() <= Forest::_nspecies) {
-                    string name = boost::str(boost::format("node-%d")%_next_species_number);
-                    _forests[1].updateThetaMap(_lot, name);
-                }
-                if (_forests.size() > 2) {
-                    for (int i=2; i<_forests.size(); i++) {
-                        _forests[i]._theta_map = _forests[1]._theta_map;
-                    }
-                }
-    #endif
-                _next_species_number++;
-            }
-            
-            // add increment to all nodes in all forests
-            assert (increment > 0.0);
-            for (int i=0; i<_forests.size(); i++) {
-                if (_forests[i]._lineages.size() > 1) {
-                    _forests[i].addIncrement(increment); // if forest is finished, don't add another increment
-                }
-                else {
-                    _forests[i]._done = true;
-                }
-            }
-            
-            double running_sum = 0.0;
-            if (no_speciation) { // don't do prior post if speciation event was chosen
-                vector<double> gene_weights;
-                vector<string> species_choices;
-                vector<unsigned> forest_numbers;
-                for (int i=1; i<_forests.size(); i++) {
-                    vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate(_lot);
-                    if (rates_by_species.size() > 0) {
-                        forest_numbers.push_back(i);
-                        vector<double> just_rates;
-                        double total_rate = 0.0;
-                        for (auto &p:rates_by_species) {
-                            total_rate += p.first;
-                         }
-                        for (auto &p:rates_by_species) {
-                            just_rates.push_back(log(p.first/total_rate));
-    //                        p.first = log(p.first/total_rate);
-                        }
-                        
-                        unsigned species_index = selectEvent(just_rates);
-                        string species_name_for_this_gene = rates_by_species[species_index].second;
-                        species_choices.push_back(species_name_for_this_gene);
-                        gene_weights.push_back(_forests[i].tryCoalescence(species_name_for_this_gene, _lot));
-                    }
-                }
-                // TODO: normalize gene weights and choose one
-                running_sum = getRunningSumChoices(gene_weights);
-
-                for (unsigned w=0; w < gene_weights.size(); w++) {
-                    gene_weights[w] -= running_sum;
-                }
-//                , forest_number, increment, species_name
-//                unsigned index_of_choice = selectEvent(gene_weights);
-                unsigned n = gene_weights.size();
-                unsigned index_of_choice = rand()%n;
-                forest_number = forest_numbers[index_of_choice];
-                species_name = species_choices[index_of_choice];
-            }
-            
-            
-            if (forest_number == 0) {
-                speciation = true;
-            }
-                        
-            bool first_step = true;
-            if (_forests[0]._lineages.size() != Forest::_nspecies) {
-                first_step = false;
-            }
-            
-            if (first_step) {
-                for (int i=1; i<_forests.size(); i++) {
-                    if (_forests[i]._lineages.size() != Forest::_ntaxa) {
-                        first_step = false;
-                    }
-                }
-            }
-            
-    #if !defined (HIERARCHICAL_FILTERING)
-            // only calculate increment priors if not doing another round of species filtering
-            calculateIncrementPriors(increment, species_name, forest_number, speciation, first_step);
-    #endif
-            
-            if (species_name == "species") {
-                unsigned n = (unsigned) _forests[0]._lineages.size();
-                assert (n > 1);
-                assert (index == 0);
-                assert (forest_number == 0);
-                
-                speciesProposal();
-                
-    #if defined (INV_GAMMA_PRIOR_TWO)
-                double theta_mean = _forests[1]._theta_mean;
-                double eps = 0.01;
-                double a = 2.0;
-                
-                inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
-                
-                // new theta drawn for the new population
-                string new_spp = _forests[0]._lineages.back()->_name;
-                double y = _forests[1]._theta_map[new_spp];
-                
-                inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
-    #endif
-                
-                _species_join_proposed = true;
-                assert (increment > 0.0);
-            }
-        
-            else {
-                
-                assert (increment > 0.0);
-                double log_speciation_term = 0.0;
-                geneProposal(forest_number, increment, species_name);
-                double log_likelihood_term = _forests[forest_number]._log_weight;
-
-//                _log_weight = log_speciation_term + log_likelihood_term;
-//                assert (running_sum > 0.0);
-                _log_weight = running_sum;
-                
-                if (_forests[1]._theta_mean == 0.0) {
-                    assert (_forests[1]._theta > 0.0);
-                    for (int i=1; i<_forests.size(); i++) {
-                        _forests[i]._theta_mean = _forests[1]._theta;
-                    }
-                }
-                assert (_forests[1]._theta_mean > 0.0);
-                
-                // modifier only happens on first round
-                if (_generation == 0 && _forests[1]._theta_prior_mean > 0.0 && _forests[1]._theta_proposal_mean > 0.0) {
-                    double prior_rate = 1.0/_forests[1]._theta_prior_mean;
-                    double proposal_rate = 1.0/_forests[1]._theta_proposal_mean;
-                    double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
-                    
-                    _log_weight += log_weight_modifier;
-                }
-                
-    #if defined (INV_GAMMA_PRIOR_TWO)
-                if (_generation == 0) {
-                    inv_gamma_modifier = 0.0;
-                    double theta_mean = _forests[1]._theta_mean;
-                    double eps = 0.01;
-                    double a = 2.0;
-                    
-                    inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
-                    
-                    // for first step, new theta drawn for each tip population
-                    for (int i=0; i<Forest::_nspecies; i++) {
-                        auto it = _forests[1]._theta_map.begin();
-                        std::advance(it, i);
-                        double y = it->second;
-                        
-                        inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
-                        
-                    }
-                }
-    #endif
-       
-                
-                done = true;
-            }
-            
-            if (Forest::_run_on_empty) {
-                _log_weight = 0.0;
-            }
-            
-            
-            _prev_forest_number = forest_number;
-            
-            _log_weight += inv_gamma_modifier;
-            
-            }
-        
-    #if defined (TESTING_UNEVEN_LIKELIHOOD_CORRECTION)
-        double total_starting_log_likelihood = 0.0;
-        for (auto &s:_starting_log_likelihoods) {
-            total_starting_log_likelihood += s;
-        }
-        
-        double fraction = _starting_log_likelihoods[_prev_forest_number-1] / total_starting_log_likelihood;
-        _log_weight = _log_weight / (100 * fraction);
-        
-        
-    //        _log_weight = _log_weight / (_starting_log_likelihoods[_prev_forest_number-1] / total_starting_log_likelihood);
-    #endif
-        
-        _generation++;
-    }
-
     inline void Particle::proposal() {
-#if defined (PRIOR_POST_ON_GENES)
-        proposalPriorPostGenes();
-#else
         double inv_gamma_modifier = 0.0;
         
         _species_join_proposed = false;
@@ -829,27 +520,27 @@ inline vector<double> Particle::getVectorPrior() {
                 if (gene_increment > speciation_time && speciation_time != -1) {
                     _deep_coal = true;
 //#if defined (DRAW_NEW_THETA)
-                    if (_forests[0]._lineages.size() <= Forest::_nspecies) {
-                        string name = boost::str(boost::format("node-%d")%_next_species_number);
-#if defined (DRAW_NEW_THETA)
-                        if (!_fix_theta_sim) { // TODO: be careful - make sure fix_theta is always false when not simulating
-                            _forests[1].updateThetaMap(_lot, name);
-                            if (_forests.size() > 2) {
-                                for (int i=2; i<_forests.size(); i++) {
-                                    _forests[i]._theta_map = _forests[1]._theta_map;
-                                }
-                            }
-                        }
-                        else {
-                            _forests[1].updateThetaMapFixedThetaSim(name);
-                            if (_forests.size() > 2) {
-                                for (int i=2; i<_forests.size(); i++) {
-                                    _forests[i]._theta_map = _forests[1]._theta_map;
-                                }
-                            }
-                        }
-#endif
-                    }
+//                    if (_forests[0]._lineages.size() <= Forest::_nspecies) {
+//                        string name = boost::str(boost::format("node-%d")%_next_species_number);
+//#if defined (DRAW_NEW_THETA)
+//                        if (!_fix_theta_sim) { // TODO: be careful - make sure fix_theta is always false when not simulating
+//                            _forests[1].updateThetaMap(_lot, name);
+//                            if (_forests.size() > 2) {
+//                                for (int i=2; i<_forests.size(); i++) {
+//                                    _forests[i]._theta_map = _forests[1]._theta_map;
+//                                }
+//                            }
+//                        }
+//                        else {
+//                            _forests[1].updateThetaMapFixedThetaSim(name);
+//                            if (_forests.size() > 2) {
+//                                for (int i=2; i<_forests.size(); i++) {
+//                                    _forests[i]._theta_map = _forests[1]._theta_map;
+//                                }
+//                            }
+//                        }
+//#endif
+//                    }
 //                    _next_species_number++;
                     // num deep coalescences += (n-1), where n is number of lineages in each affected species lineage for all genes
                     // need to know which species joined to calculate this
@@ -1116,53 +807,10 @@ inline vector<double> Particle::getVectorPrior() {
             
             }
         
-#if defined (TESTING_UNEVEN_LIKELIHOOD_CORRECTION)
-        double total_starting_log_likelihood = 0.0;
-        for (auto &s:_starting_log_likelihoods) {
-            total_starting_log_likelihood += s;
-        }
-        
-        double fraction = _starting_log_likelihoods[_prev_forest_number-1] / total_starting_log_likelihood;
-//        _log_weight = _log_weight / (100 * fraction);
-        _log_weight = _log_weight / fraction;
-        
-        
-//        _log_weight = _log_weight / (_starting_log_likelihoods[_prev_forest_number-1] / total_starting_log_likelihood);
-#endif
-        
-#if defined (TESTING_UNEVEN_SITE_CORRECTION)
-        double nsites = _nsites_per_gene[_prev_forest_number - 1];
-        double total_sites = 0;
-        unsigned forest_number = 1;
-        for (auto &n:_nsites_per_gene) {
-//            if (_forests[forest_number]._lineages.size() > 1) {
-                total_sites += n;
-//            }
-        }
-        
-//        double fraction = nsites / total_sites;
-//        _log_weight = _log_weight / (100 * fraction);
-//        _log_weight = _log_weight - nsites + total_sites;
-//        _log_weight = _log_weight + log(nsites / total_sites);
-        
-        _log_weight = _log_weight / nsites;
-        _log_weight = _log_weight * total_sites;
-        
-//        _log_weight = _log_weight - (total_sites / nsites);
-//        _log_weight = _log_weight * nsites / total_sites;
-//        _log_weight = _log_weight - log(nsites) + log(total_sites);
-//        cout << "stop";
-    
-#endif
-        
         _generation++;
-#endif
     }
 
     inline void Particle::simProposal() {
-    #if defined (PRIOR_POST_ON_GENES)
-        proposalPriorPostGenes();
-    #else
         double inv_gamma_modifier = 0.0;
         
         _species_join_proposed = false;
@@ -1516,7 +1164,6 @@ inline vector<double> Particle::getVectorPrior() {
             }
         
         _generation++;
-    #endif
     }
 
     vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {

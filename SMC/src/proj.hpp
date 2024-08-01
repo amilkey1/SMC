@@ -50,8 +50,6 @@ namespace proj {
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
             void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle::SharedPtr> &v, string filename, unsigned group_number);
             void                normalizeWeights(vector<Particle::SharedPtr> & particles);
-            void                modifyWeights(vector<Particle::SharedPtr> & particles);
-            void                correctWeights(vector<Particle::SharedPtr> & particles);
             void                normalizeSpeciesWeights(vector<Particle::SharedPtr> & particles);
             void                resampleParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
             void                resampleSpeciesParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles);
@@ -1461,19 +1459,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
         _log_species_tree_marginal_likelihood += log_particle_sum - log(_nparticles);
     }
 
-    inline void Proj::modifyWeights(vector<Particle::SharedPtr> & particles) {
-        for (auto &p:particles) {
-            double new_weight = p->getLogWeight() * _phi;
-            p->setLogWeight(new_weight);
-        }
-    }
-
-    inline void Proj::correctWeights(vector<Particle::SharedPtr> & particles) {
-        for (auto &p:particles) {
-            p->setLogWeight(p->getLogWeight()*(1 / _phi));
-        }
-    }
-
     inline void Proj::normalizeWeights(vector<Particle::SharedPtr> & particles) {
         unsigned i = 0;
         vector<double> log_weight_vec(particles.size());
@@ -2211,7 +2196,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
                         randomize.clear();
                     }
                     randomize.push_back(count);
-//                    gene_order.push_back(count);
                     count++;
                     if (count > nsubsets) {
                         random_shuffle(randomize.begin(), randomize.end()); // shuffle particles, random_shuffle will always shuffle in same order
@@ -2268,10 +2252,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
                 if (Forest::_save_memory) {
                     my_vec[0]->clearPartials(); // all other particles should have no partials
                 }
-
-#if defined (WEIGHT_CORRECTION)
-                    modifyWeights(my_vec);
-#endif
                 
                     normalizeWeights(my_vec); // initialize marginal likelihood
 
@@ -2312,9 +2292,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
 //                            cout << "coalescence proposed in gene: " << p->showPrevForestNumber() << endl;
 //                        }
 //                        cout << "\n";
-#if defined (WEIGHT_CORRECTION)
-                    modifyWeights(my_vec);
-#endif
+                        
                         normalizeWeights(my_vec);
 
                         if (_verbose > 1) {
