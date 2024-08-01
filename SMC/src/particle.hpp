@@ -446,16 +446,19 @@ inline vector<double> Particle::getVectorPrior() {
         
         _species_join_proposed = false;
         bool done = false;
+        unsigned next_gene = _gene_order[_generation];
                 
         while (!done) {
     
             bool speciation = false;
             
+            // TODO: only consider rates for just the next gene, or all genes?
             vector<double> forest_rates; // this vector contains total rate of species tree, gene 1, etc.
             vector<vector<double>> gene_forest_rates; // this vector contains rates by species for each gene forest
             gene_forest_rates.resize(_forests.size()-1);
             vector<unsigned> event_choice_index;
             vector<string> event_choice_name;
+            vector<double> chosen_gene_forest_rates; // this vector contains rates by species for just the chosen gene
                 
             for (int i=0; i<_forests.size(); i++) {
                 if (i > 0) {
@@ -463,7 +466,11 @@ inline vector<double> Particle::getVectorPrior() {
                     double total_gene_rate = 0.0;
                     for (auto &r:rates_by_species) {
                         gene_forest_rates[i-1].push_back(r.first);
-                        event_choice_name.push_back(r.second);
+                        // TODO: only push back event choice name if it's in the next gene
+                        if (i == next_gene) {
+                            event_choice_name.push_back(r.second);
+                            chosen_gene_forest_rates.push_back(r.first);
+                        }
                         total_gene_rate += r.first;
                         event_choice_index.push_back(i);
                     }
@@ -562,17 +569,19 @@ inline vector<double> Particle::getVectorPrior() {
                          p = log(p/total_rate);
                      }
                     
-                    index = selectEvent(event_choice_rates);
+//                    index = selectEvent(event_choice_rates);
+                    index = selectEvent(chosen_gene_forest_rates);
                                 
 //                    forest_number = event_choice_index[index];
-                    forest_number = _gene_order[_generation];
+//                    forest_number = _gene_order[_generation];
+                    forest_number = next_gene;
                     species_name = event_choice_name[index];
                     assert (species_name != "species");
                     assert (forest_number != 0);
                     
                     
                     // TODO: testing this
-                    if (_forests[_gene_order[_generation]]._species_partition[species_name].size() == 1) {
+                    if (_forests[forest_number]._species_partition[species_name].size() == 1) {
                         forest_number = 0;
                         increment = speciation_time;
                         assert (increment != -1.0);
