@@ -791,7 +791,6 @@ inline vector<double> Particle::getVectorPrior() {
             unsigned index = 0;
             double increment = 0.0;
             
-    #if defined (USE_TOTAL_RATE)
             unsigned forest_number = 0;
             string species_name = "species";
             double total_rate = 0.0;
@@ -884,77 +883,6 @@ inline vector<double> Particle::getVectorPrior() {
     #endif
                 _next_species_number++;
             }
-            
-    #else
-            vector<double> increments = chooseIncrements(event_choice_rates);
-        
-    //            double speciation_time = -1;
-            if (!_forests[0]._done) {
-                speciation_time = increments[0];
-            }
-            
-            if (speciation_time > -1) { // otherwise, species tree is done, and there is no constraint on gene tree increments
-                for (int i = (int) increments.size()-1; i>0; i--) {
-                    if (increments [i] > speciation_time) {
-                        event_choice_index.erase(event_choice_index.begin() + i);
-                        event_choice_name.erase(event_choice_name.begin() + i);
-                        event_choice_rates.erase(event_choice_rates.begin() + i);
-                        increments.erase(increments.begin() + i);
-                    }
-                }
-            }
-        
-            // if a gene forest coalescence is possible, do not pick a speciation event
-            // TODO: what if gene that has been pre-chosen only has 1 lineage left - must choose speciation event
-            // TODO: could this be problematic?
-    //            bool no_speciation = false;
-            if (event_choice_name[0] == "species" && event_choice_name.size() > 1) {
-    //                 erase speciation event possibility
-                event_choice_index.erase(event_choice_index.begin() + 0);
-                event_choice_name.erase(event_choice_name.begin() + 0);
-                event_choice_rates.erase(event_choice_rates.begin() + 0);
-                increments.erase(increments.begin() + 0);
-                no_speciation = true;
-            }
-            
-            double total_rate = 0.0; // normalize rates before selecting an event
-            for (auto &r:event_choice_rates) {
-                assert (r > 0.0);
-                total_rate += r;
-            }
-        
-            // choose the minimum coalescence time
-            double min_coalescence_time = 0.0;
-            index = 0;
-            unsigned forest_number = 0;
-            
-            if (event_choice_name.size() == 1 && event_choice_name[0] == "species") {
-                // choose the speciation event
-    //                showParticle();
-                increment = speciation_time;
-                assert (speciation_time == increments[0]);
-            }
-            else {
-                // choose the minimum event
-                min_coalescence_time = *min_element(std::begin(increments), std::end(increments));
-                increment = min_coalescence_time;
-                bool entered = false;
-                for (int i=0; i<increments.size(); i++) {
-                    if (increments[i] == min_coalescence_time) {
-                        index = i;
-                        entered = true;
-                        break;
-                    }
-                }
-                assert (entered);
-                forest_number = event_choice_index[index];
-                if (no_speciation) {
-                    assert (forest_number != 0);
-                }
-            }
-        
-            string species_name = event_choice_name[index];
-    #endif
                 
             // add increment to all nodes in all forests
             for (int i=0; i<_forests.size(); i++) {
@@ -987,10 +915,10 @@ inline vector<double> Particle::getVectorPrior() {
             // only calculate increment priors if not doing another round of species filtering
             calculateIncrementPriors(increment, species_name, forest_number, speciation, first_step);
     #endif
-//            if (_forests[_gene_order[_generation]]._species_partition[species_name].size() == 1) {
-//                species_name = "species";
-//                forest_number = 0;
-//            }
+    //            if (_forests[_gene_order[_generation]]._species_partition[species_name].size() == 1) {
+    //                species_name = "species";
+    //                forest_number = 0;
+    //            }
             if (species_name == "species") {
                 unsigned n = (unsigned) _forests[0]._lineages.size();
                 assert (n > 1);
