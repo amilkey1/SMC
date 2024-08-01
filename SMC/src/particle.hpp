@@ -461,7 +461,8 @@ inline vector<double> Particle::getVectorPrior() {
             vector<double> chosen_gene_forest_rates; // this vector contains rates by species for just the chosen gene
                 
             for (int i=0; i<_forests.size(); i++) {
-                if (i > 0) {
+                if (i == next_gene) {
+                    // TODO: only do this for chosen gene
                     vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate(_lot);
                     double total_gene_rate = 0.0;
                     for (auto &r:rates_by_species) {
@@ -478,7 +479,7 @@ inline vector<double> Particle::getVectorPrior() {
                         forest_rates.push_back(total_gene_rate);
                     }
                 }
-                else {
+                else if (i == 0) {
                     if (_forests[0]._lineages.size() > 1) {
                         forest_rates.push_back(Forest::_lambda * _forests[0]._lineages.size());
                         event_choice_index.push_back(0);
