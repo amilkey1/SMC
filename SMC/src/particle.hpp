@@ -858,7 +858,7 @@ inline vector<double> Particle::getVectorPrior() {
                         }
 #endif
                     }
-                    _next_species_number++;
+//                    _next_species_number++;
                     // num deep coalescences += (n-1), where n is number of lineages in each affected species lineage for all genes
                     // need to know which species joined to calculate this
                 }
@@ -1066,7 +1066,7 @@ inline vector<double> Particle::getVectorPrior() {
                 speciesProposal();
                 
 #if defined (DRAW_NEW_THETA)
-                unsigned next = _next_species_number - 1;
+                unsigned next = _next_species_number;
                 string name = boost::str(boost::format("node-%d")%next);
                 _forests[1].updateThetaMap(_lot, name);
                 if (_forests.size() > 2) {
@@ -1101,6 +1101,7 @@ inline vector<double> Particle::getVectorPrior() {
                 
                 _species_join_proposed = true;
                 assert (increment > 0.0);
+                _next_species_number++;
             }
         
             else {
