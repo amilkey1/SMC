@@ -49,12 +49,6 @@ namespace proj {
             void                writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v) const;
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v, string filename, unsigned group_number);
             void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v, string filename, unsigned group_number);
-            void                normalizeWeights(vector<Particle> & particles);
-            void                normalizeSpeciesWeights(vector<Particle> & particles);
-//            void                resampleParticles(vector<Particle> & from_particles, vector<Particle> & to_particles);
-//            void                resampleSpeciesParticles(vector<Particle> & from_particles, vector<Particle> & to_particles);
-            void                resetWeights(vector<Particle> & particles);
-            void                resetSpeciesWeights(vector<Particle> & particles);
             void                createSpeciesMap(Data::SharedPtr);
             void                simSpeciesMap();
             string              inventName(unsigned k, bool lower_case);
@@ -1109,8 +1103,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             my_vec_2[i] = Particle::SharedPtr(new Particle);
         }
 
-        bool use_first = true;
-
         initializeParticles(my_vec); // initialize in parallel with multithreading
         
         unsigned count = 0;
@@ -1288,30 +1280,13 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
         else {
             for (unsigned a=0; a < ngroups; a++) {
 //                        _log_species_tree_marginal_likelihood = 0.0; // TODO: for now, write lorad file for first set of species tree filtering and report the marginal likelihood for comparison
-                
-                use_first = true;
-                
+                                
                 vector<Particle> use_vec;
                 Particle p = my_vec[a];
                 
                 for (unsigned i=0; i<nparticles; i++) {
                     use_vec.push_back(p);
                 }
-
-                
-
-//                vector<Particle::SharedPtr> use_vec_1;
-//                vector<Particle::SharedPtr> use_vec_2;
-//                vector<Particle::SharedPtr> &use_vec = use_vec_1;
-//
-//                Particle::SharedPtr chosen_particle = my_vec_1[a]; // particle to copy
-//                for (unsigned i=0; i<_particle_increase; i++) {
-//                    use_vec_1.push_back(Particle::SharedPtr(new Particle()));
-//                    use_vec_2.push_back(Particle::SharedPtr(new Particle()));
-//                    use_vec_1[i] = Particle::SharedPtr(new Particle(*chosen_particle));
-//                    use_vec_2[i] = Particle::SharedPtr(new Particle(*chosen_particle));
-//                }
-
                 assert(use_vec.size() == _particle_increase);
 
                 index += _particle_increase;
@@ -1333,10 +1308,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 
                     proposeSpeciesParticles(use_vec);
 
-
-//                    normalizeSpeciesWeights(use_vec);
-
-
                     double ess_inverse = 0.0;
 
                     for (auto & p:use_vec) {
@@ -1349,16 +1320,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     }
 
                     filterSpeciesParticles(s, use_vec);
-//                    resampleSpeciesParticles(use_vec, use_first ? use_vec_2:use_vec_1);
-                    //if use_first is true, my_vec = my_vec_2
-                    //if use_first is false, my_vec = my_vec_1
-
-//                    use_vec = use_first ? use_vec_2:use_vec_1;
-
-                    //change use_first from true to false or false to true
-//                    use_first = !use_first;
-
-//                    resetSpeciesWeights(use_vec);
 
                 } // s loop
 
@@ -1446,112 +1407,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 
         return log_particle_sum;
     }
-
-    inline void Proj::normalizeSpeciesWeights(vector<Particle> & particles) {
-        double neg_inf = -1*numeric_limits<double>::infinity();
-
-        unsigned i = 0;
-        vector<double> log_weight_vec(particles.size());
-        for (auto & p : particles) {
-            log_weight_vec[i++] = p.getSpeciesLogWeight();
-        }
-
-        double log_particle_sum = getRunningSum(log_weight_vec);
-        if (isnan(log_particle_sum)) {
-            throw XProj("no species trees proposed legal increments; increase particle_increase and try again");
-        }
-
-        if (_verbose > 1) {
-            double max = *max_element(std::begin(log_weight_vec), std::end(log_weight_vec));
-            double min = *min_element(std::begin(log_weight_vec), std::end(log_weight_vec)); // C++11
-
-            cout << "\t" << "max weight = " << max << endl;;
-            cout << "\t" << "min weight = " << min << endl;;
-        }
-
-        for (auto & p : particles) {
-            if (p.getSpeciesLogWeight() != neg_inf) {
-                p.setLogSpeciesWeight(p.getSpeciesLogWeight() - log_particle_sum);
-            }
-        }
-
-        _log_species_tree_marginal_likelihood += log_particle_sum - log(_nparticles);
-    }
-
-    inline void Proj::normalizeWeights(vector<Particle> & particles) {
-        unsigned i = 0;
-        vector<double> log_weight_vec(particles.size());
-        for (auto & p : particles) {
-            log_weight_vec[i++] = p.getLogWeight();
-        }
-
-        double log_particle_sum = getRunningSum(log_weight_vec);
-
-        if (_verbose > 1) {
-            double max = *max_element(std::begin(log_weight_vec), std::end(log_weight_vec));
-            double min = *min_element(std::begin(log_weight_vec), std::end(log_weight_vec)); // C++11
-
-            cout << "\t" << "max weight = " << max << endl;;
-            cout << "\t" << "min weight = " << min << endl;;
-        }
-
-        for (auto & p : particles) {
-            p.setLogWeight(p.getLogWeight() - log_particle_sum);
-        }
-
-        _log_marginal_likelihood += log_particle_sum - log(_nparticles);
-    }
-
-//    inline void Proj::resampleSpeciesParticles(vector<Particle::SharedPtr> & from_particles, vector<Particle::SharedPtr> & to_particles) {
-//        assert (from_particles.size() == _nparticles);
-//        assert (to_particles.size() == _nparticles);
-//
-//        vector<pair<double, double>> cum_probs;
-//            // Create vector of pairs p, with p.first = log weight and p.second = particle index
-//        cum_probs.resize(_nparticles);
-//        unsigned i = 0;
-//
-//        for (unsigned p=0; p < _nparticles; p++) {
-//            cum_probs[i].first = from_particles[p]->getSpeciesLogWeight();
-//            cum_probs[i].second = i;
-//            ++i;
-//            }
-//
-//            // Sort cum_probs vector so that largest log weights come first
-//            sort(cum_probs.begin(), cum_probs.end(), greater< pair<double,unsigned> >());
-//
-//            // Convert vector from storing log weights to storing cumulative weights
-//            double cumpr = 0.0;
-//            for (auto & w : cum_probs) {
-//                cumpr += exp(w.first);
-//                w.first = cumpr;
-//            }
-//
-//            // Last element in cum_probs should hold 1.0 if weights were indeed normalized coming in
-//            assert( fabs( 1.0 - cum_probs[_nparticles-1].first ) < Proj::_small_enough);
-//
-//
-//        // Draw new set of particles by sampling with replacement according to cum_probs
-//        to_particles.resize(_nparticles);
-//        for(unsigned i = 0; i < _nparticles; i++) {
-//
-//            // Select a particle to copy to the ith slot in to_particles
-//            int sel_index = -1;
-//            double u = rng.uniform();
-//            for(unsigned j = 0; j < _nparticles; j++) {
-//                if (u < cum_probs[j].first) {
-//                    sel_index = cum_probs[j].second;
-//                    break;
-//                }
-//            }
-//            assert(sel_index > -1);
-//
-//            Particle::SharedPtr p0 = from_particles[sel_index];
-//            to_particles[i]=Particle::SharedPtr(new Particle(*p0));
-//
-//            assert(_nparticles == to_particles.size());
-//            }
-//    }
 
     inline void Proj::filterParticles(unsigned step, vector<Particle> & particles) {
         unsigned nparticles = (unsigned) particles.size();
@@ -1707,72 +1562,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
         }
     }
 
-
-//    inline void Proj::resampleParticles(vector<Particle> & from_particles, vector<Particle::SharedPtr> & to_particles) {
-//         assert (from_particles.size() == _nparticles);
-//         assert (to_particles.size() == _nparticles);
-//
-//         vector<pair<double, double>> cum_probs;
-//             // Create vector of pairs p, with p.first = log weight and p.second = particle index
-//         cum_probs.resize(_nparticles);
-//         unsigned i = 0;
-//
-//         for (unsigned p=0; p < _nparticles; p++) {
-//             cum_probs[i].first = from_particles[p].getLogWeight();
-//             cum_probs[i].second = i;
-//             ++i;
-//             }
-//
-//             // Sort cum_probs vector so that largest log weights come first
-//             sort(cum_probs.begin(), cum_probs.end(), greater< pair<double,unsigned> >());
-//
-//             // Convert vector from storing log weights to storing cumulative weights
-//             double cumpr = 0.0;
-//             for (auto & w : cum_probs) {
-//                 cumpr += exp(w.first);
-//                 w.first = cumpr;
-//             }
-//
-//             // Last element in cum_probs should hold 1.0 if weights were indeed normalized coming in
-//             assert( fabs( 1.0 - cum_probs[_nparticles-1].first ) < Proj::_small_enough);
-//
-//
-//         // Draw new set of particles by sampling with replacement according to cum_probs
-//         to_particles.resize(_nparticles);
-//         for(unsigned i = 0; i < _nparticles; i++) {
-//
-//             // Select a particle to copy to the ith slot in to_particles
-//             int sel_index = -1;
-//             double u = rng.uniform();
-//             for(unsigned j = 0; j < _nparticles; j++) {
-//                 if (u < cum_probs[j].first) {
-//                     sel_index = cum_probs[j].second;
-//                     break;
-//                 }
-//             }
-//             assert(sel_index > -1);
-//
-//             Particle::SharedPtr p0 = from_particles[sel_index];
-//             to_particles[i]=Particle::SharedPtr(new Particle(*p0));
-//
-//             assert(_nparticles == to_particles.size());
-//             }
-//        }
-
-    inline void Proj::resetWeights(vector<Particle> & particles) {
-        double logw = -log(particles.size());
-        for (auto & p : particles) {
-            p.setLogWeight(logw);
-        }
-    }
-
-    inline void Proj::resetSpeciesWeights(vector<Particle> & particles) {
-        double logw = -log(particles.size());
-        for (auto & p : particles) {
-            p.setLogSpeciesWeight(logw);
-        }
-    }
-
     inline string Proj::inventName(unsigned k, bool lower_case) {
         // If   0 <= k < 26, returns A, B, ..., Z,
         // If  26 <= k < 702, returns AA, AB, ..., ZZ,
@@ -1867,22 +1656,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
         unsigned nspecies = (unsigned) _species_names.size();
         
         for (unsigned i=first; i<last; i++){
-            // use_vec = particles[i]
-            
-            bool use_first = true;
-
-//            vector<Particle::SharedPtr> use_vec_1;
-//            vector<Particle::SharedPtr> use_vec_2;
-//            vector<Particle::SharedPtr> &use_vec = use_vec_1;
-//
-//            Particle::SharedPtr chosen_particle = particles[i]; // particle to copy // TODO: does this make a real copy?
-//            for (unsigned i=0; i<_particle_increase; i++) {
-//                use_vec_1.push_back(Particle::SharedPtr(new Particle()));
-//                use_vec_2.push_back(Particle::SharedPtr(new Particle()));
-//                use_vec_1[i] = Particle::SharedPtr(new Particle(*chosen_particle));
-//                use_vec_2[i] = Particle::SharedPtr(new Particle(*chosen_particle));
-//            }
-            
             vector<Particle> use_vec;
             Particle p = particles[i];
             
@@ -1896,9 +1669,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                 cout << "beginning species tree proposals for subset " << i+1 << endl;
             }
             for (unsigned s = 0; s < nspecies-1; s++) {  // skip last round of filtering because weights are always 0
-//                if (_verbose > 0) {
-//                    cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
-//                }
 
                 // set particle random number seeds
                 unsigned psuffix = 1;
@@ -1908,9 +1678,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                 }
 
                 proposeSpeciesParticles(use_vec);
-
-
-//                normalizeSpeciesWeights(use_vec);
 
                 if (_verbose > 1) {
                     double ess_inverse = 0.0;
@@ -1924,17 +1691,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                 }
 
                 filterSpeciesParticles(s, use_vec);
-//                resampleSpeciesParticles(use_vec, use_first ? use_vec_2:use_vec_1);
-                //if use_first is true, my_vec = my_vec_2
-                //if use_first is false, my_vec = my_vec_1
-
-//                use_vec = use_first ? use_vec_2:use_vec_1;
-
-                //change use_first from true to false or false to true
-//                use_first = !use_first;
-
-//                resetSpeciesWeights(use_vec);
-
             } // s loop
             
             if (_verbose > 0) {
@@ -2360,18 +2116,10 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 
                 vector<Particle> my_vec;
                 my_vec.resize(nparticles);
-                
-                vector<Particle::SharedPtr> my_vec_1(nparticles);
-                vector<Particle::SharedPtr> my_vec_2(nparticles);
-//                vector<Particle::SharedPtr> &my_vec = my_vec_1;
 
                 for (unsigned i=0; i<nparticles; i++) {
                     my_vec[i] = Particle();
-//                    my_vec_1[i] = Particle::SharedPtr(new Particle);
-//                    my_vec_2[i] = Particle::SharedPtr(new Particle);
                 }
-
-                bool use_first = true;
 
                 initializeParticles(my_vec); // initialize in parallel with multithreading
                 
@@ -2426,7 +2174,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                 unsigned psuffix = 1;
                 for (auto &p:my_vec) {
                     p.setSeed(rng.randint(1,9999) + psuffix);
-//                        p->setPsuffix(psuffix);
                     psuffix += 2;
                 }
 #endif
@@ -2477,8 +2224,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                             }
                         }
                         
-//                        normalizeWeights(my_vec);
-
                         if (_verbose > 1) {
                             for (auto & p:my_vec) {
                                 ess_inverse += exp(2.0*p.getLogWeight());
@@ -2497,14 +2242,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                         if (filter) {
                             
                             filterParticles(g, my_vec);
-//                            resampleParticles(my_vec, use_first ? my_vec_2:my_vec_1);
-                            //if use_first is true, my_vec = my_vec_2
-                            //if use_first is false, my_vec = my_vec_1
-
-//                            my_vec = use_first ? my_vec_2:my_vec_1;
-
-                            //change use_first from true to false or false to true
-//                            use_first = !use_first;
 
                             unsigned species_count = 0;
                             
@@ -2520,7 +2257,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                                 cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
                                 cout << "\t" << "number of species join particles accepted = " << species_count << endl;
                             }
-                        resetWeights(my_vec);
                         }
                 } // g loop
                 
@@ -2712,8 +2448,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                 else {
                     for (unsigned a=0; a < ngroups; a++) {
 //                        _log_species_tree_marginal_likelihood = 0.0; // for now, write lorad file for first set of species tree filtering and report the marginal likelihood for comparison
-                        
-                        use_first = true;
 
                         vector<Particle> use_vec;
                         Particle chosen_particle = my_vec[a];
@@ -2721,18 +2455,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                         for (unsigned i=0; i<_particle_increase; i++) {
                             use_vec.push_back(chosen_particle);
                         }
-
-//                        vector<Particle::SharedPtr> use_vec_1;
-//                        vector<Particle::SharedPtr> use_vec_2;
-//                        vector<Particle::SharedPtr> &use_vec = use_vec_1;
-//
-//                        Particle::SharedPtr chosen_particle = my_vec_1[a]; // particle to copy
-//                        for (unsigned i=0; i<_particle_increase; i++) {
-//                            use_vec_1.push_back(Particle::SharedPtr(new Particle()));
-//                            use_vec_2.push_back(Particle::SharedPtr(new Particle()));
-//                            use_vec_1[i] = Particle::SharedPtr(new Particle(*chosen_particle));
-//                            use_vec_2[i] = Particle::SharedPtr(new Particle(*chosen_particle));
-//                        }
 
                         assert(use_vec.size() == _particle_increase);
 
@@ -2755,10 +2477,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 
                             proposeSpeciesParticles(use_vec);
 
-
-//                            normalizeSpeciesWeights(use_vec);
-
-
                             double ess_inverse = 0.0;
 
                             for (auto & p:use_vec) {
@@ -2769,17 +2487,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                             if (_verbose > 1) {
                                 cout << "   " << "ESS = " << ess << endl;
                             }
-
-//                            resampleSpeciesParticles(use_vec, use_first ? use_vec_2:use_vec_1);
-                            //if use_first is true, my_vec = my_vec_2
-                            //if use_first is false, my_vec = my_vec_1
-
-//                            use_vec = use_first ? use_vec_2:use_vec_1;
-
-                            //change use_first from true to false or false to true
-//                            use_first = !use_first;
-
-//                            resetSpeciesWeights(use_vec);
 
                         } // s loop
 

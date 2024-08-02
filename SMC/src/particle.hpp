@@ -97,6 +97,7 @@ class Particle {
         string                                          saveGamma();
         void                                            calculateGamma();
         int                                             selectEvent(vector<double> weight_vec);
+        int                                             selectEventLinearScale(vector<double> weight_vec);
         double                                          getTopologyPrior(unsigned i);
         vector<pair<double, double>>                    getIncrementPriors(unsigned i);
         vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
@@ -453,31 +454,25 @@ inline vector<double> Particle::getVectorPrior() {
             bool speciation = false;
             
             // TODO: only consider rates for just the next gene, or all genes?
-            vector<double> forest_rates; // this vector contains total rate of species tree, gene 1, etc.
-            vector<vector<double>> gene_forest_rates; // this vector contains rates by species for each gene forest
-            gene_forest_rates.resize(_forests.size()-1);
+            vector<double> forest_rates; // this vector contains total rate of species tree and chosen gene
+            vector<double> gene_forest_rates; // this vector contains rates by species for the chosen gene
             vector<unsigned> event_choice_index;
             vector<string> event_choice_name;
-            vector<double> chosen_gene_forest_rates; // this vector contains rates by species for just the chosen gene
                 
             for (int i=0; i<_forests.size(); i++) {
-                if (i == next_gene) {
-                    // TODO: only do this for chosen gene
+                if (i == next_gene) { // only do this for the chosen gene
                     vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate(_lot);
                     double total_gene_rate = 0.0;
                     for (auto &r:rates_by_species) {
-                        gene_forest_rates[i-1].push_back(r.first);
-                        // TODO: only push back event choice name if it's in the next gene
-                        if (i == next_gene) {
-                            event_choice_name.push_back(r.second);
-                            chosen_gene_forest_rates.push_back(r.first);
-                        }
+                        gene_forest_rates.push_back(r.first);
+                        event_choice_name.push_back(r.second);
                         total_gene_rate += r.first;
                         event_choice_index.push_back(i);
                     }
                     if (total_gene_rate > 0.0) {
                         forest_rates.push_back(total_gene_rate);
                     }
+                    break;
                 }
                 else if (i == 0) {
                     if (_forests[0]._lineages.size() > 1) {
@@ -495,11 +490,10 @@ inline vector<double> Particle::getVectorPrior() {
             if (_forests[0]._lineages.size() > 1) {
                 event_choice_rates.push_back(forest_rates[0]); // push back species tree rate
             }
-            for (int i=0; i<gene_forest_rates.size(); i++) {
-                for (auto &r:gene_forest_rates[i]) {
-                    assert (r > 0.0);
-                    event_choice_rates.push_back(r);
-                }
+            
+            for (auto &r:gene_forest_rates) {
+                assert (r > 0.0);
+                event_choice_rates.push_back(r); // TODO: can simplify and just put everything in event_choice_rates from the start
             }
             
             bool no_speciation = false;
@@ -537,20 +531,11 @@ inline vector<double> Particle::getVectorPrior() {
                         event_choice_rates.erase(event_choice_rates.begin() + 0);
                     }
                     
-//                    for (auto &p:event_choice_rates) { // TODO: don't think this is necessary
-//                         p = log(p/total_rate);
-//                     }
-                    
-                    double gene_total_rate = 0.0;
-                    for (auto &g:chosen_gene_forest_rates) {
-                        gene_total_rate += g;
+                    for (auto &p:event_choice_rates) {
+                        p = p/total_rate;
                     }
-                    for (auto &p:chosen_gene_forest_rates) {
-                         p = log(p/gene_total_rate);
-                     }
                     
-                    index = selectEvent(chosen_gene_forest_rates); // only choose species from rates from the chosen gene
-                    // TODO: could do this on the log scale
+                    index = selectEventLinearScale(event_choice_rates); // only choose species from rates from the chosen gene
 
                     forest_number = next_gene;
                     species_name = event_choice_name[index];
@@ -580,19 +565,6 @@ inline vector<double> Particle::getVectorPrior() {
                 increment = speciation_time;
                 assert (increment != -1.0);
                 no_speciation = false;
-                
-//#if defined (DRAW_NEW_THETA)
-//                if (_forests[0]._lineages.size() <= Forest::_nspecies) {
-//                    string name = boost::str(boost::format("node-%d")%_next_species_number);
-//                    _forests[1].updateThetaMap(_lot, name);
-//                }
-//                if (_forests.size() > 2) {
-//                    for (int i=2; i<_forests.size(); i++) {
-//                        _forests[i]._theta_map = _forests[1]._theta_map;
-//                    }
-//                }
-//#endif
-//                _next_species_number++;
             }
             
             // add increment to all nodes in all forests
@@ -1699,6 +1671,25 @@ inline vector<double> Particle::getVectorPrior() {
         unsigned index = 0;
         for (int i=0; i < (int) weight_vec.size(); i++) {
             cum_prob += exp(weight_vec[i]); // TODO: can leave weights on linear scale
+            if (u <= cum_prob) {
+                index = i;
+                break;
+            }
+        }
+        // return index of choice
+        return index;
+    }
+
+    inline int Particle::selectEventLinearScale(vector<double> weight_vec) {
+        // choose a random number [0,1]
+        double u =  _lot->uniform();
+        assert (u > 0.0);
+        assert (u < 1.0);
+        double cum_prob = 0.0;
+        unsigned index = 0;
+        for (int i=0; i < (int) weight_vec.size(); i++) {
+//            cum_prob += exp(weight_vec[i]); // TODO: can leave weights on linear scale
+            cum_prob += weight_vec[i];
             if (u <= cum_prob) {
                 index = i;
                 break;
