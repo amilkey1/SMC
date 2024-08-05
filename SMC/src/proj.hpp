@@ -67,8 +67,9 @@ namespace proj {
             void                initializeParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
             void                handleGeneNewicks();
             void                handleSpeciesNewick(vector<Particle> particles);
-            void                filterParticles(unsigned step, vector<Particle> & particles);
-            void                filterSpeciesParticles(unsigned step, vector<Particle> & particles);
+            double              filterParticles(unsigned step, vector<Particle> & particles);
+            double              filterSpeciesParticles(unsigned step, vector<Particle> & particles);
+            double              computeEffectiveSampleSize(const vector<double> & probs) const;
 
         private:
 
@@ -114,6 +115,7 @@ namespace proj {
             string                      _species_newick_name;
             bool                        _fix_theta_for_simulations;
             double                      _phi;
+            double                      _starting_log_likelihood;
     };
 
     inline Proj::Proj() {
@@ -1319,7 +1321,11 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                         cout << "   " << "ESS = " << ess << endl;
                     }
 
-                    filterSpeciesParticles(s, use_vec);
+                    ess = filterSpeciesParticles(s, use_vec);
+                    
+                    if (_verbose > 1) {
+                        cout << "   " << "ESS = " << ess << endl;
+                    }
 
                 } // s loop
 
@@ -1395,6 +1401,13 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
         }
     }
 
+    inline double Proj::computeEffectiveSampleSize(const vector<double> & probs) const {
+        double ss = 0.0;
+        for_each(probs.begin(), probs.end(), [&ss](double w){ss += w*w;});
+        double ess = 1.0/ss;
+        return ess;
+    }
+
     inline double Proj::getRunningSum(const vector<double> & log_weight_vec) const {
         double running_sum = 0.0;
         double log_particle_sum = 0.0;
@@ -1408,7 +1421,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
         return log_particle_sum;
     }
 
-    inline void Proj::filterParticles(unsigned step, vector<Particle> & particles) {
+    inline double Proj::filterParticles(unsigned step, vector<Particle> & particles) {
         unsigned nparticles = (unsigned) particles.size();
         // Copy log weights for all bundles to prob vector
         vector<double> probs(nparticles, 0.0);
@@ -1421,6 +1434,15 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
         double log_sum_weights = getRunningSum(probs);
         
         transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
+        
+        // Compute component of the log marginal likelihood due to this step
+        _log_marginal_likelihood += log_sum_weights - log(nparticles);
+        if (step == 0) {
+            _log_marginal_likelihood += _starting_log_likelihood;
+        }
+        
+        // Compute effective sample size
+        double ess = computeEffectiveSampleSize(probs);
 
         // Compute cumulative probabilities
         partial_sum(probs.begin(), probs.end(), probs.begin());
@@ -1483,9 +1505,10 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                 recipient++;
             }
         }
+        return ess;
     }
 
-    inline void Proj::filterSpeciesParticles(unsigned step, vector<Particle> & particles) {
+    inline double Proj::filterSpeciesParticles(unsigned step, vector<Particle> & particles) {
         unsigned nparticles = (unsigned) particles.size();
         // Copy log weights for all bundles to prob vector
         vector<double> probs(nparticles, 0.0);
@@ -1499,6 +1522,15 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
         
         transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
 
+//        // Compute component of the log marginal likelihood due to this step
+//        _species_log_marginal_likelihood += log_sum_weights - log(nparticles);
+//        if (step == 0) {
+//            _species_log_marginal_likelihood += 0; // TODO: not sure
+//        }
+        
+        // Compute effective sample size
+        double ess = computeEffectiveSampleSize(probs);
+        
         // Compute cumulative probabilities
         partial_sum(probs.begin(), probs.end(), probs.begin());
 
@@ -1560,6 +1592,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                 recipient++;
             }
         }
+        return ess;
     }
 
     inline string Proj::inventName(unsigned k, bool lower_case) {
@@ -1679,18 +1712,10 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 
                 proposeSpeciesParticles(use_vec);
 
+                double ess = filterSpeciesParticles(s, use_vec);
                 if (_verbose > 1) {
-                    double ess_inverse = 0.0;
-
-                    for (auto & p:use_vec) {
-                        ess_inverse += exp(2.0*p.getSpeciesLogWeight());
-                    }
-
-                    double ess = 1.0/ess_inverse;
                     cout << "   " << "ESS = " << ess << endl;
                 }
-
-                filterSpeciesParticles(s, use_vec);
             } // s loop
             
             if (_verbose > 0) {
@@ -2169,6 +2194,11 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                 // reset marginal likelihood
                 _log_marginal_likelihood = 0.0;
                 vector<double> starting_log_likelihoods = my_vec[0].calcGeneTreeLogLikelihoods(); // can't start at 0 because not every gene gets changed
+                
+                _starting_log_likelihood = 0.0;
+                for (auto &l:starting_log_likelihoods) {
+                    _starting_log_likelihood += l;
+                }
 
 #if defined (DRAW_NEW_THETA)
                 unsigned psuffix = 1;
@@ -2215,22 +2245,12 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 
                         unsigned num_species_particles_proposed = 0;
 
-                        double ess_inverse = 0.0;
                         if (_verbose > 1) {
                             for (auto &p:my_vec) {
                                 if (p.speciesJoinProposed()) {
                                     num_species_particles_proposed++;
                                 }
                             }
-                        }
-                        
-                        if (_verbose > 1) {
-                            for (auto & p:my_vec) {
-                                ess_inverse += exp(2.0*p.getLogWeight());
-                            }
-
-                            double ess = 1.0/ess_inverse;
-                                cout << "\t" << "ESS is : " << ess << endl;
                         }
 
                         bool filter = true;
@@ -2241,11 +2261,12 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                         
                         if (filter) {
                             
-                            filterParticles(g, my_vec);
+                            unsigned ess = filterParticles(g, my_vec);
 
                             unsigned species_count = 0;
                             
                             if (_verbose > 1) {
+                                cout << "\t" << "ESS is : " << ess << endl;
                                 for (auto &p:my_vec) {
                                     if (p.speciesJoinProposed()) {
                                         species_count++;
@@ -2476,14 +2497,9 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                             }
 
                             proposeSpeciesParticles(use_vec);
+                            
+                            double ess = filterSpeciesParticles(s, use_vec);
 
-                            double ess_inverse = 0.0;
-
-                            for (auto & p:use_vec) {
-                                ess_inverse += exp(2.0*p.getSpeciesLogWeight());
-                            }
-
-                            double ess = 1.0/ess_inverse;
                             if (_verbose > 1) {
                                 cout << "   " << "ESS = " << ess << endl;
                             }
