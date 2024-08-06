@@ -2243,16 +2243,16 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     if (Forest::_proposal == "prior-prior") {
                         if (gene_order[g] == 1) {
 //                        if (g == 30) {
-                            cout << "stop";
+//                            cout << "stop";
                         }
                         proposeParticles(my_vec);
                     }
 
-                    if (g == 30) {
-                        for (auto &p:my_vec) {
-                            p.showParticle();
-                        }
-                    }
+//                    if (g == 44) {
+//                        for (auto &p:my_vec) {
+//                            p.showParticle();
+//                        }
+//                    }
                     unsigned num_species_particles_proposed = 0;
 
                     if (_verbose > 1) {
