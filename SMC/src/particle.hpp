@@ -640,7 +640,7 @@ inline vector<double> Particle::getVectorPrior() {
                 double log_speciation_term = 0.0;
                 geneProposal(forest_number, increment, species_name);
                 double log_likelihood_term = _forests[forest_number]._log_weight;
-
+                
                 _log_weight = log_speciation_term + log_likelihood_term;
                 
                 if (_forests[1]._theta_mean == 0.0) {
@@ -1527,26 +1527,8 @@ inline vector<double> Particle::getVectorPrior() {
             if (f > 0) {
                 gene_tree = true;
             }
-
-#if defined (SIM_TEST)
-            if (_species_join_proposed) {
-                new_increment = false;
-            }
-#endif
-#if defined (SIM_TES3T)
-            if (_species_join_proposed) {
-                new_increment = false;
-            }
-            if (f == 0) {
-                new_increment = true;
-            }
-#endif
 //            new_increment = true;
             _forests[f].calcIncrementPrior(increment, species_name, new_increment, coalescence, gene_tree);
-            
-#if defined (SIM_TEST3)
-            _species_join_proposed = false;
-#endif
         }
     }
 

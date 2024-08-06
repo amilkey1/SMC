@@ -1986,6 +1986,7 @@ class Forest {
         auto it2 = std::next(nodes.begin(), t.second);
         subtree2 = *it2;
         assert (t.first < nodes.size());
+//        showForest();
         assert (t.second < nodes.size());
 #endif
 

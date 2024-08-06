@@ -1203,6 +1203,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
         }
 
+        srand(rng.uniform());
         random_shuffle(my_vec.begin(), my_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
         // delete first (1-_thin) % of particles
         my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (_nparticles-ngroups)));
@@ -1338,6 +1339,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                         sample_size = _particle_increase;
                     }
 
+                    srand(rng.uniform());
                     random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
                     // delete first (1-_thin) % of particles
                     use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
@@ -1441,8 +1443,11 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             _log_marginal_likelihood += _starting_log_likelihood;
         }
         
-        // Compute effective sample size
-        double ess = computeEffectiveSampleSize(probs);
+        double ess = 0.0;
+        if (_verbose > 1) {
+            // Compute effective sample size
+            ess = computeEffectiveSampleSize(probs);
+        }
 
         // Compute cumulative probabilities
         partial_sum(probs.begin(), probs.end(), probs.begin());
@@ -1528,8 +1533,11 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 //            _species_log_marginal_likelihood += 0; // TODO: not sure
 //        }
         
+        double ess = 0.0;
+        if (_verbose > 1) {
         // Compute effective sample size
-        double ess = computeEffectiveSampleSize(probs);
+            ess = computeEffectiveSampleSize(probs);
+        }
         
         // Compute cumulative probabilities
         partial_sum(probs.begin(), probs.end(), probs.begin());
@@ -1731,6 +1739,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     sample_size = _particle_increase;
                 }
 
+                srand(rng.uniform());
                 random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
                 // delete first (1-_thin) % of particles
                 use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
@@ -2153,20 +2162,19 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                 vector<unsigned> gene_order;
                 
                 unsigned count = 1;
-                vector<unsigned> randomize;
+                vector<pair<double, unsigned>> randomize;
                 for (unsigned l=0; l<list_size; l++) {
                     if (count == 1) {
                         randomize.clear();
                     }
-                    randomize.push_back(count);
+                    randomize.push_back(make_pair(rng.uniform(), count));
                     count++;
                     if (count > nsubsets) {
-                        random_shuffle(randomize.begin(), randomize.end()); // shuffle particles, random_shuffle will always shuffle in same order
+                        sort(randomize.begin(), randomize.end());
+//                        random_shuffle(randomize.begin(), randomize.end()); // shuffle gene order, random_shuffle will always shuffle in same order
                         for (auto &r:randomize) {
-                            gene_order.push_back(r);
+                            gene_order.push_back(r.second);
                         }
-                    }
-                    if (count > nsubsets) {
                         count = 1;
                     }
                 }
@@ -2176,16 +2184,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                 for (auto &p:my_vec) {
                     p.setGeneOrder(gene_order);
                 }
-                    
-#if defined (TESTING_UNEVEN_SITE_CORRECTION)
-                vector<unsigned> nsites;
-                for (unsigned i=0; i<nsubsets; i++) {
-                    nsites.push_back(_data->calcSeqLenInSubset(i));
-                }
-                for (auto &p:my_vec) {
-                    p->setNSites(nsites);
-                }
-#endif
                 
                 if (_species_newick_name != "null") {
                     handleSpeciesNewick(my_vec);
@@ -2216,69 +2214,81 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     p.drawTheta();
 #endif
                 }
+                
                 if (Forest::_save_memory) {
                     my_vec[0].clearPartials(); // all other particles should have no partials
                 }
                 
-//                    normalizeWeights(my_vec); // initialize marginal likelihood
+                //run through each generation of particles
 
-                    //run through each generation of particles
+                unsigned nsteps = (ntaxa-1)*nsubsets;
+            
+                for (unsigned g=0; g<nsteps; g++){
+                    if (_verbose > 0) {
+                        cout << "starting step " << g << " of " << nsteps-1 << endl;
+                    }
+                    // set particle random number seeds
+                    unsigned psuffix = 1;
+                    for (auto &p:my_vec) {
+                        p.setSeed(rng.randint(1,9999) + psuffix);
+                        psuffix += 2;
+                    }
 
-                    unsigned nsteps = (ntaxa-1)*nsubsets;
-                
-                    for (unsigned g=0; g<nsteps; g++){
-                        if (_verbose > 0) {
-                            cout << "starting step " << g << " of " << nsteps-1 << endl;
+                    //taxon joining and reweighting step
+                    
+//                    for (auto &p:my_vec) {
+//                        p.showParticle();
+//                    }
+                    
+                    if (Forest::_proposal == "prior-prior") {
+                        if (gene_order[g] == 1) {
+//                        if (g == 30) {
+                            cout << "stop";
                         }
-                        // set particle random number seeds
-                        unsigned psuffix = 1;
+                        proposeParticles(my_vec);
+                    }
+
+                    if (g == 30) {
                         for (auto &p:my_vec) {
-                            p.setSeed(rng.randint(1,9999) + psuffix);
-                            psuffix += 2;
+                            p.showParticle();
                         }
+                    }
+                    unsigned num_species_particles_proposed = 0;
 
-                        //taxon joining and reweighting step
+                    if (_verbose > 1) {
+                        for (auto &p:my_vec) {
+                            if (p.speciesJoinProposed()) {
+                                num_species_particles_proposed++;
+                            }
+                        }
+                    }
+
+                    bool filter = true;
+
+                    if (Forest::_run_on_empty) {
+                        filter = false;
+                    }
+                    
+                    if (filter) {
                         
-                        if (Forest::_proposal == "prior-prior") {
-                            proposeParticles(my_vec);
-                        }
+                        unsigned ess = filterParticles(g, my_vec);
 
-                        unsigned num_species_particles_proposed = 0;
-
+                        unsigned species_count = 0;
+                        
                         if (_verbose > 1) {
+                            cout << "\t" << "ESS is : " << ess << endl;
                             for (auto &p:my_vec) {
                                 if (p.speciesJoinProposed()) {
-                                    num_species_particles_proposed++;
+                                    species_count++;
                                 }
                             }
                         }
 
-                        bool filter = true;
-
-                        if (Forest::_run_on_empty) {
-                            filter = false;
+                        if (_verbose > 1) {
+                            cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
+                            cout << "\t" << "number of species join particles accepted = " << species_count << endl;
                         }
-                        
-                        if (filter) {
-                            
-                            unsigned ess = filterParticles(g, my_vec);
-
-                            unsigned species_count = 0;
-                            
-                            if (_verbose > 1) {
-                                cout << "\t" << "ESS is : " << ess << endl;
-                                for (auto &p:my_vec) {
-                                    if (p.speciesJoinProposed()) {
-                                        species_count++;
-                                    }
-                                }
-                            }
-
-                            if (_verbose > 1) {
-                                cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
-                                cout << "\t" << "number of species join particles accepted = " << species_count << endl;
-                            }
-                        }
+                    }
                 } // g loop
                 
                 if (_save_gene_trees) {
@@ -2385,6 +2395,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
                 }
 
+                srand(rng.uniform());
                 random_shuffle(my_vec.begin(), my_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
                 // delete first (1-_thin) % of particles
                 my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (_nparticles-ngroups)));
@@ -2515,6 +2526,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                                 sample_size = _particle_increase;
                             }
 
+                            srand(rng.uniform());
                             random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
                             // delete first (1-_thin) % of particles
                             use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
