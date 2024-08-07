@@ -459,31 +459,27 @@ inline vector<double> Particle::getVectorPrior() {
             vector<unsigned> event_choice_index;
             vector<string> event_choice_name;
                 
-            for (int i=0; i<_forests.size(); i++) {
-                if (i == next_gene) { // only do this for the chosen gene
-                    vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate(_lot);
-                    double total_gene_rate = 0.0;
-                    for (auto &r:rates_by_species) {
-                        gene_forest_rates.push_back(r.first);
-                        event_choice_name.push_back(r.second);
-                        total_gene_rate += r.first;
-                        event_choice_index.push_back(i);
-                    }
-                    if (total_gene_rate > 0.0) {
-                        forest_rates.push_back(total_gene_rate);
-                    }
-                    break;
-                }
-                else if (i == 0) {
-                    if (_forests[0]._lineages.size() > 1) {
-                        forest_rates.push_back(Forest::_lambda * _forests[0]._lineages.size());
-                        event_choice_index.push_back(0);
-                        event_choice_name.push_back("species");
-                    }
-                    else {
-                        _forests[0]._done = true;
-                    }
-                }
+            // push back species tree rate
+            if (_forests[0]._lineages.size() > 1) {
+                forest_rates.push_back(Forest::_lambda * _forests[0]._lineages.size());
+                event_choice_index.push_back(0);
+                event_choice_name.push_back("species");
+            }
+            else {
+                _forests[0]._done = true;
+            }
+            
+            // only do this for the chosen gene
+            vector<pair<double, string>> rates_by_species = _forests[next_gene].calcForestRate(_lot);
+            double total_gene_rate = 0.0;
+            for (auto &r:rates_by_species) {
+                gene_forest_rates.push_back(r.first);
+                event_choice_name.push_back(r.second);
+                total_gene_rate += r.first;
+                event_choice_index.push_back(next_gene);
+            }
+            if (total_gene_rate > 0.0) {
+                forest_rates.push_back(total_gene_rate);
             }
             
             vector<double> event_choice_rates;
