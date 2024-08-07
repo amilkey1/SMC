@@ -1479,7 +1479,6 @@ class Forest {
         
         while (!done) {
         
-    //        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
             assert (lot != nullptr);
             pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
             assert (t.first != t.second);
@@ -1973,11 +1972,6 @@ class Forest {
         assert (s > 1);
         bool one_choice = false;
 
-#if defined (PRIOR_POST_ON_GENES)
-        subtree1 = _nodes_joined.first;
-        subtree2 = _nodes_joined.second;
-
-#else
         // prior-prior proposal
         pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
         auto it1 = std::next(nodes.begin(), t.first);
@@ -1986,9 +1980,7 @@ class Forest {
         auto it2 = std::next(nodes.begin(), t.second);
         subtree2 = *it2;
         assert (t.first < nodes.size());
-//        showForest();
         assert (t.second < nodes.size());
-#endif
 
         assert (subtree1 != subtree2);
 
@@ -2010,23 +2002,23 @@ class Forest {
         subtree2->_parent=new_nd;
 
         if (!_run_on_empty) {
-                //always calculating partials now
-                assert (new_nd->_partial == nullptr);
-                new_nd->_partial=ps.getPartial(_npatterns*4);
-                assert(new_nd->_left_child->_right_sib);
+            //always calculating partials now
+            assert (new_nd->_partial == nullptr);
+            new_nd->_partial=ps.getPartial(_npatterns*4);
+            assert(new_nd->_left_child->_right_sib);
 
-                if (_save_memory) {
-                    for (auto &nd:_lineages) {
-                        if (nd->_partial == nullptr) {
-                            nd->_partial = ps.getPartial(_npatterns*4);
-                            calcPartialArray(nd);
-                        }
+            if (_save_memory) {
+                for (auto &nd:_lineages) {
+                    if (nd->_partial == nullptr) {
+                        nd->_partial = ps.getPartial(_npatterns*4);
+                        calcPartialArray(nd);
                     }
                 }
-                calcPartialArray(new_nd);
+            }
+            calcPartialArray(new_nd);
 
-                subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
-                subtree2->_partial=nullptr;
+            subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
+            subtree2->_partial=nullptr;
         }
 
             //update species list
