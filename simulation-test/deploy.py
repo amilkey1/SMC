@@ -8,25 +8,25 @@ method           = 'grid' # should be either 'uniform' or 'lognorm' or 'grid'
 ntax           = [2,2,2,2,2] # number of taxa in each species
 
 # These used only if method == 'uniform' or 'grid'
-T_low            = 0.0       # smallest tree height (T) value 
+T_low            = 0.0       # smallest tree height (T) value
 T_high           = 1.0       # largest tree height (T) value
 half_theta_low   = 0.0       # smallest theta/2 value
 half_theta_high  = 0.5       # largest theta/2 value
 
-# These used only if method == 'lornorm' 
+# These used only if method == 'lornorm'
 Tmean            = 1.0       # mean tree height (T)
 Tsd              = 0.7       # standard deviation of T
 Rmean            = 0.2       # mean ratio of theta to T
 Rsd              = 0.2       # standard deviation of theta/T ratios
 
-nloci          = 10          # number of loci (conditionally independent given species tree)
-seqlen         = 100       # number of sites in each gene
-nreps          = 4          # number of simulation replicates
-nparticles     = 2000       # number of particles to use for SMC
-simprogname    = 'smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
-smcprogname    = 'smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
+nloci          = 5          # number of loci (conditionally independent given species tree)
+seqlen         = 500       # number of sites in each gene
+nreps          = 4          # number of simulation replicates (must be square of an integer if grid is chosen)
+nparticles     = 10000       # number of particles to use for SMC
+simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
+smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
-paupprogname = 'paup4a168_osx'    #name of PAUP*
+paupprogname = 'paup4a168_ubuntu64'    #name of PAUP*
 smctreefname   = 'species_trees.trees' # name of species tree file for SMC
 beasttreefname = 'species.trees'           # name of species tree file for BEAST
 svdqtreefname = 'svd.tre'           # name of species tree file for BEAST
@@ -36,15 +36,15 @@ nodechoice     = 0          # 0-offset index into nodechoices
 #partition      = 'general'   # specifies partition to use for HPC: either 'general' or 'priority'
 #constraint     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
-rnseed         = 123579      # overall pseudorandom number seed for everything except setting sim conf file
-rnsimseed      = 123       # overall pseudorandom number seed for setting sim conf file
-mcmciter       = 5000      # chain length for Beast MCMC
-saveevery      = 1000         # MCMC storeevery modulus
-preburnin      = 0        # MCMC burn in
-storeevery     = 1000        # state storeevery modulus
-screenevery    = 1000        # screen print modulus
-genetreeevery  = 1000         # gene tree save modulus
-spptreeevery   = 1000          # species tree save modulus (mcmciter/spptreeevery should equal nparticles
+rnseed         = 12357     # overall pseudorandom number seed for everything except setting sim conf file
+rnsimseed      = 12357       # overall pseudorandom number seed for setting sim conf file
+mcmciter       = 5000000      # chain length for Beast MCMC
+saveevery      = 5000         # MCMC storeevery modulus
+preburnin      = 500000        # MCMC burn in
+storeevery     = 5000        # state storeevery modulus
+screenevery    = 5000        # screen print modulus
+genetreeevery  = 5000         # gene tree save modulus
+spptreeevery   = 5000         # species tree save modulus (mcmciter/spptreeevery should equal nparticles
 
 # Settings you can change but probably shouldn't
 maxsimult   = None        # maximum number of jobs to run simultaneously (set to None if there is no maximum)
@@ -288,6 +288,7 @@ def createSimConf(rep_index):
     s += '\n'
     s += 'nspecies = %d\n' % nspecies
     s += 'ntaxaperspecies ='
+#    s += 'fix_theta_for_simulations = true\n'
     for spp in range(nspecies):
         s += str(ntax[spp])
         if spp != nspecies-1:
@@ -315,7 +316,7 @@ def createSMCConf(rep_index):
         locus = g + 1
         s += 'subset = locus%d[nucleotide]:%d-%d\n' % (locus, cum + 1, cum + seqlen)
         cum += seqlen
-    s += 'theta  = %.2f\n' % theta
+#    s += 'theta  = %.2f\n' % theta
     s += 'lambda = %.2f\n' % lamda
     s += '\n'
     s += '\n'
@@ -328,9 +329,9 @@ def createSMCConf(rep_index):
     s += '\n'
     s += 'verbose = 1\n'
     s += 'run_on_empty = false\n'
-    s += 'particle_increase = 5\n'
-    s += 'thin=0.01\n'
-    s += 'save_every = 1\n'
+    s += 'particle_increase = 1000\n'
+    s += 'thin=0.05\n'
+    s += 'save_every = 500\n'
     s += 'save_gene_trees = false\n'
 
     smcconff = open(smcconffn, 'w')
@@ -1394,6 +1395,7 @@ def writeTimeFile():
 	s += "beast_average = sum(beast_time_list) / len(beast_time_list)\n"
 	s += "timef.write('beast average time: ' + str(beast_average))\n"
 	s += "print('beast average time: ' + str(beast_average))\n"
+	s += "\n"
 
 	timef = open(timefn, 'w')
 	timef.write(s)
@@ -1435,62 +1437,71 @@ def creatergl3DPLOT():
 	else:
 		assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
 	s += '\n'
-	s += 'rf <- read.table(file="rf-summary.txt", header=FALSE)\n'
-	s += 'df <- c("particle", "col1", "rf_smc", "col3", "col4", "rf_beast", "col6")\n'
-	s += 'colnames(rf) <- df\n'
-	
+	s += '#Set colors for plots\n'
+	s += 'bgcolor <- "cornsilk"\n'
+	s += 'planecolor <- "ghostwhite"\n'
+	s += 'surfcolor <- "red"\n'
+	s += '\n'
+	s += '#Set up values used for the x-axis and y-axis of the grid\n'
+	ncols = math.sqrt(nreps)
+	s += 'ncols <- %d\n' % ncols
+	s += 'nrows <- %d\n' % ncols
+	s += '\n'
 	s += 'T_vals <- seq(1/nrows, 1.0, 1/nrows)\n'
+	s += 'cat("T_vals:\\n")\n'
+	s += 'T_vals\n'
+	s += '\n'
 	s += 'theta_vals <- seq(1/ncols, 1.0, 1/ncols)\n'
+	s += 'cat("theta_vals:\\n")\n'
+	s += 'theta_vals\n'
+	s += '\n'
+	s += '#The rf-summary.txt and kf-summary.txt files are created by crunch.py\n'
+	s += '\n'
 	s += 'rf <- read.table(file="rf-summary.txt", header=FALSE)\n'
-	s += 'rfsmc <- expand.grid(T=T_vals, theta=theta_vals)\n'
-	s += 'rfsmc$rfsmc <- rf$rf_smc\n'
-	s += 'rfbeast <- expand.grid(T=T_vals, theta=theta_vals)\n'
-	s += 'rfbeast$rfbeast <- rf$rf_beast\n'
+	s += 'names(rf) <- c("replicate","smccount","smcmean","smcstdev","beastcount","beastmean","beaststdev")\n'
 	s += '\n'
 	s += 'theta_over_two <- theta/2\n'
 	s += '\n'
-	s += '#plot smc\n'
+	s += '#Plot SMC on top of zero delta RF plane, BEAST on bottom of plane\n'
+	s += '\n'
 	s += 'open3d()\n'
-	s += 'plot3d(x=theta_over_two, y=T, z=RF_smc, type="h", col="navy", size=1, lwd=1, xlab="theta/2", ylab="T", zlab="RF", box=FALSE, zlim = c(0,8))\n'
-	s += 'spheres3d(x=theta_over_two, y=T, z=RF_smc, radius=.05, col="navy")\n'
-	s += 'grd <- expand.grid(x=c(0, max(theta_over_two)), y=c(0,max(T)), z=0)\n'
-	s += '\n'
-	s += '# prediction surface\n'
-	s += 'material3d(color = "red")\n'
-	s += 'persp3d(x=unique(grd[[1]]), y=unique(grd[[2]]), z=matrix(grd[[3]],2,2), add=TRUE)\n'
-	s += '\n'
-	s += '# plot beast\n'
-	s += 'open3d()\n'
-	s += 'plot3d(x=theta_over_two, y=T, z=RF_beast, type="h", col="navy", size=1, lwd=1, xlab="theta/2", ylab="T", zlab="RF", box=FALSE, zlim = c(0,8))\n'
-	s += 'spheres3d(x=theta_over_two, y=T, z=RF_beast, radius=.05, col="navy")\n'
-	s += 'grd <- expand.grid(x=c(0, max(theta_over_two)), y=c(0,max(T)), z=0)\n'
-	s += '\n'
-	s += '# prediction surface\n'
-	s += 'material3d(color = "red")\n'
-	s += 'persp3d(x=unique(grd[[1]]), y=unique(grd[[2]]), z=matrix(grd[[3]],2,2), add=TRUE)\n'
-	s += '\n'
-	s += '# Replot SMC\n'
-	s += 'open3d(zoom = zoom, userMatrix = userMatrix, windowRect=windowRect)\n'
 	s += 'bg3d(color=bgcolor)\n'
-	s += 'light3d(theta=45)\n'
-	s += 'persp3d(x=T_vals, y=theta_vals, z=matrix(rf$rf_smc - rf$rf_beast,nrows,ncols), col=surfcolor, zlim=c(-8,8), xlab="T", ylab="theta", zlab="delta RF")\n'
+	s += 'persp3d(x=T_vals, y=theta_vals, z=matrix(rf$smcmean - rf$beastmean,nrows,ncols), col=surfcolor, zlim=c(-8,8), xlab="T", ylab="theta", zlab="delta RF")\n'
+	s += '\n'
+	s += '# add the plane itself\n'
 	s += 'grd <- expand.grid(x=c(0, max(T_vals)), y=c(0,max(theta_vals)), z=0)\n'
 	s += 'material3d(color = planecolor)\n'
 	s += 'persp3d(x=unique(grd[[1]]), y=unique(grd[[2]]), z=matrix(grd[[3]],2,2), col=planecolor,add=TRUE)\n'
 	s += '\n'
-	s += '# Save to file\n'
+	s += '## Save view parameters\n'
+	s += '#After adjusting the plot to look the way you want, execute this chunk to save the view parameters. These view settings will be used for plotting both SMC and BEAST.\n'
+	s += '# https://stackoverflow.com/questions/22257196/get-rgl-view-parameters\n'
+	s += 'zoom <- par3d()$zoom\n'
+	s += 'userMatrix <- par3d()$userMatrix\n'
+	s += 'windowRect <- par3d()$windowRect\n'
+	s += '\n'
+	s += '#replot SMC\n'
+	s += 'open3d(zoom = zoom, userMatrix = userMatrix, windowRect=windowRect)\n'
+	s += 'bg3d(color=bgcolor)\n'
+	s += 'light3d(theta=45)\n'
+	s += 'persp3d(x=T_vals, y=theta_vals, z=matrix(rf$smcmean - rf$beastmean,nrows,ncols), col=surfcolor, zlim=c(-8,8), xlab="T", ylab="theta", zlab="delta RF")\n'
+	s += 'grd <- expand.grid(x=c(0, max(T_vals)), y=c(0,max(theta_vals)), z=0)\n'
+	s += 'material3d(color = planecolor)\n'
+	s += 'persp3d(x=unique(grd[[1]]), y=unique(grd[[2]]), z=matrix(grd[[3]],2,2), col=planecolor,add=TRUE)\n'
+	s += '\n'
+	s += '#save to file\n'
 	s += 'rgl.snapshot("rfdiff-smc-on-top.png", fmt="png", top=TRUE)\n'
 	s += '\n'
-	s += '# Plot BEAST\n'
+	s += '#plot BEAST\n'
 	s += 'open3d(zoom = zoom, userMatrix = userMatrix, windowRect=windowRect)\n'
 	s += 'bg3d(color=bgcolor)\n'
 	s += 'light3d(theta=45)\n'
-	s += 'persp3d(x=T_vals, y=theta_vals, z=matrix(rf$rf_beast - rf$rf_smc,nrows,ncols), col=surfcolor, zlim=c(-8,8), xlab="T", ylab="theta", zlab="delta RF")\n'
+	s += 'persp3d(x=T_vals, y=theta_vals, z=matrix(rf$beastmean - rf$smcmean,nrows,ncols), col=surfcolor, zlim=c(-8,8), xlab="T", ylab="theta", zlab="delta RF")\n'
 	s += 'grd <- expand.grid(x=c(0, max(T_vals)), y=c(0,max(theta_vals)), z=0)\n'
 	s += 'material3d(color = planecolor)\n'
 	s += 'persp3d(x=unique(grd[[1]]), y=unique(grd[[2]]), z=matrix(grd[[3]],2,2), col=planecolor,add=TRUE)\n'
 	s += '\n'
-	s += '# Save to file\n'
+	s += '#save to file\n'
 	s += 'rgl.snapshot("rfdiff-beast-on-top.png", fmt="png", top=TRUE)\n'
 	plotf = open(plotfn, 'w')
 	plotf.write(s)
