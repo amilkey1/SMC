@@ -174,6 +174,7 @@ class Particle {
         vector<unsigned>                        _nsites_per_gene;
         bool                                    _fix_theta_sim; // for simulations only
         vector<unsigned>                        _gene_order;
+        bool                                    _sim;
 };
 
     inline Particle::Particle() {
@@ -232,6 +233,7 @@ class Particle {
         _nsites_per_gene.clear();
         _fix_theta_sim = false;
         _gene_order.clear();
+        _sim = false;
     }
 
     inline void Particle::showSpeciesTree() {
@@ -459,31 +461,27 @@ inline vector<double> Particle::getVectorPrior() {
             vector<unsigned> event_choice_index;
             vector<string> event_choice_name;
                 
-            for (int i=0; i<_forests.size(); i++) {
-                if (i == next_gene) { // only do this for the chosen gene
-                    vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate(_lot);
-                    double total_gene_rate = 0.0;
-                    for (auto &r:rates_by_species) {
-                        gene_forest_rates.push_back(r.first);
-                        event_choice_name.push_back(r.second);
-                        total_gene_rate += r.first;
-                        event_choice_index.push_back(i);
-                    }
-                    if (total_gene_rate > 0.0) {
-                        forest_rates.push_back(total_gene_rate);
-                    }
-                    break;
-                }
-                else if (i == 0) {
-                    if (_forests[0]._lineages.size() > 1) {
-                        forest_rates.push_back(Forest::_lambda * _forests[0]._lineages.size());
-                        event_choice_index.push_back(0);
-                        event_choice_name.push_back("species");
-                    }
-                    else {
-                        _forests[0]._done = true;
-                    }
-                }
+            // push back species tree rate
+            if (_forests[0]._lineages.size() > 1) {
+                forest_rates.push_back(Forest::_lambda * _forests[0]._lineages.size());
+                event_choice_index.push_back(0);
+                event_choice_name.push_back("species");
+            }
+            else {
+                _forests[0]._done = true;
+            }
+            
+            // push back chosen gene rate
+            vector<pair<double, string>> rates_by_species = _forests[next_gene].calcForestRate(_lot);
+            double total_gene_rate = 0.0;
+            for (auto &r:rates_by_species) {
+                gene_forest_rates.push_back(r.first);
+                event_choice_name.push_back(r.second);
+                total_gene_rate += r.first;
+                event_choice_index.push_back(next_gene);
+            }
+            if (total_gene_rate > 0.0) {
+                forest_rates.push_back(total_gene_rate);
             }
             
             vector<double> event_choice_rates;
@@ -581,6 +579,8 @@ inline vector<double> Particle::getVectorPrior() {
                 speciation = true;
             }
             
+#if !defined (HIERARCHICAL_FILTERING)
+
             bool first_step = true;
             if (_forests[0]._lineages.size() != Forest::_nspecies) {
                 first_step = false;
@@ -594,7 +594,7 @@ inline vector<double> Particle::getVectorPrior() {
                 }
             }
             
-#if !defined (HIERARCHICAL_FILTERING)
+//#if !defined (HIERARCHICAL_FILTERING)
             // only calculate increment priors if not doing another round of species filtering
             calculateIncrementPriors(increment, species_name, forest_number, speciation, first_step);
 #endif
@@ -653,11 +653,14 @@ inline vector<double> Particle::getVectorPrior() {
                 
                 // modifier only happens on first round
                 if (_generation == 0 && _forests[1]._theta_prior_mean > 0.0 && _forests[1]._theta_proposal_mean > 0.0) {
-                    double prior_rate = 1.0/_forests[1]._theta_prior_mean;
-                    double proposal_rate = 1.0/_forests[1]._theta_proposal_mean;
-                    double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
-                    
-                    _log_weight += log_weight_modifier;
+                    if (_forests[1]._theta_prior_mean != _forests[1]._theta_proposal_mean) {
+                        // else, log weight modifier is 0
+                        double prior_rate = 1.0/_forests[1]._theta_prior_mean;
+                        double proposal_rate = 1.0/_forests[1]._theta_proposal_mean;
+                        double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
+                        
+                        _log_weight += log_weight_modifier;
+                    }
                 }
                 
 #if defined (INV_GAMMA_PRIOR_TWO)
@@ -699,6 +702,7 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::simProposal() {
+        _sim = true;
         double inv_gamma_modifier = 0.0;
         
         _species_join_proposed = false;
@@ -1004,10 +1008,12 @@ inline vector<double> Particle::getVectorPrior() {
         }
         
         for (int i=1; i<_forests.size(); i++) {
-            if (_deep_coal) {
-                // number of deep coalescences is (n-1) where n is the total number of lineages in the joining species
-                string new_spp = get<2>(species_joined);
-                _num_deep_coalescences += _forests[i].getDeepCoal(species_joined);
+            if (_sim) { // don't need to keep track of deep coalescences if not simulated data
+                if (_deep_coal) {
+                    // number of deep coalescences is (n-1) where n is the total number of lineages in the joining species
+                    string new_spp = get<2>(species_joined);
+                    _num_deep_coalescences += _forests[i].getDeepCoal(species_joined);
+                }
             }
             _forests[i].updateSpeciesPartition(species_joined);
         }
@@ -1363,19 +1369,13 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::geneSimProposal(unsigned forest_number, double increment, string species_name) {
-//        unsigned forest_number2 = _gene_order[_generation];
-//        _forests[forest_number2].allowCoalescence(species_name, increment, _lot);
-
             _forests[forest_number].allowCoalescence(species_name, increment, _lot);
         _gene_increment = make_pair(forest_number, increment);
     }
 
     inline void Particle::geneProposal(unsigned forest_number, double increment, string species_name) {
-        unsigned forest_number2 = _gene_order[_generation];
-        _forests[forest_number2].allowCoalescence(species_name, increment, _lot);
-
-//        _forests[forest_number].allowCoalescence(species_name, increment, _lot);
-        _gene_increment = make_pair(forest_number2, increment);
+        _forests[forest_number].allowCoalescence(species_name, increment, _lot);
+        _gene_increment = make_pair(forest_number, increment);
     }
 
     inline void Particle::setNewTheta(bool fix_theta) {
@@ -1670,7 +1670,6 @@ inline vector<double> Particle::getVectorPrior() {
         double cum_prob = 0.0;
         unsigned index = 0;
         for (int i=0; i < (int) weight_vec.size(); i++) {
-//            cum_prob += exp(weight_vec[i]); // TODO: can leave weights on linear scale
             cum_prob += weight_vec[i];
             if (u <= cum_prob) {
                 index = i;
@@ -1814,6 +1813,7 @@ inline vector<double> Particle::getVectorPrior() {
         _nsites_per_gene = other._nsites_per_gene;
         _fix_theta_sim = other._fix_theta_sim;
         _gene_order = other._gene_order;
+        _sim = other._sim;
     };
 }
 

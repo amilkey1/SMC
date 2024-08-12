@@ -2157,7 +2157,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 
                 initializeParticles(my_vec); // initialize in parallel with multithreading
                 
-                // TODO: create gene_order vector
                 unsigned list_size = (ntaxa-1)*nsubsets;
                 vector<unsigned> gene_order;
                 
@@ -2171,7 +2170,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     count++;
                     if (count > nsubsets) {
                         sort(randomize.begin(), randomize.end());
-//                        random_shuffle(randomize.begin(), randomize.end()); // shuffle gene order, random_shuffle will always shuffle in same order
                         for (auto &r:randomize) {
                             gene_order.push_back(r.second);
                         }
@@ -2198,13 +2196,11 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     _starting_log_likelihood += l;
                 }
 
-#if defined (DRAW_NEW_THETA)
                 unsigned psuffix = 1;
                 for (auto &p:my_vec) {
                     p.setSeed(rng.randint(1,9999) + psuffix);
                     psuffix += 2;
                 }
-#endif
 
                 for (auto &p:my_vec) { // TODO: can parallelize this - is it worth it?
                     if (!Forest::_run_on_empty) {
@@ -2227,11 +2223,14 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     if (_verbose > 0) {
                         cout << "starting step " << g << " of " << nsteps-1 << endl;
                     }
-                    // set particle random number seeds
-                    unsigned psuffix = 1;
-                    for (auto &p:my_vec) {
-                        p.setSeed(rng.randint(1,9999) + psuffix);
-                        psuffix += 2;
+                    
+                    if (g > 0) {
+                        // set particle random number seeds
+                        unsigned psuffix = 1;
+                        for (auto &p:my_vec) {
+                            p.setSeed(rng.randint(1,9999) + psuffix);
+                            psuffix += 2;
+                        }
                     }
 
                     //taxon joining and reweighting step
