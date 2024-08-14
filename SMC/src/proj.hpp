@@ -1203,10 +1203,25 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
         }
 
+        
+        vector<unsigned> counts;
+        for (unsigned index=0; index<my_vec.size(); index++) {
+            counts.push_back(index);
+        }
+        
         srand(rng.uniform());
-        random_shuffle(my_vec.begin(), my_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
-        // delete first (1-_thin) % of particles
-        my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (_nparticles-ngroups)));
+        random_shuffle(counts.begin(), counts.end()); // shuffle particle numbers, random_shuffle will always shuffle in same order
+        counts.erase(next(counts.begin(), 0), next(counts.begin(), (ngroups))); // choose what to delete - erase (thin) % of particle numbers
+        sort (counts.begin(), counts.end(), greater<int>()); // sort highest to lowest for deletion of particles later
+        
+//                // delete particles corresponding to those numbers
+        for (unsigned c=0; c<counts.size(); c++) {
+            my_vec.erase(my_vec.begin() + counts[c]);
+        }
+//        srand(rng.uniform());
+//        random_shuffle(my_vec.begin(), my_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
+//        // delete first (1-_thin) % of particles
+//        my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (_nparticles-ngroups)));
         assert(my_vec.size() == ngroups);
 
         _nparticles = ngroups;
@@ -1339,10 +1354,26 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                         sample_size = _particle_increase;
                     }
 
+                    
+                    vector<unsigned> counts;
+                    for (unsigned index=0; index<my_vec.size(); index++) {
+                        counts.push_back(index);
+                    }
+                    
                     srand(rng.uniform());
-                    random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
-                    // delete first (1-_thin) % of particles
-                    use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
+                    random_shuffle(counts.begin(), counts.end()); // shuffle particle numbers, random_shuffle will always shuffle in same order
+                    counts.erase(next(counts.begin(), 0), next(counts.begin(), (ngroups))); // choose what to delete - erase (thin) % of particle numbers
+                    sort (counts.begin(), counts.end(), greater<int>()); // sort highest to lowest for deletion of particles later
+                    
+    //                // delete particles corresponding to those numbers
+                    for (unsigned c=0; c<counts.size(); c++) {
+                        use_vec.erase(use_vec.begin() + counts[c]);
+                    }
+                    
+//                    srand(rng.uniform());
+//                    random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
+//                    // delete first (1-_thin) % of particles
+//                    use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
                     assert (use_vec.size() == sample_size);
                 }
 
@@ -1738,11 +1769,26 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     cout << "\n";
                     sample_size = _particle_increase;
                 }
-
+                
+                vector<unsigned> counts;
+                for (unsigned index=0; index<use_vec.size(); index++) {
+                    counts.push_back(index);
+                }
+                
                 srand(rng.uniform());
-                random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
-                // delete first (1-_thin) % of particles
-                use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
+                random_shuffle(counts.begin(), counts.end()); // shuffle particle numbers, random_shuffle will always shuffle in same order
+                counts.erase(next(counts.begin(), 0), next(counts.begin(), (sample_size))); // choose what to delete - erase (thin) % of particle numbers
+                sort (counts.begin(), counts.end(), greater<int>()); // sort highest to lowest for deletion of particles later
+                
+//                // delete particles corresponding to those numbers
+                for (unsigned c=0; c<counts.size(); c++) {
+                    use_vec.erase(use_vec.begin() + counts[c]);
+                }
+
+//                srand(rng.uniform());
+//                random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
+//                // delete first (1-_thin) % of particles
+//                use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
                 assert (use_vec.size() == sample_size);
             }
 
@@ -2241,13 +2287,19 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     
                     if (Forest::_proposal == "prior-prior") {
                         if (gene_order[g] == 1) {
-//                        if (g == 30) {
-//                            cout << "stop";
+//                            if (g == 32) {
+//                                for (auto &p:my_vec) {
+//                                    p.showParticle();
+//                                }
+//                                my_vec[0].showParticle();
+//                                cout << "stop";
+//                            }
                         }
                         proposeParticles(my_vec);
                     }
 
 //                    if (g == 44) {
+//                    if (gene_order[g] == 1) {
 //                        for (auto &p:my_vec) {
 //                            p.showParticle();
 //                        }
@@ -2393,11 +2445,22 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     ngroups = 1;
                     cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
                 }
-
+                
+                vector<unsigned> counts;
+                for (unsigned index=0; index<my_vec.size(); index++) {
+                    counts.push_back(index);
+                }
+                
                 srand(rng.uniform());
-                random_shuffle(my_vec.begin(), my_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
-                // delete first (1-_thin) % of particles
-                my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (_nparticles-ngroups)));
+                random_shuffle(counts.begin(), counts.end()); // shuffle particle numbers, random_shuffle will always shuffle in same order
+                counts.erase(next(counts.begin(), 0), next(counts.begin(), (ngroups))); // choose what to delete - erase (thin) % of particle numbers
+                sort (counts.begin(), counts.end(), greater<int>()); // sort highest to lowest for deletion of particles later
+                
+//                // delete particles corresponding to those numbers
+                for (unsigned c=0; c<counts.size(); c++) {
+                    my_vec.erase(my_vec.begin() + counts[c]);
+                }
+                
                 assert(my_vec.size() == ngroups);
 
                 _nparticles = ngroups;
@@ -2525,11 +2588,28 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                                 sample_size = _particle_increase;
                             }
 
+                            vector<unsigned> counts;
+                            for (unsigned index=0; index<my_vec.size(); index++) {
+                                counts.push_back(index);
+                            }
+                            
                             srand(rng.uniform());
-                            random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
+                            random_shuffle(counts.begin(), counts.end()); // shuffle particle numbers, random_shuffle will always shuffle in same order
+                            counts.erase(next(counts.begin(), 0), next(counts.begin(), (ngroups))); // choose what to delete - erase (thin) % of particle numbers
+                            sort (counts.begin(), counts.end(), greater<int>()); // sort highest to lowest for deletion of particles later
+                            
+            //                // delete particles corresponding to those numbers
+                            for (unsigned c=0; c<counts.size(); c++) {
+                                use_vec.erase(my_vec.begin() + counts[c]);
+                            }
+                            
+                            assert (my_vec.size() == ngroups);
+                            
+//                            srand(rng.uniform());
+//                            random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
                             // delete first (1-_thin) % of particles
-                            use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
-                            assert (use_vec.size() == sample_size);
+//                            use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
+//                            assert (use_vec.size() == sample_size);
                         }
 
                         saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
