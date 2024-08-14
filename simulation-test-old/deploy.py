@@ -13,18 +13,16 @@ T_high           = 1.0       # largest tree height (T) value
 half_theta_low   = 0.0       # smallest theta/2 value
 half_theta_high  = 0.5       # largest theta/2 value
 
-# These used only if method == 'lognorm'
+# These used only if method == 'lornorm'
 Tmean            = 1.0       # mean tree height (T)
 Tsd              = 0.7       # standard deviation of T
 Rmean            = 0.2       # mean ratio of theta to T
 Rsd              = 0.2       # standard deviation of theta/T ratios
 
-nloci          = 8          # number of loci (conditionally independent given species tree)
-#seqlen         = 500       # number of sites in each gene
-seqlenbegin    = '1, 501, 601, 801, 1101, 1401, 1701, 1901' # for now, need to manually set this as well in the SMC and sim conf files
-seqlenend      =  '500, 600, 800, 1100, 1400, 1700, 1900, 2000'
-nreps          = 49          # number of simulation replicates (must be square of an integer if grid is chosen)
-nparticles     = 5000       # number of particles to use for SMC
+nloci          = 5          # number of loci (conditionally independent given species tree)
+seqlen         = 500       # number of sites in each gene
+nreps          = 4          # number of simulation replicates (must be square of an integer if grid is chosen)
+nparticles     = 10000       # number of particles to use for SMC
 simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
 beastprogname  = 'beast'     # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
@@ -40,13 +38,13 @@ nodechoice     = 0          # 0-offset index into nodechoices
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
 rnseed         = 12357     # overall pseudorandom number seed for everything except setting sim conf file
 rnsimseed      = 12357       # overall pseudorandom number seed for setting sim conf file
-mcmciter       = 10000000      # chain length for Beast MCMC
-saveevery      = 10000         # MCMC storeevery modulus
-preburnin      = 1000000        # MCMC burn in
-storeevery     = 10000        # state storeevery modulus
-screenevery    = 10000        # screen print modulus
-genetreeevery  = 10000         # gene tree save modulus
-spptreeevery   = 10000         # species tree save modulus (mcmciter/spptreeevery should equal nparticles
+mcmciter       = 5000000      # chain length for Beast MCMC
+saveevery      = 5000         # MCMC storeevery modulus
+preburnin      = 500000        # MCMC burn in
+storeevery     = 5000        # state storeevery modulus
+screenevery    = 5000        # screen print modulus
+genetreeevery  = 5000         # gene tree save modulus
+spptreeevery   = 5000         # species tree save modulus (mcmciter/spptreeevery should equal nparticles
 
 # Settings you can change but probably shouldn't
 maxsimult   = None        # maximum number of jobs to run simultaneously (set to None if there is no maximum)
@@ -280,17 +278,10 @@ def createSimConf(rep_index):
     s += 'seed    = %d\n' % rnsimseeds[rep_index]
     s += '\n'
     cum = 0
-    s += '\n'
-    s += 'subset = locus1[nucleotide]:1-500\n'
-    s += 'subset = locus2[nucleotide]:501-600\n'
-    s += 'subset = locus3[nucleotide]:601-800\n'
-    s += 'subset = locus4[nucleotide]:801-1100\n'
-    s += 'subset = locus5[nucleotide]:1101-1400\n'
-    s += '\n'
-#    for g in range(nloci):
-#        locus = g + 1
-#        s += 'subset = locus%d[nucleotide]:%d-%d\n' % (locus, cum + 1, cum + seqlen)
-#        cum += seqlen
+    for g in range(nloci):
+        locus = g + 1
+        s += 'subset = locus%d[nucleotide]:%d-%d\n' % (locus, cum + 1, cum + seqlen)
+        cum += seqlen
     s += '\n'
     s += 'theta  = %.2f\n' % theta
     s += 'lambda = %.2f\n' % lamda
@@ -320,17 +311,11 @@ def createSMCConf(rep_index):
     s += 'seed    = %d\n' % rnseeds[rep_index]
     s += '\n'
     s += '\n'
-    s += 'subset = locus1[nucleotide]:1-500\n'
-    s += 'subset = locus2[nucleotide]:501-600\n'
-    s += 'subset = locus3[nucleotide]:601-800\n'
-    s += 'subset = locus4[nucleotide]:801-1100\n'
-    s += 'subset = locus5[nucleotide]:1101-1400\n'
-    s += '\n'
     cum = 0
-#    for g in range(nloci):
-#        locus = g + 1
-#        s += 'subset = locus%d[nucleotide]:%d-%d\n' % (locus, cum + 1, cum + seqlen)
-#        cum += seqlen
+    for g in range(nloci):
+        locus = g + 1
+        s += 'subset = locus%d[nucleotide]:%d-%d\n' % (locus, cum + 1, cum + seqlen)
+        cum += seqlen
 #    s += 'theta  = %.2f\n' % theta
     s += 'lambda = %.2f\n' % lamda
     s += '\n'
@@ -345,7 +330,7 @@ def createSMCConf(rep_index):
     s += 'verbose = 1\n'
     s += 'run_on_empty = false\n'
     s += 'particle_increase = 1000\n'
-    s += 'thin=0.1\n'
+    s += 'thin=0.05\n'
     s += 'save_every = 500\n'
     s += 'save_gene_trees = false\n'
 
@@ -1049,12 +1034,8 @@ def createCopyDataPy():
     stuff = open(copydatafn, 'r').read()
     stuff, n = re.subn('__NLOCI__', '%d' % nloci, stuff, re.M | re.S)
     assert n == 1
-    #stuff, n = re.subn('__SEQLEN__', '%d' % seqlen, stuff, re.M | re.S)
-    #assert n == 1
-    stuff, n = re.subn('__SEQLENBEGIN__', '%s' % seqlenbegin, stuff, re.M | re.S)
-    #assert n == 1
-    stuff, n = re.subn('__SEQLENEND__', '%s' % seqlenend, stuff, re.M | re.S)
-    #assert n == 1
+    stuff, n = re.subn('__SEQLEN__', '%d' % seqlen, stuff, re.M | re.S)
+    assert n == 1
     copydataf = open(copydatafn, 'w')
     copydataf.write(stuff)
     copydataf.close()
@@ -1688,4 +1669,3 @@ if __name__ == '__main__':
     creatergl3DPLOT()
     createDissonanceFile()
     createSearchFile()
-

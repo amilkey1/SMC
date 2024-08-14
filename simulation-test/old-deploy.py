@@ -8,22 +8,20 @@ method           = 'grid' # should be either 'uniform' or 'lognorm' or 'grid'
 ntax           = [2,2,2,2,2] # number of taxa in each species
 
 # These used only if method == 'uniform' or 'grid'
-T_low            = 0.0       # smallest tree height (T) value
+T_low            = 0.0       # smallest tree height (T) value 
 T_high           = 1.0       # largest tree height (T) value
 half_theta_low   = 0.0       # smallest theta/2 value
 half_theta_high  = 0.5       # largest theta/2 value
 
-# These used only if method == 'lognorm'
+# These used only if method == 'lornorm' 
 Tmean            = 1.0       # mean tree height (T)
 Tsd              = 0.7       # standard deviation of T
 Rmean            = 0.2       # mean ratio of theta to T
 Rsd              = 0.2       # standard deviation of theta/T ratios
 
-nloci          = 8          # number of loci (conditionally independent given species tree)
-#seqlen         = 500       # number of sites in each gene
-seqlenbegin    = '1, 501, 601, 801, 1101, 1401, 1701, 1901' # for now, need to manually set this as well in the SMC and sim conf files
-seqlenend      =  '500, 600, 800, 1100, 1400, 1700, 1900, 2000'
-nreps          = 49          # number of simulation replicates (must be square of an integer if grid is chosen)
+nloci          = 10          # number of loci (conditionally independent given species tree)
+seqlen         = 100       # number of sites in each gene
+nreps          = 25          # number of simulation replicates (must be square of an integer if grid is chosen)
 nparticles     = 5000       # number of particles to use for SMC
 simprogname    = 'single-smc'    # name of program used to simulate data (expected to be in $HOME/bin on cluster)
 smcprogname    = 'single-smc'    # name of program used to perform SMC (expected to be in $HOME/bin on cluster)
@@ -39,14 +37,14 @@ nodechoice     = 0          # 0-offset index into nodechoices
 #constraint     = 'epyc128'   # specifies constraint to use for HPC: e.g. 'skylake', 'epyc128', etc.
 dirname        = 'g'         # name of directory created (script aborts if it already exists)
 rnseed         = 12357     # overall pseudorandom number seed for everything except setting sim conf file
-rnsimseed      = 12357       # overall pseudorandom number seed for setting sim conf file
+rnsimseed      = 1       # overall pseudorandom number seed for setting sim conf file
 mcmciter       = 10000000      # chain length for Beast MCMC
-saveevery      = 10000         # MCMC storeevery modulus
+saveevery      = 2000         # MCMC storeevery modulus
 preburnin      = 1000000        # MCMC burn in
-storeevery     = 10000        # state storeevery modulus
-screenevery    = 10000        # screen print modulus
-genetreeevery  = 10000         # gene tree save modulus
-spptreeevery   = 10000         # species tree save modulus (mcmciter/spptreeevery should equal nparticles
+storeevery     = 2000        # state storeevery modulus
+screenevery    = 2000        # screen print modulus
+genetreeevery  = 2000         # gene tree save modulus
+spptreeevery   = 2000         # species tree save modulus (mcmciter/spptreeevery should equal nparticles
 
 # Settings you can change but probably shouldn't
 maxsimult   = None        # maximum number of jobs to run simultaneously (set to None if there is no maximum)
@@ -280,24 +278,16 @@ def createSimConf(rep_index):
     s += 'seed    = %d\n' % rnsimseeds[rep_index]
     s += '\n'
     cum = 0
-    s += '\n'
-    s += 'subset = locus1[nucleotide]:1-500\n'
-    s += 'subset = locus2[nucleotide]:501-600\n'
-    s += 'subset = locus3[nucleotide]:601-800\n'
-    s += 'subset = locus4[nucleotide]:801-1100\n'
-    s += 'subset = locus5[nucleotide]:1101-1400\n'
-    s += '\n'
-#    for g in range(nloci):
-#        locus = g + 1
-#        s += 'subset = locus%d[nucleotide]:%d-%d\n' % (locus, cum + 1, cum + seqlen)
-#        cum += seqlen
+    for g in range(nloci):
+        locus = g + 1
+        s += 'subset = locus%d[nucleotide]:%d-%d\n' % (locus, cum + 1, cum + seqlen)
+        cum += seqlen
     s += '\n'
     s += 'theta  = %.2f\n' % theta
     s += 'lambda = %.2f\n' % lamda
     s += '\n'
     s += 'nspecies = %d\n' % nspecies
     s += 'ntaxaperspecies ='
-#    s += 'fix_theta_for_simulations = true\n'
     for spp in range(nspecies):
         s += str(ntax[spp])
         if spp != nspecies-1:
@@ -320,18 +310,12 @@ def createSMCConf(rep_index):
     s += 'seed    = %d\n' % rnseeds[rep_index]
     s += '\n'
     s += '\n'
-    s += 'subset = locus1[nucleotide]:1-500\n'
-    s += 'subset = locus2[nucleotide]:501-600\n'
-    s += 'subset = locus3[nucleotide]:601-800\n'
-    s += 'subset = locus4[nucleotide]:801-1100\n'
-    s += 'subset = locus5[nucleotide]:1101-1400\n'
-    s += '\n'
     cum = 0
-#    for g in range(nloci):
-#        locus = g + 1
-#        s += 'subset = locus%d[nucleotide]:%d-%d\n' % (locus, cum + 1, cum + seqlen)
-#        cum += seqlen
-#    s += 'theta  = %.2f\n' % theta
+    for g in range(nloci):
+        locus = g + 1
+        s += 'subset = locus%d[nucleotide]:%d-%d\n' % (locus, cum + 1, cum + seqlen)
+        cum += seqlen
+    s += 'theta  = %.2f\n' % theta
     s += 'lambda = %.2f\n' % lamda
     s += '\n'
     s += '\n'
@@ -344,9 +328,9 @@ def createSMCConf(rep_index):
     s += '\n'
     s += 'verbose = 1\n'
     s += 'run_on_empty = false\n'
-    s += 'particle_increase = 1000\n'
+    s += 'particle_increase = 500\n'
     s += 'thin=0.1\n'
-    s += 'save_every = 500\n'
+    s += 'save_every = 50\n'
     s += 'save_gene_trees = false\n'
 
     smcconff = open(smcconffn, 'w')
@@ -756,23 +740,6 @@ def createREADME():
     readme += '	python3 plotdistances.py\n'
     readme += '\n'
     
-    readme += 'running galax to assess dissonance\n'
-    readme += '-----------------------------------------\n'
-    readme += 'galax will assess dissonance on two independent runs.\n'
-    readme += 'Run two simulations, keeping the simulation seed the same and modifying the run seed.\n'
-    readme += 'Move both simulation directories to the same folder and rename them g1 and g2.\n'
-    readme += 'Make a new directory for galax output:\n'
-    readme += '	mkdir galax\n'
-    readme += '	cd galax\n'
-    readme += 'Move the following scripts from either g1 or g2 into galax:\n'
-    readme += '	mv ../g1/create-galax-script.py . \n'
-    readme += '	mv ../g1/search.py . \n'
-    readme += 'Run the following scripts to run galax and summarize the dissonance output:\n'
-    readme += '	python3 create-galax-script.py\n'
-    readme += '	python3 search.py\n'
-    readme += 'View the individual output in smcout* and beastout* files or the summary output in dissonance-summary.txt.\n'
-    readme += '\n'
-    
     readmef = open(readmefn, 'w')
     readmef.write(readme)
     readmef.close()
@@ -1049,12 +1016,8 @@ def createCopyDataPy():
     stuff = open(copydatafn, 'r').read()
     stuff, n = re.subn('__NLOCI__', '%d' % nloci, stuff, re.M | re.S)
     assert n == 1
-    #stuff, n = re.subn('__SEQLEN__', '%d' % seqlen, stuff, re.M | re.S)
-    #assert n == 1
-    stuff, n = re.subn('__SEQLENBEGIN__', '%s' % seqlenbegin, stuff, re.M | re.S)
-    #assert n == 1
-    stuff, n = re.subn('__SEQLENEND__', '%s' % seqlenend, stuff, re.M | re.S)
-    #assert n == 1
+    stuff, n = re.subn('__SEQLEN__', '%d' % seqlen, stuff, re.M | re.S)
+    assert n == 1
     copydataf = open(copydatafn, 'w')
     copydataf.write(stuff)
     copydataf.close()
@@ -1081,86 +1044,6 @@ def createANOVAPy():
     anovaf = open(anovafn, 'w')
     anovaf.write(stuff)
     anovaf.close()
-    
-def createSearchFile():
-	searchfn = os.path.join(dirname, 'search.py')
-	current_nreps = int(nreps) + 1
-	s = ""
-	s += '# string to search in file\n'
-	s += 'outfname = "dissonance-summary.txt"\n'
-	s += 'f = open(outfname, "x")\n'
-	s += 'smc_dissonance = []\n'
-	s += 'beast_dissonance = []\n'
-	s += '\n'
-	s += 'word = "  merged   "\n'
-	s += '\n'
-	s += 'for i in range(1, %d):\n' % current_nreps
-	s += '	filename = "smcout" + str(i) + ".txt"\n'
-	s += '	with open(filename, 'r') as fp:\n'
-	s += '	# read all lines in a list\n'
-	s += '		lines = fp.readlines()\n'
-	s += '		for line in lines:\n'
-	s += '		# check if string present on a current line\n'
-	s += '		if line.find(word) != -1:\n'
-	s += '			smc_dissonance.append(line[122:130])\n'
-	s += '\n'
-	s += '	filename = "beastout" + str(i) + ".txt"\n'
-	s += '	with open(filename, "r") as fp:\n'
-	s += '		# read all lines in a list\n'
-	s += '		lines = fp.readlines()\n'
-	s += '		for line in lines:\n'
-	s += '			# check if string present on a current line\n'
-	s += '			if line.find(word) != -1:\n'
-	s += '				beast_dissonance.append(line[114:121])\n'
-	s += '\n'
-	s += 'print("%12s %12s %12s" % ("rep", "  SMC dissonance ", " BEAST dissonance"))\n'
-	s += 'for rep in range(%d):\n' % nreps
-	s += '	print("%12d %12.5f %12.5f" % (rep+1, float(smc_dissonance[rep]), float(beast_dissonance[rep])))\n'
-	s += '	f.write("%12d %12.5f %12.5f" % (rep+1, float(smc_dissonance[rep]), float(beast_dissonance[rep])))\n'
-	s += '	f.close\n'
-	s += '	print(" ")\n'
-	searchf = open(searchfn, "w")
-	searchf.write(s)
-	searchf.close()
-    
-def createDissonanceFile():
-	dissonancefn = os.path.join(dirname, 'create-galax-script.py')
-	current_nreps = int(nreps) + 1
-	s = ''
-	s += '# create file comparisons\n'
-	s += 'for i in range(1, %d):\n' % current_nreps
-	s += '	filename = "smcfile" + str(i) + ".txt"\n'
-	s += '	f = open(filename, "x")\n'
-	s += '	to_write = ("../g1/rep%d/smc/alt_species_trees.trees\\n") % i\n'
-	s += '	f.write(to_write)\n'
-	s += '	to_write = ("../g2/rep%d/smc/alt_species_trees.trees\\n") % i\n'
-	s += '	f.write(to_write)\n'
-	s += '	f.close()\n'
-	s += '\n'
-	s += '	filename = "beastfile" + str(i) + ".txt"\n'
-	s += '	f = open(filename, "x")\n'
-	s += '	to_write = ("../g1/rep%d/beast/species.trees\\n") % i\n'
-	s += '	f.write(to_write)\n'
-	s += '	to_write = ("../g2/rep%d/beast/species.trees\\n") % i\n'
-	s += '	f.write(to_write)\n'
-	s += '	f.close()\n'
-	s += '\n'
-	s += '# make galax file\n'
-	s += 'filename2 = "rungalax.sh"\n'
-	s += 'f = open(filename2, "x")\n'
-	s += 'for i in range(1, %d):\n' % current_nreps
-	s += '	fname = "smcfile" + str(i) + ".txt"\n'
-	s += '	outfname = "smcout" + str(i)\n'
-	s += '	to_write = "galax --listfile " + fname + " --rooted --outfile " + outfname + "\\n"\n'
-	s += '	f.write(to_write)\n'
-	s += '\n'
-	s += '	fname = "beastfile" + str(i) + ".txt"\n'
-	s += '	outfname = "beastout" + str(i)\n'
-	s += '	to_write = "galax --listfile " + fname + " --skip 1 --rooted --outfile " + outfname + "\\n"\n'
-	s += '	f.write(to_write)\n'
-	dissonancef = open(dissonancefn, "w")
-	dissonancef.write(s)
-	dissonancef.close()
 
 def createCrunch():
     # see https://blog.ronin.cloud/slurm-job-arrays/
@@ -1414,7 +1297,6 @@ def writeTimeFile():
 	s += "beast_average = sum(beast_time_list) / len(beast_time_list)\n"
 	s += "timef.write('beast average time: ' + str(beast_average))\n"
 	s += "print('beast average time: ' + str(beast_average))\n"
-	s += "\n"
 
 	timef = open(timefn, 'w')
 	timef.write(s)
@@ -1456,72 +1338,35 @@ def creatergl3DPLOT():
 	else:
 		assert False, 'method should be either "lognorm" or "uniform" but you specified "%s"' % method
 	s += '\n'
-	s += '#Set colors for plots\n'
-	s += 'bgcolor <- "cornsilk"\n'
-	s += 'planecolor <- "ghostwhite"\n'
-	s += 'surfcolor <- "red"\n'
+	s += 'rf <- read.table(file="rf-summary.txt")\n'
+	s += 'RF_smc <- rf$V3\n'
+	s += 'RF_beast <- rf$V6\n'
 	s += '\n'
-	s += '#Set up values used for the x-axis and y-axis of the grid\n'
-	ncols = math.sqrt(nreps)
-	s += 'ncols <- %d\n' % ncols
-	s += 'nrows <- %d\n' % ncols
-	s += '\n'
-	s += 'T_vals <- seq(1/nrows, 1.0, 1/nrows)\n'
-	s += 'cat("T_vals:\\n")\n'
-	s += 'T_vals\n'
-	s += '\n'
-	s += 'theta_vals <- seq(1/ncols, 1.0, 1/ncols)\n'
-	s += 'cat("theta_vals:\\n")\n'
-	s += 'theta_vals\n'
-	s += '\n'
-	s += '#The rf-summary.txt and kf-summary.txt files are created by crunch.py\n'
-	s += '\n'
-	s += 'rf <- read.table(file="rf-summary.txt", header=FALSE)\n'
-	s += 'names(rf) <- c("replicate","smccount","smcmean","smcstdev","beastcount","beastmean","beaststdev")\n'
+	s += 'kf <- read.table(file="kf-summary.txt")\n'
+	s += 'KF_smc <- kf$V3\n'
+	s += 'KF_beast <- kf$V6\n'
 	s += '\n'
 	s += 'theta_over_two <- theta/2\n'
 	s += '\n'
-	s += '#Plot SMC on top of zero delta RF plane, BEAST on bottom of plane\n'
-	s += '\n'
+	s += '#plot smc\n'
 	s += 'open3d()\n'
-	s += 'bg3d(color=bgcolor)\n'
-	s += 'persp3d(x=T_vals, y=theta_vals, z=matrix(rf$smcmean - rf$beastmean,nrows,ncols), col=surfcolor, zlim=c(-8,8), xlab="T", ylab="theta", zlab="delta RF")\n'
+	s += 'plot3d(x=theta_over_two, y=T, z=RF_smc, type="h", col="navy", size=1, lwd=1, xlab="theta/2", ylab="T", zlab="RF", box=FALSE, zlim = c(0,8))\n'
+	s += 'spheres3d(x=theta_over_two, y=T, z=RF_smc, radius=.05, col="navy")\n'
+	s += 'grd <- expand.grid(x=c(0, max(theta_over_two)), y=c(0,max(T)), z=0)\n'
 	s += '\n'
-	s += '# add the plane itself\n'
-	s += 'grd <- expand.grid(x=c(0, max(T_vals)), y=c(0,max(theta_vals)), z=0)\n'
-	s += 'material3d(color = planecolor)\n'
-	s += 'persp3d(x=unique(grd[[1]]), y=unique(grd[[2]]), z=matrix(grd[[3]],2,2), col=planecolor,add=TRUE)\n'
+	s += '# prediction surface\n'
+	s += 'material3d(color = "red")\n'
+	s += 'persp3d(x=unique(grd[[1]]), y=unique(grd[[2]]), z=matrix(grd[[3]],2,2), add=TRUE)\n'
 	s += '\n'
-	s += '## Save view parameters\n'
-	s += '#After adjusting the plot to look the way you want, execute this chunk to save the view parameters. These view settings will be used for plotting both SMC and BEAST.\n'
-	s += '# https://stackoverflow.com/questions/22257196/get-rgl-view-parameters\n'
-	s += 'zoom <- par3d()$zoom\n'
-	s += 'userMatrix <- par3d()$userMatrix\n'
-	s += 'windowRect <- par3d()$windowRect\n'
+	s += '# plot beast\n'
+	s += 'open3d()\n'
+	s += 'plot3d(x=theta_over_two, y=T, z=RF_beast, type="h", col="navy", size=1, lwd=1, xlab="theta/2", ylab="T", zlab="RF", box=FALSE, zlim = c(0,8))\n'
+	s += 'spheres3d(x=theta_over_two, y=T, z=RF_beast, radius=.05, col="navy")\n'
+	s += 'grd <- expand.grid(x=c(0, max(theta_over_two)), y=c(0,max(T)), z=0)\n'
 	s += '\n'
-	s += '#replot SMC\n'
-	s += 'open3d(zoom = zoom, userMatrix = userMatrix, windowRect=windowRect)\n'
-	s += 'bg3d(color=bgcolor)\n'
-	s += 'light3d(theta=45)\n'
-	s += 'persp3d(x=T_vals, y=theta_vals, z=matrix(rf$smcmean - rf$beastmean,nrows,ncols), col=surfcolor, zlim=c(-8,8), xlab="T", ylab="theta", zlab="delta RF")\n'
-	s += 'grd <- expand.grid(x=c(0, max(T_vals)), y=c(0,max(theta_vals)), z=0)\n'
-	s += 'material3d(color = planecolor)\n'
-	s += 'persp3d(x=unique(grd[[1]]), y=unique(grd[[2]]), z=matrix(grd[[3]],2,2), col=planecolor,add=TRUE)\n'
-	s += '\n'
-	s += '#save to file\n'
-	s += 'rgl.snapshot("rfdiff-smc-on-top.png", fmt="png", top=TRUE)\n'
-	s += '\n'
-	s += '#plot BEAST\n'
-	s += 'open3d(zoom = zoom, userMatrix = userMatrix, windowRect=windowRect)\n'
-	s += 'bg3d(color=bgcolor)\n'
-	s += 'light3d(theta=45)\n'
-	s += 'persp3d(x=T_vals, y=theta_vals, z=matrix(rf$beastmean - rf$smcmean,nrows,ncols), col=surfcolor, zlim=c(-8,8), xlab="T", ylab="theta", zlab="delta RF")\n'
-	s += 'grd <- expand.grid(x=c(0, max(T_vals)), y=c(0,max(theta_vals)), z=0)\n'
-	s += 'material3d(color = planecolor)\n'
-	s += 'persp3d(x=unique(grd[[1]]), y=unique(grd[[2]]), z=matrix(grd[[3]],2,2), col=planecolor,add=TRUE)\n'
-	s += '\n'
-	s += '#save to file\n'
-	s += 'rgl.snapshot("rfdiff-beast-on-top.png", fmt="png", top=TRUE)\n'
+	s += '# prediction surface\n'
+	s += 'material3d(color = "red")\n'
+	s += 'persp3d(x=unique(grd[[1]]), y=unique(grd[[2]]), z=matrix(grd[[3]],2,2), add=TRUE)\n'
 	plotf = open(plotfn, 'w')
 	plotf.write(s)
 	plotf.close()
@@ -1686,6 +1531,3 @@ if __name__ == '__main__':
     writeThetaFile()
     create3DRPlot()
     creatergl3DPLOT()
-    createDissonanceFile()
-    createSearchFile()
-

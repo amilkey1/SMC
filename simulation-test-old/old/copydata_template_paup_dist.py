@@ -1,9 +1,7 @@
 import glob, os, re
 
 nloci = __NLOCI__
-#seqlen = __SEQLEN__
-seqlen_begin = __SEQLENBEGIN__
-seqlen_end = __SEQLENEND__
+seqlen = __SEQLEN__
 
 def readNexusFile(fn):
     '''
@@ -107,14 +105,11 @@ for dirname in glob.glob('rep*'):
             assert m is not None
             taxon_name = m.group(1)
             species_name = m.group(2)
-            seq_begin = seqlen_begin[g]
-            seq_end = seqlen_end[g]
-            #seq_begin = g*seqlen
-            #seq_end = seq_begin + seqlen
+            seq_begin = g*seqlen
+            seq_end = seq_begin + seqlen
             seq = sequences[t][seq_begin:seq_end]
             stuff, n = re.subn(r'__SEQ_%d_%s[\^]%s__' % (g+1, taxon_name, species_name), seq, stuff, re.M | re.S)
             assert n == 1, 'expecting 1 substitution but found %d for replicate %s, taxon %s, gene %d, template string "%s"' % (n, dirname, t, g+1, '__SEQ_%d_%s__' % (g+1, t))
     xmlf = open(xmlfn, 'w')
     xmlf.write(stuff)
     xmlf.close()
-
