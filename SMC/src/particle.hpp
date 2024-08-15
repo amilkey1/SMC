@@ -455,10 +455,6 @@ inline vector<double> Particle::getVectorPrior() {
 
             bool speciation = false;
 
-            // TODO: only consider rates for just the next gene, or all genes?
-            // TODO: going bavk to tal rate for now
-
-
             vector<double> forest_rates; // this vector contains total rate of species tree and chosen gene
             vector<double> gene_forest_rates; // this vector contains rates by species for the chosen gene
             vector<unsigned> event_choice_index;

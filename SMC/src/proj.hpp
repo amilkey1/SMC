@@ -2274,7 +2274,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 //                        p.showParticle();
 //                    }
                     
-                    if (Forest::_proposal == "prior-prior") {
+//                    if (Forest::_proposal == "prior-prior") {
                         if (gene_order[g] == 1) {
 //                            if (g == 32) {
 //                                for (auto &p:my_vec) {
@@ -2285,7 +2285,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 //                            }
                         }
                         proposeParticles(my_vec);
-                    }
+//                    }
 
 //                    if (g == 44) {
 //                    if (gene_order[g] == 1) {
