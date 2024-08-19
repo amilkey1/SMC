@@ -2269,30 +2269,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     }
 
                     //taxon joining and reweighting step
-                    
-//                    for (auto &p:my_vec) {
-//                        p.showParticle();
-//                    }
-                    
-//                    if (Forest::_proposal == "prior-prior") {
-                        if (gene_order[g] == 1) {
-//                            if (g == 32) {
-//                                for (auto &p:my_vec) {
-//                                    p.showParticle();
-//                                }
-//                                my_vec[0].showParticle();
-//                                cout << "stop";
-//                            }
-                        }
-                        proposeParticles(my_vec);
-//                    }
-
-//                    if (g == 44) {
-//                    if (gene_order[g] == 1) {
-//                        for (auto &p:my_vec) {
-//                            p.showParticle();
-//                        }
-//                    }
+                    proposeParticles(my_vec);
                     unsigned num_species_particles_proposed = 0;
 
                     if (_verbose > 1) {

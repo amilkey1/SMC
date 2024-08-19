@@ -167,7 +167,6 @@ class Forest {
         string                      _ancestral_species_name;
         vector<double>              _vector_prior;
         double                      _theta_mean;
-        pair<Node*, Node*>          _nodes_joined;
         vector<pair<Node*, Node*>>  _node_choices;
         vector<double>              _log_likelihood_choices;
     
@@ -1269,7 +1268,6 @@ class Forest {
         _taxon_map = other._taxon_map;
         _species_indices = other._species_indices;
         _vector_prior = other._vector_prior;
-        _nodes_joined = other._nodes_joined;
         _node_choices = other._node_choices;
         _log_likelihood_choices = other._log_likelihood_choices;
 
@@ -1909,7 +1907,8 @@ class Forest {
 
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment, string species, Lot::SharedPtr lot) {
         double prev_log_likelihood = _gene_tree_log_likelihood;
-         _node_choices.clear();
+//         _node_choices.clear();
+        assert (_node_choices.size() == 0);
          _log_likelihood_choices.clear();
          _log_weight = 0.0;
         
@@ -1962,119 +1961,9 @@ class Forest {
              _nodes.pop_back();
          }
         
+        _node_choices.clear();
          return make_pair(subtree1, subtree2);
      }
-
-    inline double Forest::tryCoalescence(string species_name, Lot::SharedPtr lot) {
-        // this function joins two random taxa in the specified species lineage, calculates a gene weight, and then unjoins them
-        double prev_log_likelihood = _gene_tree_log_likelihood;
-            
-        Node *subtree1 = nullptr;
-        Node *subtree2 = nullptr;
-        list<Node*> nodes;
-        
-        for (auto &s:_species_partition) {
-            if (s.first == species_name) {
-                nodes = s.second;
-                break;
-            }
-        }
-        
-        unsigned s = (unsigned) nodes.size();
-        
-        assert (s > 1);
-
-        // prior-prior proposal
-        pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
-        auto it1 = std::next(nodes.begin(), t.first);
-        subtree1 = *it1;
-
-        auto it2 = std::next(nodes.begin(), t.second);
-        subtree2 = *it2;
-        assert (t.first < nodes.size());
-        assert (t.second < nodes.size());
-    
-        assert (subtree1 != subtree2);
-            
-            //new node is always needed
-            Node nd;
-            _nodes.push_back(nd);
-            Node* new_nd = &_nodes.back();
-
-            new_nd->_parent=0;
-            new_nd->_number=_nleaves+_ninternals;
-            new_nd->_edge_length=0.0;
-//            _ninternals++;
-            new_nd->_right_sib=0;
-
-            new_nd->_left_child=subtree1;
-            subtree1->_right_sib=subtree2;
-
-            subtree1->_parent=new_nd;
-            subtree2->_parent=new_nd;
-        
-        _nodes_joined = make_pair(subtree1, subtree2);
-
-        if (!_run_on_empty) {
-                //always calculating partials now
-                assert (new_nd->_partial == nullptr);
-                new_nd->_partial=ps.getPartial(_npatterns*4);
-                assert(new_nd->_left_child->_right_sib);
-                
-                if (_save_memory) {
-                    for (auto &nd:_lineages) {
-                        if (nd->_partial == nullptr) {
-                            nd->_partial = ps.getPartial(_npatterns*4);
-                            calcPartialArray(nd);
-                        }
-                    }
-                }
-                calcPartialArray(new_nd);
-        }
-
-        // do not update the species list because it will not affect the likelihood
-        // just update the _lineages vector
-        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-            
-        _gene_tree_log_likelihood = calcLogLikelihood();
-        double log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
-        
-        // reset log likelihood
-        _gene_tree_log_likelihood = prev_log_likelihood;
-        
-//        new_nd->_left_child->_right_sib = nullptr;
-//        showForest();
-//
-        // undo join
-        revertNodeVector(_lineages, subtree1, subtree2, new_nd);
-        
-        // reset new node partial?
-        new_nd->_partial = 0;
-        subtree1->_parent = 0;
-        subtree2->_parent = 0;
-        subtree1->_right_sib = 0;
-        subtree2->_right_sib = 0;
-        
-        // remove extra node from _nodes
-        _nodes.pop_back();
-        
-        // reset node numbers?
-        int n = 0;
-        for (auto &nd:_nodes) {
-            nd._number = n;
-            n++;
-        }
-        
-        // check the reversion worked
-        for (auto &s:_species_partition) {
-            for (auto &n:s.second) {
-                assert(_lineages[n->_position_in_lineages] == n);
-            }
-        }
-        
-        return log_weight;
-        
-    }
 
     inline void Forest::allowCoalescence(string species_name, double increment, Lot::SharedPtr lot) {
         double prev_log_likelihood = _gene_tree_log_likelihood;
@@ -2884,12 +2773,14 @@ class Forest {
                     assert (new_theta > 0.0);
                     _theta_map[name] = new_theta;
                 }
+#if !defined (HIERARCHICAL_FILTERING) && !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)  // don't keep track of this if integrating out theta in second round
                 // pop mean = theta / 4
                 double a = 2.0;
                 double b = scale;
                 double x = new_theta;
                 double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
                 _vector_prior.push_back(log_inv_gamma_prior);
+#endif
             }
             else {
                 _theta_map[name] = -1;
@@ -2907,6 +2798,7 @@ class Forest {
             new_theta = 1 / lot->gamma(2.0, scale);
             _theta_map[new_species] = new_theta;
         }
+#if !defined (HIERARCHICAL_FILTERING) && !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)  // don't keep track of this if integrating out theta in second round
         // pop mean = theta / 4
         double a = 2.0;
         double b = scale;
@@ -2914,6 +2806,7 @@ class Forest {
         double x = new_theta;
         double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
         _vector_prior.push_back(log_inv_gamma_prior);
+#endif
     }
 
     inline void Forest::updateThetaMapFixedThetaSim(string new_species_name) {
@@ -2931,12 +2824,14 @@ class Forest {
             assert (new_theta > 0.0);
             _theta_map[new_species_name] = new_theta;
         }
+#if !defined (HIERARCHICAL_FILTERING) && !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)  // don't keep track of this if integrating out theta in second round
         // pop mean = theta / 4
         double a = 2.0;
         double b = scale;
         double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
         double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
         _vector_prior.push_back(log_inv_gamma_prior);
+#endif
     }
 
     inline void Forest::createThetaMap(Lot::SharedPtr lot) {
@@ -2973,13 +2868,14 @@ class Forest {
                 assert (new_theta > 0.0);
                 _theta_map[name] = new_theta;
             }
+#if !defined (HIERARCHICAL_FILTERING) && !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)  // don't keep track of this if integrating out theta in second round
             // pop mean = theta / 4
             double a = 2.0;
             double b = scale;
             double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
             double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
             _vector_prior.push_back(log_inv_gamma_prior);
-
+#endif
         }
     }
 
