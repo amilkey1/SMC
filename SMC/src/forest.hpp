@@ -1909,7 +1909,8 @@ class Forest {
         double prev_log_likelihood = _gene_tree_log_likelihood;
 //         _node_choices.clear();
         assert (_node_choices.size() == 0);
-         _log_likelihood_choices.clear();
+//         _log_likelihood_choices.clear();
+        assert (_log_likelihood_choices.size() == 0);
          _log_weight = 0.0;
         
          // choose pair of nodes to try
@@ -1932,6 +1933,7 @@ class Forest {
                  // clear new node from _nodes
                  //clear new node that was just created
                  get<2>(t)->clear(); //new_nd
+//                 _nodes.pop_back();
              }
          }
          
@@ -1941,7 +1943,7 @@ class Forest {
 
          // sum unnormalized weights before choosing the pair
          // must include the likelihoods of all pairs in the final particle weight
-         double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
+         double log_weight_choices_sum = getRunningSumChoices(log_weight_choices); // TODO: just push back node numbers to _node_choices?
          _log_weight = log_weight_choices_sum;
          for (unsigned b=0; b < log_weight_choices.size(); b++) {
              log_weight_choices[b] -= log_weight_choices_sum;
@@ -1962,6 +1964,7 @@ class Forest {
          }
         
         _node_choices.clear();
+        _log_likelihood_choices.clear();
          return make_pair(subtree1, subtree2);
      }
 
@@ -1989,6 +1992,16 @@ class Forest {
         }
 
         if (Forest::_proposal == "prior-post" && (!one_choice)) {
+            if (_save_memory) {
+                for (auto &nd:_lineages) {
+//                for (auto &nd:nodes) {
+                    if (nd->_partial == nullptr) {
+                        nd->_partial = ps.getPartial(_npatterns*4);
+                        calcPartialArray(nd);
+                    }
+                }
+            }
+            
             pair<Node*, Node*> t = chooseAllPairs(nodes, increment, species_name, lot);
             
             subtree1 = t.first;

@@ -144,11 +144,8 @@ class Particle {
         void                                            setNextSpeciesNumber() {_next_species_number = Forest::_nspecies;}
         unsigned                                        showPrevForestNumber(){return _prev_forest_number;}
         string                                          getTranslateBlock();
-        void                                            setNSites(vector<unsigned> nsites) {_nsites_per_gene = nsites;}
         void                                            setGeneOrder(vector<unsigned> gene_order) {_gene_order = gene_order;}
     
-//        static bool                                     _run_on_empty;
-
     private:
 
         static unsigned                         _nsubsets;
@@ -169,9 +166,7 @@ class Particle {
         unsigned                                _next_species_number;
         vector<tuple<string, string, string>>   _species_order;
         vector<pair<tuple<string, string, string>, double>> _t;
-        pair<unsigned, double>                                  _gene_increment;
-        vector<double>                          _starting_log_likelihoods;
-        vector<unsigned>                        _nsites_per_gene;
+        pair<unsigned, double>                  _gene_increment;
         bool                                    _fix_theta_sim; // for simulations only
         vector<unsigned>                        _gene_order;
         bool                                    _sim;
@@ -229,8 +224,6 @@ class Particle {
         _deep_coal = false;
         _next_species_number = Forest::_nspecies;
         _species_order.clear();
-        _starting_log_likelihoods.clear();
-        _nsites_per_gene.clear();
         _fix_theta_sim = false;
         _gene_order.clear();
         _sim = false;
@@ -313,7 +306,6 @@ class Particle {
             _forests[i]._gene_tree_log_likelihood = forest_log_likelihoods[i-1];
             total_log_likelihood += forest_log_likelihoods[i-1];
             _forests[i]._log_weight = forest_log_likelihoods[i-1];
-            _starting_log_likelihoods.push_back(forest_log_likelihoods[i-1]);
         }
         _log_likelihood = total_log_likelihood;
         _log_weight = total_log_likelihood;
@@ -578,7 +570,7 @@ inline vector<double> Particle::getVectorPrior() {
                 speciation = true;
             }
 
-#if !defined (HIERARCHICAL_FILTERING)
+#if !defined (HIERARCHICAL_FILTERING)             // only calculate increment priors if not doing another round of species filtering
 
             bool first_step = true;
             if (_forests[0]._lineages.size() != Forest::_nspecies) {
@@ -593,8 +585,6 @@ inline vector<double> Particle::getVectorPrior() {
                 }
             }
 
-//#if !defined (HIERARCHICAL_FILTERING)
-            // only calculate increment priors if not doing another round of species filtering
             calculateIncrementPriors(increment, species_name, forest_number, speciation, first_step);
 #endif
             if (species_name == "species") {
@@ -699,291 +689,6 @@ inline vector<double> Particle::getVectorPrior() {
 
         _generation++;
     }
-
-//    inline void Particle::proposal() {
-//        double inv_gamma_modifier = 0.0;
-//
-//        _species_join_proposed = false;
-//        bool done = false;
-//        unsigned next_gene = _gene_order[_generation];
-//
-//        while (!done) {
-//
-//            bool speciation = false;
-//
-//            // TODO: only consider rates for just the next gene, or all genes?
-//            vector<double> forest_rates; // this vector contains total rate of species tree, gene 1, etc.
-//            vector<vector<double>> gene_forest_rates; // this vector contains rates by species for each gene forest
-//            gene_forest_rates.resize(_forests.size()-1);
-//            vector<unsigned> event_choice_index;
-//            vector<string> event_choice_name;
-//            vector<double> chosen_gene_forest_rates; // this vector contains rates by species for just the chosen gene
-//
-//            for (int i=0; i<_forests.size(); i++) {
-//                if (i > 0) {
-//                    vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate(_lot);
-//                    double total_gene_rate = 0.0;
-//                    for (auto &r:rates_by_species) {
-//                        gene_forest_rates[i-1].push_back(r.first);
-//                        // TODO: only push back event choice name if it's in the next gene
-//                        if (i == next_gene) {
-//                            event_choice_name.push_back(r.second);
-//                            chosen_gene_forest_rates.push_back(r.first);
-//                        }
-//                        total_gene_rate += r.first;
-//                        event_choice_index.push_back(i);
-//                    }
-//                    if (total_gene_rate > 0.0) {
-//                        forest_rates.push_back(total_gene_rate);
-//                    }
-//                }
-//                else {
-//                    if (_forests[0]._lineages.size() > 1) {
-//                        forest_rates.push_back(Forest::_lambda * _forests[0]._lineages.size());
-//                        event_choice_index.push_back(0);
-//                        event_choice_name.push_back("species");
-//                    }
-//                    else {
-//                        _forests[0]._done = true;
-//                    }
-//                }
-//            }
-//
-//            vector<double> event_choice_rates;
-//            if (_forests[0]._lineages.size() > 1) {
-//                event_choice_rates.push_back(forest_rates[0]); // push back species tree rate
-//            }
-//            for (int i=0; i<gene_forest_rates.size(); i++) {
-//                for (auto &r:gene_forest_rates[i]) {
-//                    assert (r > 0.0);
-//                    event_choice_rates.push_back(r);
-//                }
-//            }
-//
-//            bool no_speciation = false;
-//            double speciation_time = -1;
-//            unsigned index = 0;
-//            double increment = 0.0;
-//
-//            unsigned forest_number = 0;
-//            string species_name = "species";
-//            double total_rate = 0.0;
-//
-//            for (auto &r:event_choice_rates) {
-//                total_rate += r;
-//            }
-//
-//            if (event_choice_name[0] == "species") {
-//                total_rate -= event_choice_rates[0]; // remove speciation rate from total rate used for choosing increment
-//                speciation_time = -log(1.0 - _lot->uniform()) / event_choice_rates[0];
-//            }
-//
-//            if (total_rate > 0.0) {
-//                double gene_increment = -log(1.0 - _lot->uniform())/total_rate;
-//
-//                if (gene_increment > speciation_time && speciation_time != -1) {
-//                    _deep_coal = true;
-//                }
-//
-//                if (gene_increment < speciation_time || speciation_time == -1) {
-//                    // choose a coalescent event if coalescent increment < speciation increment or if species tree is finished
-//                    // if the chosen gene is down to 1 lineage, need a speciation event next - handle this later when the species name is known
-//                    increment = gene_increment;
-//                    if (event_choice_name[0] == "species") { // remove the speciation event from consideration
-//                        event_choice_index.erase(event_choice_index.begin() + 0);
-//                        event_choice_name.erase(event_choice_name.begin() + 0);
-//                        event_choice_rates.erase(event_choice_rates.begin() + 0);
-//                    }
-//
-//    //                    for (auto &p:event_choice_rates) { // TODO: don't think this is necessary
-//    //                         p = log(p/total_rate);
-//    //                     }
-//
-//                    double gene_total_rate = 0.0;
-//                    for (auto &g:chosen_gene_forest_rates) {
-//                        gene_total_rate += g;
-//                    }
-//                    for (auto &p:chosen_gene_forest_rates) {
-//                         p = log(p/gene_total_rate);
-//                     }
-//
-//                    index = selectEvent(chosen_gene_forest_rates); // only choose species from rates from the chosen gene
-//                    // TODO: could do this on the log scale
-//
-//                    forest_number = next_gene;
-//                    species_name = event_choice_name[index];
-//                    assert (species_name != "species");
-//                    assert (forest_number != 0);
-//
-//
-//                    // if no more coalescence possible in chosen species, choose a speciation event next
-//                    if (_forests[forest_number]._species_partition[species_name].size() == 1) {
-//                        forest_number = 0;
-//                        increment = speciation_time;
-//                        assert (increment != -1.0);
-//                        no_speciation = false;
-//                        species_name = "species";
-//                    }
-//
-//                }
-//                else {
-//                    forest_number = 0;
-//                    increment = speciation_time;
-//                    assert (increment != -1.0);
-//                    no_speciation = false;
-//                }
-//            }
-//            else {
-//                forest_number = 0;
-//                increment = speciation_time;
-//                assert (increment != -1.0);
-//                no_speciation = false;
-//
-//    //#if defined (DRAW_NEW_THETA)
-//    //                if (_forests[0]._lineages.size() <= Forest::_nspecies) {
-//    //                    string name = boost::str(boost::format("node-%d")%_next_species_number);
-//    //                    _forests[1].updateThetaMap(_lot, name);
-//    //                }
-//    //                if (_forests.size() > 2) {
-//    //                    for (int i=2; i<_forests.size(); i++) {
-//    //                        _forests[i]._theta_map = _forests[1]._theta_map;
-//    //                    }
-//    //                }
-//    //#endif
-//    //                _next_species_number++;
-//            }
-//
-//            // add increment to all nodes in all forests
-//            for (int i=0; i<_forests.size(); i++) {
-//                if (_forests[i]._lineages.size() > 1) {
-//                    _forests[i].addIncrement(increment); // if forest is finished, don't add another increment
-//                }
-//                else {
-//                    _forests[i]._done = true;
-//                }
-//            }
-//
-//            if (forest_number == 0) {
-//                speciation = true;
-//            }
-//
-//            bool first_step = true;
-//            if (_forests[0]._lineages.size() != Forest::_nspecies) {
-//                first_step = false;
-//            }
-//
-//            if (first_step) {
-//                for (int i=1; i<_forests.size(); i++) {
-//                    if (_forests[i]._lineages.size() != Forest::_ntaxa) {
-//                        first_step = false;
-//                    }
-//                }
-//            }
-//
-//    #if !defined (HIERARCHICAL_FILTERING)
-//            // only calculate increment priors if not doing another round of species filtering
-//            calculateIncrementPriors(increment, species_name, forest_number, speciation, first_step);
-//    #endif
-//            if (species_name == "species") {
-//                unsigned n = (unsigned) _forests[0]._lineages.size();
-//                assert (n > 1);
-//                assert (forest_number == 0);
-//
-//    #if defined (DRAW_NEW_THETA)
-//                unsigned next = _next_species_number;
-//                string name = boost::str(boost::format("node-%d")%next);
-//                _forests[1].updateThetaMap(_lot, name);
-//                if (_forests.size() > 2) {
-//                    for (int i=2; i<_forests.size(); i++) {
-//                        _forests[i]._theta_map = _forests[1]._theta_map;
-//                    }
-//                }
-//    #endif
-//
-//                speciesProposal();
-//
-//    #if defined (INV_GAMMA_PRIOR_TWO)
-//                double theta_mean = _forests[1]._theta_mean;
-//                double eps = 0.01;
-//                double a = 2.0;
-//
-//                inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
-//
-//                // new theta drawn for the new population
-//                string new_spp = _forests[0]._lineages.back()->_name;
-//                double y = _forests[1]._theta_map[new_spp];
-//
-//                inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
-//    #endif
-//
-//                _species_join_proposed = true;
-//                assert (increment > 0.0);
-//                _next_species_number++;
-//            }
-//
-//            else {
-//                assert (increment > 0.0);
-//                double log_speciation_term = 0.0;
-//                geneProposal(forest_number, increment, species_name);
-//                double log_likelihood_term = _forests[forest_number]._log_weight;
-//
-//                _log_weight = log_speciation_term + log_likelihood_term;
-//
-//                if (_forests[1]._theta_mean == 0.0) {
-//                    assert (_forests[1]._theta > 0.0);
-//                    for (int i=1; i<_forests.size(); i++) {
-//                        _forests[i]._theta_mean = _forests[1]._theta;
-//                    }
-//                }
-//                assert (_forests[1]._theta_mean > 0.0);
-//
-//                // modifier only happens on first round
-//                if (_generation == 0 && _forests[1]._theta_prior_mean > 0.0 && _forests[1]._theta_proposal_mean > 0.0) {
-//                    double prior_rate = 1.0/_forests[1]._theta_prior_mean;
-//                    double proposal_rate = 1.0/_forests[1]._theta_proposal_mean;
-//                    double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
-//
-//                    _log_weight += log_weight_modifier;
-//                }
-//
-//    #if defined (INV_GAMMA_PRIOR_TWO)
-//                if (_generation == 0) {
-//                    inv_gamma_modifier = 0.0;
-//                    double theta_mean = _forests[1]._theta_mean;
-//                    double eps = 0.01;
-//                    double a = 2.0;
-//
-//                    inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
-//
-//                    // for first step, new theta drawn for each tip population
-//                    for (int i=0; i<Forest::_nspecies; i++) {
-//                        auto it = _forests[1]._theta_map.begin();
-//                        std::advance(it, i);
-//                        double y = it->second;
-//
-//                        inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
-//
-//                    }
-//                }
-//    #endif
-//
-//
-//                done = true;
-//            }
-//
-//            if (Forest::_run_on_empty) {
-//                _log_weight = 0.0;
-//            }
-//
-//            _prev_forest_number = forest_number;
-//
-//            _log_weight += inv_gamma_modifier;
-//
-//            }
-//
-//        _generation++;
-//    }
-
 
     inline void Particle::simProposal() {
         _sim = true;
@@ -1220,39 +925,8 @@ inline vector<double> Particle::getVectorPrior() {
                         _forests[i]._theta_mean = _forests[1]._theta;
                     }
                 }
+                
                 assert (_forests[1]._theta_mean > 0.0);
-                
-                // modifier only happens on first round
-                if (_generation == 0 && _forests[1]._theta_prior_mean > 0.0 && _forests[1]._theta_proposal_mean > 0.0) {
-                    double prior_rate = 1.0/_forests[1]._theta_prior_mean;
-                    double proposal_rate = 1.0/_forests[1]._theta_proposal_mean;
-                    double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
-                    
-                    _log_weight += log_weight_modifier;
-                }
-                
-    #if defined (INV_GAMMA_PRIOR_TWO)
-                if (_generation == 0) {
-                    inv_gamma_modifier = 0.0;
-                    double theta_mean = _forests[1]._theta_mean;
-                    double eps = 0.01;
-                    double a = 2.0;
-                    
-                    inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
-                    
-                    // for first step, new theta drawn for each tip population
-                    for (int i=0; i<Forest::_nspecies; i++) {
-                        auto it = _forests[1]._theta_map.begin();
-                        std::advance(it, i);
-                        double y = it->second;
-                        
-                        inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
-                        
-                    }
-                }
-    #endif
-       
-                
                 done = true;
             }
             
@@ -2070,7 +1744,6 @@ inline vector<double> Particle::getVectorPrior() {
         _forests[0]._last_edge_length = 0.0;
         _forests[0]._increments_and_priors.clear();
         _gene_order.clear();
-        _starting_log_likelihoods.clear();
     }
 
     inline void Particle::setForest(Forest f, unsigned forest_number) {
@@ -2096,8 +1769,6 @@ inline vector<double> Particle::getVectorPrior() {
         _gene_increment = other._gene_increment;
         _next_species_number = other._next_species_number;
         _species_order = other._species_order;
-        _starting_log_likelihoods = other._starting_log_likelihoods;
-        _nsites_per_gene = other._nsites_per_gene;
         _fix_theta_sim = other._fix_theta_sim;
         _gene_order = other._gene_order;
         _sim = other._sim;

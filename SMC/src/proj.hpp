@@ -888,6 +888,13 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             throw XProj("particle_increase must be greater than or equal to save_every");
         }
         
+        // if simulating data and fix_theta_for_simulations, must also set theta
+        if (_start_mode == "sim" && _fix_theta_for_simulations) {
+            if (Forest::_theta == 0.0) {
+                throw XProj("must specify theta if simulating data and fixing theta");
+            }
+        }
+        
         if (Forest::_model == "JC") {
             cout << "Setting kappa to 1.0 under JC model\n";
             cout << "Setting base frequencies equal under JC model\n";
@@ -1299,8 +1306,11 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                 vector<Particle> use_vec;
                 Particle p = my_vec[a];
                 
+                use_vec.resize(nparticles);
+                
                 for (unsigned i=0; i<nparticles; i++) {
-                    use_vec.push_back(p);
+//                    use_vec.push_back(p);
+                    use_vec[i] = p;
                 }
                 assert(use_vec.size() == _particle_increase);
 
@@ -1353,6 +1363,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 
                     
                     vector<unsigned> counts;
+                    counts.reserve(my_vec.size());
                     for (unsigned index=0; index<my_vec.size(); index++) {
                         counts.push_back(index);
                     }
@@ -1724,6 +1735,8 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             vector<Particle> use_vec;
             Particle p = particles[i];
             
+            use_vec.reserve(_particle_increase);
+            
             for (unsigned i=0; i<_particle_increase; i++) {
                 use_vec.push_back(p);
             }
@@ -2072,11 +2085,12 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 
         unsigned nsteps = (unsigned) (_taxon_map.size()-1)*nsubsets;
 
+        cout << "\nBuilding species tree and associated gene trees....\n";
+        
         for (unsigned g=0; g<nsteps; g++){
             proposeSimParticles(sim_vec);
         }
 
-        cout << "\nBuilding species tree and associated gene trees....\n";
         vector<string> taxon_names;
         for (auto &t:_taxon_map) {
             taxon_names.push_back(t.first);
@@ -2510,6 +2524,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 //                        _log_species_tree_marginal_likelihood = 0.0; // for now, write lorad file for first set of species tree filtering and report the marginal likelihood for comparison
 
                         vector<Particle> use_vec;
+                        use_vec.reserve(_particle_increase);
                         Particle chosen_particle = my_vec[a];
                         
                         for (unsigned i=0; i<_particle_increase; i++) {
