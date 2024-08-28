@@ -18,3 +18,7 @@
 //#define DEBUG_MODE
 
 #define INV_GAMMA_PRIOR_TWO // turn this off if not defining DRAW_NEW_THETA
+
+//#define DELAY_FILTERING
+
+#define CONSISTENCY_TEST

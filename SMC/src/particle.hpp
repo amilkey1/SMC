@@ -145,6 +145,7 @@ class Particle {
         unsigned                                        showPrevForestNumber(){return _prev_forest_number;}
         string                                          getTranslateBlock();
         void                                            setGeneOrder(vector<unsigned> gene_order) {_gene_order = gene_order;}
+        void                                            calcInfiniteLikelihood();
     
     private:
 
@@ -630,7 +631,11 @@ inline vector<double> Particle::getVectorPrior() {
                 geneProposal(forest_number, increment, species_name);
                 double log_likelihood_term = _forests[forest_number]._log_weight;
 
+#if defined (DELAY_FILTERING)
+                _log_weight += log_speciation_term + log_likelihood_term;
+#else
                 _log_weight = log_speciation_term + log_likelihood_term;
+#endif
 
                 if (_forests[1]._theta_mean == 0.0) {
                     assert (_forests[1]._theta > 0.0);
@@ -1717,6 +1722,12 @@ inline vector<double> Particle::getVectorPrior() {
         }
         block += ";\n";
         return block;
+    }
+
+    inline void Particle::calcInfiniteLikelihood() {
+        // read in true tree (trueg1.tre) or false tree (falseg1.tre) - must rename files to gene1.trees
+        
+        _forests[1].calcInfiniteLikelihood();
     }
 
     inline void Particle::processGeneNewicks(vector<string> newicks) {

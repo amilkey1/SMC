@@ -123,6 +123,7 @@ class Forest {
         pair<Node*, Node*>          chooseAllPairs(list<Node*> &nodes, double increment, string species, Lot::SharedPtr lot);
         tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, double increment, string species);
         pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
+        void                        calcInfiniteLikelihood();
     
         map<string, double>         _theta_map;
 
@@ -909,6 +910,10 @@ class Forest {
     }
 
     inline void Forest::calcPartialArray(Node* new_nd) {
+#if defined (CONSISTENCY_TEST)
+        _npatterns = 1;
+#endif
+        
         assert (_index > 0);
         
         if (!new_nd->_left_child) {
@@ -928,9 +933,9 @@ class Forest {
             }
         }
         
-        for (auto &nd:_lineages) {
-            assert (nd->_right_sib != nd);
-        }
+//        for (auto &nd:_lineages) {
+//            assert (nd->_right_sib != nd);
+//        }
         auto & parent_partial_array = *(new_nd->_partial);
         for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
             
@@ -1050,6 +1055,13 @@ class Forest {
         //calc likelihood for each lineage separately
         auto &counts = _data->getPatternCounts();
         _gene_tree_log_likelihood = 0.0;
+//
+        for (auto &nd:_nodes) { // TODO: delete this
+            if (nd._partial == nullptr) {
+                nd._partial = ps.getPartial(_npatterns*4);
+                calcPartialArray(&nd);
+            }
+        }
 
         for (auto &nd:_lineages) {
             double log_like = 0.0;
@@ -2079,8 +2091,8 @@ class Forest {
             for (auto &nd:_nodes) {
                 nd._partial=nullptr;
             }
+        }
     }
-}
 
     inline void Forest::debugForest() {
         cout << "debugging forest" << endl;
@@ -4441,6 +4453,396 @@ class Forest {
             j++;
         }
     }
+
+    inline void Forest::calcInfiniteLikelihood() {
+        map <string, double> patterns_and_likelihoods;
+        vector<double> just_likelihoods;
+
+        // TODO: stop at 2 subtrees
+
+            for (unsigned i = 0; i<4; i++) {
+                for (unsigned j = 0; j<4; j++) {
+                    for (unsigned k = 0; k<4; k++) {
+                        for (unsigned l = 0; l<4; l++) {
+                            for (unsigned m = 0; m<4; m++) {
+                                for (unsigned n = 0; n<4; n++) {
+                                    for (unsigned o = 0; o<4; o++) {
+                                        for (unsigned p = 0; p<4; p++) {
+                                            
+                                            // TODO: ignore A
+                                            // TODO: stop at 2 subtrees
+
+                                                unsigned count = 0;
+                                                
+                                                for (auto &nd:_nodes) {
+                                                    nd._partial = nullptr;
+                                                    nd._partial = ps.getPartial(4);
+                                                    
+                                                    if (!nd._left_child && !ends_with(nd._name, "A")) { // disregard A lineage
+                                                        if (count == 0) {
+                                                            (*nd._partial)[i] = 1;
+                                                        }
+                                                        else if (count == 1) {
+                                                            (*nd._partial)[j] = 1;
+                                                        }
+                                                        else if (count == 2) {
+                                                            (*nd._partial)[k] = 1;
+                                                        }
+                                                        else if (count == 3) {
+                                                            (*nd._partial)[l] = 1;
+                                                        }
+                                                        else if (count == 4) {
+                                                            (*nd._partial)[m] = 1;
+                                                        }
+                                                        else if (count == 5) {
+                                                            (*nd._partial)[n] = 1;
+                                                        }
+                                                        else if (count == 6) {
+                                                            (*nd._partial)[o] = 1;
+                                                        }
+                                                        else if (count == 7) {
+                                                            (*nd._partial)[p] = 1;
+                                                        }
+                                                        count++;
+                                                    }
+                                                }
+                                                
+                                                for (auto &nd:_nodes) {
+                                                    if (nd._left_child) {
+                                                        calcPartialArray(&nd);
+                                                    }
+                                                }
+                                                
+                                                _first_pattern = 1;
+                                                _npatterns = 1;
+                                                
+                                            double site_like_one = 0.0;
+                                            double site_like_two = 0.0;
+                                            double site_like_three = 0.0;
+                                            
+                                            double site_like = 0.0;
+                                                
+                                            
+                                            bool true_tree = false;
+                                            
+                                            // TODO: for this example (true tree), only care about nodes 15 and 16
+                                            
+                                            Node* node_for_partials;
+                                            Node* node_for_partials_two;
+                                            Node* node_for_partials_three;
+                                            
+                                            if (true_tree) {
+                                                for (auto &nd:_nodes) {
+                                                    if (nd._number == 15) {
+                                                        node_for_partials = &nd;
+                                                    }
+                                                    else if (nd._number == 16) {
+                                                        node_for_partials_two = &nd;
+                                                    }
+                                                }
+                                                
+                                                    for (unsigned s=0; s<_nstates; s++) {
+                                                        double partial = (*node_for_partials->_partial)[s];
+                                                        site_like_one += 0.25*partial;
+                                                    }
+                                                    assert(site_like_one > 0);
+                                                    
+                                                    for (unsigned s=0; s<_nstates; s++) {
+                                                        double partial = (*node_for_partials_two->_partial)[s];
+                                                        site_like_two += 0.25*partial;
+                                                    }
+                                                    assert(site_like_two > 0);
+                                                site_like = site_like_one * site_like_two;
+                                                }
+                                            
+                                            else if (!true_tree) {
+                                                // for false example, also take into account C lineage
+                                                for (auto &nd:_nodes) {
+                                                    if (nd._number == 16) {
+                                                        node_for_partials = &nd;
+                                                    }
+                                                    if (nd._number == 12) {
+                                                        node_for_partials_three = &nd;
+                                                    }
+                                                }
+                                                
+                                                for (unsigned s=0; s<_nstates; s++) {
+                                                    double partial = (*node_for_partials->_partial)[s];
+                                                    site_like_one += 0.25*partial;
+                                                }
+                                                
+                                                for (unsigned s=0; s<_nstates; s++) {
+                                                    double partial = (*node_for_partials_three->_partial)[s];
+                                                    site_like_three += 0.25*partial;
+                                                }
+                                                assert(site_like_three > 0);
+                                                assert (site_like_one > 0.0);
+                                                site_like = site_like_one * site_like_three;
+                                            }
+                                            
+                                            string pattern = to_string(i) + to_string(j) + to_string(k) + to_string(l) + to_string(m) + to_string(n) + to_string(o) + to_string(p);
+                                            patterns_and_likelihoods[pattern] = log(site_like); // TODO: careful of underflow
+                                        just_likelihoods.push_back(site_like);
+                                            
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+            }
+        }
+        
+        unsigned nsteps = pow(4, 8);
+        double infinite_log_likelihood = 0.0;
+                
+        for (unsigned i=0; i < nsteps; i++) {
+            double pattern_like = just_likelihoods[i];
+            double pattern_log_like = log(pattern_like);
+            infinite_log_likelihood += pattern_like * pattern_log_like;
+        }
+        cout << "end";
+    }
+
+//    inline void Forest::calcInfiniteLikelihood() {
+//        map <string, double> patterns_and_likelihoods;
+//        vector<double> site_likelihoods;
+//        site_likelihoods.resize(65536);
+//
+//        // TODO: stop at 2 subtrees
+//
+//        unsigned pattern_count = 0;
+//
+//            for (unsigned i = 0; i<4; i++) {
+//                for (unsigned j = 0; j<4; j++) {
+//                    for (unsigned k = 0; k<4; k++) {
+//                        for (unsigned l = 0; l<4; l++) {
+//                            for (unsigned m = 0; m<4; m++) {
+//                                for (unsigned n = 0; n<4; n++) {
+//                                    for (unsigned o = 0; o<4; o++) {
+//                                        for (unsigned p = 0; p<4; p++) {
+//
+//                                            for (auto &nd:_nodes) {
+//                                                nd._partial = nullptr;
+//                                                nd._partial = ps.getPartial(4);
+//                                            }
+//
+//                                            unsigned count = 0;
+//
+//                                            for (auto &nd:_nodes) {
+//                                                if (nd._number < 20) { // for this example, stop at this subtree // TODO: switch back to 17
+//
+//                                                bool tip = false;
+//                                                bool calculate = true;
+//
+//                                            if (nd._left_child) {
+//                                                if (!nd._left_child->_left_child) {
+//                                                    // if node's left child does not have a left child
+//                                                    tip = true;
+//                                                }
+//                                            }
+//
+//                                            Node* child;
+//
+//                                            if (nd._left_child) { // TODO: ignoring this for now
+////                                                calculate = true;
+////                                                if (!ends_with(nd._left_child->_name, "A")) {
+//                                                    child = nd._left_child; // disregard lineage A
+////                                                }
+////                                                else {
+////                                                    // skip lineage A
+////                                                    calculate = false;
+////                                                }
+//
+//                                            }
+//                                            else {
+//                                                calculate = false; // don't calculate anything for tip nodes
+//                                            }
+//
+//                                            if (calculate) {
+//
+//                                                unsigned tip_state = 0;
+//                                                if (tip) {
+//                                                    vector<double> node_likelihoods;
+//
+//                                                    double node_likelihood = 0.0;
+//
+//                                                    for (unsigned s=0; s<_nstates; s++) {
+//
+//                                                        double site_like = 0.0;
+//
+//                                                    for (unsigned a=0; a<2; a++) {
+//                                                        if (a == 1) {
+//                                                            child = child->_right_sib;
+//                                                        }
+//
+//                                                        if (count == 0) {
+//                                                            tip_state = i;
+//                                                        }
+//                                                        else if (count == 1) {
+//                                                            tip_state = j;
+//                                                        }
+//                                                        else if (count == 2) {
+//                                                            tip_state = k;
+//                                                        }
+//                                                        else if (count == 3) {
+//                                                            tip_state = l;
+//                                                        }
+//                                                        else if (count == 4) {
+//                                                            tip_state = m;
+//                                                        }
+//                                                        else if (count == 5) {
+//                                                            tip_state = n;
+//                                                        }
+//                                                        else if (count == 6) {
+//                                                            tip_state = o;
+//                                                        }
+//                                                        else if (count == 7) {
+//                                                            tip_state = p;
+//                                                        }
+//
+//                                                        double expterm = exp(-4.0*(child->_edge_length)/3.0);
+//                                                        double prsame = 0.25+0.75*expterm;
+//                                                        double prdif = 0.25 - 0.25*expterm;
+//
+//                                                        double transition_prob = (s == tip_state ? prsame : prdif);
+//
+//                                                        assert (transition_prob > 0.0);
+//
+//                                                        if (a == 0) {
+//                                                            node_likelihood = transition_prob;
+//
+////                                                            site_like = transition_prob;
+//                                                            count++;
+//                                                        }
+//                                                        else {
+//                                                            node_likelihood *= transition_prob;
+//                                                            node_likelihood *=0.25;
+//
+////                                                            site_like *= transition_prob;
+////                                                            site_like *= 0.25;
+//
+////                                                            site_likelihoods[pattern_count] += site_like;
+////                                                            (*nd._partial)[0] = 0;
+//                                                            count--;
+//                                                            (*nd._partial)[s] = node_likelihood;
+//
+//                                                            // reset child
+//                                                            child = child->_parent->_left_child;
+//                                                        }
+//                                                    }
+//                                                }
+//                                                    count += 2;
+////                                                    if (site_likelihoods[pattern_count] == 0) {
+////                                                        site_likelihoods[pattern_count] = node_likelihood;
+////                                                    }
+////                                                    else {
+////                                                        site_likelihoods[pattern_count] *= node_likelihood; // TODO: total likelihood is a product of all the node likelihoods
+////                                                    }
+//                                                }
+//
+//                                                // TODO: calculate likelihoods for rest of tree
+//                                                // TODO: stop at subtree - just two more nodes
+//                                                else {
+//                                                    calcPartialArray(&nd);
+//
+//                                                    assert (count == 8);
+//
+////                                                    double node_likelihood = 0.0;
+//
+////                                                    for (unsigned s_child = 0; s_child < _nstates; s_child++) {
+////
+////                                                        for (unsigned s = 0; s <_nstates; s++) {
+////
+//////                                                            double site_like = 0.0;
+////
+////                                                            for (unsigned a=0; a<2; a++) {
+////
+////                                                                if (a == 1) {
+////                                                                    child = child->_right_sib;
+////                                                                }
+////
+////                                                                double expterm = exp(-4.0*(child->_edge_length)/3.0);
+////                                                                double prsame = 0.25+0.75*expterm;
+////                                                                double prdif = 0.25 - 0.25*expterm;
+////
+////                                                                double transition_prob = (s == s_child ? prsame : prdif);
+////
+////                                                                assert (transition_prob > 0.0);
+////
+////                                                                if (a == 0) {
+////                                                                    node_likelihood = transition_prob;
+////
+//////                                                                    site_like = transition_prob;
+////                                                                }
+////                                                                else {
+////                                                                    node_likelihood *= transition_prob;
+////                                                                    node_likelihood *= 0.25;
+//////
+//////                                                                    site_like *= transition_prob;
+//////                                                                    site_like *= 0.25;
+////
+//////                                                                    site_likelihoods[pattern_count] += site_like; // TODO: if it's a new node, should be multiplying this, not adding?
+////
+////                                                                    // reset child
+////                                                                    child = child->_parent->_left_child;
+////                                                                }
+////                                                            }
+////                                                        }
+////                                                    }
+////                                                    if (site_likelihoods[pattern_count] == 0) {
+////                                                        site_likelihoods[pattern_count] = node_likelihood;
+////                                                    }
+////                                                    else {
+////                                                        site_likelihoods[pattern_count] *= node_likelihood; // total likelihood is a product of all the node likelihoods
+////                                                    }
+//                                                }
+//                                            }
+//
+////                                            string pattern = to_string(i) + to_string(j) + to_string(k) + to_string(l) + to_string(m) + to_string(n) + to_string(o) + to_string(p);
+////                                            patterns_and_likelihoods[pattern] = log(site_likelihoods[pattern_count]); // TODO: careful of underflow
+////
+////                                            pattern_count++; // TODO: should this go outside of the node loop?
+//                                                }
+//                                        }
+////                                            string pattern = to_string(i) + to_string(j) + to_string(k) + to_string(l) + to_string(m) + to_string(n) + to_string(o) + to_string(p);
+////                                            patterns_and_likelihoods[pattern] = log(site_likelihoods[pattern_count]); // TODO: careful of underflow
+////
+////                                            pattern_count++; // TODO: should this go outside of the node loop?
+//
+//                                            for (auto &nd:_lineages) {
+//                                                double log_like = 0.0;
+//                                                for (unsigned p=0; p<_npatterns; p++) {
+//                                                    double site_like = 0.0;
+//                                                    for (unsigned s=0; s<_nstates; s++) {
+//                                                        double partial = (*nd->_partial)[p*_nstates+s];
+//                                                        site_like += 0.25*partial;
+//                                                    }
+//                                                    assert(site_like>0);
+////                                                    log_like += log(site_like)*counts[_first_pattern+p];
+//                                                }
+//                                                _gene_tree_log_likelihood += log_like;
+//                                            }
+//
+//                                        }
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+////            }
+////        }
+//
+////        }
+//        cout << "stop";
+//        // TODO: 8 for loops to go through all possible patterns
+//
+//        // TODO: calculate likelihood for each pattern
+//
+//        // TODO: sum log likelihoods: n_i * log p(D_i | theta)
+//    }
 
 }
 

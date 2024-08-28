@@ -1053,7 +1053,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             while (getline(infile, newick)) { // file newicks must start with the word "tree"
                 if (current_gene_newicks.size() < _nparticles) { // stop adding newicks once the number of particles has been reached // TODO: add option to randomize this?
 //                size_t found = newick.find("tree");
-                if (newick.find("tree") == 2) { // TODO: not sure why / if this works - switch to checking for parenthesis?
+                if (newick.find("tree") == 2) { // TODO: only works if tree name starts 2 spaces in
                     // TODO: also need to start at the parenthesis?
                         size_t pos = newick.find("("); //find location of parenthesis
                         newick.erase(0,pos); //delete everything prior to location found
@@ -1094,6 +1094,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
         unsigned nparticles = _nparticles;
 
         unsigned nsubsets = _data->getNumSubsets();
+        
         Particle::setNumSubsets(nsubsets);
 
         vector<Particle> my_vec;
@@ -1125,7 +1126,14 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             count++;
         }
 
+#if defined (CONSISTENCY_TEST)
+                cout << "consistency test" << endl;
+                
+                my_vec[0].calcInfiniteLikelihood();
+                
+#else
         cout << "\n";
+        my_vec[0].calcLogLikelihood(); // TODO: delete this
         string filename1 = "species_trees.trees";
         string filename2 = "unique_species_trees.trees";
         string filename3 = "params-beast-comparison.log";
@@ -1436,6 +1444,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             filesystem::remove(oldfname);
             std::rename(newfname, oldfname);
         }
+#endif
     }
 
     inline double Proj::computeEffectiveSampleSize(const vector<double> & probs) const {
@@ -2300,9 +2309,25 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                         filter = false;
                     }
                     
+#if defined (DELAY_FILTERING)
+//                    if (g % 10 == 0 || g == nsteps - 1) {
+                    if (g == nsteps - 1) {
+                        filter = true;
+                    }
+                    else {
+                        filter = false;
+                    }
+#endif
+                    
                     if (filter) {
                         
                         unsigned ess = filterParticles(g, my_vec);
+                        
+#if defined (DELAY_FILTERING)
+                        for (auto &p:my_vec) {
+                            p.setLogWeight(0.0);
+                        }
+#endif
 
                         unsigned species_count = 0;
                         
@@ -2648,7 +2673,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     std::rename(newfname, oldfname);
                 }
 #endif
-
             }
 
         catch (XProj & x) {
