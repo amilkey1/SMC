@@ -4456,9 +4456,6 @@ class Forest {
 
     inline void Forest::calcInfiniteLikelihood() {
         map <string, double> patterns_and_likelihoods;
-        vector<double> just_likelihoods;
-
-        // TODO: stop at 2 subtrees
 
             for (unsigned i = 0; i<4; i++) {
                 for (unsigned j = 0; j<4; j++) {
@@ -4581,8 +4578,7 @@ class Forest {
                                             }
                                             
                                             string pattern = to_string(i) + to_string(j) + to_string(k) + to_string(l) + to_string(m) + to_string(n) + to_string(o) + to_string(p);
-                                            patterns_and_likelihoods[pattern] = log(site_like); // TODO: careful of underflow
-                                        just_likelihoods.push_back(site_like);
+                                            patterns_and_likelihoods[pattern] = site_like; // TODO: careful of underflow
                                             
                                             }
                                         }
@@ -4593,14 +4589,47 @@ class Forest {
             }
         }
         
-        unsigned nsteps = pow(4, 8);
-        double infinite_log_likelihood = 0.0;
+//        double n_i = 0.0;
+//        double n_i = 2.41929547;
+//        for (auto &l:patterns_and_likelihoods) {
+//            double pattern_like = l.second;
+//            n_i += pattern_like;
+//        }
+        
+        // cannot calculate infinite_log_likelihood_true_tree and infinite_log_likelihood_false_tree at the same time - need to do two separate runs with different newicks
+        // but need to run the true tree first to create the n_i_ file
+        
+        double infinite_log_likelihood_true_tree = 0.0;
                 
-        for (unsigned i=0; i < nsteps; i++) {
-            double pattern_like = just_likelihoods[i];
+//        ofstream logf("n_i_for_true_tree-g1.log");
+        
+        for (auto &l:patterns_and_likelihoods) {
+            double pattern_like = l.second;
             double pattern_log_like = log(pattern_like);
-            infinite_log_likelihood += pattern_like * pattern_log_like;
+//            logf << pattern_like << endl;
+//            infinite_log_likelihood_true_tree += pattern_like * pattern_log_like;
         }
+        
+        // TODO: write file with n_i for each pattern for true tree
+        // TODO: can read those values back in and use them for the false tree
+        
+        ifstream infile ("n_i_for_true_tree-g1.log");
+        
+        vector<double> n_i;
+        string line;
+        while (getline(infile, line)) {
+            n_i.push_back(stod(line));
+        }
+        
+        unsigned count = 0;
+        double infinite_log_likelihood_false_tree = 0.0; // TODO: not n_i, but need the vector of n_i for true tree
+        for (auto &l:patterns_and_likelihoods) {
+            double pattern_like = l.second;
+            double pattern_log_like = log(pattern_like);
+            infinite_log_likelihood_false_tree += n_i[count] * pattern_log_like;
+            count++;
+        }
+        
         cout << "end";
     }
 

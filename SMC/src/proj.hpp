@@ -2311,7 +2311,8 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     
 #if defined (DELAY_FILTERING)
 //                    if (g % 10 == 0 || g == nsteps - 1) {
-                    if (g == nsteps - 1) {
+//                    if (g == nsteps - 1) {
+                    if (g % 15 == 0 || g == nsteps - 1) {
                         filter = true;
                     }
                     else {

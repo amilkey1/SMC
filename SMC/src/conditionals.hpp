@@ -21,4 +21,4 @@
 
 //#define DELAY_FILTERING
 
-#define CONSISTENCY_TEST
+//#define CONSISTENCY_TEST
