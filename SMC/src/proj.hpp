@@ -2322,6 +2322,10 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     
                     if (filter) {
                         
+//                        for (auto &p:my_vec) {
+//                            p.showParticle();
+//                        }
+                        
                         unsigned ess = filterParticles(g, my_vec);
                         
 #if defined (DELAY_FILTERING)
@@ -2552,7 +2556,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                         vector<Particle> use_vec;
                         use_vec.reserve(_particle_increase);
                         Particle chosen_particle = my_vec[a];
-                        
+                                                
                         for (unsigned i=0; i<_particle_increase; i++) {
                             use_vec.push_back(chosen_particle);
                         }

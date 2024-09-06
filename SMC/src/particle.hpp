@@ -1338,6 +1338,9 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline void Particle::geneProposal(unsigned forest_number, double increment, string species_name) {
         _forests[forest_number].allowCoalescence(species_name, increment, _lot);
+# if defined (BUILD_UPGMA_TREE)
+        _forests[forest_number].buildRestOfTree(_lot);
+#endif
         _gene_increment = make_pair(forest_number, increment);
     }
 

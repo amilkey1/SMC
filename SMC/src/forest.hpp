@@ -86,6 +86,7 @@ class Forest {
         void                        addMigratingTaxon(string key_to_add, string key_to_del, Node* taxon_to_migrate);
         void                        deleteTaxon(string key_to_del, unsigned taxon_choice);
         void                        allowCoalescence(string species_name, double increment, Lot::SharedPtr lot);
+        void                        buildRestOfTree(Lot::SharedPtr lot);
         tuple<unsigned, unsigned, unsigned> chooseTaxaToHybridize();
         vector<string>              hybridizeSpecies();
         void                        moveGene(string new_nd, string parent, string hybrid);
@@ -170,6 +171,7 @@ class Forest {
         double                      _theta_mean;
         vector<pair<Node*, Node*>>  _node_choices;
         vector<double>              _log_likelihood_choices;
+        double                      _gene_tree_log_likelihood_before_rest_of_tree_built;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -251,6 +253,7 @@ class Forest {
         _vector_prior.clear();
         _node_choices.clear();
         _log_likelihood_choices.clear();
+        _gene_tree_log_likelihood_before_rest_of_tree_built = 0.0;
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -918,7 +921,7 @@ class Forest {
         
         if (!new_nd->_left_child) {
             auto &data_matrix=_data->getDataMatrix();
-            assert (_save_memory || _start_mode == "sim");
+//            assert (_save_memory || _start_mode == "sim"); // TODO: tried commenting this out for new UPGMA proposal
             if (!new_nd->_left_child) {
                 new_nd->_partial=ps.getPartial(_npatterns*4);
                 for (unsigned p=0; p<_npatterns; p++) {
@@ -1056,12 +1059,12 @@ class Forest {
         auto &counts = _data->getPatternCounts();
         _gene_tree_log_likelihood = 0.0;
 //
-        for (auto &nd:_nodes) { // TODO: delete this
-            if (nd._partial == nullptr) {
-                nd._partial = ps.getPartial(_npatterns*4);
-                calcPartialArray(&nd);
-            }
-        }
+//        for (auto &nd:_nodes) { // TODO: delete this
+//            if (nd._partial == nullptr) {
+//                nd._partial = ps.getPartial(_npatterns*4);
+//                calcPartialArray(&nd);
+//            }
+//        }
 
         for (auto &nd:_lineages) {
             double log_like = 0.0;
@@ -1282,6 +1285,7 @@ class Forest {
         _vector_prior = other._vector_prior;
         _node_choices = other._node_choices;
         _log_likelihood_choices = other._log_likelihood_choices;
+        _gene_tree_log_likelihood_before_rest_of_tree_built = other._gene_tree_log_likelihood_before_rest_of_tree_built;
 
         // copy tree itself
 
@@ -1980,6 +1984,147 @@ class Forest {
          return make_pair(subtree1, subtree2);
      }
 
+    inline void Forest::buildRestOfTree(Lot::SharedPtr lot) {
+        unsigned lineage_size_before = (unsigned) _lineages.size();
+        unsigned node_size_before = (unsigned) _nodes.size();
+        
+        double prev_log_likelihood = _gene_tree_log_likelihood;
+//        double prev_log_likelihood = _gene_tree_log_likelihood_before_rest_of_tree_built;
+        
+        vector<double> gene_increments;
+        
+        while (_lineages.size() > 1) {
+            unsigned s = (unsigned) _lineages.size();
+            assert (s > 1);
+            
+            // drawn an increment
+            double population_theta = Forest::_theta; // TODO: need to fix this for changing theta
+            if (population_theta == 0.0) {
+                population_theta = Forest::_theta_mean;
+            }
+            assert (population_theta > 0.0);
+            double population_coalescence_rate = (s*(s-1))/population_theta;
+            double gene_increment = -log(1.0 - lot->uniform())/population_coalescence_rate;
+            
+            gene_increments.push_back(gene_increment);
+            
+            for (auto &nd:_lineages) {
+                nd->_edge_length += gene_increment;
+            }
+            
+            // join lineages at random
+            
+            // TODO: for now, prior-prior only
+            Node* subtree1;
+            Node* subtree2;
+            
+            pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
+            auto it1 = std::next(_lineages.begin(), t.first);
+            subtree1 = *it1;
+
+            auto it2 = std::next(_lineages.begin(), t.second);
+            subtree2 = *it2;
+            assert (t.first < _lineages.size());
+            assert (t.second < _lineages.size());
+
+            assert (subtree1 != subtree2);
+            
+            //new node is always needed
+            Node nd;
+            _nodes.push_back(nd);
+            Node* new_nd = &_nodes.back();
+
+            new_nd->_parent=0;
+            new_nd->_number=_nleaves+_ninternals;
+            new_nd->_edge_length=0.0;
+            new_nd->_right_sib=0;
+
+            new_nd->_left_child=subtree1;
+            subtree1->_right_sib=subtree2;
+
+            subtree1->_parent=new_nd;
+            subtree2->_parent=new_nd;
+
+            if (!_run_on_empty) {
+                //always calculating partials now
+                assert (new_nd->_partial == nullptr);
+                new_nd->_partial=ps.getPartial(_npatterns*4);
+                assert(new_nd->_left_child->_right_sib);
+
+//                if (_save_memory) {
+//                    for (auto &nd:_lineages) {
+//                        if (nd->_partial == nullptr) {
+//                            nd->_partial = ps.getPartial(_npatterns*4);
+//                            calcPartialArray(nd);
+//                        }
+//                    }
+//                }
+                calcPartialArray(new_nd);
+
+//                subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
+//                subtree2->_partial=nullptr;
+                
+                // do not update species partition
+                updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+            }
+        }
+        
+//        showForest();
+        _gene_tree_log_likelihood = calcLogLikelihood();
+        _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
+        
+        assert (_lineages.size() == 1);
+        
+        while (_lineages.size() < lineage_size_before) {
+
+            // revert _lineages if > 1 choice
+            Node* parent = _lineages.back();
+            Node* child1 = parent->_left_child;
+            Node* child2 = parent->_left_child->_right_sib;
+            
+            revertNodeVector(_lineages, child1, child2, parent);
+
+            //reset siblings and parents of original nodes back to 0
+            child1->resetNode(); //subtree1
+            child2->resetNode(); //subtree2
+
+            // clear new node from _nodes
+            //clear new node that was just created
+            parent->clear(); //new_nd
+            
+            for (auto &nd:_lineages) {
+                nd->_edge_length -= gene_increments.back();
+//                assert (nd->_edge_length >= 0.0);
+            }
+            gene_increments.pop_back();
+//            showForest();
+        }
+        
+        // erase extra nodes created from node list
+        while (_nodes.size() > node_size_before) {
+            _nodes.pop_back();
+        }
+        
+        assert (_nodes.size() == node_size_before);
+        
+        // reset partials for last node because they have been deleted // TODO: can make this faster
+//        if (_lineages.size() > 1) {
+//            Node* new_nd = _lineages.back();
+//
+//            assert (new_nd->_partial == nullptr);
+//            new_nd->_partial=ps.getPartial(_npatterns*4);
+//            assert(new_nd->_left_child->_right_sib);
+//
+//            calcPartialArray(_lineages.back()); // TODO: necessary?
+//        }
+        
+        assert(gene_increments.size() == 0);
+        assert (_lineages.size() == lineage_size_before);
+//        showForest();
+        
+//        _gene_tree_log_likelihood = _gene_tree_log_likelihood_before_rest_of_tree_built; // trying to recalculate
+    }
+
     inline void Forest::allowCoalescence(string species_name, double increment, Lot::SharedPtr lot) {
         double prev_log_likelihood = _gene_tree_log_likelihood;
 
@@ -2068,8 +2213,10 @@ class Forest {
             }
             calcPartialArray(new_nd);
 
+#if !defined (BUILD_UPGMA_TREE)
             subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
             subtree2->_partial=nullptr;
+#endif
         }
 
             //update species list
@@ -2084,8 +2231,12 @@ class Forest {
             }
 
             if ((_proposal == "prior-prior" || one_choice) && (!_run_on_empty) ) {
+#if !defined(BUILD_UPGMA_TREE)
                 _gene_tree_log_likelihood = calcLogLikelihood();
                 _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
+#else
+//                _gene_tree_log_likelihood_before_rest_of_tree_built = calcLogLikelihood();
+#endif
             }
         if (_save_memory) {
             for (auto &nd:_nodes) {
