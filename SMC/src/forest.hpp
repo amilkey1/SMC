@@ -7,6 +7,7 @@
 #include <vector>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/math/tools/minima.hpp>
 #include <thread>
 #include <mutex>
 #include <algorithm>
@@ -1984,7 +1985,94 @@ class Forest {
          return make_pair(subtree1, subtree2);
      }
 
+    struct negLogLikeDist {
+        negLogLikeDist(unsigned npatterns, unsigned first, const Data::pattern_counts_t & counts, const vector<double> & same, const vector<double> & diff, double v0)
+            : _npatterns(npatterns), _first(first), _counts(counts), _same(same), _diff(diff), _v0(v0) {}
+        
+        double operator()(double const & v) {
+            double edgelen = v + _v0;
+            double tprob_same = 0.25 + 0.75*exp(-4.0*edgelen/3.0);
+            double tprob_diff = 0.25 - 0.25*exp(-4.0*edgelen/3.0);
+
+            double log_like = 0.0;
+            for (unsigned p = 0; p < _npatterns; p++) {
+                double site_like = 0.25 * (tprob_same * _same[p] + tprob_diff * _diff[p]);
+                log_like += log(site_like) * _counts[_first + p];
+            }
+            
+            return -log_like;
+        }
+        
+        private:
+            unsigned _npatterns;
+            unsigned _first;
+            const Data::pattern_counts_t & _counts;
+            const vector<double> & _same;
+            const vector<double> & _diff;
+            double _v0;
+    };
+
     inline void Forest::buildRestOfTree(Lot::SharedPtr lot) {
+        // TODO: instead of drawing branch lengths from prior, calculate distances - use paul's code
+        // Get the number of patterns
+        unsigned npatterns = _data->getNumPatternsInSubset(_index - 1); // forest index starts at 1 but subsets start at 0
+
+        // Get the first and last pattern index for this gene's data
+        Data::begin_end_pair_t be = _data->getSubsetBeginEnd(_index - 1);
+        unsigned first_pattern = be.first;
+        
+        // Get the name of the gene (data subset)
+        //string gene_name = _data->getSubsetName(_gene_index);
+
+        // Get pattern counts
+        auto counts = _data->getPatternCounts();
+        
+        // Create vectors to store products of same-state and different-state partials
+        vector<double> same_state(npatterns, 0.0);
+        vector<double> diff_state(npatterns, 0.0);
+
+        // Calculate distances between all pairs of lineages
+        map<pair<unsigned,unsigned>, double> d;
+        size_t n = _lineages.size();
+        for (unsigned i = 0; i < n - 1; i++) {
+            for (unsigned j = i + 1; j < n; j++) {
+                pair<unsigned, unsigned> ij = make_pair(i,j);
+                Node * lnode = _lineages[i];
+                Node * rnode = _lineages[j];
+                
+                // Fill same_state and diff_state vectors
+                same_state.assign(npatterns, 0.0);
+                diff_state.assign(npatterns, 0.0);
+                for (unsigned p = 0; p < npatterns; p++) {
+                    for (unsigned lstate = 0; lstate < _nstates; lstate++) {
+                        auto & l_partial_array = *(lnode->_partial);
+//                        double lpartial = lnode->_partial[p*_nstates + lstate];
+                        double lpartial = l_partial_array[p*_nstates + lstate];
+                        for (unsigned rstate = 0; rstate < _nstates; rstate++) {
+//                            double rpartial = rnode->_partial[p*_nstates + rstate];
+                            auto & r_partial_array = *(rnode->_partial);
+                            double rpartial = r_partial_array[p*_nstates + rstate];
+                            if (lstate == rstate)
+                                same_state[p] += lpartial*rpartial;
+                            else
+                                diff_state[p] += lpartial*rpartial;
+                        }
+                    }
+                }
+                
+                // Optimize edge length using black-box maximizer
+                double v0 = lnode->getEdgeLength() + rnode->getEdgeLength();
+                negLogLikeDist f(npatterns, first_pattern, counts, same_state, diff_state, v0);
+                auto r = boost::math::tools::brent_find_minima(f, 0.0, 2.0, std::numeric_limits<double>::digits);
+                double maximized_log_likelihood = -r.second;
+                d[ij] = r.first;
+                
+//                output(format("d[%d, %d] = %.7f (logL = %.5f") % i % j % d[ij] % maximized_log_likelihood, 1);
+            
+            }
+        }
+        
+        // TODO: then create a UPGMA tree
         unsigned lineage_size_before = (unsigned) _lineages.size();
         unsigned node_size_before = (unsigned) _nodes.size();
         

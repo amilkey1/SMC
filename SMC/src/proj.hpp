@@ -1133,7 +1133,7 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                 
 #else
         cout << "\n";
-        my_vec[0].calcLogLikelihood(); // TODO: delete this
+//        my_vec[0].calcLogLikelihood(); // TODO: delete this
         string filename1 = "species_trees.trees";
         string filename2 = "unique_species_trees.trees";
         string filename3 = "params-beast-comparison.log";
@@ -1475,7 +1475,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
         for (unsigned p=0; p < nparticles; p++) {
             probs[p] = particles[p].getLogWeight();
         }
-
         // Normalize log_weights to create discrete probability distribution
         double log_sum_weights = getRunningSum(probs);
         
