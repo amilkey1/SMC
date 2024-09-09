@@ -753,6 +753,8 @@ inline vector<double> Particle::getVectorPrior() {
 #if defined (PRIOR_POST_ON_GENES)
         proposalPriorPostGenes();
 #else
+        double inv_gamma_modifier = 0.0;
+        
         unsigned next_gene = _gene_order[_generation];
         bool calc_weight = false;
         
@@ -791,15 +793,14 @@ inline vector<double> Particle::getVectorPrior() {
                 }
                 
                 unsigned next_species_index = _next_species_number_by_gene[next_gene-1];
-               double species_increment = _t_by_gene[next_gene-1][next_species_index].second;
+                double species_increment = _t_by_gene[next_gene-1][next_species_index].second;
                 
                 string species_name = "species";
                 
-//                if (total_rate > 0.0) { // if total rate is 0, gene increment will be -1.0, which will be taken care of
-//                    double gene_increment = -log(1.0 - _lot->uniform())/total_rate;
+              // if total rate is 0, gene increment will be -1.0, which will be taken care of
 
-                    if (gene_increment < species_increment || species_increment == 0.0) { // if speices increment is 0.0, choose a coalescent event because the species tree is finished
-//                    if ((gene_increment < species_increment || _forests[next_gene]._species_partition.size() == 1) && gene_increment != -1.0 && species_increment != -1) { // TODO: not sure about speciation time
+                    if (gene_increment < species_increment || species_increment == 0.0) { // if species increment is 0.0, choose a coalescent event because the species tree is finished
+
                         
                         if (gene_increment != -1.0) {
                             assert (gene_increment > 0.0);
@@ -824,6 +825,44 @@ inline vector<double> Particle::getVectorPrior() {
                         }
                         else {
                             // carry out speciation event
+                            
+#if defined (DRAW_NEW_THETA)
+                            // only do this for first locus that creates the new species
+//                            unsigned next = _next_species_number;
+//                            unsigned next = _next_species_number_by_gene[next_gene - 1]; // TODO: unsure
+                            string name = get<2>(_t_by_gene[next_gene-1][next_species_index+1].first);
+//                            string name = boost::str(boost::format("node-%d")%next);
+                            
+                            bool update_map = true;
+                            if (_forests[next_gene]._theta_map[name]) {
+                                update_map = false;
+                            }
+                            
+                            if (update_map) {
+                                _forests[1].updateThetaMap(_lot, name);
+                                if (_forests.size() > 2) {
+                                    for (int i=2; i<_forests.size(); i++) {
+                                        _forests[i]._theta_map = _forests[1]._theta_map;
+                                    }
+                                }
+                            }
+#endif
+                      
+#if defined (INV_GAMMA_PRIOR_TWO) // TODO: not sure this works anymore
+                    double theta_mean = _forests[1]._theta_mean;
+                    double eps = 0.01;
+                    double a = 2.0;
+
+                    inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
+
+                    // new theta drawn for the new population
+//                    string new_spp = _forests[0]._lineages.back()->_name;
+                    string new_spp = get<2>(_t_by_gene[next_gene-1][next_species_index+1].first);
+                    double y = _forests[1]._theta_map[new_spp];
+
+                    inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
+#endif
+                            
                             assert (species_increment > 0.0);
                             assert (_forests[next_gene]._species_partition.size() > 1);
                             _forests[next_gene].addIncrement(species_increment);
@@ -837,13 +876,12 @@ inline vector<double> Particle::getVectorPrior() {
                     }
                     
                     }
+                
                     if (calc_weight) { // calc weight just means coalescent event has bene proposed
                         done = true;
                     }
-//                    }
                 }
                 
-        _log_weight = _forests[next_gene]._log_weight;
 
                      if (_forests[1]._theta_mean == 0.0) {
                          assert (_forests[1]._theta > 0.0);
@@ -854,7 +892,31 @@ inline vector<double> Particle::getVectorPrior() {
                      assert (_forests[1]._theta_mean > 0.0);
                      
                      done = true;
+        
         _generation++;
+        
+#if defined (INV_GAMMA_PRIOR_TWO)
+                if (_generation == 0) {
+                    inv_gamma_modifier = 0.0;
+                    double theta_mean = _forests[1]._theta_mean;
+                    double eps = 0.01;
+                    double a = 2.0;
+
+                    inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
+
+                    // for first step, new theta drawn for each tip population
+                    for (int i=0; i<Forest::_nspecies; i++) {
+                        auto it = _forests[1]._theta_map.begin();
+                        std::advance(it, i);
+                        double y = it->second;
+
+                        inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
+
+                    }
+                }
+#endif
+        
+        _log_weight = _forests[next_gene]._log_weight + inv_gamma_modifier;
 #endif
             }
 
