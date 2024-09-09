@@ -2298,9 +2298,9 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
 
                         //taxon joining and reweighting step
                         
-                        if (Forest::_proposal == "prior-prior") {
+//                        if (Forest::_proposal == "prior-prior") {
                             proposeParticles(my_vec);
-                        }
+//                        }
 
                         unsigned num_species_particles_proposed = 0;
 
