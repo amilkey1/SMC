@@ -779,7 +779,6 @@ inline vector<double> Particle::getVectorPrior() {
         // TODO: trim species tree back after each locus has been filtered once
         
             while (!done) {
-                bool speciation = false;
                 vector<pair<double, string>> rates_by_species = _forests[next_gene].calcForestRate(_lot);
                 double total_rate = 0.0;
                 double gene_increment = -1.0;
@@ -799,10 +798,9 @@ inline vector<double> Particle::getVectorPrior() {
                 
               // if total rate is 0, gene increment will be -1.0, which will be taken care of
 
-                    if (gene_increment < species_increment || species_increment == 0.0) { // if species increment is 0.0, choose a coalescent event because the species tree is finished
+                    if ((gene_increment < species_increment || species_increment == 0.0) && gene_increment != -1.0) { // if species increment is 0.0, choose a coalescent event because the species tree is finished
 
                         
-                        if (gene_increment != -1.0) {
                             assert (gene_increment > 0.0);
                             _forests[next_gene].addIncrement(gene_increment);
                             
@@ -820,7 +818,9 @@ inline vector<double> Particle::getVectorPrior() {
                             string species_name = rates_by_species[index].second;
                             _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
                             
+                        if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
                             _t_by_gene[next_gene-1][next_species_index].second -= gene_increment; // update species tree increments
+                        }
                             calc_weight = true;
                         }
                         else {
@@ -848,7 +848,7 @@ inline vector<double> Particle::getVectorPrior() {
                             }
 #endif
                       
-#if defined (INV_GAMMA_PRIOR_TWO) // TODO: not sure this works anymore
+#if defined (INV_GAMMA_PRIOR_TWO) // TODO: does this happen with every speciation event, or just once per each set of loci?
                     double theta_mean = _forests[1]._theta_mean;
                     double eps = 0.01;
                     double a = 2.0;
@@ -863,35 +863,34 @@ inline vector<double> Particle::getVectorPrior() {
                     inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
 #endif
                             
-                            assert (species_increment > 0.0);
-                            assert (_forests[next_gene]._species_partition.size() > 1);
-                            _forests[next_gene].addIncrement(species_increment);
-                            _forests[next_gene].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
-                            assert (next_species_index < _t_by_gene[next_gene-1].size());
-                            _t_by_gene[next_gene-1][next_species_index].second -= species_increment; // update species tree increments
-                            assert (_t_by_gene[next_gene-1][next_species_index].second == 0.0);
-                            if (_forests[next_gene]._species_partition.size() > 1) {
-                                _next_species_number_by_gene[next_gene-1]++;
-                            }
-                    }
-                    
-                    }
-                
-                    if (calc_weight) { // calc weight just means coalescent event has bene proposed
-                        done = true;
+                    assert (species_increment > 0.0);
+                    assert (_forests[next_gene]._species_partition.size() > 1);
+                    _forests[next_gene].addIncrement(species_increment);
+                    _forests[next_gene].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
+                    assert (next_species_index < _t_by_gene[next_gene-1].size());
+                    _t_by_gene[next_gene-1][next_species_index].second -= species_increment; // update species tree increments
+                    assert (_t_by_gene[next_gene-1][next_species_index].second == 0.0);
+                    if (_forests[next_gene]._species_partition.size() > 1) {
+                        _next_species_number_by_gene[next_gene-1]++;
                     }
                 }
-                
+                    
+            
+                if (calc_weight) { // calc weight just means coalescent event has bene proposed
+                    done = true;
+                }
+            }
+            
 
-                     if (_forests[1]._theta_mean == 0.0) {
-                         assert (_forests[1]._theta > 0.0);
-                         for (int i=1; i<_forests.size(); i++) {
-                             _forests[i]._theta_mean = _forests[1]._theta;
-                         }
+                 if (_forests[1]._theta_mean == 0.0) {
+                     assert (_forests[1]._theta > 0.0);
+                     for (int i=1; i<_forests.size(); i++) {
+                         _forests[i]._theta_mean = _forests[1]._theta;
                      }
-                     assert (_forests[1]._theta_mean > 0.0);
-                     
-                     done = true;
+                 }
+                 assert (_forests[1]._theta_mean > 0.0);
+                 
+                 done = true;
         
         _generation++;
         
@@ -1735,6 +1734,7 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::trimSpeciesTree() {
+//        showParticle();
         bool trim = true;
         vector<double> gene_tree_heights;
         for (unsigned i=1; i<_forests.size(); i++) {
@@ -1777,10 +1777,8 @@ inline vector<double> Particle::getVectorPrior() {
                     amount_to_trim = _t[count - 2].second;
                     
                     _t.pop_back();
-//                    _t[count-2].second -= amount_to_trim;
                     
                     for (auto &g:_t_by_gene) {
-//                        g[count-2].second -= amount_to_trim;
                         g.pop_back();
                     }
                     _forests[0]._ninternals--;
@@ -1799,10 +1797,13 @@ inline vector<double> Particle::getVectorPrior() {
                         nd->_edge_length -= amount_to_trim;
                     }
                     _t[count-2].second -= amount_to_trim;
+//                    assert(_t[count-2].second >= 0.0);
+//                    assert(fabs(_t[count-2].second)>0.000001);
+                    
                     for (auto &g:_t_by_gene) {
                         g[count-2].second -= amount_to_trim;
-                        // TODO: need to also remove joined nodes from _t_by_gene
-//                        g[count-2].first = make_tuple("placeholder", "placeholder", "placeholder");
+//                        double a = fabs(g[count-2].second)
+//                        assert(fabs(g[count-2].second)>0.000001);
                     }
                     done = true;
                 }
@@ -1810,6 +1811,7 @@ inline vector<double> Particle::getVectorPrior() {
             }
 
         }
+//        showParticle();
     }
 
     inline void Particle::rebuildSpeciesTree() {
