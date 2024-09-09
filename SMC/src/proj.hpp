@@ -2212,6 +2212,32 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
                     p->setNSites(nsites);
                 }
 #endif
+      
+                unsigned list_size = (ntaxa-1)*nsubsets;
+                vector<unsigned> gene_order;
+                
+                unsigned count = 1;
+                vector<pair<double, unsigned>> randomize;
+                for (unsigned l=0; l<list_size; l++) {
+                    if (count == 1) {
+                        randomize.clear();
+                    }
+                    randomize.push_back(make_pair(rng.uniform(), count));
+                    count++;
+                    if (count > nsubsets) {
+                        sort(randomize.begin(), randomize.end());
+                        for (auto &r:randomize) {
+                            gene_order.push_back(r.second);
+                        }
+                        count = 1;
+                    }
+                }
+                
+                assert (gene_order.size() == list_size);
+                
+                for (auto &p:my_vec) {
+                    p->setGeneOrder(gene_order);
+                }
                 
                 if (_species_newick_name != "null" || _start_from_species_tree_prior) {
                     // set particle random number seeds
@@ -2256,8 +2282,8 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle::SharedPtr> &v
 
                     //run through each generation of particles
 
-//                    unsigned nsteps = (ntaxa-1)*nsubsets;
-                unsigned nsteps = (ntaxa - 1);
+                    unsigned nsteps = (ntaxa-1)*nsubsets;
+//                unsigned nsteps = (ntaxa - 1);
                 
                     for (unsigned g=0; g<nsteps; g++){
                         if (_verbose > 0) {

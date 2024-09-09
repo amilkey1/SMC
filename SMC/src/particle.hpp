@@ -96,6 +96,7 @@ class Particle {
         string                                          saveGamma();
         void                                            calculateGamma();
         int                                             selectEvent(vector<double> weight_vec);
+        int                                             selectEventLinearScale(vector<double> weight_vec);
         double                                          getTopologyPrior(unsigned i);
         vector<pair<double, double>>                    getIncrementPriors(unsigned i);
         vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
@@ -143,6 +144,7 @@ class Particle {
         string                                          getTranslateBlock();
         void                                            setNSites(vector<unsigned> nsites) {_nsites_per_gene = nsites;}
         void                                            buildEntireSpeciesTree();
+        void                                            setGeneOrder(vector<unsigned> gene_order) {_gene_order = gene_order;}
     
 //        static bool                                     _run_on_empty;
 
@@ -171,6 +173,7 @@ class Particle {
         vector<double>                          _starting_log_likelihoods;
         vector<unsigned>                        _nsites_per_gene;
         vector<double>                          _gene_weights;
+        vector<unsigned>                        _gene_order;
 };
 
     inline Particle::Particle() {
@@ -230,6 +233,7 @@ class Particle {
         _t_by_gene.clear();
         _next_species_number_by_gene.clear();
         _gene_weights.clear();
+        _gene_order.clear();
     }
 
     inline void Particle::showSpeciesTree() {
@@ -749,7 +753,11 @@ inline vector<double> Particle::getVectorPrior() {
 #if defined (PRIOR_POST_ON_GENES)
         proposalPriorPostGenes();
 #else
+        unsigned next_gene = _gene_order[_generation];
+        bool calc_weight = false;
+        
         if (_generation == 0) {
+            buildEntireSpeciesTree();
 //            _forests[0].showForest();
             // make a separate species tree information vector for each gene
             for (unsigned i=1; i<_forests.size(); i++) {
@@ -762,11 +770,13 @@ inline vector<double> Particle::getVectorPrior() {
         _species_join_proposed = false;
         bool done = false;
         
-        for (unsigned i=1; i<_forests.size(); i++) {
-            done = false;
+        // TODO: only do this for one forest at a time
+        // TODO: filter only one locus per generation (the same one for each particle)
+        // TODO: trim species tree back after each locus has been filtered once
+        
             while (!done) {
-                bool calc_weight = false;
-                vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate(_lot);
+                bool speciation = false;
+                vector<pair<double, string>> rates_by_species = _forests[next_gene].calcForestRate(_lot);
                 double total_rate = 0.0;
                 double gene_increment = -1.0;
                 if (rates_by_species.size() > 0) {
@@ -777,401 +787,74 @@ inline vector<double> Particle::getVectorPrior() {
                     gene_increment = -log(1.0 - _lot->uniform())/total_rate;
                     assert (gene_increment > 0.0);
                 }
-
-                unsigned next_species_index = _next_species_number_by_gene[i-1];
-                double species_increment = _t_by_gene[i-1][next_species_index].second;
                 
-                if ((gene_increment < species_increment || _forests[i]._species_partition.size() == 1) && gene_increment != -1.0) {
-                    // if the species forest is done, don't choose a speciation event
+                unsigned next_species_index = _next_species_number_by_gene[next_gene-1];
+               double species_increment = _t_by_gene[next_gene-1][next_species_index].second;
+                
+                string species_name = "species";
+                
+//                if (total_rate > 0.0) { // if total rate is 0, gene increment will be -1.0, which will be taken care of
+//                    double gene_increment = -log(1.0 - _lot->uniform())/total_rate;
 
-                    assert (gene_increment > 0.0);
-                    _forests[i].addIncrement(gene_increment); // add increment to each lineage in the gene forest
-
-                    vector<double> event_choice_rates;
-                    for (auto &r:rates_by_species) {
-                        event_choice_rates.push_back(r.first);
+                    if (gene_increment < species_increment || species_increment == 0.0) { // if speices increment is 0.0, choose a coalescent event because the species tree is finished
+//                    if ((gene_increment < species_increment || _forests[next_gene]._species_partition.size() == 1) && gene_increment != -1.0 && species_increment != -1) { // TODO: not sure about speciation time
+                        
+                        if (gene_increment != -1.0) {
+                            assert (gene_increment > 0.0);
+                            _forests[next_gene].addIncrement(gene_increment);
+                            
+                            vector<double> event_choice_rates;
+                            for (auto &r:rates_by_species) {
+                                event_choice_rates.push_back(r.first);
+                            }
+                            for (auto &p:event_choice_rates) {
+                                 p = log(p/total_rate);
+                             }
+                            
+                            _deep_coal = true;
+                            
+                            unsigned index = selectEvent(event_choice_rates);
+                            string species_name = rates_by_species[index].second;
+                            _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
+                            
+                            _t_by_gene[next_gene-1][next_species_index].second -= gene_increment; // update species tree increments
+                            calc_weight = true;
+                        }
+                        else {
+                            // carry out speciation event
+                            assert (species_increment > 0.0);
+                            assert (_forests[next_gene]._species_partition.size() > 1);
+                            _forests[next_gene].addIncrement(species_increment);
+                            _forests[next_gene].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
+                            assert (next_species_index < _t_by_gene[next_gene-1].size());
+                            _t_by_gene[next_gene-1][next_species_index].second -= species_increment; // update species tree increments
+                            assert (_t_by_gene[next_gene-1][next_species_index].second == 0.0);
+                            if (_forests[next_gene]._species_partition.size() > 1) {
+                                _next_species_number_by_gene[next_gene-1]++;
+                            }
                     }
-                    for (auto &p:event_choice_rates) {
-                         p = log(p/total_rate);
-                     }
-
-                    unsigned index = selectEvent(event_choice_rates);
-                    string species_name = rates_by_species[index].second;
-                    _forests[i].allowCoalescence(species_name, gene_increment, _lot);
                     
-                    _t_by_gene[i-1][next_species_index].second -= gene_increment; // update species tree increments
-                    calc_weight = true;
-                }
-
-                else {
-                    // carry out speciation event
-                    assert (_forests[i]._species_partition.size() > 1);
-//                    _forests[0].showForest();
-//                    _forests[i].showForest();
-                    _forests[i].addIncrement(species_increment);
-                    _forests[i].updateSpeciesPartition(_t_by_gene[i-1][next_species_index+1].first);
-//                    _forests[i].updateSpeciesPartition(_t_by_gene[i-1][next_species_index].first);
-                    assert (next_species_index < _t_by_gene[i-1].size());
-                    _t_by_gene[i-1][next_species_index].second -= species_increment; // update species tree increments
-                    assert (_t_by_gene[i-1][next_species_index].second == 0.0);
-                    if (_forests[i]._species_partition.size() > 1) {
-                        _next_species_number_by_gene[i-1]++;
                     }
+                    if (calc_weight) { // calc weight just means coalescent event has bene proposed
+                        done = true;
+                    }
+//                    }
                 }
-//                _forests[i].showForest();
-                if (calc_weight) {
-                    _gene_weights.push_back(_forests[i]._log_weight);
-                    done = true; // reset done bool for next gene
-                }
-            }
-        }
-        
-        // TODO: calculate each gene weight
-        // TODO: add all weights together for total weight
-        _log_weight = 0.0;
-        assert (_gene_weights.size() == _forests.size() - 1);
-        for (auto &g:_gene_weights) {
-            _log_weight += g;
-        }
-//
-//        for (unsigned i=1; i<_forests.size(); i++) {
-//            cout << _forests[i]._lineages.size() << endl;
-//        }
-//        cout << "stop";
                 
-//        while (!done) {
-//            // TODO: do this by gene instead
-//
-//            bool speciation = false;
-//
-//            vector<double> forest_rates; // this vector contains total rate of species tree, gene 1, etc.
-//            vector<vector<double>> gene_forest_rates; // this vector contains rates by species for each gene forest
-//            gene_forest_rates.resize(_forests.size()-1);
-//            vector<unsigned> event_choice_index;
-//            vector<string> event_choice_name;
-//
-//            for (int i=0; i<_forests.size(); i++) {
-//                if (i > 0) {
-//                    vector<pair<double, string>> rates_by_species = _forests[i].calcForestRate(_lot);
-//                    double total_gene_rate = 0.0;
-//                    for (auto &r:rates_by_species) {
-//                        gene_forest_rates[i-1].push_back(r.first);
-//                        event_choice_name.push_back(r.second);
-//                        total_gene_rate += r.first;
-//                        event_choice_index.push_back(i);
-//                    }
-//                    if (total_gene_rate > 0.0) {
-//                        forest_rates.push_back(total_gene_rate);
-//                    }
-//
-//    #if defined (SNAKE)
-//                    Forest::_theta = 0.001;
-//    #endif
-//                }
-//                else {
-//                    if (_forests[0]._lineages.size() > 1) {
-//                        forest_rates.push_back(Forest::_lambda * _forests[0]._lineages.size());
-//                        event_choice_index.push_back(0);
-//                        event_choice_name.push_back("species");
-//                    }
-//                    else {
-//                        _forests[0]._done = true;
-//                    }
-//                }
-//            }
-//
-//            vector<double> event_choice_rates;
-//            if (_forests[0]._lineages.size() > 1) {
-//                event_choice_rates.push_back(forest_rates[0]); // push back species tree rate
-//            }
-//            for (int i=0; i<gene_forest_rates.size(); i++) {
-//                for (auto &r:gene_forest_rates[i]) {
-//                    assert (r > 0.0);
-//                    event_choice_rates.push_back(r);
-//                }
-//            }
-//
-//            bool no_speciation = false;
-//            double speciation_time = -1;
-//            unsigned index = 0;
-//            double increment = 0.0;
-//
-//#if defined (USE_TOTAL_RATE)
-//            unsigned forest_number = 0;
-//            string species_name = "species";
-//            double total_rate = 0.0;
-//
-//            for (auto &r:event_choice_rates) {
-//                total_rate += r;
-//            }
-//
-//            if (event_choice_name[0] == "species") {
-//                total_rate -= event_choice_rates[0]; // remove speciation rate from total rate used for choosing increment
-//                speciation_time = -log(1.0 - _lot->uniform()) / event_choice_rates[0];
-//            }
-//
-//            if (total_rate > 0.0) {
-//                double gene_increment = -log(1.0 - _lot->uniform())/total_rate;
-////                cout << "\tincrement is : " << gene_increment << endl;
-//
-//                if (gene_increment > speciation_time && speciation_time != -1) {
-//                    _deep_coal = true;
-////#if defined (DRAW_NEW_THETA)
-//                    if (_forests[0]._lineages.size() <= Forest::_nspecies) {
-//                        string name = boost::str(boost::format("node-%d")%_next_species_number);
-//#if defined (DRAW_NEW_THETA)
-//                        _forests[1].updateThetaMap(_lot, name);
-//                        if (_forests.size() > 2) {
-//                            for (int i=2; i<_forests.size(); i++) {
-//                                _forests[i]._theta_map = _forests[1]._theta_map;
-//                            }
-//                        }
-//#endif
-//                    }
-//                    _next_species_number++;
-//                    // num deep coalescences += (n-1), where n is number of lineages in each affected species lineage for all genes
-//                    // need to know which species joined to calculate this
-//                }
-//
-//                if (gene_increment < speciation_time || speciation_time == -1) {
-//                    // choose a coalescent event if coalescent increment < speciation increment or if species tree is finished
-//                    increment = gene_increment;
-//                    if (event_choice_name[0] == "species") { // remove the speciation event from consideration
-//                        event_choice_index.erase(event_choice_index.begin() + 0);
-//                        event_choice_name.erase(event_choice_name.begin() + 0);
-//                        event_choice_rates.erase(event_choice_rates.begin() + 0);
-//                    }
-//
-//                    for (auto &p:event_choice_rates) {
-//                         p = log(p/total_rate);
-//                     }
-//
-//                    index = selectEvent(event_choice_rates);
-//
-//                    forest_number = event_choice_index[index];
-//                    species_name = event_choice_name[index];
-//                    assert (species_name != "species");
-//                    assert (forest_number != 0);
-//
-//                }
-//                else {
-//                    forest_number = 0;
-//                    increment = speciation_time;
-//                    assert (increment != -1.0);
-//                    no_speciation = false;
-//                }
-//            }
-//            else {
-//                forest_number = 0;
-//                increment = speciation_time;
-//                assert (increment != -1.0);
-//                no_speciation = false;
-//
-//#if defined (DRAW_NEW_THETA)
-//                if (_forests[0]._lineages.size() <= Forest::_nspecies) {
-//                    string name = boost::str(boost::format("node-%d")%_next_species_number);
-//                    _forests[1].updateThetaMap(_lot, name);
-//                }
-//                if (_forests.size() > 2) {
-//                    for (int i=2; i<_forests.size(); i++) {
-//                        _forests[i]._theta_map = _forests[1]._theta_map;
-//                    }
-//                }
-//#endif
-//                _next_species_number++;
-//            }
-//
-//#else
-//            vector<double> increments = chooseIncrements(event_choice_rates);
-//
-////            double speciation_time = -1;
-//            if (!_forests[0]._done) {
-//                speciation_time = increments[0];
-//            }
-//
-//            if (speciation_time > -1) { // otherwise, species tree is done, and there is no constraint on gene tree increments
-//                for (int i = (int) increments.size()-1; i>0; i--) {
-//                    if (increments [i] > speciation_time) {
-//                        event_choice_index.erase(event_choice_index.begin() + i);
-//                        event_choice_name.erase(event_choice_name.begin() + i);
-//                        event_choice_rates.erase(event_choice_rates.begin() + i);
-//                        increments.erase(increments.begin() + i);
-//                    }
-//                }
-//            }
-//
-//            // if a gene forest coalescence is possible, do not pick a speciation event
-////            bool no_speciation = false;
-//            if (event_choice_name[0] == "species" && event_choice_name.size() > 1) {
-////                 erase speciation event possibility
-//                event_choice_index.erase(event_choice_index.begin() + 0);
-//                event_choice_name.erase(event_choice_name.begin() + 0);
-//                event_choice_rates.erase(event_choice_rates.begin() + 0);
-//                increments.erase(increments.begin() + 0);
-//                no_speciation = true;
-//            }
-//
-//            double total_rate = 0.0; // normalize rates before selecting an event
-//            for (auto &r:event_choice_rates) {
-//                assert (r > 0.0);
-//                total_rate += r;
-//            }
-//
-//            // choose the minimum coalescence time
-//            double min_coalescence_time = 0.0;
-//            index = 0;
-//            unsigned forest_number = 0;
-//
-//            if (event_choice_name.size() == 1 && event_choice_name[0] == "species") {
-//                // choose the speciation event
-//                showParticle();
-//                increment = speciation_time;
-//                assert (speciation_time == increments[0]);
-//            }
-//            else {
-//                // choose the minimum event
-//                min_coalescence_time = *min_element(std::begin(increments), std::end(increments));
-//                increment = min_coalescence_time;
-//                bool entered = false;
-//                for (int i=0; i<increments.size(); i++) {
-//                    if (increments[i] == min_coalescence_time) {
-//                        index = i;
-//                        entered = true;
-//                        break;
-//                    }
-//                }
-//                assert (entered);
-//                forest_number = event_choice_index[index];
-//                if (no_speciation) {
-//                    assert (forest_number != 0);
-//                }
-//            }
-//
-//            string species_name = event_choice_name[index];
-//#endif
-//
-//            // add increment to all nodes in all forests
-//            for (int i=0; i<_forests.size(); i++) {
-//                if (_forests[i]._lineages.size() > 1) {
-//                    _forests[i].addIncrement(increment); // if forest is finished, don't add another increment
-//                }
-//                else {
-//                    _forests[i]._done = true;
-//                }
-//            }
-//
-//            if (forest_number == 0) {
-//                speciation = true;
-//            }
-//
-//            bool first_step = true;
-//            if (_forests[0]._lineages.size() != Forest::_nspecies) {
-//                first_step = false;
-//            }
-//
-//            if (first_step) {
-//                for (int i=1; i<_forests.size(); i++) {
-//                    if (_forests[i]._lineages.size() != Forest::_ntaxa) {
-//                        first_step = false;
-//                    }
-//                }
-//            }
-//
-//#if !defined (HIERARCHICAL_FILTERING)
-//            // only calculate increment priors if not doing another round of species filtering
-//            calculateIncrementPriors(increment, species_name, forest_number, speciation, first_step);
-//#endif
-//
-//            if (species_name == "species") {
-//                unsigned n = (unsigned) _forests[0]._lineages.size();
-//                assert (n > 1);
-//                assert (index == 0);
-//                assert (forest_number == 0);
-//
-//                speciesProposal();
-//
-//#if defined (INV_GAMMA_PRIOR_TWO)
-//                double theta_mean = _forests[1]._theta_mean;
-//                double eps = 0.01;
-//                double a = 2.0;
-//
-//                inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
-//
-//                // new theta drawn for the new population
-//                string new_spp = _forests[0]._lineages.back()->_name;
-//                double y = _forests[1]._theta_map[new_spp];
-//
-//                inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
-//#endif
-//
-//                _species_join_proposed = true;
-//                assert (increment > 0.0);
-//            }
-//
-//            else {
-//                assert (increment > 0.0);
-//                double log_speciation_term = 0.0;
-//                geneProposal(forest_number, increment, species_name);
-//                double log_likelihood_term = _forests[forest_number]._log_weight;
-//
-//                _log_weight = log_speciation_term + log_likelihood_term;
-//
-//                if (_forests[1]._theta_mean == 0.0) {
-//                    assert (_forests[1]._theta > 0.0);
-//                    for (int i=1; i<_forests.size(); i++) {
-//                        _forests[i]._theta_mean = _forests[1]._theta;
-//                    }
-//                }
-//                assert (_forests[1]._theta_mean > 0.0);
-//
-//                // modifier only happens on first round
-//                if (_generation == 0 && _forests[1]._theta_prior_mean > 0.0 && _forests[1]._theta_proposal_mean > 0.0) {
-//                    double prior_rate = 1.0/_forests[1]._theta_prior_mean;
-//                    double proposal_rate = 1.0/_forests[1]._theta_proposal_mean;
-//                    double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
-//
-//                    _log_weight += log_weight_modifier;
-//                }
-//
-//#if defined (INV_GAMMA_PRIOR_TWO)
-//                if (_generation == 0) {
-//                    inv_gamma_modifier = 0.0;
-//                    double theta_mean = _forests[1]._theta_mean;
-//                    double eps = 0.01;
-//                    double a = 2.0;
-//
-//                    inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
-//
-//                    // for first step, new theta drawn for each tip population
-//                    for (int i=0; i<Forest::_nspecies; i++) {
-//                        auto it = _forests[1]._theta_map.begin();
-//                        std::advance(it, i);
-//                        double y = it->second;
-//
-//                        inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
-//
-//                    }
-//                }
-//#endif
-//
-//
-//                done = true;
-//            }
-//
-//            if (Forest::_run_on_empty) {
-//                _log_weight = 0.0;
-//            }
-//
-//
-//            _prev_forest_number = forest_number;
-//
-//            _log_weight += inv_gamma_modifier;
-//
-//            }
-        
+        _log_weight = _forests[next_gene]._log_weight;
+
+                     if (_forests[1]._theta_mean == 0.0) {
+                         assert (_forests[1]._theta > 0.0);
+                         for (int i=1; i<_forests.size(); i++) {
+                             _forests[i]._theta_mean = _forests[1]._theta;
+                         }
+                     }
+                     assert (_forests[1]._theta_mean > 0.0);
+                     
+                     done = true;
         _generation++;
 #endif
-    }
+            }
 
     vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {
         vector<double> increments;
@@ -1840,6 +1523,24 @@ inline vector<double> Particle::getVectorPrior() {
             cout << "\n";
         }
     }
+        
+    inline int Particle::selectEventLinearScale(vector<double> weight_vec) {
+        // choose a random number [0,1]
+        double u =  _lot->uniform();
+        assert (u > 0.0);
+        assert (u < 1.0);
+        double cum_prob = 0.0;
+        unsigned index = 0;
+        for (int i=0; i < (int) weight_vec.size(); i++) {
+            cum_prob += weight_vec[i];
+            if (u <= cum_prob) {
+                index = i;
+                break;
+            }
+        }
+        // return index of choice
+        return index;
+    }
 
     inline int Particle::selectEvent(vector<double> weight_vec) {
         // choose a random number [0,1]
@@ -2018,6 +1719,7 @@ inline vector<double> Particle::getVectorPrior() {
         _t_by_gene = other._t_by_gene;
         _next_species_number_by_gene = other._next_species_number_by_gene;
         _gene_weights = other._gene_weights;
+        _gene_order = other._gene_order;
     };
 }
 
