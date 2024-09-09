@@ -144,7 +144,9 @@ class Particle {
         string                                          getTranslateBlock();
         void                                            setNSites(vector<unsigned> nsites) {_nsites_per_gene = nsites;}
         void                                            buildEntireSpeciesTree();
+        void                                            rebuildSpeciesTree();
         void                                            setGeneOrder(vector<unsigned> gene_order) {_gene_order = gene_order;}
+        void                                            trimSpeciesTree();
     
 //        static bool                                     _run_on_empty;
 
@@ -172,7 +174,6 @@ class Particle {
         vector<vector<pair<tuple<string, string, string>, double>>> _t_by_gene;
         vector<double>                          _starting_log_likelihoods;
         vector<unsigned>                        _nsites_per_gene;
-        vector<double>                          _gene_weights;
         vector<unsigned>                        _gene_order;
 };
 
@@ -232,7 +233,6 @@ class Particle {
         _nsites_per_gene.clear();
         _t_by_gene.clear();
         _next_species_number_by_gene.clear();
-        _gene_weights.clear();
         _gene_order.clear();
     }
 
@@ -758,20 +758,22 @@ inline vector<double> Particle::getVectorPrior() {
         
         if (_generation == 0) {
             buildEntireSpeciesTree();
-//            _forests[0].showForest();
             // make a separate species tree information vector for each gene
             for (unsigned i=1; i<_forests.size(); i++) {
                 _t_by_gene.push_back(_t);
                 _next_species_number_by_gene.push_back(0);
             }
         }
-        _gene_weights.clear();
+        else if (_generation % _nsubsets == 0) { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+            trimSpeciesTree();
+            if (_forests[0]._lineages.size() > 1) {
+                rebuildSpeciesTree();
+            }
+        }
         
         _species_join_proposed = false;
         bool done = false;
         
-        // TODO: only do this for one forest at a time
-        // TODO: filter only one locus per generation (the same one for each particle)
         // TODO: trim species tree back after each locus has been filtered once
         
             while (!done) {
@@ -1670,6 +1672,123 @@ inline vector<double> Particle::getVectorPrior() {
         _forests[forest_number] = f;
     }
 
+    inline void Particle::trimSpeciesTree() {
+        bool trim = true;
+        vector<double> gene_tree_heights;
+        for (unsigned i=1; i<_forests.size(); i++) {
+            if (_forests[i]._species_partition.size() > 1) {
+                gene_tree_heights.push_back(_forests[i].getTreeHeight());
+            }
+            else {
+                trim = false;
+                break;
+            }
+        }
+        
+        if (trim) {
+            double max_gene_tree_height = *max_element(gene_tree_heights.begin(), gene_tree_heights.end());
+            
+            bool done = false;
+            unsigned count = (unsigned) _t.size();
+            
+            while (!done) {
+                double species_tree_height = _forests[0].getTreeHeight();
+                double amount_to_trim = 0.0;
+                
+                Node* nd = _forests[0]._lineages.back();
+                if (_forests[0]._lineages.size() < Forest::_nspecies) {
+                    Node* subtree1 = nd->_left_child;
+                    Node* subtree2 = nd->_left_child->_right_sib;
+                    
+                    _forests[0].revertNodeVector(_forests[0]._lineages, subtree1, subtree2, nd);
+                    
+//                    //reset siblings and parents of original nodes back to 0
+                    subtree1->resetNode(); //subtree1
+                    subtree2->resetNode(); //subtree2
+
+                    // clear new node from _nodes
+                    //clear new node that was just created
+                    nd->clear(); //new_nd
+                    
+                    _forests[0]._nodes.pop_back();
+                    
+                    amount_to_trim = _t[count - 2].second;
+                    
+                    _t.pop_back();
+//                    _t[count-2].second -= amount_to_trim;
+                    
+                    for (auto &g:_t_by_gene) {
+//                        g[count-2].second -= amount_to_trim;
+                        g.pop_back();
+                    }
+                    _forests[0]._ninternals--;
+                }
+                
+                if (species_tree_height - amount_to_trim > max_gene_tree_height) {
+                    for (auto &nd:_forests[0]._lineages) {
+                        nd->_edge_length -= amount_to_trim;
+                    }
+
+                }
+                else {
+                    amount_to_trim = species_tree_height - max_gene_tree_height;
+                    assert (amount_to_trim > 0.0);
+                    for (auto &nd:_forests[0]._lineages) {
+                        nd->_edge_length -= amount_to_trim;
+                    }
+                    _t[count-2].second -= amount_to_trim;
+                    for (auto &g:_t_by_gene) {
+                        g[count-2].second -= amount_to_trim;
+                        // TODO: need to also remove joined nodes from _t_by_gene
+//                        g[count-2].first = make_tuple("placeholder", "placeholder", "placeholder");
+                    }
+                    done = true;
+                }
+                count--;
+            }
+
+        }
+    }
+
+    inline void Particle::rebuildSpeciesTree() {
+        
+        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+//        _t.push_back(make_pair(species_joined, edge_len));
+        
+        // draw an increment and add to existing species lineages, don't join anything else at this stage
+        _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
+        double edge_increment = _forests[0]._last_edge_length;
+        _t.back().second += edge_increment;
+        
+        for (auto &g:_t_by_gene) {
+            g.back().second += edge_increment;
+        }
+        
+        // now walk through loop,
+        while (_forests[0]._lineages.size() > 1) {
+            if (_forests[0]._lineages.size() > 1) {
+                species_joined = _forests[0].speciesTreeProposal(_lot);
+                
+                // if the species tree is not finished, add another species increment
+//                if (_forests[0]._lineages.size()>1) {
+//                    _forests[0].addSpeciesIncrement();
+//                }
+                
+                double edge_len = 0.0;
+                if (_forests[0]._lineages.size() > 1) {
+                    _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
+                    edge_len = _forests[0]._last_edge_length;
+                }
+                _t.push_back(make_pair(species_joined, edge_len));         // TODO: need to update _t and _t_by_gene
+                
+                for (auto &g:_t_by_gene) {
+                    g.push_back(make_pair(species_joined, edge_len));
+                }
+            }
+        }
+//        _forests[0].showForest();
+    }
+
     inline void Particle::buildEntireSpeciesTree() {
         _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
         double edge_len = _forests[0]._last_edge_length;
@@ -1718,7 +1837,6 @@ inline vector<double> Particle::getVectorPrior() {
         _nsites_per_gene = other._nsites_per_gene;
         _t_by_gene = other._t_by_gene;
         _next_species_number_by_gene = other._next_species_number_by_gene;
-        _gene_weights = other._gene_weights;
         _gene_order = other._gene_order;
     };
 }
