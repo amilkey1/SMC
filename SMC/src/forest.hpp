@@ -7,6 +7,7 @@
 #include <vector>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/math/tools/minima.hpp>
 #include <thread>
 #include <mutex>
 #include <algorithm>
@@ -122,6 +123,7 @@ class Forest {
         pair<Node*, Node*>          chooseAllPairs(list<Node*> &nodes, double increment, string species, Lot::SharedPtr lot);
         tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, double increment, string species);
         pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
+        void                        buildRestOfTree(Lot::SharedPtr lot);
 
     
         map<string, double>         _theta_map;
@@ -170,6 +172,10 @@ class Forest {
         pair<Node*, Node*>          _nodes_joined;
         vector<pair<Node*, Node*>>  _node_choices;
         vector<double>              _log_likelihood_choices;
+        double                      _infinity = numeric_limits<double>::infinity();
+    
+        stack<Node *>               _upgma_additions;
+        map<Node *, double>         _upgma_starting_edgelen;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -249,7 +255,8 @@ class Forest {
         _taxon_map.clear();
         _species_indices.clear();
         _vector_prior.clear();
-        
+        _upgma_additions = stack<Node*>();
+        _upgma_starting_edgelen.clear();
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -1269,6 +1276,11 @@ class Forest {
         _species_indices = other._species_indices;
         _vector_prior = other._vector_prior;
         _nodes_joined = other._nodes_joined;
+        _infinity = other._infinity;
+#if defined(BUILD_UPGMA_TREE)
+            _upgma_additions = other._upgma_additions;
+            _upgma_starting_edgelen = other._upgma_starting_edgelen;
+#endif
 
         // copy tree itself
 
@@ -1845,6 +1857,269 @@ class Forest {
             _log_coalescent_likelihood_increment = log_increment_prior;
         }
 #endif
+    }
+
+    struct negLogLikeDist {
+        negLogLikeDist(unsigned npatterns, unsigned first, const Data::pattern_counts_t & counts, const vector<double> & same, const vector<double> & diff, double v0)
+            : _npatterns(npatterns), _first(first), _counts(counts), _same(same), _diff(diff), _v0(v0) {}
+        
+        double operator()(double const & v) {
+            double edgelen = v + _v0;
+            double tprob_same = 0.25 + 0.75*exp(-4.0*edgelen/3.0);
+            double tprob_diff = 0.25 - 0.25*exp(-4.0*edgelen/3.0);
+
+            double log_like = 0.0;
+            for (unsigned p = 0; p < _npatterns; p++) {
+                double site_like = 0.25 * (tprob_same * _same[p] + tprob_diff * _diff[p]);
+                log_like += log(site_like) * _counts[_first + p];
+            }
+            
+            return -log_like;
+        }
+        
+        private:
+            unsigned _npatterns;
+            unsigned _first;
+            const Data::pattern_counts_t & _counts;
+            const vector<double> & _same;
+            const vector<double> & _diff;
+            double _v0;
+    };
+
+
+    inline void Forest::buildRestOfTree(Lot::SharedPtr lot) {
+    //        showForest();
+        double prev_log_likelihood = _gene_tree_log_likelihood; // TODO: double check this
+        // Get the number of patterns
+        unsigned npatterns = _data->getNumPatternsInSubset(_index - 1); // forest index starts at 1 but subsets start at 0
+
+        // Get the first and last pattern index for this gene's data
+        Data::begin_end_pair_t be = _data->getSubsetBeginEnd(_index - 1);
+        unsigned first_pattern = be.first;
+        
+        // Get the name of the gene (data subset)
+        //string gene_name = _data->getSubsetName(_gene_index);
+
+        // Get pattern counts
+        auto counts = _data->getPatternCounts();
+        
+        // Create vectors to store products of same-state and different-state partials
+        vector<double> same_state(npatterns, 0.0);
+        vector<double> diff_state(npatterns, 0.0);
+        
+        // Create a map relating position in dij vector to row,col in distance matrix
+        map<unsigned, pair<unsigned, unsigned>> dij_row_col;
+        
+        // Create distance matrix dij and workspace dij2 used to build next dij
+        // Both dij and dij2 are 1-dimensional vectors that store only the
+        // lower diagonal of the distance matrix (excluding diagonal elements)
+        unsigned n = (unsigned)_lineages.size();
+        vector<double> dij(n*(n-1)/2, _infinity);
+        vector<double> dij2;
+
+        // Calculate distances between all pairs of lineages
+        map<pair<unsigned,unsigned>, double> d;
+        for (unsigned i = 1; i < n; i++) {
+            for (unsigned j = 0; j < i; j++) {
+                pair<unsigned, unsigned> ij = make_pair(i,j);
+                Node * lnode = _lineages[i];
+                Node * rnode = _lineages[j];
+                
+                // Fill same_state and diff_state vectors
+                same_state.assign(npatterns, 0.0);
+                diff_state.assign(npatterns, 0.0);
+                for (unsigned p = 0; p < npatterns; p++) {
+                    for (unsigned lstate = 0; lstate < _nstates; lstate++) {
+                        auto & l_partial_array = *(lnode->_partial);
+                        double lpartial = l_partial_array[p*_nstates + lstate];
+                        for (unsigned rstate = 0; rstate < _nstates; rstate++) {
+                            auto & r_partial_array = *(rnode->_partial);
+                            double rpartial = r_partial_array[p*_nstates + rstate];
+                            if (lstate == rstate)
+                                same_state[p] += lpartial*rpartial;
+                            else
+                                diff_state[p] += lpartial*rpartial;
+                        }
+                    }
+                }
+                
+                // Optimize edge length using black-box maximizer
+                double v0 = lnode->getEdgeLength() + rnode->getEdgeLength();
+                negLogLikeDist f(npatterns, first_pattern, counts, same_state, diff_state, v0);
+                auto r = boost::math::tools::brent_find_minima(f, 0.0, 2.0, std::numeric_limits<double>::digits);
+                double maximized_log_likelihood = -r.second;
+                unsigned k = i*(i-1)/2 + j;
+                dij[k] = r.first;
+                dij_row_col[k] = make_pair(i,j);
+                
+    //                output(format("d[%d, %d] = %.7f (logL = %.5f") % i % j % d[ij] % maximized_log_likelihood, 1);
+            
+            }
+        }
+        
+        // Create a map relating nodes in _lineages to rows of dij
+        // Also save starting edge lengths so they can be restored in destroyUPGMA()
+        map<Node *, unsigned> row;
+        _upgma_starting_edgelen.clear();
+        for (unsigned i = 0; i < n; i++) {
+            Node * nd = _lineages[i];
+            _upgma_starting_edgelen[nd] = nd->_edge_length;
+            row[nd] = i;
+        }
+
+        // Build UPGMA tree on top of existing forest
+        assert(_upgma_additions.empty());
+        unsigned nsteps = n - 1;
+        while (nsteps > 0) {
+            // Find smallest entry in d
+            auto it = min_element(dij.begin(), dij.end()); // TODO: why infinity for some of theM?
+            unsigned offset = (unsigned)std::distance(dij.begin(), it);
+            auto p = dij_row_col.at(offset);
+            unsigned i = p.first;
+            unsigned j = p.second;
+            
+            // Update all leading edge lengths
+            double v = *it;
+            for (auto nd : _lineages) {
+                nd->_edge_length += 0.5*v;
+            }
+            
+            //debugShowLineages();
+            
+            // Join lineages i and j
+            Node nd;
+            _nodes.push_back(nd);
+            Node* new_nd = &_nodes.back();
+
+            Node * subtree1 = _lineages[i];
+            Node * subtree2 = _lineages[j];
+            
+            new_nd->_parent=0;
+            new_nd->_number=_nleaves+_ninternals;
+            new_nd->_right_sib=0;
+
+            new_nd->_left_child=subtree1;
+            subtree1->_right_sib=subtree2;
+
+            subtree1->_parent=new_nd;
+            subtree2->_parent=new_nd;
+            
+            // Nodes added to _upgma_additions will be removed in destroyUPGMA()
+            _upgma_additions.push(new_nd);
+            
+            // Remove lnode and rnode from _lineages and add anc at the end
+            updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+            row[new_nd] = i;
+                        
+            //debugShowLineages();
+            // output(format("\nJoining lineages %d and %d\n") % i % j, 0);
+
+            assert (new_nd->_partial == nullptr);
+            new_nd->_partial=ps.getPartial(_npatterns*4);
+            assert(new_nd->_left_child->_right_sib);
+            calcPartialArray(new_nd);
+            
+            // Update distance matrix
+            for (unsigned k = 0; k < n; k++) {
+                if (k != i && k != j) {
+                    unsigned ik = (i > k) ? (i*(i-1)/2 + k) : (k*(k-1)/2 + i);
+                    unsigned jk = (j > k) ? (j*(j-1)/2 + k) : (k*(k-1)/2 + j);
+                    double a = dij[ik];
+                    double b = dij[jk];
+                    dij[ik] = 0.5*(a + b);
+                    dij[jk] = _infinity;
+                }
+            }
+            
+            // Sanity check
+            for (auto nd : _lineages) {
+                assert(!nd->_right_sib);
+                assert(!nd->_parent);
+            }
+            
+            // Build new distance matrix
+            unsigned n2 = (unsigned)_lineages.size();
+            assert(n2 == n - 1);
+            unsigned dim2 = n2*(n2-1)/2;
+            dij2.resize(dim2);
+            dij2.assign(dim2, _infinity);
+            
+            // Calculate distances between all pairs of lineages
+            dij_row_col.clear();
+            for (unsigned i2 = 1; i2 < n2; i2++) {
+                for (unsigned j2 = 0; j2 < i2; j2++) {
+                    Node * lnode2 = _lineages[i2];
+                    Node * rnode2 = _lineages[j2];
+                    unsigned i = row[lnode2];
+                    unsigned j = row[rnode2];
+                    unsigned k2 = i2*(i2-1)/2 + j2;
+                    unsigned k = i*(i-1)/2 + j;
+                    if (j > i) {
+                        k = j*(j-1)/2 + i;
+                    }
+                    dij2[k2] = dij[k];
+                    dij_row_col[k2] = make_pair(i2,j2);
+                }
+            }
+            
+            // debugShowDistanceMatrix(dij2);
+            
+            // Set up for next iteration
+            dij = dij2;
+            n = n2;
+            for (unsigned i = 0; i < n; i++) {
+                Node * nd = _lineages[i];
+                row[nd] = i;
+            }
+            
+            --nsteps;
+        }
+        
+        // debugging output
+        // output(format("\nGene forest for locus \"%s\" after UPGMA:\n%s\n") % gene_name % makeNewick(9, /*use_names*/true, /*coalunits*/false), 0);
+        // output(format("  Height after UPGMA = %g\n") % _forest_height, 0);
+        
+        // TODO: get likelihood?
+        _gene_tree_log_likelihood = calcLogLikelihood();
+        _log_weight = _gene_tree_log_likelihood - prev_log_likelihood; // TODO: double check this is correct
+        
+    //        showForest();
+        
+        // destroy upgma
+        while (!_upgma_additions.empty()) {
+            Node * parent = _upgma_additions.top();
+            Node* child1 = parent->_left_child;
+            Node* child2 = parent->_left_child->_right_sib;
+            
+            assert(child1);
+            assert(child2);
+            
+            revertNodeVector(_lineages, child1, child2, parent);
+
+            //reset siblings and parents of original nodes back to 0
+            child1->resetNode(); //subtree1
+            child2->resetNode(); //subtree2
+
+            // clear new node from _nodes
+            //clear new node that was just created
+            parent->clear(); //new_nd
+
+            _upgma_additions.pop();
+            _nodes.pop_back(); // remove unused node from node list
+        }
+        
+        // Restore starting edge lengths
+        for (auto nd : _lineages) {
+            nd->_edge_length = _upgma_starting_edgelen.at(nd);
+        }
+        
+        // output("\nIn GeneForest::destroyUPGMA:\n", 0);
+        // output(format("  Height before refreshAllHeightsAndPreorders = %g\n") % _forest_height, 0);
+        // refreshAllHeightsAndPreorders();
+        // output(format("  newick = %s\n") % makeNewick(9, /*use_names*/true, /*coalunits*/false), 0);
+        // output(format("  Height after refreshAllHeightsAndPreorders = %g\n") % _forest_height, 0);
+        // output("\n", 0);
+    //        showForest();
     }
 
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment, string species, Lot::SharedPtr lot) {

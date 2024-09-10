@@ -33,3 +33,5 @@
 //#define PRIOR_POST_ON_GENES
 
 //#define WEIGHT_CORRECTION
+
+//#define BUILD_UPGMA_TREE
