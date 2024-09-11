@@ -26,10 +26,6 @@
 
 #define INV_GAMMA_PRIOR_TWO // turn this off if not defining DRAW_NEW_THETA
 
-//#define TESTING_UNEVEN_LIKELIHOOD_CORRECTION
-
-//#define TESTING_UNEVEN_SITE_CORRECTION
-
 //#define PRIOR_POST_ON_GENES
 
 //#define WEIGHT_CORRECTION
