@@ -36,7 +36,6 @@ namespace proj {
             void                processCommandLineOptions(int argc, const char * argv[]);
             void                run();
             void                saveAllForests(vector<Particle> &v) const ;
-            void                saveSpeciesTreesAltHierarchical(vector<Particle> &v) const;
             void                saveSpeciesTrees(vector<Particle> &v) const;
             void                saveSpeciesTreesAfterFirstRound(vector<Particle> &v) const;
             void                saveSpeciesTreesHierarchical(vector<Particle> &v, string filename1, string filename2) const;
@@ -49,8 +48,6 @@ namespace proj {
             void                writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v) const;
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v, string filename, unsigned group_number);
             void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v, string filename, unsigned group_number);
-            void                modifyWeights(vector<Particle> & particles);
-            void                correctWeights(vector<Particle> & particles);
             void                createSpeciesMap(Data::SharedPtr);
             void                simSpeciesMap();
             string              inventName(unsigned k, bool lower_case);
@@ -61,7 +58,6 @@ namespace proj {
             void                proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets, unsigned ntaxa);
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
             void                proposeParticles(vector<Particle> &particles);
-            void                saveAllHybridNodes(vector<Particle> &v) const;
             void                simulateData();
             void                writePaupFile(vector<Particle> particles, vector<string> taxpartition);
             void                initializeParticles(vector<Particle> &particles);
@@ -116,8 +112,6 @@ namespace proj {
             unsigned                    _ngenes_provided;
             string                      _species_newick_name;
             bool                        _fix_theta_for_simulations;
-            double                      _phi;
-            bool                        _start_from_species_tree_prior;
             double                      _starting_log_likelihood;
     };
 
@@ -138,7 +132,6 @@ namespace proj {
         _nparticles = 50000;
         _data = nullptr;
         _small_enough = 0.0000001;
-        _phi = 1.0;
     }
 
 //    inline void Proj::saveAllForests(const vector<Particle> &v) const {
@@ -725,29 +718,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
         }
 
-inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
-        string filename1 = "alt_species_trees.trees";
-//        if (filesystem::remove(filename1)) {
-//               cout << "existing file " << filename1 << " removed and replaced\n";
-//        }
-        assert (_start_mode != "sim");
-
-        unsigned count = 0;
-        // save all species trees
-        std::ofstream treef;
-
-        treef.open(filename1, std::ios_base::app);
-//        treef << "Begin trees;" << endl;
-//        string translate_block = v[0]->getTranslateBlock();
-//        treef << translate_block << endl;
-        for (auto &p:v) {
-            treef << "  tree test = [&R] " << p.saveForestNewickAlt()  << ";\n";
-            count++;
-        }
-//        treef << "end;\n";
-        treef.close();
-        }
-
     inline void Proj::saveGeneTrees(unsigned ngenes, vector<Particle> &v) const {
         if (_start_mode == "smc") {
             ofstream treef("gene_trees.trees");
@@ -793,15 +763,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
         treef.close();
     }
 
-    inline void Proj::saveAllHybridNodes(vector<Particle> &v) const {
-        ofstream nodef("nodes.txt");
-        for (auto &p:v) {
-            nodef << "particle\n";
-            nodef << p.saveHybridNodes()  << "\n";
-        }
-        nodef.close();
-    }
-
     inline void Proj::processCommandLineOptions(int argc, const char * argv[]) {
         std::vector<std::string> partition_subsets;
         boost::program_options::variables_map vm;
@@ -823,8 +784,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
         ("kappa",  boost::program_options::value(&Forest::_kappa)->default_value(1.0), "value of kappa")
         ("base_frequencies", boost::program_options::value(&Forest::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ("nthreads",  boost::program_options::value(&_nthreads)->default_value(1), "number of threads for multi threading")
-        ("migration_rate", boost::program_options::value(&Forest::_migration_rate)->default_value(0.0), "migration rate")
-        ("hybridization_rate", boost::program_options::value(&Forest::_hybridization_rate)->default_value(0.0), "hybridization rate")
         ("run_on_empty", boost::program_options::value(&Forest::_run_on_empty)->default_value(false), "run program without data")
         ("verbose", boost::program_options::value(&_verbose)->default_value(1), "set amount of output printed")
         ("save_memory", boost::program_options::value(&Forest::_save_memory)->default_value(false), "save memory at the expense of time")
@@ -843,8 +802,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
         ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
         ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
         ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(false), "set to true to fix one theta for all populations")
-        ("phi", boost::program_options::value(&_phi)->default_value(1.0), "correct weights by this number")
-        ("start_from_species_tree_prior", boost::program_options::value(&_start_from_species_tree_prior)->default_value(false), "if true, start by sampling from species tree prior")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -1006,39 +963,31 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
     }
 
     inline void Proj::handleSpeciesNewick(vector<Particle> particles) {
-        if (_start_from_species_tree_prior) {
-            for (auto &p:particles) {
-                p.buildEntireSpeciesTree();
-            }
-        }
-        
-        else {
             ifstream infile(_species_newick_name);
             string newick_string;
-    //        int size_before = (int) newicks.size();
             string newick;
-    //        while (getline(infile, newick)) { // file newicks must start with the word "tree"
-    //        if (newick.find("tree") == 2) { // TODO: not sure why / if this works - switch to checking for parenthesis?
-    //            // TODO: also need to start at the parenthesis?
-    //                size_t pos = newick.find("("); //find location of parenthesis
-    //                newick.erase(0,pos); //delete everything prior to location found
-    //            newick_string = newick;
-    //            }
-    //        }
+        int size_before = (int) newick.size();
+            while (getline(infile, newick)) { // file newicks must start with the word "tree" two spaces from the left margin
+            if (newick.find("tree") == 2) { // TODO: not sure why / if this works - switch to checking for parenthesis?
+                // TODO: also need to start at the parenthesis?
+                    size_t pos = newick.find("("); //find location of parenthesis
+                    newick.erase(0,pos); //delete everything prior to location found
+                newick_string = newick;
+                }
+            }
             while (getline(infile, newick)) {
                 newick_string = newick;
                 break;
             }
-    //        int size_after = (int) newick.size();
-    //        if (size_before == size_after) {
-    //            throw XProj("cannot find gene newick file");
-    //        }
+            int size_after = (int) newick.size();
+            if (size_before == size_after) {
+                throw XProj("cannot find gene newick file");
+            }
             
             for (auto &p:particles) {
                 p.processSpeciesNewick(newick_string); // TODO: can do this once and copy to all particles
                 p.mapSpecies(_taxon_map, _species_names);
             }
-        }
     }
 
     inline void Proj::handleGeneNewicks() {
@@ -1169,34 +1118,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             ofstream paramsf(filename3);
             if (_verbose > 0) {
                 cout << "created new file " << filename3 << "\n";
-            }
-        }
-        
-        string altfname = "alt_species_trees.trees";
-        if (filesystem::remove(altfname)) {
-            if (_verbose > 0) {
-               cout << "existing file " << altfname << " removed and replaced\n";
-            }
-            
-            ofstream alttrf(altfname);
-
-//            alttrf.open(altfname, std::ios_base::app);
-            alttrf << "#nexus\n\n";
-            alttrf << "Begin trees;" << endl;
-            string translate_block = my_vec[0].getTranslateBlock();
-            alttrf << translate_block << endl;
-        }
-        else {
-            ofstream alttrf(altfname);
-
-//            alttrf.open(altfname, std::ios_base::app);
-            alttrf << "#nexus\n\n";
-            alttrf << "Begin trees;" << endl;
-            string translate_block = my_vec[0].getTranslateBlock();
-            alttrf << translate_block << endl;
-            
-            if (_verbose > 0) {
-                cout << "created new file " << altfname << "\n";
             }
         }
         
@@ -1346,7 +1267,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                 }
 
                 saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
-                saveSpeciesTreesAltHierarchical(use_vec);
                 writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nsubsets, nspecies, ntaxa, use_vec, filename3, a);
                 if (a == 0) {
                     writeLoradFileAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec); // testing the marginal likelihood by writing to file for lorad for first species group only
@@ -1413,19 +1333,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
         log_particle_sum = log(running_sum) + log_max_weight;
 
         return log_particle_sum;
-    }
-
-    inline void Proj::modifyWeights(vector<Particle> & particles) {
-        for (auto &p:particles) {
-            double new_weight = p.getLogWeight() * _phi;
-            p.setLogWeight(new_weight);
-        }
-    }
-
-    inline void Proj::correctWeights(vector<Particle> & particles) {
-        for (auto &p:particles) {
-            p.setLogWeight(p.getLogWeight()*(1 / _phi));
-        }
     }
 
     inline double Proj::computeEffectiveSampleSize(const vector<double> & probs) const {
@@ -1719,10 +1626,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             }
 
             assert(use_vec.size() == _particle_increase);
-            
-            // use_vec = particles[i]
-            
-            bool use_first = true;
 
             assert(use_vec.size() == _particle_increase);
 
@@ -1768,7 +1671,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
 
             mtx.lock(); // TODO: does this slow things down?
             saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
-            saveSpeciesTreesAltHierarchical(use_vec);
             _count++;
             if (_gene_newicks_specified) {
                 writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nsubsets, nspecies, ntaxa, use_vec, filename3, i);
@@ -2340,34 +2242,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                         cout << "created new file " << filename2 << "\n";
                     }
                 }
-                string altfname = "alt_species_trees.trees";
-                if (filesystem::remove(altfname)) {
-                    
-                    if (_verbose > 0) {
-                       cout << "existing file " << altfname << " removed and replaced\n";
-                    }
-                    
-                    ofstream alttrf(altfname);
-
-//                    alttrf.open(altfname, std::ios_base::app);
-                    alttrf << "#nexus\n\n";
-                    alttrf << "Begin trees;" << endl;
-                    string translate_block = my_vec[0].getTranslateBlock();
-                    alttrf << translate_block << endl;
-                }
-                else {
-                    ofstream alttrf(altfname);
-
-//                    alttrf.open(altfname, std::ios_base::app);
-                    alttrf << "#nexus\n\n";
-                    alttrf << "Begin trees;" << endl;
-                    string translate_block = my_vec[0].getTranslateBlock();
-                    alttrf << translate_block << endl;
-                    
-                    if (_verbose > 0) {
-                        cout << "created new file " << altfname << "\n";
-                    }
-                }
                 
                 if (filesystem::remove(filename3)) {
                     ofstream paramsf(filename3);
@@ -2440,11 +2314,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     u_strees.open("unique_species_trees.trees", std::ios::app);
                     u_strees << "end;" << endl;
                     u_strees.close();
-                    
-                    ofstream altfname;
-                    altfname.open("alt_species_trees.trees", std::ios::app);
-                    altfname << "end;" << endl;
-                    altfname.close();
 
                     string line;
                     // For writing text file
@@ -2551,7 +2420,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                         }
 
                         saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
-                        saveSpeciesTreesAltHierarchical(use_vec);
                         writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, a);
                         if (a == 0) {
                             writeLoradFileAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec); // testing the marginal likelihood by writing to file for lorad for first species group only
@@ -2568,11 +2436,6 @@ inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
                     unique_treef.open(filename2, std::ios_base::app);
                     unique_treef << "end;\n";
                     unique_treef.close();
-                    
-                    std::ofstream alttrf;
-                    alttrf.open("alt_species_trees.trees", std::ios_base::app);
-                    alttrf << "end;\n";
-                    alttrf.close();
                     
                     // add iterations to params file
                     string line;

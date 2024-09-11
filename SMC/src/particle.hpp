@@ -71,9 +71,8 @@ class Particle {
         double                                  getThetaMean(){return _forests[1]._theta_mean;}
         string                                  saveForestNewick() {
             return _forests[0].makeNewick(8, true);}
-        string                                  saveForestNewickAlt() {return _forests[0].makeAltNewick(8, false);}
             
-            string                             saveGeneNewick(unsigned i) {
+        string                                  saveGeneNewick(unsigned i) {
             return _forests[i].makeNewick(8, true);}
     
         bool operator<(const Particle::SharedPtr & other) const {
@@ -89,8 +88,6 @@ class Particle {
         void                                            showSpeciesIncrement();
         void                                            showSpeciesJoined();
         void                                            showSpeciesTree();
-        void                                            showHybridNodes();
-        string                                          saveHybridNodes();
         void                                            showGamma();
         string                                          saveGamma();
         void                                            calculateGamma();
@@ -141,13 +138,10 @@ class Particle {
         void                                            setNextSpeciesNumber() {_next_species_number = Forest::_nspecies;}
         unsigned                                        showPrevForestNumber(){return _prev_forest_number;}
         string                                          getTranslateBlock();
-        void                                            setNSites(vector<unsigned> nsites) {_nsites_per_gene = nsites;}
         void                                            buildEntireSpeciesTree();
         void                                            rebuildSpeciesTree();
         void                                            setGeneOrder(vector<unsigned> gene_order) {_gene_order = gene_order;}
         void                                            trimSpeciesTree();
-    
-//        static bool                                     _run_on_empty;
 
     private:
 
@@ -172,7 +166,6 @@ class Particle {
         vector<pair<tuple<string, string, string>, double>> _t;
         vector<vector<pair<tuple<string, string, string>, double>>> _t_by_gene;
         vector<double>                          _starting_log_likelihoods;
-        vector<unsigned>                        _nsites_per_gene;
         vector<unsigned>                        _gene_order;
 };
 
@@ -229,7 +222,6 @@ class Particle {
         _next_species_number = Forest::_nspecies;
         _species_order.clear();
         _starting_log_likelihoods.clear();
-        _nsites_per_gene.clear();
         _t_by_gene.clear();
         _next_species_number_by_gene.clear();
         _gene_order.clear();
@@ -497,13 +489,14 @@ inline vector<double> Particle::getVectorPrior() {
                             for (auto &r:rates_by_species) {
                                 event_choice_rates.push_back(r.first);
                             }
-                            for (auto &p:event_choice_rates) {
-                                 p = log(p/total_rate);
-                             }
+                        
+                        for (auto &p:event_choice_rates) {
+                            p = p/total_rate;
+                        }
                             
                             _deep_coal = true;
                             
-                            unsigned index = selectEvent(event_choice_rates);
+                            unsigned index = selectEventLinearScale(event_choice_rates);
                             string species_name = rates_by_species[index].second;
                             _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
 # if defined (BUILD_UPGMA_TREE)
@@ -1182,31 +1175,6 @@ inline vector<double> Particle::getVectorPrior() {
     inline void Particle::showSpeciesJoined(){
         _forests[0].showSpeciesJoined();
     }
-    
-    inline void Particle::showHybridNodes() {
-        cout << "particle" << endl;
-        showGamma();
-        for (auto &nd:_forests[0]._nodes) {
-            if (nd._major_parent) {
-                cout << "       " << "hybridized node is: " << nd._name << " with minor parent " << nd._minor_parent->_name << " and major parent " << nd._major_parent->_name << endl;
-            }
-        }
-    }
-
-    inline string Particle::saveHybridNodes() {
-        string nodes = "";
-        int i = 0;
-        for (auto &nd:_forests[0]._nodes) {
-//        for (Node* nd = _forests[0]._lineages[0]; nd; nd=nd->_left_child->_right_sib) {
-//            for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
-            if (nd._major_parent) {
-                string gammastr = to_string(_forests[0]._gamma[i]);
-                nodes +=  "hybridized node is: " + nd._name + " with minor parent " + nd._minor_parent->_name + " and major parent " + nd._major_parent->_name + "\n" + "gamma is: " + gammastr + "\n";
-                i++;
-            }
-        }
-        return nodes;
-    }
 
     inline void Particle::showGamma() {
         if (_forests[0]._gamma.size() > 0) {
@@ -1565,7 +1533,6 @@ inline vector<double> Particle::getVectorPrior() {
         _next_species_number = other._next_species_number;
         _species_order = other._species_order;
         _starting_log_likelihoods = other._starting_log_likelihoods;
-        _nsites_per_gene = other._nsites_per_gene;
         _t_by_gene = other._t_by_gene;
         _next_species_number_by_gene = other._next_species_number_by_gene;
         _gene_order = other._gene_order;
