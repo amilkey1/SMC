@@ -9,9 +9,6 @@
 
 #define USE_TOTAL_RATE
 
-//#define SIM_TEST // simulated example with 2 taxa, 2 species - 1 taxon per species
-//#define SIM_TEST3 // simulated example with 3 species, 3 taxa
-
 #define HIERARCHICAL_FILTERING
 
 #define DRAW_NEW_THETA
@@ -25,9 +22,5 @@
 //#define DEBUG_MODE
 
 #define INV_GAMMA_PRIOR_TWO // turn this off if not defining DRAW_NEW_THETA
-
-//#define PRIOR_POST_ON_GENES
-
-//#define WEIGHT_CORRECTION
 
 //#define BUILD_UPGMA_TREE
