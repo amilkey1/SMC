@@ -499,8 +499,13 @@ inline vector<double> Particle::getVectorPrior() {
                             unsigned index = selectEventLinearScale(event_choice_rates);
                             string species_name = rates_by_species[index].second;
                             _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
+                                                
 # if defined (BUILD_UPGMA_TREE)
-        _forests[next_gene].buildRestOfTree(_lot);
+# if defined (BUILD_UPGMA_TREE_CONSTRAINED)
+                        _forests[next_gene].buildRestOfTree(_lot, _t);
+#else
+                        _forests[next_gene].buildRestOfTree(_lot);
+#endif
 #endif
                             
                         if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update

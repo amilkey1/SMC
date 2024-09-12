@@ -102,7 +102,13 @@ class Forest {
         pair<Node*, Node*>          chooseAllPairs(list<Node*> &nodes, double increment, string species, Lot::SharedPtr lot);
         tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, double increment, string species);
         pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
+#if defined (BUILD_UPGMA_TREE)
+# if defined (BUILD_UPGMA_TREE_CONSTRAINED)
+    void                        buildRestOfTree(Lot::SharedPtr lot, vector<pair<tuple<string, string, string>, double>> species_info);
+# else
         void                        buildRestOfTree(Lot::SharedPtr lot);
+#endif
+#endif
 
     
         map<string, double>         _theta_map;
@@ -1477,9 +1483,14 @@ class Forest {
     };
 
 
+# if defined (BUILD_UPGMA_TREE)
+# if defined (BUILD_UPGMA_TREE_CONSTRAINED)
+    inline void Forest::buildRestOfTree(Lot::SharedPtr lot, vector<pair<tuple<string, string, string>, double>> species_info) {
+#else
     inline void Forest::buildRestOfTree(Lot::SharedPtr lot) {
-    //        showForest();
-        double prev_log_likelihood = _gene_tree_log_likelihood; // TODO: double check this
+#endif
+        double prev_log_likelihood = _gene_tree_log_likelihood; // TODO: THIS IS WRONG?
+        // TODO: also check constrained height - need to subtract height of existing gene tree?
         // Get the number of patterns
         unsigned npatterns = _data->getNumPatternsInSubset(_index - 1); // forest index starts at 1 but subsets start at 0
 
@@ -1532,10 +1543,82 @@ class Forest {
                     }
                 }
                 
+                double min_dist = 0.0;
+                double max_dist = min_dist + 5.0; //TODO: replace arbitrary value 5.0
+                
+#if defined(BUILD_UPGMA_TREE_CONSTRAINED)
+                // TODO: for now, walk through species partition to find them, but can make this faster
+                // TODO: need to subtract existing gene tree height?
+                string lspp = "";
+                string rspp = "";
+                
+                for (auto &s:_species_partition) {
+                    for (auto &nd:s.second) {
+                        if (nd == lnode) {
+                            lspp = s.first;
+                        }
+                        else if (nd == rnode) {
+                            rspp = s.first;
+                        }
+                    }
+                    if (lspp != "" && rspp != "") {
+                        break;
+                    }
+                }
+                
+                double min_height = 0.0;
+                bool lspp_first = false;
+                bool found = false;
+                                
+                if (lspp != rspp) {
+                    for (auto &s:species_info) {
+                        if (!found) {
+                            // find either lnode or rnode
+                            if ((get<1>(s.first) == lspp) || (get<2>(s.first) == lspp)) {
+                                min_height += s.second;
+                                lspp_first = true;
+                                found = true;
+                            }
+                            else if ((get<1>(s.first) == rspp) || (get<2>(s.first) == rspp)) {
+                                assert (min_height == 0.0);
+                                min_height += s.second;
+                                found = true;
+                            }
+                        }
+                        else {
+                            // if lnode comes first, add all the remaining increments up to rnode
+                            // if rnode comes first, add all the remaining increments up to lnode
+                            min_height += s.second;
+                            if (lspp_first) {
+                                if ((get<1>(s.first) == rspp) || (get<2>(s.first) == rspp)) {
+                                    break;
+                                }
+                            }
+                            else {
+                                if ((get<1>(s.first) == lspp) || (get<2>(s.first) == lspp)) {
+                                    break;
+                                }
+                                
+                            }
+                        }
+                    }
+                }
+                // Determine minimum distance based on species tree
+//                G::species_t lspp = lnode->getSpecies();
+//                G::species_t rspp = rnode->getSpecies();
+//                double min_height = 0.0;
+//                if (lspp != rspp) {
+//                    min_height = species_forest.mrcaHeight(lspp, rspp);
+//                }
+                min_dist = 2.0*min_height;
+                max_dist = min_dist + 5.0; //TODO: replace arbitrary value 5.0
+#endif
+                
                 // Optimize edge length using black-box maximizer
                 double v0 = lnode->getEdgeLength() + rnode->getEdgeLength();
                 negLogLikeDist f(npatterns, first_pattern, counts, same_state, diff_state, v0);
-                auto r = boost::math::tools::brent_find_minima(f, 0.0, 2.0, std::numeric_limits<double>::digits);
+//                auto r = boost::math::tools::brent_find_minima(f, 0.0, 2.0, std::numeric_limits<double>::digits);
+                auto r = boost::math::tools::brent_find_minima(f, min_dist, max_dist, std::numeric_limits<double>::digits);
 //                double maximized_log_likelihood = -r.second;
                 unsigned k = i*(i-1)/2 + j;
                 dij[k] = r.first;
@@ -1671,8 +1754,9 @@ class Forest {
         // TODO: get likelihood?
         _gene_tree_log_likelihood = calcLogLikelihood();
         _log_weight = _gene_tree_log_likelihood - prev_log_likelihood; // TODO: double check this is correct
-        
-    //        showForest();
+        // TODO: prev log likelihood needs to be the previous entire tree, not just the top part
+                
+//        showForest();
         
         // destroy upgma
         while (!_upgma_additions.empty()) {
@@ -1708,8 +1792,9 @@ class Forest {
         // output(format("  newick = %s\n") % makeNewick(9, /*use_names*/true, /*coalunits*/false), 0);
         // output(format("  Height after refreshAllHeightsAndPreorders = %g\n") % _forest_height, 0);
         // output("\n", 0);
-    //        showForest();
+//            showForest();
     }
+#endif
 
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment, string species, Lot::SharedPtr lot) {
           double prev_log_likelihood = _gene_tree_log_likelihood;
@@ -1935,10 +2020,12 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
                  }
              }
 
+# if !defined (BUILD_UPGMA_TREE)
              if ((_proposal == "prior-prior" || one_choice) && (!_run_on_empty) ) {
                  _gene_tree_log_likelihood = calcLogLikelihood();
                  _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
              }
+#endif
          if (_save_memory) {
              for (auto &nd:_nodes) {
                  nd._partial=nullptr;
