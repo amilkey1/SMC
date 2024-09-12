@@ -2171,7 +2171,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 //                                p.showParticle();
 //                            }
                             
-                            double ess = filterParticles(g, my_vec); // TODO: I think this is not really going one coalescent event per gene under the upgma constraint
+                            double ess = filterParticles(g, my_vec);
                             
 //                            for (auto &p:my_vec) {
 //                                p.showParticle();

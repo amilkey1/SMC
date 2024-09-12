@@ -1570,38 +1570,66 @@ class Forest {
                 bool lspp_first = false;
                 bool found = false;
                                 
-                if (lspp != rspp) {
+                if (lspp != rspp) { // TODO: this is totally wrong
+//                    showForest();
                     for (auto &s:species_info) {
-                        if (!found) {
+//                        if (!found) {
                             // find either lnode or rnode
-                            if ((get<1>(s.first) == lspp) || (get<2>(s.first) == lspp)) {
-                                min_height += s.second;
+                            if ((get<0>(s.first) == lspp) || (get<1>(s.first) == lspp)) {
+//                                min_height += s.second;
                                 lspp_first = true;
-                                found = true;
+                                break;
+//                                found = true;
                             }
-                            else if ((get<1>(s.first) == rspp) || (get<2>(s.first) == rspp)) {
+                            else if ((get<0>(s.first) == rspp) || (get<1>(s.first) == rspp)) {
                                 assert (min_height == 0.0);
-                                min_height += s.second;
-                                found = true;
+//                                min_height += s.second;
+                                lspp_first = false;
+                                break;
+//                                found = true;
+                            }
+//                        }
+//                        else {
+//                            // if lnode comes first, add all the remaining increments up to rnode
+//                            // if rnode comes first, add all the remaining increments up to lnode
+//                            min_height += s.second;
+//                            if (lspp_first) {
+//                                if ((get<1>(s.first) == rspp) || (get<2>(s.first) == rspp)) {
+//                                    break;
+//                                }
+//                            }
+//                            else {
+//                                if ((get<1>(s.first) == lspp) || (get<2>(s.first) == lspp)) {
+//                                    break;
+//                                }
+//
+//                            }
+//                        }
+                    }
+                    
+                    // find the height from the tips of the species tree to the lowest of lspp / rspp, then subtract the gene tree height
+                    for (auto &s:species_info) {
+                        // if lnode comes first, add all the remaining increments up to rnode
+                        // if rnode comes first, add all the remaining increments up to lnode
+                        min_height += s.second;
+                        if (lspp_first) {
+                            if ((get<0>(s.first) == rspp) || (get<1>(s.first) == rspp)) {
+                                min_height -= s.second;
+                                break;
                             }
                         }
                         else {
-                            // if lnode comes first, add all the remaining increments up to rnode
-                            // if rnode comes first, add all the remaining increments up to lnode
-                            min_height += s.second;
-                            if (lspp_first) {
-                                if ((get<1>(s.first) == rspp) || (get<2>(s.first) == rspp)) {
-                                    break;
-                                }
+                            if ((get<0>(s.first) == lspp) || (get<1>(s.first) == lspp)) {
+                                min_height -= s.second;
+                                break;
                             }
-                            else {
-                                if ((get<1>(s.first) == lspp) || (get<2>(s.first) == lspp)) {
-                                    break;
-                                }
-                                
-                            }
-                        }
                     }
+                    }
+                        double gene_tree_height = getTreeHeight();
+                        
+                        min_height -= gene_tree_height;
+                    
+                    assert (min_height > 0.0);
                 }
                 // Determine minimum distance based on species tree
 //                G::species_t lspp = lnode->getSpecies();
