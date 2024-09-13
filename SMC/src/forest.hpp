@@ -1545,8 +1545,11 @@ class Forest {
                 double min_dist = 0.0;
                 double max_dist = min_dist + 5.0; //TODO: replace arbitrary value 5.0
                 
+                // TODO: v_0 must start from node of gene tree, then extend at least as far as existing branch length
+                
 #if defined(BUILD_UPGMA_TREE_CONSTRAINED)
                 // TODO: for now, walk through species partition to find them, but can make this faster
+                // TODO: this part subtracts from the wrong part of the species tree - need to find the distance of the shallowest species, not the deepest of the two
                 string lspp = "";
                 string rspp = "";
                 
@@ -1566,7 +1569,6 @@ class Forest {
                 
                 double min_height = 0.0;
                 bool lspp_first = false;
-                bool found = false;
                                 
                 if (lspp != rspp) {
 //                    showForest();
@@ -1574,17 +1576,17 @@ class Forest {
 //                        if (!found) {
                             // find either lnode or rnode
                             if ((get<0>(s.first) == lspp) || (get<1>(s.first) == lspp)) {
-                                lspp_first = true;
+                                lspp_first = false; // TODO: switched this so first is the deeper node
                                 break;
                             }
                             else if ((get<0>(s.first) == rspp) || (get<1>(s.first) == rspp)) {
                                 assert (min_height == 0.0);
-                                lspp_first = false;
+                                lspp_first = true;
                                 break;
                             }
                     }
                     
-                    // find the height from the tips of the species tree to the lowest of lspp / rspp, then subtract the gene tree height
+                    // find the height from the tips of the species tree to the highest of lspp / rspp, then subtract the gene tree height
                     for (auto &s:species_info) {
                         // if lnode comes first, add all the remaining increments up to rnode
                         // if rnode comes first, add all the remaining increments up to lnode
@@ -1613,7 +1615,7 @@ class Forest {
 #endif
                 
                 // Optimize edge length using black-box maximizer
-                double v0 = lnode->getEdgeLength() + rnode->getEdgeLength();
+                double v0 = lnode->getEdgeLength() + rnode->getEdgeLength(); // TODO: double check this is correct
                 negLogLikeDist f(npatterns, first_pattern, counts, same_state, diff_state, v0);
 //                auto r = boost::math::tools::brent_find_minima(f, 0.0, 2.0, std::numeric_limits<double>::digits);
                 auto r = boost::math::tools::brent_find_minima(f, min_dist, max_dist, std::numeric_limits<double>::digits);
@@ -1752,7 +1754,7 @@ class Forest {
         _gene_tree_log_likelihood = calcLogLikelihood();
         _log_weight = _gene_tree_log_likelihood - prev_log_likelihood; // previous likelihood is the entire tree
                 
-        showForest();
+//        showForest();
         
         // destroy upgma
         while (!_upgma_additions.empty()) {
