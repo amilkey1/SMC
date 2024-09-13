@@ -23,6 +23,6 @@
 
 #define INV_GAMMA_PRIOR_TWO // turn this off if not defining DRAW_NEW_THETA
 
-#define BUILD_UPGMA_TREE
+//#define BUILD_UPGMA_TREE
 
-#define BUILD_UPGMA_TREE_CONSTRAINED // if this is turned on, also turn on BUILD_UPGMA_TREE
+//#define BUILD_UPGMA_TREE_CONSTRAINED // if this is turned on, also turn on BUILD_UPGMA_TREE

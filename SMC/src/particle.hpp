@@ -1339,7 +1339,6 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::trimSpeciesTree() {
-        // TODO: pop back from theta map as tree is torn down
         map<string, double> theta_map = _forests[1]._theta_map;
         vector<string> species_names = _forests[1]._species_names;
         
@@ -1395,10 +1394,6 @@ inline vector<double> Particle::getVectorPrior() {
                     
                     theta_map[species_names[spp_count-1]] = -1.0;
                     
-//                    theta_map.end()->second = -1.0;
-//                    theta_map.erase(prev( theta_map.end() ) );
-//                    theta_map.pop_back();
-                    
                     spp_count--;
                 }
                 
@@ -1431,72 +1426,122 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::rebuildSpeciesTree() {
-        map<string, double> theta_map = _forests[1]._theta_map;
+        bool trim_to_previous_join = false;
         
-        // TODO: testing trimming species tree all the way back to the previous join
-        
-        double min_branch_length = _forests[0]._lineages.back()->_edge_length; // species tree must remain at least as tall as it was after initial trimming
-        for (auto &nd:_forests[0]._lineages) {
-            nd->_edge_length -= min_branch_length;
-        }
+        if (trim_to_previous_join) {
+            map<string, double> theta_map = _forests[1]._theta_map;
+            
+            // TODO: testing trimming species tree all the way back to the previous join
+            
+            double min_branch_length = _forests[0]._lineages.back()->_edge_length; // species tree must remain at least as tall as it was after initial trimming
+            for (auto &nd:_forests[0]._lineages) {
+                nd->_edge_length -= min_branch_length;
+            }
 
-        _t.back().second -= min_branch_length;
-        
-        for (auto &g:_t_by_gene) {
-            g.back().second -= min_branch_length;
+            _t.back().second -= min_branch_length;
+            
+            for (auto &g:_t_by_gene) {
+                g.back().second -= min_branch_length;
+            }
+            
+            tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+            
+            double edge_increment = 0.0;
+            while (edge_increment < min_branch_length) {
+                // draw an increment and add to existing species lineages, don't join anything else at this stage
+                _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
+                edge_increment = _forests[0]._last_edge_length;
+                if (edge_increment < min_branch_length) { // TODO: there must be a better way to do this
+                    for (auto &nd:_forests[0]._lineages) {
+                        nd->_edge_length -= edge_increment;
+                    }
+                }
+            }
+            
+            assert (edge_increment >= min_branch_length);
+            _t.back().second += edge_increment;
+            
+            for (auto &g:_t_by_gene) {
+                g.back().second += edge_increment;
+            }
+            
+            // now walk through loop,
+            while (_forests[0]._lineages.size() > 1) {
+                if (_forests[0]._lineages.size() > 1) {
+                    species_joined = _forests[0].speciesTreeProposal(_lot);
+                    double edge_len = 0.0;
+                    if (_forests[0]._lineages.size() > 1) {
+                        _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
+                        edge_len = _forests[0]._last_edge_length;
+                    }
+                    _t.push_back(make_pair(species_joined, edge_len));
+                    
+                    for (auto &g:_t_by_gene) {
+                        g.push_back(make_pair(species_joined, edge_len));
+                    }
+                }
+            }
+            
+            // update theta map
+            for (auto t:theta_map) {
+                if (t.second == -1.0)  {
+                    _forests[1].updateThetaMap(_lot, t.first); // TODO: make sure this works regardless of gene order
+                }
+            }
+            
+            if (_forests.size() > 2) {
+                for (unsigned i=2; i<_forests.size(); i++) {
+                    _forests[i]._theta_map = _forests[1]._theta_map;
+                }
+            }
+            
         }
-        
-        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-        
-        double edge_increment = 0.0;
-        while (edge_increment < min_branch_length) {
+        else {
+            map<string, double> theta_map = _forests[1]._theta_map;
+            
+            tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+            
             // draw an increment and add to existing species lineages, don't join anything else at this stage
             _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
-            edge_increment = _forests[0]._last_edge_length;
-            if (edge_increment < min_branch_length) { // TODO: there must be a better way to do this
-                for (auto &nd:_forests[0]._lineages) {
-                    nd->_edge_length -= edge_increment;
-                }
+            double edge_increment = _forests[0]._last_edge_length;
+            _t.back().second += edge_increment;
+            
+            for (auto &g:_t_by_gene) {
+                g.back().second += edge_increment;
             }
-        }
-        
-        assert (edge_increment >= min_branch_length);
-        _t.back().second += edge_increment;
-        
-        for (auto &g:_t_by_gene) {
-            g.back().second += edge_increment;
-        }
-        
-        // now walk through loop,
-        while (_forests[0]._lineages.size() > 1) {
-            if (_forests[0]._lineages.size() > 1) {
-                species_joined = _forests[0].speciesTreeProposal(_lot);
-                double edge_len = 0.0;
+            
+            // now walk through loop,
+            while (_forests[0]._lineages.size() > 1) {
                 if (_forests[0]._lineages.size() > 1) {
-                    _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
-                    edge_len = _forests[0]._last_edge_length;
+                    species_joined = _forests[0].speciesTreeProposal(_lot);
+                    
+                    double edge_len = 0.0;
+                    if (_forests[0]._lineages.size() > 1) {
+                        _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
+                        edge_len = _forests[0]._last_edge_length;
+                    }
+                    _t.push_back(make_pair(species_joined, edge_len));
+                    
+                    for (auto &g:_t_by_gene) {
+                        g.push_back(make_pair(species_joined, edge_len));
+                    }
                 }
-                _t.push_back(make_pair(species_joined, edge_len));
-                
-                for (auto &g:_t_by_gene) {
-                    g.push_back(make_pair(species_joined, edge_len));
+            }
+            
+            // update theta map
+            for (auto t:theta_map) {
+                if (t.second == -1.0)  {
+                    _forests[1].updateThetaMap(_lot, t.first); // TODO: make sure this works regardless of gene order
+                }
+            }
+            
+            if (_forests.size() > 2) {
+                for (unsigned i=2; i<_forests.size(); i++) {
+                    _forests[i]._theta_map = _forests[1]._theta_map;
                 }
             }
         }
-        
-        // update theta map
-        for (auto t:theta_map) {
-            if (t.second == -1.0)  {
-                _forests[1].updateThetaMap(_lot, t.first); // TODO: make sure this works regardless of gene order
-            }
-        }
-        
-        if (_forests.size() > 2) {
-            for (unsigned i=2; i<_forests.size(); i++) {
-                _forests[i]._theta_map = _forests[1]._theta_map;
-            }
-        }
-        
+ 
     }
 
     inline void Particle::buildEntireSpeciesTree() {

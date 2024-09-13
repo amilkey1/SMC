@@ -1489,8 +1489,7 @@ class Forest {
 #else
     inline void Forest::buildRestOfTree(Lot::SharedPtr lot) {
 #endif
-        double prev_log_likelihood = _gene_tree_log_likelihood; // TODO: THIS IS WRONG?
-        // TODO: also check constrained height - need to subtract height of existing gene tree?
+        double prev_log_likelihood = _gene_tree_log_likelihood;
         // Get the number of patterns
         unsigned npatterns = _data->getNumPatternsInSubset(_index - 1); // forest index starts at 1 but subsets start at 0
 
@@ -1548,7 +1547,6 @@ class Forest {
                 
 #if defined(BUILD_UPGMA_TREE_CONSTRAINED)
                 // TODO: for now, walk through species partition to find them, but can make this faster
-                // TODO: need to subtract existing gene tree height?
                 string lspp = "";
                 string rspp = "";
                 
@@ -1570,41 +1568,20 @@ class Forest {
                 bool lspp_first = false;
                 bool found = false;
                                 
-                if (lspp != rspp) { // TODO: this is totally wrong
+                if (lspp != rspp) {
 //                    showForest();
                     for (auto &s:species_info) {
 //                        if (!found) {
                             // find either lnode or rnode
                             if ((get<0>(s.first) == lspp) || (get<1>(s.first) == lspp)) {
-//                                min_height += s.second;
                                 lspp_first = true;
                                 break;
-//                                found = true;
                             }
                             else if ((get<0>(s.first) == rspp) || (get<1>(s.first) == rspp)) {
                                 assert (min_height == 0.0);
-//                                min_height += s.second;
                                 lspp_first = false;
                                 break;
-//                                found = true;
                             }
-//                        }
-//                        else {
-//                            // if lnode comes first, add all the remaining increments up to rnode
-//                            // if rnode comes first, add all the remaining increments up to lnode
-//                            min_height += s.second;
-//                            if (lspp_first) {
-//                                if ((get<1>(s.first) == rspp) || (get<2>(s.first) == rspp)) {
-//                                    break;
-//                                }
-//                            }
-//                            else {
-//                                if ((get<1>(s.first) == lspp) || (get<2>(s.first) == lspp)) {
-//                                    break;
-//                                }
-//
-//                            }
-//                        }
                     }
                     
                     // find the height from the tips of the species tree to the lowest of lspp / rspp, then subtract the gene tree height
@@ -1631,13 +1608,6 @@ class Forest {
                     
                     assert (min_height > 0.0);
                 }
-                // Determine minimum distance based on species tree
-//                G::species_t lspp = lnode->getSpecies();
-//                G::species_t rspp = rnode->getSpecies();
-//                double min_height = 0.0;
-//                if (lspp != rspp) {
-//                    min_height = species_forest.mrcaHeight(lspp, rspp);
-//                }
                 min_dist = 2.0*min_height;
                 max_dist = min_dist + 5.0; //TODO: replace arbitrary value 5.0
 #endif
@@ -1779,12 +1749,10 @@ class Forest {
         // output(format("\nGene forest for locus \"%s\" after UPGMA:\n%s\n") % gene_name % makeNewick(9, /*use_names*/true, /*coalunits*/false), 0);
         // output(format("  Height after UPGMA = %g\n") % _forest_height, 0);
         
-        // TODO: get likelihood?
         _gene_tree_log_likelihood = calcLogLikelihood();
-        _log_weight = _gene_tree_log_likelihood - prev_log_likelihood; // TODO: double check this is correct
-        // TODO: prev log likelihood needs to be the previous entire tree, not just the top part
+        _log_weight = _gene_tree_log_likelihood - prev_log_likelihood; // previous likelihood is the entire tree
                 
-//        showForest();
+        showForest();
         
         // destroy upgma
         while (!_upgma_additions.empty()) {
