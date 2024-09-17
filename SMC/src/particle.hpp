@@ -449,7 +449,9 @@ inline vector<double> Particle::getVectorPrior() {
                 _next_species_number_by_gene.push_back(0);
             }
         }
+//        else {
         else if (_generation % _nsubsets == 0) { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+            // TODO: do this at every step, not just after filtering all loci once? - did not work as well on simulation grid
             trimSpeciesTree();
             if (_forests[0]._lineages.size() > 1) {
                 rebuildSpeciesTree();

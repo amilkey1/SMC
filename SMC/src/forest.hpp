@@ -1490,6 +1490,7 @@ class Forest {
     inline void Forest::buildRestOfTree(Lot::SharedPtr lot) {
 #endif
         double prev_log_likelihood = _gene_tree_log_likelihood;
+//        showForest();
         // Get the number of patterns
         unsigned npatterns = _data->getNumPatternsInSubset(_index - 1); // forest index starts at 1 but subsets start at 0
 
@@ -1518,7 +1519,7 @@ class Forest {
         vector<double> dij2;
 
         // Calculate distances between all pairs of lineages
-        map<pair<unsigned,unsigned>, double> d;
+        
         for (unsigned i = 1; i < n; i++) {
             for (unsigned j = 0; j < i; j++) {
                 Node * lnode = _lineages[i];
@@ -1546,10 +1547,14 @@ class Forest {
                 double max_dist = min_dist + 5.0; //TODO: replace arbitrary value 5.0
                 
                 // TODO: v_0 must start from node of gene tree, then extend at least as far as existing branch length
+                // TODO: this may only apply to branches that have not had the most recent coalesent event??
+                
+                double min_height = 0.0;
                 
 #if defined(BUILD_UPGMA_TREE_CONSTRAINED)
+//                showForest();
                 // TODO: for now, walk through species partition to find them, but can make this faster
-                // TODO: this part subtracts from the wrong part of the species tree - need to find the distance of the shallowest species, not the deepest of the two
+                // TODO: this part subtracts from the wrong part of the species tree - need to find the distance of the shallowest species, not the deepest of the two - fixed
                 string lspp = "";
                 string rspp = "";
                 
@@ -1567,7 +1572,7 @@ class Forest {
                     }
                 }
                 
-                double min_height = 0.0;
+//                double min_height = 0.0;
                 bool lspp_first = false;
                                 
                 if (lspp != rspp) {
@@ -1615,9 +1620,19 @@ class Forest {
 #endif
                 
                 // Optimize edge length using black-box maximizer
-                double v0 = lnode->getEdgeLength() + rnode->getEdgeLength(); // TODO: double check this is correct
+                // TODO: v_0 must start from node of gene tree, then extend at least as far as existing branch length
+//                double v0 = lnode->getEdgeLength() + rnode->getEdgeLength(); // TODO: double check this is correct
+                double v0 = getLineageHeight(lnode) + getLineageHeight(rnode);
+//                double min1 = lnode->getEdgeLength();
+//                double min2 = rnode->getEdgeLength();
+//                if (min1 < min2) {
+//                    min_dist = 2.0 * min1;
+//                }
+//                else {
+//                    min_dist = 2.0 * min2;
+//                }
+                
                 negLogLikeDist f(npatterns, first_pattern, counts, same_state, diff_state, v0);
-//                auto r = boost::math::tools::brent_find_minima(f, 0.0, 2.0, std::numeric_limits<double>::digits);
                 auto r = boost::math::tools::brent_find_minima(f, min_dist, max_dist, std::numeric_limits<double>::digits);
 //                double maximized_log_likelihood = -r.second;
                 unsigned k = i*(i-1)/2 + j;
