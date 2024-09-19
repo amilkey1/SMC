@@ -1550,11 +1550,12 @@ class Forest {
                 // TODO: this may only apply to branches that have not had the most recent coalesent event??
                 
                 double min_height = 0.0;
+//                showForest();
                 
 #if defined(BUILD_UPGMA_TREE_CONSTRAINED)
 //                showForest();
                 // TODO: for now, walk through species partition to find them, but can make this faster
-                // TODO: this part subtracts from the wrong part of the species tree - need to find the distance of the shallowest species, not the deepest of the two - fixed
+                // find the distance from the tips to the deeper of the two species, then subtract the height of the existing gene tree
                 string lspp = "";
                 string rspp = "";
                 
@@ -1581,12 +1582,12 @@ class Forest {
 //                        if (!found) {
                             // find either lnode or rnode
                             if ((get<0>(s.first) == lspp) || (get<1>(s.first) == lspp)) {
-                                lspp_first = false; // TODO: switched this so first is the deeper node
+                                lspp_first = true; // lspp_first is the deeper node
                                 break;
                             }
                             else if ((get<0>(s.first) == rspp) || (get<1>(s.first) == rspp)) {
                                 assert (min_height == 0.0);
-                                lspp_first = true;
+                                lspp_first = false;
                                 break;
                             }
                     }
@@ -1621,8 +1622,29 @@ class Forest {
                 
                 // Optimize edge length using black-box maximizer
                 // TODO: v_0 must start from node of gene tree, then extend at least as far as existing branch length
+                double v0 = 0.0;
+                if (lnode->_left_child) {
+                    v0 += lnode->_left_child->getEdgeLength(); // TODO: need to constrain the increment too
+//                    if (min_height < lnode->_left_child->getEdgeLength()) {
+//                        min_dist = 2 * lnode->_left_child->getEdgeLength();
+//                    }
+                }
+                else {
+                    v0 += lnode->getEdgeLength();
+                }
+                
+                if (rnode->_left_child) {
+                    v0 += lnode->_left_child->getEdgeLength();
+//                    if (min_height < rnode->_left_child->getEdgeLength()) {
+//                        min_dist = 2 * rnode->_left_child->getEdgeLength();
+//                    }
+                }
+                else {
+                    v0 += rnode->getEdgeLength();
+                }
+                
 //                double v0 = lnode->getEdgeLength() + rnode->getEdgeLength(); // TODO: double check this is correct
-                double v0 = getLineageHeight(lnode) + getLineageHeight(rnode);
+//                double v0 = getLineageHeight(lnode) + getLineageHeight(rnode); // TODO: edge length or node height?
 //                double min1 = lnode->getEdgeLength();
 //                double min2 = rnode->getEdgeLength();
 //                if (min1 < min2) {

@@ -25,4 +25,4 @@
 
 #define BUILD_UPGMA_TREE
 
-#define BUILD_UPGMA_TREE_CONSTRAINED // if this is turned on, also turn on BUILD_UPGMA_TREE
+//#define BUILD_UPGMA_TREE_CONSTRAINED // if this is turned on, also turn on BUILD_UPGMA_TREE

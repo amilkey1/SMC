@@ -504,7 +504,7 @@ inline vector<double> Particle::getVectorPrior() {
                                                 
 # if defined (BUILD_UPGMA_TREE)
 # if defined (BUILD_UPGMA_TREE_CONSTRAINED)
-//                        _forests[0].showForest();
+                        _forests[0].showForest();
                         _forests[next_gene].buildRestOfTree(_lot, _t);
 #else
                         _forests[next_gene].buildRestOfTree(_lot);
