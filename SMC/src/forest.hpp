@@ -65,7 +65,6 @@ class Forest {
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
         tuple<string,string, string> speciesTreeProposal(Lot::SharedPtr lot);
-        tuple<string,string, string> predeterminedSpeciesTreeProposal(tuple<string, string, string> species_to_join);
         void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
         void                        revertNodeVector(vector<Node *> & node_vector, Node * addnode1, Node * addnode2, Node * delnode1);
@@ -89,7 +88,9 @@ class Forest {
         vector< pair<double, Node *>>      sortPreorder();
         void                        refreshPreorder();
         void                        createThetaMap(Lot::SharedPtr lot);
+        void                        createThetaMapFixedTheta(Lot::SharedPtr lot);
         void                        updateThetaMap(Lot::SharedPtr lot, string new_species_name);
+        void                        updateThetaMapFixedTheta(Lot::SharedPtr lot, string new_species_name);
         void                        resetThetaMap(Lot::SharedPtr lot);
         void                        drawNewTheta(string new_species, Lot::SharedPtr lot);
         void                        buildFromNewick(const string newick, bool rooted, bool allow_polytomies);
@@ -800,59 +801,6 @@ class Forest {
         return num_deep_coal;
     }
 
-//    inline unsigned Forest::getDeepCoal(tuple <string, string, string> species_joined) {
-//        unsigned num_deep_coal = 0;
-////        if (_species_partition.size() > 2) { // don't count ancestral population as deep coalescence
-//            unsigned count1 = 0;
-//            unsigned count2 = 0;
-//
-//            // first lineage
-//            for (auto &nd:_species_partition[get<0>(species_joined)]) {
-//    //            if (nd->_deep_coalescence_counted) {
-//    //                count1 = 1; // avoid double counting
-//    //                break;
-//    //            }
-//    //            else {
-//                    count1 += 1;
-//                    nd->_deep_coalescence_counted = true;
-//    //            }
-//            }
-//
-//            // ensure all nodes are accounted for
-//            for (auto &nd:_species_partition[get<0>(species_joined)]) {
-//                nd->_deep_coalescence_counted = true;
-//            }
-//
-//            // second lineage
-//            for (auto &nd:_species_partition[get<1>(species_joined)]) {
-//    //            if (nd->_deep_coalescence_counted) {
-//    //                count2 = 1; // avoid double counting
-//    //                break;
-//    //            }
-//    //            else {
-//                    count2 += 1;
-//                    nd->_deep_coalescence_counted = true;
-//    //            }
-//            }
-//
-//            // ensure all nodes are accounted for
-//            for (auto &nd:_species_partition[get<1>(species_joined)]) {
-//                nd->_deep_coalescence_counted = true;
-//            }
-//
-//            num_deep_coal = (count1 + count2) - 1;
-//
-//    //        for (auto &nd:_species_partition[new_spp]) {
-//    //            if (!nd->_deep_coalescence_counted) {
-//    //                num_deep_coal += 1;
-//    //                nd->_deep_coalescence_counted = true;
-//    //            }
-//    //        }
-//            //                _num_deep_coalescences += _forests[i]._species_partition[new_spp].size() - 1;
-////        }
-//        return num_deep_coal;
-//    }
-
     inline void Forest::debugLogLikelihood(Node* nd, double log_like) {
         cout << "debugging likelihood" << endl;
         cout << "gene: " << _index << endl;
@@ -998,7 +946,6 @@ class Forest {
                 nd->_edge_length = othernd._edge_length;
                 nd->_position_in_lineages = othernd._position_in_lineages;
                 nd->_partial = othernd._partial;
-                nd->_deep_coalescence_counted = othernd._deep_coalescence_counted;
             }
         }
 
@@ -1165,80 +1112,6 @@ class Forest {
             _species_joined = make_pair(subtree1, subtree2); // last step just joins remaining two
         }
 #endif
-        
-        calcTopologyPrior((int) _lineages.size()+1);
-
-        _species_build.push_back(make_pair(make_tuple(subtree1->_name, subtree2->_name, new_nd->_name), 0.0));
-        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
-    }
-
-    inline tuple<string,string, string> Forest::predeterminedSpeciesTreeProposal(tuple<string, string, string> species_to_join) {
-        _cum_height = 0.0; // reset cum height for a new lineage
-        // this function creates a new node and joins two species
-        
-        Node* subtree1 = nullptr;
-        Node* subtree2 = nullptr;
-        
-        for (auto &nd:_lineages) {
-            if (nd->_name == get<0>(species_to_join)) {
-                subtree1 = nd;
-            }
-            else if (nd->_name == get<1>(species_to_join)) {
-                subtree2 = nd;
-            }
-        }
-        
-//        while (!done) {
-//
-//    //        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
-//            assert (lot != nullptr);
-//            pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
-//            assert (t.first != t.second);
-//            subtree1=_lineages[t.first];
-//            subtree2=_lineages[t.second];
-//            assert (t.first < _lineages.size());
-//            assert (t.second < _lineages.size());
-//            assert(!subtree1->_parent && !subtree2->_parent);
-//
-//            if (_outgroup != "none") {
-//                if (subtree1->_name != _outgroup && subtree2->_name != _outgroup && _lineages.size() > 2) { // outgroup can only be chosen on the last step
-//                    done = true;
-//                }
-//                else if (_lineages.size() == 2) {
-//                    done = true;
-//                }
-//            }
-//            else {
-//                done = true;
-//            }
-//            if (_outgroup == "none") {
-//                assert (done == true);
-//            }
-//        }
-        
-        Node nd;
-        _nodes.push_back(nd);
-        Node* new_nd = &_nodes.back();
-        new_nd->_parent=0;
-        new_nd->_number=_nleaves+_ninternals;
-        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
-        new_nd->_edge_length=0.0;
-        _ninternals++;
-        new_nd->_right_sib=0;
-
-        new_nd->_left_child=subtree1;
-        subtree1->_right_sib=subtree2;
-
-        subtree1->_parent=new_nd;
-        subtree2->_parent=new_nd;
-        
-        updateNodeVector (_lineages, subtree1, subtree2, new_nd);
-
-    #if defined (DEBUG_MODE)
-        if (_lineages.size() > 1) {
-            _species_joined = make_pair(subtree1, subtree2); // last step just joins remaining two
-        }
-    #endif
         
         calcTopologyPrior((int) _lineages.size()+1);
 
@@ -2368,6 +2241,36 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
         double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
         _vector_prior.push_back(log_inv_gamma_prior);
+    }
+        
+    inline void Forest::updateThetaMapFixedTheta(Lot::SharedPtr lot, string new_species_name) {
+        _theta_map[new_species_name] = Forest::_theta;
+    }
+        
+    inline void Forest::createThetaMapFixedTheta(Lot::SharedPtr lot) {
+        // map should be 2*nspecies - 1 size
+        unsigned number = 0;
+        _species_names.clear();
+        
+        for (auto &s:_species_partition) {
+            _species_names.push_back(s.first);
+            number++;
+            _species_indices[s.first] = number - 1;
+        }
+        assert (_species_names.size() == _nspecies);
+        
+        for (int i=0; i<_nspecies-1; i++) {
+            string name = boost::str(boost::format("node-%d")%number);
+            number++;
+            _species_names.push_back(name);
+            _species_indices[name] = number - 1;
+        }
+        
+        _theta_mean = Forest::_theta;
+        
+        for (auto &name:_species_names) {
+            _theta_map[name] = Forest::_theta;
+        }
     }
 
     inline void Forest::createThetaMap(Lot::SharedPtr lot) {

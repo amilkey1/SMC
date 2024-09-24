@@ -64,7 +64,6 @@ namespace proj {
             int                 _flags;
             PartialStore::partial_t _partial;
             int                 _position_in_lineages;
-            bool                _deep_coalescence_counted;
     };
     
     
@@ -84,7 +83,6 @@ namespace proj {
         _name = "";
         _edge_length = _smallest_edge_length;
         _partial.reset();
-        _deep_coalescence_counted = false;
     }
 
     inline void Node::setEdgeLength(double v) {

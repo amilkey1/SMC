@@ -100,13 +100,13 @@ class Particle {
         bool                                            speciesJoinProposed();
         void                                            clear();
         vector<double>                                  chooseIncrements(vector<double> event_choice_rates);
-        void                                            speciesProposal();
         void                                            speciesOnlyProposal();
         void                                            speciesOnlyProposalIntegratingOutTheta();
         void                                            geneProposal(unsigned forest_number, double increment, string species_name);
         void                                            calculateIncrementPriors(double increment, string species_name, unsigned forest_number, bool speciation, bool first_step);
         void                                            changeTheta(unsigned i);
         void                                            drawTheta();
+        void                                            fixTheta();
         void                                            clearPartials();
         Lot::SharedPtr getLot() const {return _lot;}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
@@ -142,6 +142,7 @@ class Particle {
         void                                            rebuildSpeciesTree();
         void                                            setGeneOrder(vector<unsigned> gene_order) {_gene_order = gene_order;}
         void                                            trimSpeciesTree();
+        void                                            setFixTheta(bool fix) {_fix_theta = fix;}
 
     private:
 
@@ -167,6 +168,7 @@ class Particle {
         vector<vector<pair<tuple<string, string, string>, double>>> _t_by_gene;
         vector<double>                          _starting_log_likelihoods;
         vector<unsigned>                        _gene_order;
+        bool                                    _fix_theta;
 };
 
     inline Particle::Particle() {
@@ -588,29 +590,6 @@ inline vector<double> Particle::getVectorPrior() {
         return increments;
     }
 
-    inline void Particle::speciesProposal() {
-        // species tree proposal, need to update species partition in all gene forests
-        assert (_lot != nullptr);
-        tuple <string, string, string> species_joined;
-        if (_species_order.size() > 0) {
-            species_joined = _forests[0].predeterminedSpeciesTreeProposal(_species_order[0]);
-            _species_order.erase(_species_order.begin());
-        }
-        else {
-            species_joined = _forests[0].speciesTreeProposal(_lot);
-        }
-        
-        for (int i=1; i<_forests.size(); i++) {
-            if (_deep_coal) {
-                // number of deep coalescences is (n-1) where n is the total number of lineages in the joining species
-                string new_spp = get<2>(species_joined);
-                _num_deep_coalescences += _forests[i].getDeepCoal(species_joined);
-            }
-            _forests[i].updateSpeciesPartition(species_joined);
-        }
-        _deep_coal = false;
-    }
-
     inline void Particle::speciesOnlyProposalIntegratingOutTheta() {
         if (_generation == 0) {
             for (int i=1; i<_forests.size(); i++) {
@@ -1019,6 +998,24 @@ inline vector<double> Particle::getVectorPrior() {
 #else
         return Forest::_theta;
 #endif
+    }
+
+    inline void Particle::fixTheta() {
+        _forests[1].createThetaMapFixedTheta(_lot); // create map for one forest, then copy it to all forests
+        double theta_mean = _forests[1]._theta_mean;
+        double theta_proposal_mean = _forests[1]._theta_proposal_mean;
+        double theta_prior_mean = _forests[1]._theta_prior_mean;
+        map<string, double> theta_map = _forests[1]._theta_map;
+        map<string, unsigned> species_indices = _forests[1]._species_indices;
+        if (_forests.size() > 2) {
+            for (int i=2; i<_forests.size(); i++) {
+                _forests[i]._theta_map = theta_map;
+                _forests[i]._species_indices = species_indices;
+                _forests[i]._theta_mean = theta_mean;
+                _forests[i]._theta_proposal_mean = theta_proposal_mean;
+                _forests[i]._theta_prior_mean = theta_prior_mean;
+            }
+        }
     }
 
     inline void Particle::drawTheta() {
@@ -1496,7 +1493,12 @@ inline vector<double> Particle::getVectorPrior() {
             // update theta map
             for (auto t:theta_map) {
                 if (t.second == -1.0)  {
-                    _forests[1].updateThetaMap(_lot, t.first); // TODO: make sure this works regardless of gene order
+                    if (_fix_theta) {
+                        _forests[1].updateThetaMapFixedTheta(_lot, t.first);
+                    }
+                    else {
+                        _forests[1].updateThetaMap(_lot, t.first); // TODO: make sure this works regardless of gene order
+                    }
                 }
             }
             
@@ -1598,6 +1600,7 @@ inline vector<double> Particle::getVectorPrior() {
         _t_by_gene = other._t_by_gene;
         _next_species_number_by_gene = other._next_species_number_by_gene;
         _gene_order = other._gene_order;
+        _fix_theta = other._fix_theta;
     };
 }
 

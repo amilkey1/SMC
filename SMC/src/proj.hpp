@@ -112,6 +112,7 @@ namespace proj {
             unsigned                    _ngenes_provided;
             string                      _species_newick_name;
             bool                        _fix_theta_for_simulations;
+            bool                        _fix_theta;
             double                      _starting_log_likelihood;
     };
 
@@ -802,6 +803,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
         ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
         ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(false), "set to true to fix one theta for all populations")
+        ("fix_theta",  boost::program_options::value(&_fix_theta)->default_value(false), "set to true to fix one theta for all populations")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -2153,7 +2155,14 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     if (!Forest::_run_on_empty) {
                         p.setLogLikelihood(starting_log_likelihoods);
                     }
+                    
+                    if (_fix_theta) {
+                        p.fixTheta();
+                        p.setFixTheta(true);
+                    }
+                    
 #if defined (DRAW_NEW_THETA)
+                    assert (!_fix_theta);
                     p.drawTheta();
 #endif
                 }

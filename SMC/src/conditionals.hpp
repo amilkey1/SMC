@@ -11,11 +11,12 @@
 
 #define HIERARCHICAL_FILTERING
 
-#define DRAW_NEW_THETA
+//#define DRAW_NEW_THETA
 
 //#define UNCONSTRAINED_PROPOSAL 
 
-#define GRAHAM_JONES_COALESCENT_LIKELIHOOD // if defined, also define DRAW_NEW_THETA or turn off HIERARCHICAL_FILTERING
+//#define GRAHAM_JONES_COALESCENT_LIKELIHOOD // if defined, also define DRAW_NEW_THETA or turn off HIERARCHICAL_FILTERING
+// do not define this if fix_theta defined in conf file
 
 #define PARALLELIZE_BY_GROUP
 
