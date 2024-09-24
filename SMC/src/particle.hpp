@@ -504,7 +504,8 @@ inline vector<double> Particle::getVectorPrior() {
                         unsigned index = selectEventLinearScale(event_choice_rates);
                         string species_name = rates_by_species[index].second;
                         _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
-                                                
+                                   
+                        if (Forest::_start_mode == "smc") {
 # if defined (BUILD_UPGMA_TREE)
 //                        _forests[0].showForest();
 # if defined (BUILD_UPGMA_TREE_CONSTRAINED)
@@ -513,6 +514,7 @@ inline vector<double> Particle::getVectorPrior() {
                         _forests[next_gene].buildRestOfTree(_lot);
 #endif
 #endif
+                        }
                             
                         if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
                             _t_by_gene[next_gene-1][next_species_index].second -= gene_increment; // update species tree increments
