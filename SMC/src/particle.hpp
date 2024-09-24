@@ -506,8 +506,8 @@ inline vector<double> Particle::getVectorPrior() {
                         _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
                                                 
 # if defined (BUILD_UPGMA_TREE)
-# if defined (BUILD_UPGMA_TREE_CONSTRAINED)
 //                        _forests[0].showForest();
+# if defined (BUILD_UPGMA_TREE_CONSTRAINED)
                         _forests[next_gene].buildRestOfTree(_lot, _t);
 #else
                         _forests[next_gene].buildRestOfTree(_lot);

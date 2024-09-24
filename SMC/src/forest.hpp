@@ -110,6 +110,7 @@ class Forest {
         void                        buildRestOfTree(Lot::SharedPtr lot);
 #endif
 #endif
+        void                        debugShowDistanceMatrix(const vector<double> & d) const;
 
     
         map<string, double>         _theta_map;
@@ -1439,9 +1440,6 @@ class Forest {
                 double min_dist = 0.0;
                 double max_dist = min_dist + 5.0; //TODO: replace arbitrary value 5.0
                 
-                // TODO: v_0 must start from node of gene tree, then extend at least as far as existing branch length
-                // TODO: this may only apply to branches that have not had the most recent coalesent event??
-                
                 double min_height = 0.0;
 //                showForest();
                 
@@ -1449,12 +1447,11 @@ class Forest {
                 
 #if defined(BUILD_UPGMA_TREE_CONSTRAINED)
                 
-////                showForest();
 //                // TODO: for now, walk through species partition to find them, but can make this faster
 //                // find the distance from the tips to the deeper of the two species, then subtract the height of the existing gene tree
                 string lspp = "";
                 string rspp = "";
-//
+
                 for (auto &s:_species_partition) {
                     for (auto &nd:s.second) {
                         if (nd == lnode) {
@@ -1468,120 +1465,93 @@ class Forest {
                         break;
                     }
                 }
-//
-//                double min_height = 0.0;
-                bool lspp_first = false;
-//
+                
                 if (lspp != rspp) {
+                    
+                    double mrca_height = 0.0;
+                
                     for (auto &s:species_info) {
-                            // find either lnode or rnode
-                            if ((get<0>(s.first) == lspp) || (get<1>(s.first) == lspp)) {
-                                lspp_first = true; // lspp_first is the deeper node
-                                break;
-                            }
-                            else if ((get<0>(s.first) == rspp) || (get<1>(s.first) == rspp)) {
-                                assert (min_height == 0.0);
-                                lspp_first = false;
-                                break;
-                            }
+                        if (get<0>(s.first) == lspp) {
+                            lspp = get<2>(s.first);
+                        }
+                        else if (get<1>(s.first) == lspp) {
+                            lspp = get<2>(s.first);
+                        }
+                        
+                        if (get<0>(s.first) == rspp) {
+                            rspp = get<2>(s.first);
+                        }
+                        else if (get<1>(s.first) == rspp) {
+                            rspp = get<2>(s.first);
+                        }
+                        
+                        if (lspp != rspp) {
+                            mrca_height += s.second;
+                            // don't include any increment for the population where the two species have joined for the first time
+                        }
+                        
+                        if (lspp == rspp) {
+                            break;
+                        }
                     }
 
-                    double mrca_height = 0.0;
+                // TODO: need to walk through species info to find height where both species join
+                
+//                bool lspp_first = false;
+//
+//                    for (auto &s:species_info) {
+//                            // find either lnode or rnode
+//                            if ((get<0>(s.first) == lspp) || (get<1>(s.first) == lspp)) {
+//                                lspp_first = true; // lspp_first is the deeper node
+//                                break;
+//                            }
+//                            else if ((get<0>(s.first) == rspp) || (get<1>(s.first) == rspp)) {
+//                                assert (min_height == 0.0);
+//                                lspp_first = false;
+//                                break;
+//                            }
+//                    }
+
+//                    double mrca_height = 0.0;
                     
                     // find the height from the tips of the species tree to the highest of lspp / rspp, then subtract the gene tree height
-                    for (auto &s:species_info) {
-                        // if lnode comes first, add all the remaining increments up to rnode
-                        // if rnode comes first, add all the remaining increments up to lnode
-                        mrca_height += s.second;
-                        if (lspp_first) {
-                            if ((get<0>(s.first) == rspp) || (get<1>(s.first) == rspp)) {
-                                mrca_height -= s.second;
-                                break;
-                            }
-                        }
-                        else {
-                            if ((get<0>(s.first) == lspp) || (get<1>(s.first) == lspp)) {
-                                mrca_height -= s.second;
-                                break;
-                            }
-                    }
-                    }
-                    
-//                    assert (v0 == 0.0);
-//                    v0 = mrca_height * 2;
-//                    mrca_height *= 2.0;
-                    
-//                    if (lnode->_left_child) {
-////                        v0 -= lnode->_left_child->getEdgeLength();
-//                        mrca_height -= lnode->_left_child->getEdgeLength();
+//                    for (auto &s:species_info) {
+//                        // if lnode comes first, add all the remaining increments up to rnode
+//                        // if rnode comes first, add all the remaining increments up to lnode
+//                        mrca_height += s.second;
+//                        if (lspp_first) {
+//                            if ((get<0>(s.first) == rspp) || (get<1>(s.first) == rspp)) {
+//                                mrca_height -= s.second;
+//                                break;
+//                            }
+//                        }
+//                        else {
+//                            if ((get<0>(s.first) == lspp) || (get<1>(s.first) == lspp)) {
+//                                mrca_height -= s.second;
+//                                break;
+//                            }
+//                    }
 //                    }
                     
-//                    if (rnode->_left_child) {
-////                        v0 -= lnode->_left_child->getEdgeLength();
-//                        mrca_height -= lnode->_left_child->getEdgeLength();
-//                    }
-                    
-//                    if (lnode->_left_child) {
-//                        v0 -= lnode->_edge_length;
-//                    }
-//                    if (rnode->_left_child) {
-//                        v0 -= lnode->_edge_length;
-//                    }
                         double gene_tree_height = getTreeHeight();
                     
                     mrca_height -= gene_tree_height;
-                    
-                    min_dist = mrca_height;
                     
                     min_dist = 2.0 * mrca_height;
 
                     assert (min_dist > 0.0);
                 }
-//                min_dist = 2.0*min_height;
-//                max_dist = min_dist + 5.0; //TODO: replace arbitrary value 5.0
-//#else
 #endif
                 
-                // Optimize edge length using black-box maximizer
-//                double v0 = 0.0;
-//                if (lnode->_left_child) {
-//                    v0 += lnode->_left_child->getEdgeLength();
-//                }
-//                else {
-//                    v0 += lnode->getEdgeLength();
-//                }
-//
-//                if (rnode->_left_child) {
-//                    v0 += lnode->_left_child->getEdgeLength();
-//                }
-//                else {
-//                    v0 += rnode->getEdgeLength();
-//                }
-                
-//                showForest();
-                v0 = lnode->getEdgeLength() + rnode->getEdgeLength(); // TODO: double check this is correct
-                
-//                v0 += min_dist;
-                
-//                min_dist = 0.0;
-//                double v0 = getLineageHeight(lnode) + getLineageHeight(rnode); // TODO: edge length or node height?
-//                double min1 = lnode->getEdgeLength();
-//                double min2 = rnode->getEdgeLength();
-//                if (min1 < min2) {
-//                    min_dist = 2.0 * min1;
-//                }
-//                else {
-//                    min_dist = 2.0 * min2;
-//                }
-//#endif
+                v0 = lnode->getEdgeLength() + rnode->getEdgeLength();
                 
                 negLogLikeDist f(npatterns, first_pattern, counts, same_state, diff_state, v0);
                 auto r = boost::math::tools::brent_find_minima(f, min_dist, max_dist, std::numeric_limits<double>::digits);
-//                double maximized_log_likelihood = -r.second;
+                double maximized_log_likelihood = -r.second;
                 unsigned k = i*(i-1)/2 + j;
                 dij[k] = r.first;
                 dij_row_col[k] = make_pair(i,j);
-                
+                                
     //                output(format("d[%d, %d] = %.7f (logL = %.5f") % i % j % d[ij] % maximized_log_likelihood, 1);
             
             }
@@ -1597,6 +1567,11 @@ class Forest {
             row[nd] = i;
         }
 
+        
+//        debugShowDistanceMatrix(dij);
+        
+        double upgma_height = 0.0;
+        
         // Build UPGMA tree on top of existing forest
         assert(_upgma_additions.empty());
         unsigned nsteps = n - 1;
@@ -1611,8 +1586,10 @@ class Forest {
             // Update all leading edge lengths
             double v = *it;
             for (auto nd : _lineages) {
-                nd->_edge_length += 0.5*v;
+                nd->_edge_length += (0.5*v - upgma_height);
             }
+            
+            upgma_height = v / 2.0;
             
             //debugShowLineages();
             
@@ -1661,6 +1638,7 @@ class Forest {
                     dij[ik] = 0.5*(a + b);
                     dij[jk] = _infinity;
                 }
+//                debugShowDistanceMatrix(dij);
             }
             
             // Sanity check
@@ -1691,6 +1669,9 @@ class Forest {
                     }
                     dij2[k2] = dij[k];
                     dij_row_col[k2] = make_pair(i2,j2);
+                    
+//                    debugShowDistanceMatrix(dij);
+//                    debugShowDistanceMatrix(dij2);
                 }
             }
             
@@ -1755,6 +1736,73 @@ class Forest {
 //            showForest();
     }
 #endif
+        
+    inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
+        // d is a 1-dimensional vector that stores the lower triangle of a square matrix
+        // (not including diagonals) in row order
+        //
+        // For example, for a 4x4 matrix (- means non-applicable):
+        //
+        //       0  1  2  3
+        //     +-----------
+        //  0  | -  -  -  -
+        //  1  | 0  -  -  -
+        //  2  | 1  2  -  -
+        //  3  | 3  4  5  -
+        //
+        // For this example, d = {0, 1, 2, 3, 4 ,5}
+        //
+        // See this explanation for how to index d:
+        //   https://math.stackexchange.com/questions/646117/how-to-find-a-function-mapping-matrix-indices
+        //
+        // In short, d[k] is the (i,j)th element, where k = i(i-1)/2 + j
+        //       i   j   k = i*(i-1)/2 + j
+        //       1   0   0 = 1*0/2 + 0
+        //       2   0   1 = 2*1/2 + 0
+        //       2   1   2 = 2*1/2 + 1
+        //       3   0   3 = 3*2/2 + 0
+        //       3   1   4 = 3*2/2 + 1
+        //       3   2   5 = 3*2/2 + 2
+        //
+        // Number of elements in d is n(n-1)/2
+        // Solving for n, and letting x = d.size(),
+        //  x = n(n-1)/2
+        //  2x = n^2 - n
+        //  0 = a n^2 + b n + c, where a = 1, b = -1, c = -2x
+        //  n = (-b += sqrt(b^2 - 4ac))/(2a)
+        //    = (1 + sqrt(1 + 8x))/2
+        double x = (double)d.size();
+        double dbln = (1.0 + sqrt(1.0 + 8.0*x))/2.0;
+        unsigned n = (unsigned)dbln;
+        
+        cout << format("\nDistance matrix (%d x %d):\n") % n % n;
+
+        // Column headers
+        cout << format("%12d") % " ";
+        for (unsigned j = 0; j < n; j++) {
+            cout << format("%12d") % j;
+        }
+        cout << "\n";
+        
+        unsigned k = 0;
+        for (unsigned i = 0; i < n; i++) {
+            cout << format("%12d") % i;
+            for (unsigned j = 0; j < n; j++) {
+                if (j < i) {
+                    double v = d[k++];
+                    if (v == Forest::_infinity)
+                        cout << "         inf";
+                    else
+                        cout << format("%12.5f") % v;
+                }
+                else {
+                    cout << "         inf";
+                }
+            }
+            cout << "\n";
+        }
+        cout << "\n";
+    }
 
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment, string species, Lot::SharedPtr lot) {
           double prev_log_likelihood = _gene_tree_log_likelihood;
