@@ -450,7 +450,8 @@ inline vector<double> Particle::getVectorPrior() {
             }
         }
 //        else {
-        else if (_generation % _nsubsets == 0) { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+        else if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+            // don't rebuild the species tree at every step when simulating data
             // TODO: do this at every step, not just after filtering all loci once? - did not work as well on simulation grid
             trimSpeciesTree();
             if (_forests[0]._lineages.size() > 1) {
@@ -484,27 +485,27 @@ inline vector<double> Particle::getVectorPrior() {
                     if ((gene_increment < species_increment || species_increment == 0.0) && gene_increment != -1.0) { // if species increment is 0.0, choose a coalescent event because the species tree is finished
 
                         
-                            assert (gene_increment > 0.0);
-                            _forests[next_gene].addIncrement(gene_increment);
-                            
-                            vector<double> event_choice_rates;
-                            for (auto &r:rates_by_species) {
-                                event_choice_rates.push_back(r.first);
-                            }
+                        assert (gene_increment > 0.0);
+                        _forests[next_gene].addIncrement(gene_increment);
+                        
+                        vector<double> event_choice_rates;
+                        for (auto &r:rates_by_species) {
+                            event_choice_rates.push_back(r.first);
+                        }
                         
                         for (auto &p:event_choice_rates) {
                             p = p/total_rate;
                         }
                             
-                            _deep_coal = true;
+                        _deep_coal = true;
                             
-                            unsigned index = selectEventLinearScale(event_choice_rates);
-                            string species_name = rates_by_species[index].second;
-                            _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
+                        unsigned index = selectEventLinearScale(event_choice_rates);
+                        string species_name = rates_by_species[index].second;
+                        _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
                                                 
 # if defined (BUILD_UPGMA_TREE)
 # if defined (BUILD_UPGMA_TREE_CONSTRAINED)
-                        _forests[0].showForest();
+//                        _forests[0].showForest();
                         _forests[next_gene].buildRestOfTree(_lot, _t);
 #else
                         _forests[next_gene].buildRestOfTree(_lot);
@@ -519,16 +520,19 @@ inline vector<double> Particle::getVectorPrior() {
                         else {
                             // carry out speciation event
                             
-                        assert (species_increment > 0.0);
-                        assert (_forests[next_gene]._species_partition.size() > 1);
-                        _forests[next_gene].addIncrement(species_increment);
-                        _forests[next_gene].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
-                        assert (next_species_index < _t_by_gene[next_gene-1].size());
-                        _t_by_gene[next_gene-1][next_species_index].second -= species_increment; // update species tree increments
-                        assert (_t_by_gene[next_gene-1][next_species_index].second == 0.0);
-                        if (_forests[next_gene]._species_partition.size() > 1) {
-                            _next_species_number_by_gene[next_gene-1]++;
-                        }
+                            assert (species_increment > 0.0);
+                            assert (_forests[next_gene]._species_partition.size() > 1);
+                            _forests[next_gene].addIncrement(species_increment);
+                            
+                            _num_deep_coalescences += _forests[next_gene].getDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
+                            
+                            _forests[next_gene].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
+                            assert (next_species_index < _t_by_gene[next_gene-1].size());
+                            _t_by_gene[next_gene-1][next_species_index].second -= species_increment; // update species tree increments
+                            assert (_t_by_gene[next_gene-1][next_species_index].second == 0.0);
+                            if (_forests[next_gene]._species_partition.size() > 1) {
+                                _next_species_number_by_gene[next_gene-1]++;
+                            }
                     }
                     
             
@@ -566,7 +570,12 @@ inline vector<double> Particle::getVectorPrior() {
         
         _generation++;
         
-        _log_weight = _forests[next_gene]._log_weight + inv_gamma_modifier;
+        if (Forest::_start_mode == "smc") {
+            _log_weight = _forests[next_gene]._log_weight + inv_gamma_modifier;
+        }
+        else {
+            _log_weight = 0.0;
+        }
             }
 
     vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {

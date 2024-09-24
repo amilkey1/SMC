@@ -141,7 +141,6 @@ class Forest {
         double                      _panmictic_coalescent_likelihood;
         double                      _log_coalescent_likelihood_increment;
         double                      _cum_height;
-        string                      _start_mode;
         vector<pair<double, pair<string, string>>>              _depths;
         unsigned                    _nincrements = 0;
         vector<Node*>               _preorder;
@@ -193,6 +192,7 @@ class Forest {
         static string               _outgroup;
         static bool                 _run_on_empty;
         static double               _ploidy;
+        static string               _start_mode;
 };
 
 
@@ -783,56 +783,75 @@ class Forest {
 
     inline unsigned Forest::getDeepCoal(tuple <string, string, string> species_joined) {
         unsigned num_deep_coal = 0;
-//        if (_species_partition.size() > 2) { // don't count ancestral population as deep coalescence
-            unsigned count1 = 0;
-            unsigned count2 = 0;
-            
-            // first lineage
-            for (auto &nd:_species_partition[get<0>(species_joined)]) {
-    //            if (nd->_deep_coalescence_counted) {
-    //                count1 = 1; // avoid double counting
-    //                break;
-    //            }
-    //            else {
-                    count1 += 1;
-                    nd->_deep_coalescence_counted = true;
-    //            }
-            }
-            
-            // ensure all nodes are accounted for
-            for (auto &nd:_species_partition[get<0>(species_joined)]) {
-                nd->_deep_coalescence_counted = true;
-            }
-            
-            // second lineage
-            for (auto &nd:_species_partition[get<1>(species_joined)]) {
-    //            if (nd->_deep_coalescence_counted) {
-    //                count2 = 1; // avoid double counting
-    //                break;
-    //            }
-    //            else {
-                    count2 += 1;
-                    nd->_deep_coalescence_counted = true;
-    //            }
-            }
-            
-            // ensure all nodes are accounted for
-            for (auto &nd:_species_partition[get<1>(species_joined)]) {
-                nd->_deep_coalescence_counted = true;
-            }
-            
-            num_deep_coal = (count1 + count2) - 1;
-            
-    //        for (auto &nd:_species_partition[new_spp]) {
-    //            if (!nd->_deep_coalescence_counted) {
-    //                num_deep_coal += 1;
-    //                nd->_deep_coalescence_counted = true;
-    //            }
-    //        }
-            //                _num_deep_coalescences += _forests[i]._species_partition[new_spp].size() - 1;
-//        }
+        
+        string spp1 = get<0> (species_joined);
+        string spp2 = get<1> (species_joined);
+        
+        unsigned nlineages1 = (unsigned) _species_partition[spp1].size();
+        unsigned nlineages2 = (unsigned) _species_partition[spp2].size();
+        
+        if (nlineages1 > 1) {
+            num_deep_coal += nlineages1;
+        }
+        if (nlineages2 > 1) {
+            num_deep_coal += nlineages2;
+        }
+        
         return num_deep_coal;
     }
+
+//    inline unsigned Forest::getDeepCoal(tuple <string, string, string> species_joined) {
+//        unsigned num_deep_coal = 0;
+////        if (_species_partition.size() > 2) { // don't count ancestral population as deep coalescence
+//            unsigned count1 = 0;
+//            unsigned count2 = 0;
+//
+//            // first lineage
+//            for (auto &nd:_species_partition[get<0>(species_joined)]) {
+//    //            if (nd->_deep_coalescence_counted) {
+//    //                count1 = 1; // avoid double counting
+//    //                break;
+//    //            }
+//    //            else {
+//                    count1 += 1;
+//                    nd->_deep_coalescence_counted = true;
+//    //            }
+//            }
+//
+//            // ensure all nodes are accounted for
+//            for (auto &nd:_species_partition[get<0>(species_joined)]) {
+//                nd->_deep_coalescence_counted = true;
+//            }
+//
+//            // second lineage
+//            for (auto &nd:_species_partition[get<1>(species_joined)]) {
+//    //            if (nd->_deep_coalescence_counted) {
+//    //                count2 = 1; // avoid double counting
+//    //                break;
+//    //            }
+//    //            else {
+//                    count2 += 1;
+//                    nd->_deep_coalescence_counted = true;
+//    //            }
+//            }
+//
+//            // ensure all nodes are accounted for
+//            for (auto &nd:_species_partition[get<1>(species_joined)]) {
+//                nd->_deep_coalescence_counted = true;
+//            }
+//
+//            num_deep_coal = (count1 + count2) - 1;
+//
+//    //        for (auto &nd:_species_partition[new_spp]) {
+//    //            if (!nd->_deep_coalescence_counted) {
+//    //                num_deep_coal += 1;
+//    //                nd->_deep_coalescence_counted = true;
+//    //            }
+//    //        }
+//            //                _num_deep_coalescences += _forests[i]._species_partition[new_spp].size() - 1;
+////        }
+//        return num_deep_coal;
+//    }
 
     inline void Forest::debugLogLikelihood(Node* nd, double log_like) {
         cout << "debugging likelihood" << endl;
@@ -1490,6 +1509,7 @@ class Forest {
     inline void Forest::buildRestOfTree(Lot::SharedPtr lot) {
 #endif
         double prev_log_likelihood = _gene_tree_log_likelihood;
+        
 //        showForest();
         // Get the number of patterns
         unsigned npatterns = _data->getNumPatternsInSubset(_index - 1); // forest index starts at 1 but subsets start at 0
@@ -1552,13 +1572,16 @@ class Forest {
                 double min_height = 0.0;
 //                showForest();
                 
+                double v0 = 0.0;
+                
 #if defined(BUILD_UPGMA_TREE_CONSTRAINED)
-//                showForest();
-                // TODO: for now, walk through species partition to find them, but can make this faster
-                // find the distance from the tips to the deeper of the two species, then subtract the height of the existing gene tree
+                
+////                showForest();
+//                // TODO: for now, walk through species partition to find them, but can make this faster
+//                // find the distance from the tips to the deeper of the two species, then subtract the height of the existing gene tree
                 string lspp = "";
                 string rspp = "";
-                
+//
                 for (auto &s:_species_partition) {
                     for (auto &nd:s.second) {
                         if (nd == lnode) {
@@ -1572,14 +1595,12 @@ class Forest {
                         break;
                     }
                 }
-                
+//
 //                double min_height = 0.0;
                 bool lspp_first = false;
-                                
+//
                 if (lspp != rspp) {
-//                    showForest();
                     for (auto &s:species_info) {
-//                        if (!found) {
                             // find either lnode or rnode
                             if ((get<0>(s.first) == lspp) || (get<1>(s.first) == lspp)) {
                                 lspp_first = true; // lspp_first is the deeper node
@@ -1591,59 +1612,85 @@ class Forest {
                                 break;
                             }
                     }
+
+                    double mrca_height = 0.0;
                     
                     // find the height from the tips of the species tree to the highest of lspp / rspp, then subtract the gene tree height
                     for (auto &s:species_info) {
                         // if lnode comes first, add all the remaining increments up to rnode
                         // if rnode comes first, add all the remaining increments up to lnode
-                        min_height += s.second;
+                        mrca_height += s.second;
                         if (lspp_first) {
                             if ((get<0>(s.first) == rspp) || (get<1>(s.first) == rspp)) {
-                                min_height -= s.second;
+                                mrca_height -= s.second;
                                 break;
                             }
                         }
                         else {
                             if ((get<0>(s.first) == lspp) || (get<1>(s.first) == lspp)) {
-                                min_height -= s.second;
+                                mrca_height -= s.second;
                                 break;
                             }
                     }
                     }
-                        double gene_tree_height = getTreeHeight();
-                        
-                        min_height -= gene_tree_height;
                     
-                    assert (min_height > 0.0);
+//                    assert (v0 == 0.0);
+//                    v0 = mrca_height * 2;
+//                    mrca_height *= 2.0;
+                    
+//                    if (lnode->_left_child) {
+////                        v0 -= lnode->_left_child->getEdgeLength();
+//                        mrca_height -= lnode->_left_child->getEdgeLength();
+//                    }
+                    
+//                    if (rnode->_left_child) {
+////                        v0 -= lnode->_left_child->getEdgeLength();
+//                        mrca_height -= lnode->_left_child->getEdgeLength();
+//                    }
+                    
+//                    if (lnode->_left_child) {
+//                        v0 -= lnode->_edge_length;
+//                    }
+//                    if (rnode->_left_child) {
+//                        v0 -= lnode->_edge_length;
+//                    }
+                        double gene_tree_height = getTreeHeight();
+                    
+                    mrca_height -= gene_tree_height;
+                    
+                    min_dist = mrca_height;
+                    
+                    min_dist = 2.0 * mrca_height;
+
+                    assert (min_dist > 0.0);
                 }
-                min_dist = 2.0*min_height;
-                max_dist = min_dist + 5.0; //TODO: replace arbitrary value 5.0
+//                min_dist = 2.0*min_height;
+//                max_dist = min_dist + 5.0; //TODO: replace arbitrary value 5.0
+//#else
 #endif
                 
                 // Optimize edge length using black-box maximizer
-                // TODO: v_0 must start from node of gene tree, then extend at least as far as existing branch length
-                double v0 = 0.0;
-                if (lnode->_left_child) {
-                    v0 += lnode->_left_child->getEdgeLength(); // TODO: need to constrain the increment too
-//                    if (min_height < lnode->_left_child->getEdgeLength()) {
-//                        min_dist = 2 * lnode->_left_child->getEdgeLength();
-//                    }
-                }
-                else {
-                    v0 += lnode->getEdgeLength();
-                }
+//                double v0 = 0.0;
+//                if (lnode->_left_child) {
+//                    v0 += lnode->_left_child->getEdgeLength();
+//                }
+//                else {
+//                    v0 += lnode->getEdgeLength();
+//                }
+//
+//                if (rnode->_left_child) {
+//                    v0 += lnode->_left_child->getEdgeLength();
+//                }
+//                else {
+//                    v0 += rnode->getEdgeLength();
+//                }
                 
-                if (rnode->_left_child) {
-                    v0 += lnode->_left_child->getEdgeLength();
-//                    if (min_height < rnode->_left_child->getEdgeLength()) {
-//                        min_dist = 2 * rnode->_left_child->getEdgeLength();
-//                    }
-                }
-                else {
-                    v0 += rnode->getEdgeLength();
-                }
+//                showForest();
+                v0 = lnode->getEdgeLength() + rnode->getEdgeLength(); // TODO: double check this is correct
                 
-//                double v0 = lnode->getEdgeLength() + rnode->getEdgeLength(); // TODO: double check this is correct
+//                v0 += min_dist;
+                
+//                min_dist = 0.0;
 //                double v0 = getLineageHeight(lnode) + getLineageHeight(rnode); // TODO: edge length or node height?
 //                double min1 = lnode->getEdgeLength();
 //                double min2 = rnode->getEdgeLength();
@@ -1653,6 +1700,7 @@ class Forest {
 //                else {
 //                    min_dist = 2.0 * min2;
 //                }
+//#endif
                 
                 negLogLikeDist f(npatterns, first_pattern, counts, same_state, diff_state, v0);
                 auto r = boost::math::tools::brent_find_minima(f, min_dist, max_dist, std::numeric_limits<double>::digits);
@@ -1713,6 +1761,8 @@ class Forest {
             subtree1->_parent=new_nd;
             subtree2->_parent=new_nd;
             
+            _ninternals++;
+            
             // Nodes added to _upgma_additions will be removed in destroyUPGMA()
             _upgma_additions.push(new_nd);
             
@@ -1727,7 +1777,7 @@ class Forest {
             new_nd->_partial=ps.getPartial(_npatterns*4);
             assert(new_nd->_left_child->_right_sib);
             calcPartialArray(new_nd);
-            
+                        
             // Update distance matrix
             for (unsigned k = 0; k < n; k++) {
                 if (k != i && k != j) {
@@ -1814,6 +1864,8 @@ class Forest {
 
             _upgma_additions.pop();
             _nodes.pop_back(); // remove unused node from node list
+            
+            _ninternals--;
         }
         
         // Restore starting edge lengths

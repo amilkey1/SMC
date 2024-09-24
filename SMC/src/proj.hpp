@@ -1903,10 +1903,17 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         _nthreads = 1;
         rng.setSeed(_random_seed);
 
+        unsigned ntaxa = 0;
+        
         if (_ntaxaperspecies.size() == 1) {
-            unsigned ntaxa = _ntaxaperspecies[0];
+            ntaxa = _ntaxaperspecies[0];
             for (int i=0; i<_sim_nspecies-1; i++) {
                 _ntaxaperspecies.push_back(ntaxa);
+            }
+        }
+        else {
+            for (auto &t:_ntaxaperspecies) {
+                ntaxa += t;
             }
         }
 
@@ -1938,6 +1945,32 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
         unsigned nsubsets = _data->getNumSubsets();
         Particle::setNumSubsets(nsubsets);
+        
+        assert (ntaxa > 0);
+        
+        unsigned list_size = (ntaxa-1)*nsubsets;
+        vector<unsigned> gene_order;
+        
+        unsigned count = 1;
+        vector<pair<double, unsigned>> randomize;
+        for (unsigned l=0; l<list_size; l++) {
+            if (count == 1) {
+                randomize.clear();
+            }
+            randomize.push_back(make_pair(rng.uniform(), count));
+            count++;
+            if (count > nsubsets) {
+                sort(randomize.begin(), randomize.end());
+                for (auto &r:randomize) {
+                    gene_order.push_back(r.second);
+                }
+                count = 1;
+            }
+        }
+        
+        assert (gene_order.size() == list_size);
+        
+        sim_vec[0].setGeneOrder(gene_order);
 
         sim_vec[0].setSimData(_data, _taxon_map, nsubsets, (unsigned) _taxon_map.size());
 
@@ -1952,6 +1985,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         for (unsigned g=0; g<nsteps; g++){
             proposeParticles(sim_vec);
         }
+        
+        sim_vec[0].getNumDeepCoalescences();
 
         cout << "\nBuilding species tree and associated gene trees....\n";
         vector<string> taxon_names;
