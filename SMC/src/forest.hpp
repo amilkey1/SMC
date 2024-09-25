@@ -606,9 +606,10 @@ class Forest {
             }
         }
         
-        for (auto &nd:_lineages) {
-            assert (nd->_right_sib != nd);
-        }
+//        for (auto &nd:_lineages) {
+//            assert (nd->_right_sib != nd);
+//        }
+        
         auto & parent_partial_array = *(new_nd->_partial);
         for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
             
@@ -1494,44 +1495,6 @@ class Forest {
                             break;
                         }
                     }
-
-                // TODO: need to walk through species info to find height where both species join
-                
-//                bool lspp_first = false;
-//
-//                    for (auto &s:species_info) {
-//                            // find either lnode or rnode
-//                            if ((get<0>(s.first) == lspp) || (get<1>(s.first) == lspp)) {
-//                                lspp_first = true; // lspp_first is the deeper node
-//                                break;
-//                            }
-//                            else if ((get<0>(s.first) == rspp) || (get<1>(s.first) == rspp)) {
-//                                assert (min_height == 0.0);
-//                                lspp_first = false;
-//                                break;
-//                            }
-//                    }
-
-//                    double mrca_height = 0.0;
-                    
-                    // find the height from the tips of the species tree to the highest of lspp / rspp, then subtract the gene tree height
-//                    for (auto &s:species_info) {
-//                        // if lnode comes first, add all the remaining increments up to rnode
-//                        // if rnode comes first, add all the remaining increments up to lnode
-//                        mrca_height += s.second;
-//                        if (lspp_first) {
-//                            if ((get<0>(s.first) == rspp) || (get<1>(s.first) == rspp)) {
-//                                mrca_height -= s.second;
-//                                break;
-//                            }
-//                        }
-//                        else {
-//                            if ((get<0>(s.first) == lspp) || (get<1>(s.first) == lspp)) {
-//                                mrca_height -= s.second;
-//                                break;
-//                            }
-//                    }
-//                    }
                     
                         double gene_tree_height = getTreeHeight();
                     
@@ -1547,7 +1510,7 @@ class Forest {
                 
                 negLogLikeDist f(npatterns, first_pattern, counts, same_state, diff_state, v0);
                 auto r = boost::math::tools::brent_find_minima(f, min_dist, max_dist, std::numeric_limits<double>::digits);
-                double maximized_log_likelihood = -r.second;
+//                double maximized_log_likelihood = -r.second;
                 unsigned k = i*(i-1)/2 + j;
                 dij[k] = r.first;
                 dij_row_col[k] = make_pair(i,j);
@@ -1711,6 +1674,11 @@ class Forest {
             //reset siblings and parents of original nodes back to 0
             child1->resetNode(); //subtree1
             child2->resetNode(); //subtree2
+            
+            if (_save_memory) {
+                child1->_partial = nullptr;
+                child2->_partial = nullptr;
+            }
 
             // clear new node from _nodes
             //clear new node that was just created

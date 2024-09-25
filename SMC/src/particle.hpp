@@ -439,6 +439,7 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline void Particle::proposal() {
         double inv_gamma_modifier = 0.0;
+        double log_weight_modifier = 0.0;
         
         unsigned next_gene = _gene_order[_generation];
         bool calc_weight = false;
@@ -540,7 +541,7 @@ inline vector<double> Particle::getVectorPrior() {
                     }
                     
             
-                if (calc_weight) { // calc weight just means coalescent event has bene proposed
+                if (calc_weight) { // calc weight just means coalescent event has been proposed
                     done = true;
                 }
             }
@@ -570,6 +571,20 @@ inline vector<double> Particle::getVectorPrior() {
                 double y = t.second; // theta
                 inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
             }
+#endif
+        
+#if defined (WEIGHT_MODIFIER)
+        // modifier only happens on first round // TODO: unsure - does gene order matter?
+        if (_generation == 0 && _forests[1]._theta_prior_mean > 0.0 && _forests[1]._theta_proposal_mean > 0.0) {
+            if (_forests[1]._theta_prior_mean != _forests[1]._theta_proposal_mean) {
+                // else, log weight modifier is 0
+                double prior_rate = 1.0/_forests[1]._theta_prior_mean;
+                double proposal_rate = 1.0/_forests[1]._theta_proposal_mean;
+                double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
+
+                _log_weight += log_weight_modifier;
+            }
+        }
 #endif
         
         _generation++;

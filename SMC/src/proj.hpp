@@ -2211,15 +2211,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         
                         if (filter) {
                             
-//                            for (auto &p:my_vec) {
-//                                p.showParticle();
-//                            }
-                            
                             double ess = filterParticles(g, my_vec);
-                            
-//                            for (auto &p:my_vec) {
-//                                p.showParticle();
-//                            }
 
                             unsigned species_count = 0;
                             
