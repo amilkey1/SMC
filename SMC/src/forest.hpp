@@ -793,12 +793,12 @@ class Forest {
         unsigned nlineages1 = (unsigned) _species_partition[spp1].size();
         unsigned nlineages2 = (unsigned) _species_partition[spp2].size();
         
-        if (nlineages1 > 1) {
-            num_deep_coal += nlineages1;
-        }
-        if (nlineages2 > 1) {
-            num_deep_coal += nlineages2;
-        }
+//        if (nlineages1 > 1) {
+            num_deep_coal += nlineages1 - 1;
+//        }
+//        if (nlineages2 > 1) {
+            num_deep_coal += nlineages2 - 1;
+//        }
         
         return num_deep_coal;
     }
