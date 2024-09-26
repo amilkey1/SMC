@@ -125,7 +125,6 @@ class Forest {
         unsigned                    _npatterns;
         unsigned                    _nstates;
         double                      _last_edge_length;
-        vector<double>              _gamma;
 
         Data::SharedPtr             _data;
         static unsigned             _nspecies;
@@ -135,7 +134,6 @@ class Forest {
         map<string, list<Node*> >   _species_partition;
         double                      _gene_tree_log_likelihood;
         pair<Node*, Node*>          _species_joined;
-        string                      _last_direction;
         double                      _log_joining_prob;
         vector<pair<double, double>> _increments_and_priors;
         bool                        _done;
@@ -165,7 +163,7 @@ class Forest {
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
         double                      calcSimTransitionProbability(unsigned from, unsigned to, double edge_length);
-         double                      getTreeHeight();
+        double                      getTreeHeight();
         double                      getTreeLength();
         double                      getSpeciesTreeIncrement();
         double                      getLineageHeight(Node* nd);
@@ -865,9 +863,6 @@ class Forest {
         _nspecies           = other._nspecies;
         _ntaxa              = other._ntaxa;
         _species_joined = other._species_joined;
-        _last_direction = other._last_direction;
-        _gamma = other._gamma;
-        _log_weight = other._log_weight;
         _log_joining_prob = other._log_joining_prob;
         _increments_and_priors = other._increments_and_priors;
         _done = other._done;
@@ -1385,7 +1380,6 @@ class Forest {
 #endif
         double prev_log_likelihood = _gene_tree_log_likelihood;
         
-//        showForest();
         // Get the number of patterns
         unsigned npatterns = _data->getNumPatternsInSubset(_index - 1); // forest index starts at 1 but subsets start at 0
 
@@ -1657,6 +1651,12 @@ class Forest {
         
         _gene_tree_log_likelihood = calcLogLikelihood();
         _log_weight = _gene_tree_log_likelihood - prev_log_likelihood; // previous likelihood is the entire tree
+        
+        if (_save_memory) {
+            for (auto &nd:_nodes) {
+                nd._partial=nullptr;
+            }
+        }
                 
 //        showForest();
         
@@ -1694,6 +1694,8 @@ class Forest {
         for (auto nd : _lineages) {
             nd->_edge_length = _upgma_starting_edgelen.at(nd);
         }
+        
+        _upgma_starting_edgelen.clear();
         
         // output("\nIn GeneForest::destroyUPGMA:\n", 0);
         // output(format("  Height before refreshAllHeightsAndPreorders = %g\n") % _forest_height, 0);
@@ -2001,12 +2003,14 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
                  _gene_tree_log_likelihood = calcLogLikelihood();
                  _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
              }
+        
+        if (_save_memory) {
+            for (auto &nd:_nodes) {
+                nd._partial=nullptr;
+            }
+        }
+        
 #endif
-         if (_save_memory) {
-             for (auto &nd:_nodes) {
-                 nd._partial=nullptr;
-             }
-         }
      }
 
     inline void Forest::debugForest() {
@@ -2727,7 +2731,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
     }
 
     inline pair<vector<double>, vector<unsigned>> Forest::calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build) { // TODO: issues when newicks read in have very small branch lengths
-        vector<double> gamma_b; // contains gamma_b by species
+         vector<double> gamma_b; // contains gamma_b by species
         vector<unsigned> q_b; // contains q_b by species
         
         gamma_b.resize(_nspecies + species_build.size());

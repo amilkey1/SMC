@@ -88,10 +88,6 @@ class Particle {
         void                                            showSpeciesIncrement();
         void                                            showSpeciesJoined();
         void                                            showSpeciesTree();
-        void                                            showGamma();
-        string                                          saveGamma();
-        void                                            calculateGamma();
-        int                                             selectEvent(vector<double> weight_vec);
         int                                             selectEventLinearScale(vector<double> weight_vec);
         double                                          getTopologyPrior(unsigned i);
         vector<pair<double, double>>                    getIncrementPriors(unsigned i);
@@ -102,7 +98,6 @@ class Particle {
         vector<double>                                  chooseIncrements(vector<double> event_choice_rates);
         void                                            speciesOnlyProposal();
         void                                            speciesOnlyProposalIntegratingOutTheta();
-        void                                            geneProposal(unsigned forest_number, double increment, string species_name);
         void                                            calculateIncrementPriors(double increment, string species_name, unsigned forest_number, bool speciation, bool first_step);
         void                                            changeTheta(unsigned i);
         void                                            drawTheta();
@@ -110,7 +105,6 @@ class Particle {
         void                                            clearPartials();
         Lot::SharedPtr getLot() const {return _lot;}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
-        double                                          getRunningSumChoices(vector<double> choices);
         double                                          getSpeciesTreeHeight();
         double                                          getSpeciesTreeLength();
         vector<double>                                  getGeneTreeHeights();
@@ -158,7 +152,7 @@ class Particle {
         double                                  _log_coalescent_likelihood;
         mutable                                 Lot::SharedPtr _lot;
         unsigned                                _num_deep_coalescences;
-        bool                                    _deep_coal;
+//        bool                                    _deep_coal;
         double                                  _species_tree_height;
         unsigned                                _psuffix;
         unsigned                                _next_species_number;
@@ -220,13 +214,13 @@ class Particle {
         _species_tree_height = 0.0;
         _t.clear();
         _psuffix = 0;
-        _deep_coal = false;
         _next_species_number = Forest::_nspecies;
         _species_order.clear();
         _starting_log_likelihoods.clear();
         _t_by_gene.clear();
         _next_species_number_by_gene.clear();
         _gene_order.clear();
+        _fix_theta = false;
     }
 
     inline void Particle::showSpeciesTree() {
@@ -310,17 +304,6 @@ class Particle {
         }
         _log_likelihood = total_log_likelihood;
         _log_weight = total_log_likelihood;
-    }
-
-    inline double Particle::getRunningSumChoices(vector<double> choices) {
-        double running_sum = 0.0;
-        double log_weight_choices_sum = 0.0;
-        double log_max_weight = *max_element(choices.begin(), choices.end());
-        for (auto & i:choices) {
-            running_sum += exp(i - log_max_weight);
-        }
-        log_weight_choices_sum = log(running_sum) + log_max_weight;
-        return log_weight_choices_sum;
     }
 
     inline double Particle::getSpeciesTreeHeight() {
@@ -499,9 +482,7 @@ inline vector<double> Particle::getVectorPrior() {
                         for (auto &p:event_choice_rates) {
                             p = p/total_rate;
                         }
-                            
-                        _deep_coal = true;
-                            
+                                                        
                         unsigned index = selectEventLinearScale(event_choice_rates);
                         string species_name = rates_by_species[index].second;
                         _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
@@ -630,16 +611,12 @@ inline vector<double> Particle::getVectorPrior() {
                 vector<double> max_depth_vector;
                 double max_depth = 0.0;
 
-//#if !defined (UNCONSTRAINED_PROPOSAL)
                 for (int i=1; i<_forests.size(); i++) {
                     string species1 = get<0>(species_joined);
                     string species2 = get<1>(species_joined);
-                    
-                    if (species1 != "null") {
-                        // if using Jones formula, species partition update will happen in coalescent likelihood calculation
-                    }
                         
                     if (_forests[0]._lineages.size() > 1 && species1 != "null") {
+                        // if using Jones formula, species partition update will happen in coalescent likelihood calculation
                         _forests[i].resetDepthVector(species_joined);
                     }
 
@@ -651,7 +628,6 @@ inline vector<double> Particle::getVectorPrior() {
                     max_depth -= _forests[0].getTreeHeight();
                     // choose a species tree increment
                 }
-//#endif
                 
                 if (_forests[0]._lineages.size() > 1) {
 #if !defined (UNCONSTRAINED_PROPOSAL)
@@ -667,8 +643,6 @@ inline vector<double> Particle::getVectorPrior() {
                     _forests[0]._last_edge_length = 0.0;
                 }
         
-                _t.push_back(make_pair(species_joined, _forests[0]._last_edge_length));
-                
                 _log_coalescent_likelihood = 0.0;
         
             assert (_log_coalescent_likelihood == 0.0);
@@ -956,10 +930,6 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
     }
 
-    inline void Particle::geneProposal(unsigned forest_number, double increment, string species_name) {
-        _forests[forest_number].allowCoalescence(species_name, increment, _lot);
-    }
-
     inline void Particle::setNewTheta(bool fix_theta) {
         if (fix_theta) { // fix theta for all populations
             // map should be 2*nspecies - 1 size
@@ -1058,6 +1028,7 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::changeTheta(unsigned i) {
+        // for snake data set?
         if (i == 1) {
             Forest::_theta *= 3.25926;
         }
@@ -1135,18 +1106,6 @@ inline vector<double> Particle::getVectorPrior() {
         *this = other;
     }
 
-    inline void Particle::calculateGamma() {
-        double major = 0.0;
-        double total = _forests.size()-1;
-        for (int i=1; i < (int) _forests.size(); i++) {
-            if (_forests[i]._last_direction == "major") {
-                major++;
-            }
-        }
-        double gamma = major / total;
-        _forests[0]._gamma.push_back(gamma);
-    }
-
     inline void Particle::saveForest(std::string treefilename)  {
         for (auto &_forest:_forests) {
             ofstream treef(treefilename);
@@ -1206,16 +1165,6 @@ inline vector<double> Particle::getVectorPrior() {
     inline void Particle::showSpeciesJoined(){
         _forests[0].showSpeciesJoined();
     }
-
-    inline void Particle::showGamma() {
-        if (_forests[0]._gamma.size() > 0) {
-            cout << "   " << "gamma is: " << endl;
-            for (auto &g:_forests[0]._gamma) {
-                cout << g << "   ";
-            }
-            cout << "\n";
-        }
-    }
         
     inline int Particle::selectEventLinearScale(vector<double> weight_vec) {
         // choose a random number [0,1]
@@ -1226,24 +1175,6 @@ inline vector<double> Particle::getVectorPrior() {
         unsigned index = 0;
         for (int i=0; i < (int) weight_vec.size(); i++) {
             cum_prob += weight_vec[i];
-            if (u <= cum_prob) {
-                index = i;
-                break;
-            }
-        }
-        // return index of choice
-        return index;
-    }
-
-    inline int Particle::selectEvent(vector<double> weight_vec) {
-        // choose a random number [0,1]
-        double u =  _lot->uniform();
-        assert (u > 0.0);
-        assert (u < 1.0);
-        double cum_prob = 0.0;
-        unsigned index = 0;
-        for (int i=0; i < (int) weight_vec.size(); i++) {
-            cum_prob += exp(weight_vec[i]); // TODO: can leave weights on linear scale
             if (u <= cum_prob) {
                 index = i;
                 break;
@@ -1344,6 +1275,7 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::resetSpecies() {
+        _data = nullptr;
         _forests[0].clear();
         _generation = 0;
         setLogWeight(0.0);
@@ -1353,8 +1285,13 @@ inline vector<double> Particle::getVectorPrior() {
             _forests[i]._log_coalescent_likelihood = 0.0;
             _forests[i]._data = nullptr;
             _forests[i]._log_weight = 0.0;
+            _forests[i]._species_indices.clear();
         }
+        _gene_order.clear();
+        _next_species_number_by_gene.clear();
+        _starting_log_likelihoods.clear();
         _t.clear();
+        _t_by_gene.clear();
         _forests[0]._last_edge_length = 0.0;
         _forests[0]._increments_and_priors.clear();
     }
@@ -1607,7 +1544,6 @@ inline vector<double> Particle::getVectorPrior() {
         _species_join_proposed = other._species_join_proposed;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _num_deep_coalescences = other._num_deep_coalescences;
-        _deep_coal = other._deep_coal;
         _species_tree_height = other._species_tree_height;
         _t = other._t;
         _psuffix = other._psuffix;
