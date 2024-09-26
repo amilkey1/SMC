@@ -576,6 +576,7 @@ inline vector<double> Particle::getVectorPrior() {
         else {
             _log_weight = 0.0;
         }
+        
             }
 
     vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {

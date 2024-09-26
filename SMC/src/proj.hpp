@@ -1216,12 +1216,10 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 vector<Particle> use_vec;
                 Particle p = my_vec[a];
                 
-                use_vec.resize(nparticles);
                 
-                for (unsigned i=0; i<nparticles; i++) {
-//                    use_vec.push_back(p);
-                    use_vec[i] = p;
-                }
+                use_vec.resize(_particle_increase);
+                
+                fill(use_vec.begin(), use_vec.end(), p);
                 
                 assert(use_vec.size() == _particle_increase);
 
@@ -1621,11 +1619,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             vector<Particle> use_vec;
             Particle p = particles[i];
             
-            use_vec.reserve(_particle_increase);
+            use_vec.resize(_particle_increase);
             
-            for (unsigned i=0; i<_particle_increase; i++) {
-                use_vec.push_back(p);
-            }
+            fill(use_vec.begin(), use_vec.end(), p);
 
             assert(use_vec.size() == _particle_increase);
 
@@ -2400,12 +2396,13 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 //                        _log_species_tree_marginal_likelihood = 0.0; // for now, write lorad file for first set of species tree filtering and report the marginal likelihood for comparison
                         
                         vector<Particle> use_vec;
-                        use_vec.reserve(_particle_increase);
+                        
+                        
+                        use_vec.resize(_particle_increase);
+                        
                         Particle chosen_particle = my_vec[a];
                                                 
-                        for (unsigned i=0; i<_particle_increase; i++) {
-                            use_vec.push_back(chosen_particle);
-                        }
+                        fill(use_vec.begin(), use_vec.end(), chosen_particle);
                         
                         assert(use_vec.size() == _particle_increase);
 

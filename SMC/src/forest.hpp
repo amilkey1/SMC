@@ -1435,9 +1435,6 @@ class Forest {
                 double min_dist = 0.0;
                 double max_dist = min_dist + 5.0; //TODO: replace arbitrary value 5.0
                 
-                double min_height = 0.0;
-//                showForest();
-                
                 double v0 = 0.0;
                 
 #if defined(BUILD_UPGMA_TREE_CONSTRAINED)
@@ -1657,8 +1654,6 @@ class Forest {
                 nd._partial=nullptr;
             }
         }
-                
-//        showForest();
         
         // destroy upgma
         while (!_upgma_additions.empty()) {
@@ -1703,7 +1698,6 @@ class Forest {
         // output(format("  newick = %s\n") % makeNewick(9, /*use_names*/true, /*coalunits*/false), 0);
         // output(format("  Height after refreshAllHeightsAndPreorders = %g\n") % _forest_height, 0);
         // output("\n", 0);
-//            showForest();
     }
 #endif
         
