@@ -1896,12 +1896,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
          Node *subtree2 = nullptr;
          list<Node*> nodes;
 
-         for (auto &s:_species_partition) {
-             if (s.first == species_name) {
-                 nodes = s.second;
-                 break;
-             }
-         }
+        nodes = _species_partition[species_name];
 
          unsigned s = (unsigned) nodes.size();
          calcTopologyPrior(s);
@@ -1985,12 +1980,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
              updateNodeList(nodes, subtree1, subtree2, new_nd);
              updateNodeVector(_lineages, subtree1, subtree2, new_nd);
 
-             for (auto &s:_species_partition) {
-                 if (s.first == species_name) {
-                     s.second = nodes; // TODO: this should happen automatically
-                     break;
-                 }
-             }
+        _species_partition[species_name] = nodes;
 
 # if !defined (BUILD_UPGMA_TREE)
              if ((_proposal == "prior-prior" || one_choice) && (!_run_on_empty) ) {

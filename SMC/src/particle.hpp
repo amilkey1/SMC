@@ -422,7 +422,7 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline void Particle::proposal() {
         double inv_gamma_modifier = 0.0;
-        double log_weight_modifier = 0.0;
+//        double log_weight_modifier = 0.0;
         
         unsigned next_gene = _gene_order[_generation];
         bool calc_weight = false;
@@ -476,20 +476,19 @@ inline vector<double> Particle::getVectorPrior() {
                         
                         vector<double> event_choice_rates;
                         for (auto &r:rates_by_species) {
-                            event_choice_rates.push_back(r.first);
+                            event_choice_rates.push_back(r.first / total_rate);
                         }
                         
-                        for (auto &p:event_choice_rates) {
-                            p = p/total_rate;
-                        }
+//                        for (auto &p:event_choice_rates) {
+//                            p = p/total_rate;
+//                        } // TODO: can combine this with the previous loop?
                                                         
-                        unsigned index = selectEventLinearScale(event_choice_rates);
+                        unsigned index = selectEventLinearScale(event_choice_rates); // TODO: do the rates have to be in order?
                         string species_name = rates_by_species[index].second;
                         _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
                                    
                         if (Forest::_start_mode == "smc") {
 # if defined (BUILD_UPGMA_TREE)
-//                        _forests[0].showForest();
 # if defined (BUILD_UPGMA_TREE_CONSTRAINED)
                         _forests[next_gene].buildRestOfTree(_lot, _t);
 #else
@@ -512,6 +511,7 @@ inline vector<double> Particle::getVectorPrior() {
                             
                             _num_deep_coalescences += _forests[next_gene].getDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
                             
+                            // TODO: why does this not start at the null species - because if you are here you have already gone past the first species increment?
                             _forests[next_gene].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
                             assert (next_species_index < _t_by_gene[next_gene-1].size());
                             _t_by_gene[next_gene-1][next_species_index].second -= species_increment; // update species tree increments
