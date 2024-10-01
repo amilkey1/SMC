@@ -447,7 +447,7 @@ inline vector<double> Particle::getVectorPrior() {
         
 #if defined (FASTER_UPGMA_TREE)
         if (_generation < _nsubsets) {
-            _forests[next_gene].buildStartingUPGMAMatrix();
+            _forests[next_gene].buildStartingUPGMAMatrix(); // TODO: can do this once and copy to all particles
         }
 #endif
         

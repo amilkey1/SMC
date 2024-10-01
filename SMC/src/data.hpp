@@ -85,6 +85,9 @@ namespace proj {
             taxon_names_t                               _taxon_names;
             data_matrix_t                               _data_matrix;
             subset_end_t                                _subset_end;
+//# if defined (FASTER_UPMGA_TREE)
+            data_matrix_t                               _original_data_matrix;
+//#endif
     };
 
     inline Data::Data() {
@@ -148,6 +151,7 @@ namespace proj {
         _taxon_names.clear();
         _data_matrix.clear();
         _subset_end.clear();
+        _original_data_matrix.clear();
     }
 
     inline unsigned Data::getNumPatterns() const {
@@ -189,18 +193,27 @@ namespace proj {
     }
     
     inline unsigned Data::buildSubsetSpecificMaps(unsigned ntaxa, unsigned seqlen, unsigned nsubsets) {
+//#if defined (FASTER_UPGMA_TREE)
+        _original_data_matrix = _data_matrix;
+//#endif
+        
         pattern_vect_t pattern(ntaxa);
 
         _pattern_map_vect.clear();
         _pattern_map_vect.resize(nsubsets);
         
         const Partition::partition_t & tuples = _partition->getSubsetRangeVect();
+                
         for (auto & t : tuples) {
             unsigned site_begin  = std::get<0>(t);
             unsigned site_end    = std::get<1>(t);
             unsigned site_skip   = std::get<2>(t);
             unsigned site_subset = std::get<3>(t);
+            
+            unsigned subset = 0;
+            
             for (unsigned site = site_begin; site <= site_end; site += site_skip) {
+                
                 // Copy site into pattern
                 for (unsigned taxon = 0; taxon < ntaxa; ++taxon) {
                     pattern[taxon] = _data_matrix[taxon][site-1];
@@ -208,6 +221,8 @@ namespace proj {
                 
                 // Add this pattern to _pattern_map_vect element corresponding to subset site_subset
                 updatePatternMap(pattern, site_subset);
+                
+                subset++;
             }
         }
         
