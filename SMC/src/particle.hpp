@@ -445,6 +445,12 @@ inline vector<double> Particle::getVectorPrior() {
             }
         }
         
+#if defined (FASTER_UPGMA_TREE)
+        if (_generation < _nsubsets) {
+            _forests[next_gene].buildStartingUPGMAMatrix();
+        }
+#endif
+        
         _species_join_proposed = false;
         bool done = false;
                 
