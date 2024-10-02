@@ -1735,12 +1735,11 @@ class Forest {
         
 #if defined (FASTER_UPGMA_TREE)
         inline void Forest::buildStartingUPGMAMatrix() {
-            // TODO: can clear original data matrix after this
             // Get the number of patterns
             unsigned npatterns = _data->getNumPatternsInSubset(_index - 1); // forest index starts at 1 but subsets start at 0
 
             // Get the first and last pattern index for this gene's data
-            Data::begin_end_pair_t be = _data->getSubsetBeginEnd(_index - 1);
+//            Data::begin_end_pair_t be = _data->getSubsetBeginEnd(_index - 1);
 
             // Get pattern counts
             auto counts = _data->getPatternCounts();
@@ -1760,31 +1759,6 @@ class Forest {
             vector<double> dij(n*(n-1)/2, _infinity);
             vector<double> dij2;
             
-            // Calculate distances between all pairs of lineages
-            // TODO: need to deal with missing data and gaps
-//            for (unsigned i = 1; i < n; i++) {
-//                for (unsigned j = 0; j < i; j++) {
-//                    double ndiff = 0;
-//                    double ntotal = 0;
-//                    unsigned start = be.first;
-//                    unsigned end = be.second;
-//                    for (unsigned m = start; m<end; m++) {
-//                        if (_data->_data_matrix[i][m] != _data->_data_matrix[j][m]) {
-//                            ndiff += counts[m];
-//                        }
-//                        ntotal += counts[m];
-//                    }
-//
-//                    double p = ndiff / ntotal;
-//
-//                    double v = -0.75 * log(1 - 4.0/3.0 * p);
-//
-//                    unsigned k = i*(i-1)/2 + j;
-//                    dij[k] = v;
-//                    dij_row_col[k] = make_pair(i,j);
-//                }
-//            }
-            
             vector<tuple<unsigned, unsigned, unsigned, unsigned>> sites_tuples = _data->_partition->getSubsetRangeVect();
             
             for (unsigned i = 1; i < n; i++) {
@@ -1792,12 +1766,14 @@ class Forest {
                     double ndiff = 0;
                     double ntotal = 0;
                     unsigned start_index = _index - 1;
-                    unsigned start = get<0>(sites_tuples[start_index]);
+                    unsigned start = get<0>(sites_tuples[start_index]) - 1;
+                    assert (start >= 0);
 //                    unsigned start = be.first;
 //                    unsigned end = be.second;
-                    unsigned end = get<1>(sites_tuples[start_index]) + 1; // include last site
+                    assert (_data->_original_data_matrix.size() > 0);
+                    unsigned end = get<1>(sites_tuples[start_index]); // include last site
                     for (unsigned m = start; m<end; m++) {
-                        if (_data->_original_data_matrix[i][m] <8 && _data->_original_data_matrix[j][m] < 8) {
+                        if (_data->_original_data_matrix[i][m] < 15 && _data->_original_data_matrix[j][m] < 15) { // 15 is ambiguity?
                             if (_data->_original_data_matrix[i][m] != _data->_original_data_matrix[j][m]) {
     //                            ndiff += counts[m];
                                 ndiff++;
@@ -1807,6 +1783,8 @@ class Forest {
                         }
                     }
                         
+                    assert (ntotal > 0);
+                    
                     double p = ndiff / ntotal;
                     
                     double v = -0.75 * log(1 - 4.0/3.0 * p);
@@ -1814,10 +1792,16 @@ class Forest {
                     unsigned k = i*(i-1)/2 + j;
                     dij[k] = v;
                     dij_row_col[k] = make_pair(i,j);
+                    
+                    assert (v == v);
                 }
             }
             
             _starting_dij = dij;
+            
+            for (auto &d:_starting_dij) {
+                assert (d == d);
+            }
             
             map<Node *, unsigned> row;
             _upgma_starting_edgelen.clear();
@@ -1827,6 +1811,10 @@ class Forest {
                 row[nd] = i;
             }
             _starting_row = row;
+            
+//            _data->_original_data_matrix.clear(); // TODO: can't clear this until all genes have gone through once
+            
+//            debugShowDistanceMatrix(_starting_dij);
         }
 #endif
         
@@ -1900,6 +1888,8 @@ class Forest {
                         }
                         dij2[k2] = dij[k];
                         dij_row_col[k2] = make_pair(i2,j2);
+                        
+                        assert (dij[k] == dij[k]);
                     }
                 }
             
@@ -1942,6 +1932,7 @@ class Forest {
             if (v == 0) { // TODO: to avoid likelihood issues, set v to very small if 0
                 v = _small_enough;
             }
+            assert (v == v); // check v is not NaN
             for (auto nd : _lineages) {
                 nd->_edge_length += (0.5*v - upgma_height);
             }
