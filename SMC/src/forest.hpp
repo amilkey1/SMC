@@ -1787,6 +1787,13 @@ class Forest {
                     
                     double p = ndiff / ntotal;
                     
+                    if (p > 0.75) {
+                        p = 0.75;
+                    }
+                    
+                    // TODO: if p > 0.75, this will cause a crash - v will be NaN
+                    // TODO: for now, just reset p to 0.75
+                    
                     double v = -0.75 * log(1 - 4.0/3.0 * p);
                     
                     unsigned k = i*(i-1)/2 + j;
