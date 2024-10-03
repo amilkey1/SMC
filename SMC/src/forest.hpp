@@ -1788,7 +1788,7 @@ class Forest {
                     double p = ndiff / ntotal;
                     
                     if (p > 0.75) {
-                        p = 0.75;
+                        p = 0.7499;
                     }
                     
                     // TODO: if p > 0.75, this will cause a crash - v will be NaN
@@ -1936,6 +1936,9 @@ class Forest {
             
             // Update all leading edge lengths
             double v = *it;
+            
+            assert (v != _infinity);
+            
             if (v == 0) { // TODO: to avoid likelihood issues, set v to very small if 0
                 v = _small_enough;
             }
