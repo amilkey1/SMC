@@ -1679,6 +1679,8 @@ class Forest {
         
         _gene_tree_log_likelihood = calcLogLikelihood();
         _log_weight = _gene_tree_log_likelihood - prev_log_likelihood; // previous likelihood is the entire tree
+        
+//        showForest();
                 
         if (_save_memory) {
             for (auto &nd:_nodes) {
@@ -1735,95 +1737,189 @@ class Forest {
         
 #if defined (FASTER_UPGMA_TREE)
         inline void Forest::buildStartingUPGMAMatrix() {
-            // Get the number of patterns
-            unsigned npatterns = _data->getNumPatternsInSubset(_index - 1); // forest index starts at 1 but subsets start at 0
+            bool use_minimizer = true;
+            
+            if (!use_minimizer) {
+                // Get the number of patterns
+                unsigned npatterns = _data->getNumPatternsInSubset(_index - 1); // forest index starts at 1 but subsets start at 0
 
-            // Get the first and last pattern index for this gene's data
-//            Data::begin_end_pair_t be = _data->getSubsetBeginEnd(_index - 1);
+                // Get the first and last pattern index for this gene's data
+    //            Data::begin_end_pair_t be = _data->getSubsetBeginEnd(_index - 1);
 
-            // Get pattern counts
-            auto counts = _data->getPatternCounts();
-            
-            // Create vectors to store products of same-state and different-state partials
-            vector<double> same_state(npatterns, 0.0);
-            vector<double> diff_state(npatterns, 0.0);
-            
-            // Create a map relating position in dij vector to row,col in distance matrix
-            map<unsigned, pair<unsigned, unsigned>> dij_row_col;
-            
-            // Create distance matrix dij and workspace dij2 used to build next dij
-            // Both dij and dij2 are 1-dimensional vectors that store only the
-            // lower diagonal of the distance matrix (excluding diagonal elements)
-            assert (_lineages.size() == _ntaxa);
-            unsigned n = _ntaxa;
-            vector<double> dij(n*(n-1)/2, _infinity);
-            vector<double> dij2;
-            
-            vector<tuple<unsigned, unsigned, unsigned, unsigned>> sites_tuples = _data->_partition->getSubsetRangeVect();
-            
-            for (unsigned i = 1; i < n; i++) {
-                for (unsigned j = 0; j < i; j++) {
-                    double ndiff = 0;
-                    double ntotal = 0;
-                    unsigned start_index = _index - 1;
-                    unsigned start = get<0>(sites_tuples[start_index]) - 1;
-                    assert (start >= 0);
-//                    unsigned start = be.first;
-//                    unsigned end = be.second;
-                    assert (_data->_original_data_matrix.size() > 0);
-                    unsigned end = get<1>(sites_tuples[start_index]); // include last site
-                    for (unsigned m = start; m<end; m++) {
-                        if (_data->_original_data_matrix[i][m] < 15 && _data->_original_data_matrix[j][m] < 15) { // 15 is ambiguity?
-                            if (_data->_original_data_matrix[i][m] != _data->_original_data_matrix[j][m]) {
-    //                            ndiff += counts[m];
-                                ndiff++;
+                // Get pattern counts
+                auto counts = _data->getPatternCounts();
+                
+                // Create vectors to store products of same-state and different-state partials
+                vector<double> same_state(npatterns, 0.0);
+                vector<double> diff_state(npatterns, 0.0);
+                
+                // Create a map relating position in dij vector to row,col in distance matrix
+                map<unsigned, pair<unsigned, unsigned>> dij_row_col;
+                
+                // Create distance matrix dij and workspace dij2 used to build next dij
+                // Both dij and dij2 are 1-dimensional vectors that store only the
+                // lower diagonal of the distance matrix (excluding diagonal elements)
+                assert (_lineages.size() == _ntaxa);
+                unsigned n = _ntaxa;
+                vector<double> dij(n*(n-1)/2, _infinity);
+                vector<double> dij2;
+                
+                vector<tuple<unsigned, unsigned, unsigned, unsigned>> sites_tuples = _data->_partition->getSubsetRangeVect();
+                
+                for (unsigned i = 1; i < n; i++) {
+                    for (unsigned j = 0; j < i; j++) {
+                        double ndiff = 0;
+                        double ntotal = 0;
+                        unsigned start_index = _index - 1;
+                        unsigned start = get<0>(sites_tuples[start_index]) - 1;
+                        assert (start >= 0);
+    //                    unsigned start = be.first;
+    //                    unsigned end = be.second;
+                        assert (_data->_original_data_matrix.size() > 0);
+                        unsigned end = get<1>(sites_tuples[start_index]); // include last site
+                        for (unsigned m = start; m<end; m++) {
+                            if (_data->_original_data_matrix[i][m] < 15 && _data->_original_data_matrix[j][m] < 15) { // 15 is ambiguity?
+                                if (_data->_original_data_matrix[i][m] != _data->_original_data_matrix[j][m]) {
+        //                            ndiff += counts[m];
+                                    ndiff++;
+                                }
+        //                        ntotal += counts[m];
+                                ntotal++;
                             }
-    //                        ntotal += counts[m];
-                            ntotal++;
                         }
-                    }
+                            
+                        assert (ntotal > 0);
                         
-                    assert (ntotal > 0);
-                    
-                    double p = ndiff / ntotal;
-                    
-                    if (p >= 0.75) {
-                        p = 0.7499;
+                        double p = ndiff / ntotal;
+                        
+                        if (p >= 0.75) {
+                            p = 0.7499;
+                        }
+                        
+                        // TODO: if p > 0.75, this will cause a crash - v will be NaN
+                        // TODO: for now, just reset p to 0.7499
+                        
+                        double v = -0.75 * log(1 - 4.0/3.0 * p);
+                        
+                        assert (v != _infinity);
+                        
+                        unsigned k = i*(i-1)/2 + j;
+                        dij[k] = v;
+                        dij_row_col[k] = make_pair(i,j);
+                        
+                        assert (v == v);
                     }
-                    
-                    // TODO: if p > 0.75, this will cause a crash - v will be NaN
-                    // TODO: for now, just reset p to 0.75
-                    
-                    double v = -0.75 * log(1 - 4.0/3.0 * p);
-                    
-                    assert (v != _infinity);
-                    
-                    unsigned k = i*(i-1)/2 + j;
-                    dij[k] = v;
-                    dij_row_col[k] = make_pair(i,j);
-                    
-                    assert (v == v);
                 }
+                
+                _starting_dij = dij;
+                
+                for (auto &d:_starting_dij) {
+                    assert (d == d);
+                }
+                
+                map<Node *, unsigned> row;
+                _upgma_starting_edgelen.clear();
+                for (unsigned i = 0; i < n; i++) {
+                    Node * nd = _lineages[i];
+                    _upgma_starting_edgelen[nd] = nd->_edge_length;
+                    row[nd] = i;
+                }
+                _starting_row = row;
+                
+    //            _data->_original_data_matrix.clear(); // TODO: can't clear this until all genes have gone through once
+                
+    //            debugShowDistanceMatrix(_starting_dij);
             }
             
-            _starting_dij = dij;
-            
-            for (auto &d:_starting_dij) {
-                assert (d == d);
+            else {
+                // Get the number of patterns
+                unsigned npatterns = _data->getNumPatternsInSubset(_index - 1); // forest index starts at 1 but subsets start at 0
+
+                // Get the first and last pattern index for this gene's data
+                Data::begin_end_pair_t be = _data->getSubsetBeginEnd(_index - 1);
+                unsigned first_pattern = be.first;
+                
+                // Get the name of the gene (data subset)
+                //string gene_name = _data->getSubsetName(_gene_index);
+
+                // Get pattern counts
+                auto counts = _data->getPatternCounts();
+                
+                // Create vectors to store products of same-state and different-state partials
+                vector<double> same_state(npatterns, 0.0);
+                vector<double> diff_state(npatterns, 0.0);
+                
+                // Create a map relating position in dij vector to row,col in distance matrix
+                map<unsigned, pair<unsigned, unsigned>> dij_row_col;
+                
+                // Create distance matrix dij and workspace dij2 used to build next dij
+                // Both dij and dij2 are 1-dimensional vectors that store only the
+                // lower diagonal of the distance matrix (excluding diagonal elements)
+                unsigned n = (unsigned)_lineages.size();
+                vector<double> dij(n*(n-1)/2, _infinity);
+                vector<double> dij2;
+
+                // Calculate distances between all pairs of lineages
+                
+                for (unsigned i = 1; i < n; i++) {
+                    for (unsigned j = 0; j < i; j++) {
+                        Node * lnode = _lineages[i];
+                        Node * rnode = _lineages[j];
+                        
+                        // Fill same_state and diff_state vectors
+                        same_state.assign(npatterns, 0.0);
+                        diff_state.assign(npatterns, 0.0);
+                        for (unsigned p = 0; p < npatterns; p++) {
+                            for (unsigned lstate = 0; lstate < _nstates; lstate++) {
+                                auto & l_partial_array = *(lnode->_partial);
+                                double lpartial = l_partial_array[p*_nstates + lstate];
+                                for (unsigned rstate = 0; rstate < _nstates; rstate++) {
+                                    auto & r_partial_array = *(rnode->_partial);
+                                    double rpartial = r_partial_array[p*_nstates + rstate];
+                                    if (lstate == rstate)
+                                        same_state[p] += lpartial*rpartial;
+                                    else
+                                        diff_state[p] += lpartial*rpartial;
+                                }
+                            }
+                        }
+                        
+                        double min_dist = 0.0;
+                        double max_dist = min_dist + 5.0; //TODO: replace arbitrary value 5.0
+                        
+                        double v0 = 0.0;
+                        
+                        v0 = lnode->getEdgeLength() + rnode->getEdgeLength();
+                        
+                        negLogLikeDist f(npatterns, first_pattern, counts, same_state, diff_state, v0);
+                        auto r = boost::math::tools::brent_find_minima(f, min_dist, max_dist, std::numeric_limits<double>::digits);
+        //                double maximized_log_likelihood = -r.second;
+                        unsigned k = i*(i-1)/2 + j;
+                        dij[k] = r.first;
+                        dij_row_col[k] = make_pair(i,j);
+                                        
+            //                output(format("d[%d, %d] = %.7f (logL = %.5f") % i % j % d[ij] % maximized_log_likelihood, 1);
+                    
+                    }
+                }
+                _starting_dij = dij;
+                
+//                debugShowDistanceMatrix(_starting_dij);
+                
+                for (auto &d:_starting_dij) {
+                    assert (d == d);
+                }
+                
+                map<Node *, unsigned> row;
+                _upgma_starting_edgelen.clear();
+                for (unsigned i = 0; i < n; i++) {
+                    Node * nd = _lineages[i];
+                    _upgma_starting_edgelen[nd] = nd->_edge_length;
+                    row[nd] = i;
+                }
+                _starting_row = row;
             }
             
-            map<Node *, unsigned> row;
-            _upgma_starting_edgelen.clear();
-            for (unsigned i = 0; i < n; i++) {
-                Node * nd = _lineages[i];
-                _upgma_starting_edgelen[nd] = nd->_edge_length;
-                row[nd] = i;
-            }
-            _starting_row = row;
-            
-//            _data->_original_data_matrix.clear(); // TODO: can't clear this until all genes have gone through once
-            
-//            debugShowDistanceMatrix(_starting_dij);
         }
 #endif
         
