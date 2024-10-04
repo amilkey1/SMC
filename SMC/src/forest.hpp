@@ -1737,6 +1737,8 @@ class Forest {
         
 #if defined (FASTER_UPGMA_TREE)
         inline void Forest::buildStartingUPGMAMatrix() {
+            // TODO: if using minimizer, don't need the original data matrix -> if not using minimizer, clear original data matrix after this is done
+            // TODO: construct this once for each locus, then copy to each particle
             bool use_minimizer = true;
             
             if (!use_minimizer) {
@@ -1887,9 +1889,10 @@ class Forest {
                         double min_dist = 0.0;
                         double max_dist = min_dist + 5.0; //TODO: replace arbitrary value 5.0
                         
-                        double v0 = 0.0;
+                        double v0 = 0.0; // don't need to get edge lengths since we are starting from the trivial forest
                         
-                        v0 = lnode->getEdgeLength() + rnode->getEdgeLength();
+//                        v0 = lnode->getEdgeLength() + rnode->getEdgeLength();
+                        // TODO: what is this doing with missing data?
                         
                         negLogLikeDist f(npatterns, first_pattern, counts, same_state, diff_state, v0);
                         auto r = boost::math::tools::brent_find_minima(f, min_dist, max_dist, std::numeric_limits<double>::digits);

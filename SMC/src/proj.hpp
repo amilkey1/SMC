@@ -2125,8 +2125,16 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 
                 assert (gene_order.size() == list_size);
                 
+                unsigned particle_num = 0;
                 for (auto &p:my_vec) {
                     p.setGeneOrder(gene_order);
+                    if (particle_num == 0) {
+                        p.calcStartingUPGMAMatrix();
+                    }
+                    else {
+                        p.setStartingUPGMAMatrix(my_vec[0].getStartingUPGMAMatrix());
+                        p.setStartingRowCount(my_vec[0].getStartingRowCount());
+                    }
                 }
                 
                 if (_species_newick_name != "null") {
