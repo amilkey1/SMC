@@ -116,6 +116,7 @@ class Forest {
 #if defined (FASTER_UPGMA_TREE)
         void                        buildRestOfTreeFaster(Lot::SharedPtr lot);
         void                        buildStartingUPGMAMatrix();
+        void                        buildStartingRow();
 #endif
 
     
@@ -1819,14 +1820,14 @@ class Forest {
                     assert (d == d);
                 }
                 
-                map<Node *, unsigned> row;
-                _upgma_starting_edgelen.clear();
-                for (unsigned i = 0; i < n; i++) {
-                    Node * nd = _lineages[i];
-                    _upgma_starting_edgelen[nd] = nd->_edge_length;
-                    row[nd] = i;
-                }
-                _starting_row = row;
+//                map<Node *, unsigned> row;
+//                _upgma_starting_edgelen.clear();
+//                for (unsigned i = 0; i < n; i++) {
+//                    Node * nd = _lineages[i];
+//                    _upgma_starting_edgelen[nd] = nd->_edge_length;
+//                    row[nd] = i;
+//                }
+//                _starting_row = row;
                 
     //            _data->_original_data_matrix.clear(); // TODO: can't clear this until all genes have gone through once
                 
@@ -1913,16 +1914,30 @@ class Forest {
                     assert (d == d);
                 }
                 
-                map<Node *, unsigned> row;
-                _upgma_starting_edgelen.clear();
-                for (unsigned i = 0; i < n; i++) {
-                    Node * nd = _lineages[i];
-                    _upgma_starting_edgelen[nd] = nd->_edge_length;
-                    row[nd] = i;
-                }
-                _starting_row = row;
+//                map<Node *, unsigned> row;
+//                _upgma_starting_edgelen.clear();
+//                for (unsigned i = 0; i < n; i++) {
+//                    Node * nd = _lineages[i];
+//                    _upgma_starting_edgelen[nd] = nd->_edge_length;
+//                    row[nd] = i;
+//                }
+//                _starting_row = row;
             }
             
+        }
+#endif
+        
+#if defined (FASTER_UPGMA_TREE)
+        inline void Forest::buildStartingRow() {
+            unsigned n = _ntaxa;
+            map<Node *, unsigned> row;
+            _upgma_starting_edgelen.clear();
+            for (unsigned i = 0; i < n; i++) {
+                Node * nd = _lineages[i];
+                _upgma_starting_edgelen[nd] = nd->_edge_length;
+                row[nd] = i;
+            }
+            _starting_row = row;
         }
 #endif
         
@@ -2022,10 +2037,13 @@ class Forest {
             row[nd] = i;
         }
             
-        double upgma_height = 0.0;
+//        double upgma_height = 0.0;
         
         // Build UPGMA tree on top of existing forest
         assert(_upgma_additions.empty());
+            
+            double upgma_height = getLineageHeight(_lineages.back());
+                        
         unsigned nsteps = n - 1;
         while (nsteps > 0) {
             // Find smallest entry in d
@@ -2035,17 +2053,32 @@ class Forest {
             unsigned i = p.first;
             unsigned j = p.second;
             
+            double edge_len_to_subtract = 0.0;
+            
+            // all lineages should be at the same height here
+            // only subtract existing edge length if the node is at the smc height??
+//            if (getLineageHeight(_lineages[i]) <= smc_height) {
+//                edge_len_to_subtract = _lineages[i]->_edge_length + _lineages[j]->_edge_length;
+//            }
+                
             // Update all leading edge lengths
-            double v = *it;
+            double v = *it; // TODO: need to subtract existing node height?
             
             assert (v != _infinity);
             
-            if (v == 0) { // TODO: to avoid likelihood issues, set v to very small if 0
-                v = _small_enough;
+            double edge_len_to_add = 0.5*(v - edge_len_to_subtract) - upgma_height;
+            if (edge_len_to_add <= 0.0) {
+                edge_len_to_add = _small_enough;
             }
+            
+//            if (v == 0) { // TODO: to avoid likelihood issues, set v to very small if 0
+//                v = _small_enough;
+//            }
+            assert (edge_len_to_add > 0.0);
             assert (v == v); // check v is not NaN
             for (auto nd : _lineages) {
-                nd->_edge_length += (0.5*v - upgma_height);
+//                nd->_edge_length += (0.5*v - upgma_height);
+                nd->_edge_length += edge_len_to_add;
             }
             
             upgma_height = v / 2.0;

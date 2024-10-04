@@ -143,6 +143,7 @@ class Particle {
         void                                            setStartingUPGMAMatrix(vector<vector<double>> starting_upgma_matrices_by_gene);
         vector<map<Node*,  unsigned>>                   getStartingRowCount();
         void                                            setStartingRowCount(vector<map<Node*,  unsigned>> starting_row_count_by_gene);
+        void                                            calcStartingRowCount();
 #endif
 
     private:
@@ -924,7 +925,7 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
 
 #if defined (FASTER_UPGMA_TREE)
-    vector<map<Node*,  unsigned>> Particle::getStartingRowCount() {
+    inline vector<map<Node*,  unsigned>> Particle::getStartingRowCount() {
         vector<map<Node*,  unsigned>> starting_row_count_by_gene;
         for (unsigned i=1; i<_forests.size(); i++) {
             starting_row_count_by_gene.push_back(_forests[i]._starting_row);
@@ -934,9 +935,17 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
 
 #if defined (FASTER_UPGMA_TREE)
-    void Particle::setStartingRowCount(vector<map<Node*,  unsigned>> starting_row_count_by_gene) {
+    inline void Particle::setStartingRowCount(vector<map<Node*,  unsigned>> starting_row_count_by_gene) {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i]._starting_row = starting_row_count_by_gene[i-1];
+        }
+    }
+#endif
+
+#if defined (FASTER_UPGMA_TREE)
+    inline void Particle::calcStartingRowCount() {
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i].buildStartingRow();
         }
     }
 #endif
