@@ -453,14 +453,6 @@ inline vector<double> Particle::getVectorPrior() {
             }
         }
         
-//#if defined (FASTER_UPGMA_TREE)
-//        if (_generation < _nsubsets && Forest::_start_mode == "smc") {
-//            for (unsigned i=1; i<_forests.size(); i++) {
-//                _forests[i].buildStartingUPGMAMatrix(); // TODO: can do this once and copy to all particles
-//            }
-//        }
-//#endif
-        
         _species_join_proposed = false;
         bool done = false;
                 

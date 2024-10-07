@@ -114,7 +114,7 @@ class Forest {
         void                        debugShowDistanceMatrix(const vector<double> & d) const;
     
 #if defined (FASTER_UPGMA_TREE)
-        void                        buildRestOfTreeFaster(Lot::SharedPtr lot);
+        void                        buildRestOfTreeFaster();
         void                        buildStartingUPGMAMatrix();
         void                        buildStartingRow();
 #endif
@@ -1403,7 +1403,7 @@ class Forest {
         
         // TODO: try using starting distances rather than likelihood minimizer
 # if defined (FASTER_UPGMA_TREE)
-        buildRestOfTreeFaster(lot);
+        buildRestOfTreeFaster();
 #else
         double prev_log_likelihood = _gene_tree_log_likelihood;
         
@@ -1738,8 +1738,6 @@ class Forest {
         
 #if defined (FASTER_UPGMA_TREE)
         inline void Forest::buildStartingUPGMAMatrix() {
-            // TODO: if using minimizer, don't need the original data matrix -> if not using minimizer, clear original data matrix after this is done
-            // TODO: construct this once for each locus, then copy to each particle
             bool use_minimizer = true;
             
             if (!use_minimizer) {
@@ -1747,7 +1745,6 @@ class Forest {
                 unsigned npatterns = _data->getNumPatternsInSubset(_index - 1); // forest index starts at 1 but subsets start at 0
 
                 // Get the first and last pattern index for this gene's data
-    //            Data::begin_end_pair_t be = _data->getSubsetBeginEnd(_index - 1);
 
                 // Get pattern counts
                 auto counts = _data->getPatternCounts();
@@ -1776,17 +1773,13 @@ class Forest {
                         unsigned start_index = _index - 1;
                         unsigned start = get<0>(sites_tuples[start_index]) - 1;
                         assert (start >= 0);
-    //                    unsigned start = be.first;
-    //                    unsigned end = be.second;
                         assert (_data->_original_data_matrix.size() > 0);
                         unsigned end = get<1>(sites_tuples[start_index]); // include last site
                         for (unsigned m = start; m<end; m++) {
                             if (_data->_original_data_matrix[i][m] < 15 && _data->_original_data_matrix[j][m] < 15) { // 15 is ambiguity?
                                 if (_data->_original_data_matrix[i][m] != _data->_original_data_matrix[j][m]) {
-        //                            ndiff += counts[m];
                                     ndiff++;
                                 }
-        //                        ntotal += counts[m];
                                 ntotal++;
                             }
                         }
@@ -1820,21 +1813,11 @@ class Forest {
                     assert (d == d);
                 }
                 
-//                map<Node *, unsigned> row;
-//                _upgma_starting_edgelen.clear();
-//                for (unsigned i = 0; i < n; i++) {
-//                    Node * nd = _lineages[i];
-//                    _upgma_starting_edgelen[nd] = nd->_edge_length;
-//                    row[nd] = i;
-//                }
-//                _starting_row = row;
-                
-    //            _data->_original_data_matrix.clear(); // TODO: can't clear this until all genes have gone through once
-                
     //            debugShowDistanceMatrix(_starting_dij);
             }
             
             else {
+                _data->_original_data_matrix.clear();
                 // Get the number of patterns
                 unsigned npatterns = _data->getNumPatternsInSubset(_index - 1); // forest index starts at 1 but subsets start at 0
 
@@ -1892,7 +1875,6 @@ class Forest {
                         
                         double v0 = 0.0; // don't need to get edge lengths since we are starting from the trivial forest
                         
-//                        v0 = lnode->getEdgeLength() + rnode->getEdgeLength();
                         // TODO: what is this doing with missing data?
                         
                         negLogLikeDist f(npatterns, first_pattern, counts, same_state, diff_state, v0);
@@ -1913,15 +1895,6 @@ class Forest {
                 for (auto &d:_starting_dij) {
                     assert (d == d);
                 }
-                
-//                map<Node *, unsigned> row;
-//                _upgma_starting_edgelen.clear();
-//                for (unsigned i = 0; i < n; i++) {
-//                    Node * nd = _lineages[i];
-//                    _upgma_starting_edgelen[nd] = nd->_edge_length;
-//                    row[nd] = i;
-//                }
-//                _starting_row = row;
             }
             
         }
@@ -1942,7 +1915,11 @@ class Forest {
 #endif
         
 #if defined (FASTER_UPGMA_TREE)
-        inline void Forest::buildRestOfTreeFaster(Lot::SharedPtr lot) {
+        inline void Forest::buildRestOfTreeFaster() {
+            if (_data->_original_data_matrix.size() > 0) {
+                _data->_original_data_matrix.clear(); // if not using minimizer, can't clear this until all genes have gone through once
+            }
+
 //            debugShowDistanceMatrix(_starting_dij);
             
             double prev_log_likelihood = _gene_tree_log_likelihood;

@@ -1384,50 +1384,58 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
           
           // Copy particles
 
+        bool copying_needed = true;
+        
           // Locate first donor
           unsigned donor = 0;
           while (counts[donor] < 2) {
               donor++;
-          }
-
-          // Locate first recipient
-          unsigned recipient = 0;
-          while (counts[recipient] != 0) {
-              recipient++;
-          }
-
-          // Count number of cells with zero count that can serve as copy recipients
-          unsigned nzeros = 0;
-          for (unsigned i = 0; i < nparticles; i++) {
-              if (counts[i] == 0)
-                  nzeros++;
-          }
-
-          while (nzeros > 0) {
-              assert(donor < nparticles);
-              assert(recipient < nparticles);
-
-              // Copy donor to recipient
-              particles[recipient] = particles[donor];
-
-              counts[donor]--;
-              counts[recipient]++;
-              nzeros--;
-
-              if (counts[donor] == 1) {
-                  // Move donor to next slot with count > 1
-                  donor++;
-                  while (donor < nparticles && counts[donor] < 2) {
-                      donor++;
-                  }
+              if (donor >= counts.size()) {
+                  copying_needed = false; // all the particle counts are 1
+                  break;
               }
+          }
 
-              // Move recipient to next slot with count equal to 0
-              recipient++;
-              while (recipient < nparticles && counts[recipient] > 0) {
+        if (copying_needed) {
+              // Locate first recipient
+              unsigned recipient = 0;
+              while (counts[recipient] != 0) {
                   recipient++;
               }
-          }
+
+              // Count number of cells with zero count that can serve as copy recipients
+              unsigned nzeros = 0;
+              for (unsigned i = 0; i < nparticles; i++) {
+                  if (counts[i] == 0)
+                      nzeros++;
+              }
+
+              while (nzeros > 0) {
+                  assert(donor < nparticles);
+                  assert(recipient < nparticles);
+
+                  // Copy donor to recipient
+                  particles[recipient] = particles[donor];
+
+                  counts[donor]--;
+                  counts[recipient]++;
+                  nzeros--;
+
+                  if (counts[donor] == 1) {
+                      // Move donor to next slot with count > 1
+                      donor++;
+                      while (donor < nparticles && counts[donor] < 2) {
+                          donor++;
+                      }
+                  }
+
+                  // Move recipient to next slot with count equal to 0
+                  recipient++;
+                  while (recipient < nparticles && counts[recipient] > 0) {
+                      recipient++;
+                  }
+              }
+        }
           return ess;
       }
 
