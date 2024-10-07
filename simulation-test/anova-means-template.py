@@ -22,35 +22,31 @@ n = __NREPS__
 p = __SAMPLESIZE__
 
 def getDistances(fnprefix):
-    dkf = {}
     drf = {}
     for rep in range(n):
-        dkf[rep] = []
         drf[rep] = []
         lines = open("%s%d.txt" % (fnprefix, rep+1,), "r").readlines()
         for line in lines[1:]:
             parts = line.strip().split()
-            assert len(parts) == 3
-            ykf = float(parts[1])
-            dkf[rep].append(ykf)
-            yrf = float(parts[2])
+            assert len(parts) == 2
+            yrf = float(parts[1])
             drf[rep].append(yrf)
-    return dkf,drf
+    return drf
 
-def anova(title, dsmc, dbeast):
+def anova(title, d_first, d_second, str1, str2):
     print('\n%s:' % title)
-    nrows_smc = len(dsmc)
-    ncols_smc = len(dsmc[0])
-    nrows_beast = len(dbeast)
-    ncols_beast = len(dbeast[0])
+    nrows_dfirst = len(d_first)
+    ncols_dfirst = len(d_first[0])
+    nrows_dsecond = len(d_second)
+    ncols_dsecond = len(d_second[0])
     if row_col_table:
         print('%12s %12s %12s' % ('Method', 'Rows', 'Columns'))
-        print('%12s %12d %12d' % ('SMC', nrows_smc, ncols_smc))
-        print('%12s %12d %12d' % ('BEAST', nrows_beast, ncols_beast))
-    assert nrows_smc == nrows_beast
-    assert ncols_smc == ncols_beast
-    nrows = nrows_smc
-    ncols = ncols_smc
+        print('%12s %12d %12d' % (dfirst, nrows_dfirst, ncols_dfirst))
+        print('%12s %12d %12d' % (dsecond, nrows_dsecond, ncols_dsecond))
+    assert nrows_dfirst == nrows_dsecond
+    assert ncols_dfirst == ncols_dsecond
+    nrows = nrows_dfirst
+    ncols = ncols_dfirst
     
     # subject is simulation replicate
     # treatment is either SMC or BEAST
@@ -58,11 +54,11 @@ def anova(title, dsmc, dbeast):
     # Calculate meanrowcol for each subject and treatment combination
     meanrowcol = {}
     for i in range(n):
-        # Calculate mean for replicate i, treatment SMC
-        meanrowcol[(i,0)] = sum(dsmc[i])/len(dsmc[i])
+        # Calculate mean for replicate i, treatment dfirst
+        meanrowcol[(i,0)] = sum(d_first[i])/len(d_first[i])
     
-        # Calculate mean for replicate i, treatment BEAST
-        meanrowcol[(i,1)] = sum(dbeast[i])/len(dbeast[i])
+        # Calculate mean for replicate i, treatment dsecond
+        meanrowcol[(i,1)] = sum(d_second[i])/len(d_second[i])
         
     # Calculate meanrow for each subject
     meanrow = {}
@@ -131,7 +127,7 @@ def anova(title, dsmc, dbeast):
     if usescipy:
         pA = 1.0 - f.cdf(FA, dfA, dfAxS)
     if verbose:
-        print('\nTest of whether SMC and BEAST differ:')
+#        print('\nTest of whether SMC and BEAST differ:')
         print('  MSA   = %.5f' % MSA)
         print('  MSAxS = %.5f' % MSAxS)
         print('  F     = %.5f' % FA)
@@ -190,8 +186,8 @@ def anova(title, dsmc, dbeast):
             print('%12s %12s %12s %12s %12s'       % ('------------', '------------', '------------', '------------', '------------'))
     
     if data_to_file:
-        outf = open('anova-means-data.txt', 'w')
-        outf.write('%12s\t%12s\t%12s\t%12s\n' % ('Replicate', 'SMC', 'BEAST', 'Mean'))
+        outfname = 'anova-means-data-%s-%s.txt' % (str1, str2)
+        outf = open(outfname, "w")
         for i in range(n):
             outf.write('%12d\t%12.5f\t%12.5f\t%12.5f\n' % (i+1, meanrowcol[(i,0)], meanrowcol[(i,1)], meanrow[i]))
         outf.write('%12s\t%12.5f\t%12.5f\t%12.5f\n' % ('mean', meancol[0], meancol[1], M))
@@ -223,10 +219,18 @@ def anova(title, dsmc, dbeast):
         Rfile.close()    
 
 if __name__ == '__main__':
-    dkfsmc, drfsmc = getDistances("smcdists")
-    dkfbeast,drfbeast = getDistances("beastdists")
-    anova('KF distances', dkfsmc, dkfbeast)
-    anova('RF distances', drfsmc, drfbeast)
-
+    drfsmc = getDistances("smcdists")
+    drfbeast = getDistances("beastdists")
+    drfsvdq = getDistances("svdqdists")
+    drfsmc_string = "drfsmc"
+    drfbeast_string = "drfbeast"
+    drfsvdq_string = "drfsvdq"
+    print('\nTest of whether SMC and BEAST differ:\n')
+    anova('RF distances', drfsmc, drfbeast, drfsmc_string, drfbeast_string)
+    print('\nTest of whether SMC and SVDQ differ:\n')
+    anova('RF distances', drfsmc, drfsvdq, drfsmc_string, drfsvdq_string)
+    print('\nTest of whether BEAST and SVDQ differ:\n')
+    anova('RF distances', drfbeast, drfsvdq, drfbeast_string, drfsvdq_string)
+    
 
     
