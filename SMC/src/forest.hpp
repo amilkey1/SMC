@@ -2666,6 +2666,11 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
                 double population_coalescence_rate = 0.0;
 #if defined (DRAW_NEW_THETA)
                     double population_theta = _theta_map[s.first];
+#if defined (RATE_HET_SIM)
+                if (_index == 1) {
+                    population_theta *= 100.0;
+                }
+#endif
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
 #else
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta;
