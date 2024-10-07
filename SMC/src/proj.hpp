@@ -1886,7 +1886,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         paupf << "  log start file=svdout.txt replace;\n";
         paupf << "  exe " + _sim_file_name + ";\n";
         paupf << "  taxpartition species (vector) = " << join(taxpartition," ") << ";\n";
-        paupf << "svd taxpartition=species bootstrap nreps = 100 treefile=test.tre replace;\n";
+        paupf << "svd taxpartition=species bootstrap nreps = 1000 treefile=test.tre replace;\n";
 //        paupf << "  svd taxpartition=species;\n";
         paupf << "  roottrees;\n";
         paupf << "  qage taxpartition=species patprob=exactjc outUnits=substitutions treefile=svd.tre replace;\n";
