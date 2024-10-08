@@ -176,8 +176,6 @@ class Forest {
         double                      getTreeLength();
         double                      getSpeciesTreeIncrement();
         double                      getLineageHeight(Node* nd);
-        double                      getLineageHeightLogScale(Node* nd);
-        double                      getTotalLineageHeight(Node* nd);
         void                        addIncrement(double increment);
         void                        simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
@@ -2020,7 +2018,6 @@ class Forest {
         assert(_upgma_additions.empty());
             
             double upgma_height = getLineageHeight(_lineages.back());
-            double starting_smc_height = upgma_height;
                         
         unsigned nsteps = n - 1;
         while (nsteps > 0) {
@@ -2039,6 +2036,7 @@ class Forest {
             double edge_len_to_add = 0.5*v - upgma_height;
             if (edge_len_to_add <= 0.0) {
                 edge_len_to_add = _small_enough; // TODO: to avoid likelihood issues, set v to very small if 0
+                v = _small_enough;
             }
             
             assert (edge_len_to_add > 0.0);
@@ -2048,8 +2046,7 @@ class Forest {
                 nd->_edge_length += edge_len_to_add;
             }
             
-//            upgma_height = v / 2.0;
-            upgma_height = v / 2.0 + starting_smc_height; // TODO: need to add height of prev SMC forest?
+            upgma_height += edge_len_to_add;
             
             //debugShowLineages();
             
@@ -3470,7 +3467,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
                         done = true;
                     }
                     if (spp_left_child != spp_right_child) {
-                        double height = getTotalLineageHeight(nd->_left_child);
+                        double height = getLineageHeight(nd->_left_child);
                         _depths.push_back(make_pair(height, make_pair(spp_left_child, spp_right_child)));
     //                        _depths.push_back(height);
                     }
@@ -3506,7 +3503,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             Node * nd = *it;
             if (nd->_left_child) {
                 // if internal node, store cumulative height in _height
-                double height = getTotalLineageHeight(nd->_left_child); //
+                double height = getLineageHeight(nd->_left_child); //
                 heights_and_nodes.push_back(make_pair(height, nd));
 //                nd->_height = nd->_left_child->_height + nd->_left_child->_edge_length;
 //                heights_and_nodes.push_back(make_pair(nd->_height, nd));
@@ -3522,73 +3519,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         return(heights_and_nodes);
     }
 
-    inline double Forest::getLineageHeightLogScale(Node* nd) {
-    //        double running_sum = 0.0;
-    //        double log_weight_choices_sum = 0.0;
-    //        double log_max_weight = *max_element(log_weight_choices.begin(), log_weight_choices.end());
-    //        for (auto & i:log_weight_choices) {
-    //            running_sum += exp(i - log_max_weight);
-    //        }
-    //        log_weight_choices_sum = log(running_sum) + log_max_weight;
-    //        return log_weight_choices_sum;
-        
-        if (nd != nullptr) {
-            double running_sum = 0.0;
-            double log_sum_height = 0.0;
-            vector<double> log_edge_lengths_to_add;
-            
-            log_edge_lengths_to_add.push_back(log(nd->getEdgeLength()));
-            if (nd->_left_child) {
-                for (Node* child = nd->_left_child; child; child=child->_left_child) {
-                    log_edge_lengths_to_add.push_back(log(child->getEdgeLength()));
-                }
-            }
-            
-            double log_max_weight = *max_element(log_edge_lengths_to_add.begin(), log_edge_lengths_to_add.end());
-            for (auto & i:log_edge_lengths_to_add) {
-                running_sum += exp(i - log_max_weight);
-            }
-            log_sum_height = log(running_sum) + log_max_weight;
-    //            return log_sum_height;
-            
-            double sum_height = 0.0;
-
-            sum_height += (nd->getEdgeLength());
-            if (nd->_left_child) {
-                for (Node* child = nd->_left_child; child; child=child->_left_child) {
-                    sum_height += (child->getEdgeLength());
-                }
-            }
-    //            cout << "sum height is " << sum_height << endl;
-    //            cout << "e^log sum height is: " << exp(log_sum_height) << endl;
-    //        cout << "log sum height of node " << nd->_parent->_name << " is: "<< (log_sum_height) << endl;
-    //            return log(log_sum_height);
-            return log_sum_height;
-        }
-        
-        else {
-            return 1.0;
-        }
-    }
-
     inline double Forest::getLineageHeight(Node* nd) {
-        if (nd != nullptr) {
-            double sum_height = 0.0;
-            
-            sum_height += nd->getEdgeLength();
-            if (nd->_left_child) {
-                for (Node* child = nd->_left_child; child; child=child->_left_child) {
-                    sum_height += child->getEdgeLength();
-                }
-            }
-            return sum_height;
-        }
-        else {
-            return 0.0;
-        }
-    }
-
-    inline double Forest::getTotalLineageHeight(Node* nd) {
         if (nd != nullptr) {
             double sum_height = 0.0;
             
@@ -4369,10 +4300,6 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         // remove parent from new last node
         _nodes.front()._parent = NULL;
         
-//        _nodes.sort(
-//             [this](Node& lhs, Node& rhs) {
-//                 return getLineageHeightLogScale(lhs._left_child) < getLineageHeightLogScale(rhs._left_child); } );
-//
         _nodes.sort(
              [this](Node& lhs, Node& rhs) {
                  return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
