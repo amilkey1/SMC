@@ -93,7 +93,7 @@ class Particle {
         vector<pair<double, double>>                    getIncrementPriors(unsigned i);
         vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
         double                                          getCoalescentLikelihood(unsigned g);
-        bool                                            speciesJoinProposed();
+        bool                                            speciesJoinProposed() {return _species_join_proposed;}
         void                                            clear();
         vector<double>                                  chooseIncrements(vector<double> event_choice_rates);
         void                                            speciesOnlyProposal();
@@ -160,7 +160,6 @@ class Particle {
         double                                  _log_coalescent_likelihood;
         mutable                                 Lot::SharedPtr _lot;
         unsigned                                _num_deep_coalescences;
-//        bool                                    _deep_coal;
         double                                  _species_tree_height;
         unsigned                                _psuffix;
         unsigned                                _next_species_number;
@@ -487,10 +486,6 @@ inline vector<double> Particle::getVectorPrior() {
                             event_choice_rates.push_back(r.first / total_rate);
                         }
                         
-//                        for (auto &p:event_choice_rates) {
-//                            p = p/total_rate;
-//                        } // TODO: can combine this with the previous loop?
-                                                        
                         unsigned index = selectEventLinearScale(event_choice_rates); // TODO: do the rates have to be in order?
                         string species_name = rates_by_species[index].second;
                         _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
@@ -519,7 +514,6 @@ inline vector<double> Particle::getVectorPrior() {
                             
                             _num_deep_coalescences += _forests[next_gene].getDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
                             
-                            // TODO: why does this not start at the null species - because if you are here you have already gone past the first species increment?
                             _forests[next_gene].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
                             assert (next_species_index < _t_by_gene[next_gene-1].size());
                             _t_by_gene[next_gene-1][next_species_index].second -= species_increment; // update species tree increments
@@ -1264,15 +1258,6 @@ inline vector<double> Particle::getVectorPrior() {
         assert (g>0); // no coalescent likelihood for species tree
         return _forests[g]._log_coalescent_likelihood;
 #endif
-    }
-
-    inline bool Particle::speciesJoinProposed() {
-        if (_species_join_proposed) {
-            return true;
-        }
-        else {
-            return false;
-        }
     }
 
     inline void Particle::simulateData(vector<unsigned> sites_vector) {

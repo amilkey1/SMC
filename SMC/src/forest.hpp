@@ -2020,6 +2020,7 @@ class Forest {
         assert(_upgma_additions.empty());
             
             double upgma_height = getLineageHeight(_lineages.back());
+            double starting_smc_height = upgma_height;
                         
         unsigned nsteps = n - 1;
         while (nsteps > 0) {
@@ -2030,27 +2031,16 @@ class Forest {
             unsigned i = p.first;
             unsigned j = p.second;
             
-            double edge_len_to_subtract = 0.0;
-            
-            // all lineages should be at the same height here
-            // only subtract existing edge length if the node is at the smc height??
-//            if (getLineageHeight(_lineages[i]) <= smc_height) {
-//                edge_len_to_subtract = _lineages[i]->_edge_length + _lineages[j]->_edge_length;
-//            }
-                
             // Update all leading edge lengths
             double v = *it; // TODO: need to subtract existing node height?
             
             assert (v != _infinity);
             
-            double edge_len_to_add = 0.5*(v - edge_len_to_subtract) - upgma_height;
+            double edge_len_to_add = 0.5*v - upgma_height;
             if (edge_len_to_add <= 0.0) {
-                edge_len_to_add = _small_enough;
+                edge_len_to_add = _small_enough; // TODO: to avoid likelihood issues, set v to very small if 0
             }
             
-//            if (v == 0) { // TODO: to avoid likelihood issues, set v to very small if 0
-//                v = _small_enough;
-//            }
             assert (edge_len_to_add > 0.0);
             assert (v == v); // check v is not NaN
             for (auto nd : _lineages) {
@@ -2058,7 +2048,8 @@ class Forest {
                 nd->_edge_length += edge_len_to_add;
             }
             
-            upgma_height = v / 2.0;
+//            upgma_height = v / 2.0;
+            upgma_height = v / 2.0 + starting_smc_height; // TODO: need to add height of prev SMC forest?
             
             //debugShowLineages();
             
@@ -3449,14 +3440,18 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
                     while (spp_left_child == "" || spp_right_child == "") {
                         for (auto &s:_species_partition) {
                             for (auto &nd:s.second) {
-                                if (nd == left_child) {
+                                if (nd == left_child && spp_left_child == "") {
                                     spp_left_child = s.first;
                                 }
-                                else if (nd == right_child) {
+                                else if (nd == right_child && spp_right_child == "") {
                                     spp_right_child = s.first;
                                 }
                             }
+                            if (spp_left_child != "" && spp_right_child != "") {
+                                break;
+                            }
                         }
+                        
                         if (spp_left_child == "") {
                             if (left_child->_left_child) {
                                 left_child = left_child->_left_child; // TODO: not sure about these; will the parent get accounted for later?
