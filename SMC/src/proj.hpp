@@ -2061,12 +2061,14 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
                 // Propose a coalescence event (which may involve also proposing
                 // one or more speciation events)
 //                _log_weights[i] = p.proposeCoalescence(update_seeds[i], step, i, proposal, /*compute_partial*/true);
+//                p.showParticle(); // TODO: there is some copying issue where other particles are getting lineages added on as other particles get modified - but only happens with large numbers of particles?
                 p.proposal();
                 _log_weights[i] = p.getLogWeight();
                 
                 // Return particle to its original state
 //                p.reverseProposal(proposal);
                 p.reverseProposal();
+//                p.showParticle();
 
                 n--;
                 i++;
@@ -2564,6 +2566,9 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
 #if defined (COMPRESS_PARTICLES)
                         proposeParticles(my_vec, g, nsteps);
 #elif defined (COMPRESS_PARTICLES_TWO)
+                        if (g == 37) {
+                            cout << "x";
+                        }
                         proposeParticlesCompressed(my_list, update_seeds_two);
 #else
 //                        proposeParticles(my_vec);
@@ -2591,9 +2596,9 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
 #if defined (COMPRESS_PARTICLES)
                             double ess = filterParticles(g, my_vec, update_seeds);
 #elif defined (COMPRESS_PARTICLES_TWO)
-                            for (auto &p:my_list) {
-                                p.showParticle();
-                            }
+//                            for (auto &p:my_list) {
+//                                p.showParticle();
+//                            }
                             double ess = filterParticles(g, my_list, _log_weights, counts_two, update_seeds_two);
 #else
 //                            double ess = filterParticles(g, my_vec);

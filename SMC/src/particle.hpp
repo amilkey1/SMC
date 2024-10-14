@@ -1031,14 +1031,16 @@ inline vector<double> Particle::getVectorPrior() {
         _forests[gene_to_unjoin].subtractIncrement(_prev_gene_increment); // TODO: need to subtract every increment, not just the gene one
         
         // now, undo all the species proposals
-        unsigned count = (unsigned) _prev_species_increments.size() - 1;
+        unsigned count = (unsigned) _prev_species_increments.size();
         
         if (_prev_species_increments.size() > 0) {
-            assert (_speciation);
-            unsigned species_number = _next_species_number_by_gene[gene_to_unjoin - 1];
-            _forests[gene_to_unjoin].resetSpeciesPartition(_t_by_gene[gene_to_unjoin-1][species_number].first);
-            _forests[gene_to_unjoin].subtractIncrement(_prev_species_increments[count]);
-            count--;
+            while (count > 0) {
+                assert (_speciation);
+                unsigned species_number = _next_species_number_by_gene[gene_to_unjoin - 1];
+                _forests[gene_to_unjoin].resetSpeciesPartition(_t_by_gene[gene_to_unjoin-1][species_number].first);
+                _forests[gene_to_unjoin].subtractIncrement(_prev_species_increments[count - 1]);
+                count--;
+            }
         }
         
         regrowSpeciesTree();
