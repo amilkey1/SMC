@@ -64,6 +64,9 @@ namespace proj {
             int                 _flags;
             PartialStore::partial_t _partial;
             int                 _position_in_lineages;
+#if defined (COMPRESS_PARTICLES_TWO)
+            int                 _position_in_node_list;
+#endif
     };
     
     
@@ -83,6 +86,9 @@ namespace proj {
         _name = "";
         _edge_length = _smallest_edge_length;
         _partial.reset();
+#if defined (COMPRESS_PARTICLES_TWO)
+        _position_in_node_list = 0;
+#endif
     }
 
     inline void Node::setEdgeLength(double v) {

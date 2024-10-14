@@ -22,6 +22,7 @@ std::mutex mtx;
 #include "partial_store.hpp"
 extern proj::PartialStore ps;
 
+
 #include "node.hpp"
 
 namespace proj {
@@ -67,6 +68,9 @@ class Forest {
         void                        setUpSpeciesForest(vector<string> &species_names);
         tuple<string,string, string> speciesTreeProposal(Lot::SharedPtr lot);
         void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
+#if defined (COMPRESS_PARTICLES_TWO)
+        void                        revertNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
+#endif
         void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
         void                        revertNodeVector(vector<Node *> & node_vector, Node * addnode1, Node * addnode2, Node * delnode1);
         double                      getRunningSumChoices(vector<double> &log_weight_choices);
@@ -118,6 +122,14 @@ class Forest {
         void                        buildStartingUPGMAMatrix();
         void                        buildStartingRow();
 #endif
+    
+#if defined (COMPRESS_PARTICLES_TWO)
+        void                        reverseForestProposal();
+        void                        saveSpeciesPartition();
+        void                        resetSpeciesPartition(tuple<string, string, string> species_info);
+        void                        rejoinSpecies(vector<pair<tuple<string, string, string>, double>> species_info);
+#endif
+        void                        recalcPartials();
 
     
         map<string, double>         _theta_map;
@@ -169,6 +181,10 @@ class Forest {
         vector<double>              _starting_dij;
         map<Node*,  unsigned>       _starting_row;
     
+#if defined (COMPRESS_PARTICLES_TWO)
+        vector<map<string, list<unsigned>>>   _prev_species_partition;
+#endif
+    
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
         double                      calcSimTransitionProbability(unsigned from, unsigned to, double edge_length);
@@ -177,6 +193,7 @@ class Forest {
         double                      getSpeciesTreeIncrement();
         double                      getLineageHeight(Node* nd);
         void                        addIncrement(double increment);
+        void                        subtractIncrement(double increment);
         void                        simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
         pair<vector<double>, vector<unsigned>>        calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build);
@@ -245,6 +262,9 @@ class Forest {
         _species_names.clear();
         _starting_dij.clear();
         _starting_row.clear();
+#if defined (COMPRESS_PARTICLES_TWO)
+        _prev_species_partition.clear();
+#endif
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -598,7 +618,9 @@ class Forest {
         
         if (!new_nd->_left_child) {
             auto &data_matrix=_data->getDataMatrix();
+#if !defined (COMPRESS_PARTICLES_TWO) // for compressing particles, need to recalc some partials
             assert (_save_memory || _start_mode == "sim");
+#endif
             if (!new_nd->_left_child) {
                 new_nd->_partial=ps.getPartial(_npatterns*4);
                 for (unsigned p=0; p<_npatterns; p++) {
@@ -904,6 +926,9 @@ class Forest {
         _starting_row = other._starting_row;
 #endif
         _species_names = other._species_names;
+#if defined (COMPRESS_PARTICLES_TWO)
+        _prev_species_partition = other._prev_species_partition;
+#endif
 
         // copy tree itself
 
@@ -915,6 +940,17 @@ class Forest {
                 _species_partition[spiter.first].push_back(nd);
             }
         }
+        
+#if defined (COMPRESS_PARTICLES_TWO)
+//        _prev_species_partition.clear();
+//        for (auto prev_spiter : other._prev_species_partition) {
+//            for (auto s : prev_spiter.second) {
+//                unsigned number = s->_number;
+//                Node* nd = &*next(_nodes.begin(), number);
+//                _prev_species_partition[prev_spiter.first].push_back(nd);
+//            }
+//        }
+#endif
         
 #if defined(BUILD_UPGMA_TREE)
         _starting_row.clear();
@@ -1678,9 +1714,7 @@ class Forest {
         
         _gene_tree_log_likelihood = calcLogLikelihood();
         _log_weight = _gene_tree_log_likelihood - prev_log_likelihood; // previous likelihood is the entire tree
-        
-//        showForest();
-                
+                        
         if (_save_memory) {
             for (auto &nd:_nodes) {
                 nd._partial=nullptr;
@@ -2145,9 +2179,7 @@ class Forest {
             
         _gene_tree_log_likelihood = calcLogLikelihood();
         _log_weight = _gene_tree_log_likelihood - prev_log_likelihood; // previous likelihood is the entire tree
-            
-//            showForest();
-            
+                        
         if (_save_memory) {
             for (auto &nd:_nodes) {
                 nd._partial=nullptr;
@@ -2267,6 +2299,230 @@ class Forest {
         }
         cout << "\n";
     }
+        
+#if defined (COMPRESS_PARTICLES_TWO)
+    inline void Forest::saveSpeciesPartition() {
+//        _prev_species_partition.clear();
+        map<string, list<unsigned>> prev_spp_part;
+        unsigned i = 0;
+        for (auto &s:_species_partition) {
+            i = 0;
+            for (auto &nd:s.second) {
+                prev_spp_part[s.first].push_back(nd->_number);
+                nd->_position_in_node_list = i;
+                i++;
+            }
+        }
+        _prev_species_partition.push_back(prev_spp_part);
+//        _prev_species_partition = _species_partition;
+    }
+#endif
+        
+#if defined (COMPRESS_PARTICLES_TWO)
+    inline void Forest::rejoinSpecies(vector<pair<tuple<string, string, string>, double>> species_info) {
+        // take down existing species forest
+        _ninternals = 0;
+        
+        for (unsigned i=0; i<_nspecies - 1; i++) {
+            Node* parent = _lineages.back();
+            Node* child1 = _lineages.back()->_left_child;
+            Node* child2 = _lineages.back()->_left_child->_right_sib;
+            revertNodeVector(_lineages, child1, child2, parent);
+            //reset siblings and parents of original nodes back to 0
+            child1->resetNode(); //subtree1
+            child2->resetNode(); //subtree2
+            _nodes.pop_back();
+        }
+        assert (_lineages.size() == _nspecies);
+        for (auto &nd:_lineages) {
+            nd->_edge_length = 0.0;
+        }
+        
+        for (auto &t:species_info) {
+            
+            string node1_name = get<0>(t.first);
+            string node2_name = get<1>(t.first);
+            string new_name = get<2>(t.first);
+            
+            if (node1_name != "null") {
+            
+                Node* subtree1;
+                Node* subtree2;
+                
+                for (auto &nd:_lineages) {
+                    if (nd->_name == node1_name) {
+                        subtree1 = nd;
+                    }
+                    else if (nd->_name == node2_name) {
+                        subtree2 = nd;
+                    }
+                }
+                assert (subtree1);
+                assert (subtree2);
+                
+                //new node is always needed
+                Node nd;
+                _nodes.push_back(nd);
+                Node* new_nd = &_nodes.back();
+
+                new_nd->_parent=0;
+                new_nd->_number=_nleaves+_ninternals;
+                new_nd->_name = new_name;
+                new_nd->_edge_length=0.0;
+                _ninternals++;
+                new_nd->_right_sib=0;
+
+                new_nd->_left_child=subtree1;
+                subtree1->_right_sib=subtree2;
+
+                subtree1->_parent=new_nd;
+                subtree2->_parent=new_nd;
+                
+                updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+            }
+            for (auto &nd:_lineages) {
+                nd->_edge_length += t.second;
+            }
+        }
+    }
+#endif
+        
+#if defined (COMPRESS_PARTICLES_TWO)
+    inline void Forest::resetSpeciesPartition(tuple<string, string, string> species_info) {
+        while (_prev_species_partition.size() > 0) {
+            map<string, list<unsigned>> prev_spp_part = _prev_species_partition.back();
+            vector<string> old_species;
+            vector<string> new_species;
+            
+            string spp1 = "null";
+            string spp2 = "null";
+            string new_spp = "null";
+            
+            for (auto &s:prev_spp_part) {
+                old_species.push_back(s.first);
+            }
+            for (auto &s:_species_partition) {
+                new_species.push_back(s.first);
+            }
+            
+            assert (old_species.size() == new_species.size() + 1);
+            
+            for (auto &s:old_species) {
+                if (find(new_species.begin(), new_species.end(), s) != new_species.end()) {
+                    // temp
+                }
+                else {
+                    if (spp1 == "null") {
+                        spp1 = s;
+                    }
+                    else {
+                        assert (spp2 == "null");
+                        spp2 = s;
+                    }
+            }
+            }
+            
+            for (auto &s:new_species) {
+                if (find(old_species.begin(), old_species.end(), s) != old_species.end()) {
+                    // temp
+                }
+                else {
+                    assert (new_spp == "null");
+                    new_spp = s;
+                }
+            }
+            
+            
+            
+            // TODO: find most recently created species in _species_partition and revert it to the two extra species in prev_spp_part
+    //         TODO: find the correct nodes corresponding to the node numbers in prev_spp_part and add to _species_partition
+//            string spp1 = get<0>(species_info); // TODO: this should not be species info, get it from prev spp part
+//            string spp2 = get<1>(species_info);
+//            string new_spp = get<2>(species_info);
+            
+            list<unsigned> spp1_nodes = prev_spp_part[spp1];
+            list<unsigned> spp2_nodes = prev_spp_part[spp2];
+            
+            assert (spp1 != "null");
+            assert (spp2 != "null");
+
+            unsigned before = (int) _species_partition.size();
+
+            list<Node*> &nodes = _species_partition[new_spp]; // TODO: need to divide up nodes among the two species
+            list<Node*> nodes1;
+            list<Node*> nodes2;
+            
+            for (auto &nd:nodes) {
+                for (auto &num1:spp1_nodes) {
+                    if (nd->_number == num1) {
+                        nodes1.push_back(nd);
+                        break;
+                    }
+                }
+                for (auto &num2:spp2_nodes) {
+                    if (nd->_number == num2) {
+                        nodes2.push_back(nd);
+                        break;
+                    }
+                }
+            }
+            _species_partition[spp1] = nodes1;
+            _species_partition[spp2] = nodes2;
+            
+            _species_partition.erase(new_spp);
+            
+            assert (_species_partition.size() == before + 1);
+
+            _prev_species_partition.pop_back();
+        }
+    }
+#endif
+        
+    inline void Forest::recalcPartials() {
+        for (auto &nd:_lineages) {
+            if (nd->_partial == nullptr) {
+                nd->_partial = ps.getPartial(_npatterns*4);
+                calcPartialArray(nd);
+            }
+        }
+    }
+        
+#if defined (COMPRESS_PARTICLES_TWO)
+    inline void Forest::reverseForestProposal() {
+        
+        // TODO: need to update species partition too?
+        Node* parent = _lineages.back();
+        Node* child1 = parent->_left_child;
+        Node* child2 = parent->_left_child->_right_sib;
+        
+        string spp;
+        
+        list<Node*> nodes;
+        for (auto &s:_species_partition) {
+            for (auto &nd:s.second) {
+                if (nd == parent) {
+                    nodes = s.second;
+                    spp = s.first;
+                    break;
+                }
+            }
+        }
+        
+        revertNodeList(nodes, child1, child2, parent);
+        _species_partition[spp] = nodes;
+        
+        revertNodeVector(_lineages, child1, child2, parent);
+        //reset siblings and parents of original nodes back to 0
+        child1->resetNode(); //subtree1
+        child2->resetNode(); //subtree2
+
+        // clear parent from _nodes
+        //clear parent node
+        parent->clear(); //new_nd
+        _nodes.pop_back();
+        _ninternals--;
+    }
+#endif
 
     inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment, string species, Lot::SharedPtr lot) {
           double prev_log_likelihood = _gene_tree_log_likelihood;
@@ -2462,6 +2718,15 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
              new_nd->_partial=ps.getPartial(_npatterns*4);
              assert(new_nd->_left_child->_right_sib);
 
+#if defined (COMPRESS_PARTICLES_TWO)
+             for (auto &nd:_lineages) {
+                 if (nd->_partial ==  nullptr) {
+                     nd->_partial = ps.getPartial(_npatterns * 4);
+                     calcPartialArray(nd);
+                 }
+             }
+#endif
+             
              if (_save_memory) {
                  for (auto &nd:_lineages) {
                      if (nd->_partial == nullptr) {
@@ -2571,6 +2836,49 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             _lineages[i] -> _position_in_lineages=i;
         }
     }
+        
+#if defined (COMPRESS_PARTICLES_TWO)
+    inline void Forest::revertNodeList(list<Node *> & node_list, Node *addnode1, Node *addnode2, Node *delnode1) {
+        // Delete delnode1 from node_vector
+        auto it = find(node_list.begin(), node_list.end(), delnode1);
+        assert (it != node_list.end());
+        node_list.erase(it);
+        
+        // find positions of nodes to insert
+        unsigned position1 = addnode1->_position_in_node_list; // TODO: need to know position in node list before, not position in lineages
+        unsigned position2 = addnode2->_position_in_node_list;
+        
+        auto iter1 = node_list.begin();
+        std::advance(iter1, position1);
+        
+        auto iter2 = node_list.begin();
+        std::advance(iter2, position2);
+        
+        // lower position must be inserted first
+        if (position1 < position2) {
+            node_list.insert(iter1, addnode1);
+            node_list.insert(iter2, addnode2);
+        }
+        else {
+            node_list.insert(iter2, addnode2);
+            node_list.insert(iter1, addnode1);
+        }
+        
+//        assert(node_list[addnode1->_position_in_node_list] == addnode1);
+//        assert(node_list[addnode2->_position_in_node_list] == addnode2);
+
+        // reset _position_in_node_list
+        unsigned i = 0;
+        for (auto &nd:node_list) {
+            nd->_position_in_node_list = i;
+            i++;
+        }
+//        for (int i=0; i < (int) node_list.size(); i++) {
+//            node_list[i] -> _position_in_node_list=i;
+//        }
+    }
+#endif
+
 
     inline void Forest::updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode) {
         // Delete delnode1 from node_list
@@ -2648,6 +2956,14 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         return rates;
     }
 
+#if defined (COMPRESS_PARTICLES_TWO)
+    inline void Forest::subtractIncrement(double increment) {
+        for (auto &nd:_lineages) {
+            nd->_edge_length -= increment;
+        }
+    }
+#endif
+        
     inline void Forest::addIncrement(double increment) {
         for (auto &nd:_lineages) {
             nd->_edge_length += increment;
