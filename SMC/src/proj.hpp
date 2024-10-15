@@ -1518,7 +1518,7 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
           for (unsigned p=0; p < nparticles; p++) {
               auto iter = particles.begin();
               std::advance(iter, p);
-              iter->getLogWeight();
+              probs[p] = iter->getLogWeight();
               
 //              probs[p] = particles[p].getLogWeight();
           }
@@ -1591,10 +1591,10 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
                   
                   auto recipient_part = particles.begin();
                   std::advance(recipient_part, recipient);
-
+                  
                   // Copy donor to recipient
-                  recipient_part = donor_part; // TODO: not sure this will work
-//                  particles[recipient] = particles[donor];
+                  
+                  *recipient_part = *donor_part;
 
                   counts[donor]--;
                   counts[recipient]++;

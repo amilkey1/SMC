@@ -11,7 +11,7 @@
 
 //#define HIERARCHICAL_FILTERING
 
-//#define DRAW_NEW_THETA
+#define DRAW_NEW_THETA
 
 //#define UNCONSTRAINED_PROPOSAL 
 
@@ -24,7 +24,7 @@
 
 //#define INV_GAMMA_PRIOR_TWO // turn this off if not defining DRAW_NEW_THETA
 
-//#define BUILD_UPGMA_TREE
+#define BUILD_UPGMA_TREE
 
 //#define BUILD_UPGMA_TREE_CONSTRAINED // if this is turned on, also turn on BUILD_UPGMA_TREE
 
@@ -38,4 +38,4 @@
 // for now, must also turn off draw_new_thet and inv_gamma_prior_two and all upgma stuff
 
 
-#define COMPRESS_PARTICLES_TWO // if defined, only tear down each particle back to the last join, then resample based on counts
+//#define COMPRESS_PARTICLES_TWO // if defined, only tear down each particle back to the last join, then resample based on counts
