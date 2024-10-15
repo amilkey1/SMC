@@ -1412,9 +1412,14 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
         assert(log_weights.size() == _nparticles);
                 
         // Normalize log_weights to create discrete probability distribution
-        double log_sum_weights = Proj::calcLogSum(log_weights);
-        vector<double> probs(_nparticles, 0.0);
-        transform(log_weights.begin(), log_weights.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
+        vector<double> probs = log_weights;
+//        double log_sum_weights = Proj::calcLogSum(log_weights);
+        double log_sum_weights = getRunningSum(probs);
+
+//        vector<double> probs(_nparticles, 0.0);
+        
+//        transform(log_weights.begin(), log_weights.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
+        transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
         
         // Compute component of the log marginal likelihood
         //log_marg_like += log_sum_weights - log(nparticles);
@@ -2125,6 +2130,7 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
                 p.setSeed(update_seeds_two[count]);
                 
                 p.proposal();
+//                p.showParticle();
                 _log_weights[i] = p.getLogWeight();
                 
                 // Return particle to its original state
@@ -2643,13 +2649,10 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
                         proposeParticlesCompressed(my_list, update_seeds_two);
 #else
                         proposeParticles(my_list);
-//                        if (g == 1) {
-//                            for (auto &p:my_list) {
-//                                p.showParticle();
-//                            }
-//                        }
 #endif
-
+//                        for (auto &p:my_list) {
+//                            p.showParticle();
+//                        }
                         unsigned num_species_particles_proposed = 0;
 
                         if (_verbose > 1) {
