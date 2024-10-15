@@ -2105,6 +2105,8 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
         
 #if defined (COMPRESS_PARTICLES_TWO)
     inline void Proj::proposeParticlesCompressed(list<Particle> &particles, vector<unsigned> update_seeds_two) {
+        unsigned count = 0;
+        
         unsigned i = 0;
         for (auto &p:particles) {
 //            p.showParticle();
@@ -2120,18 +2122,18 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
                 
                 // Propose a coalescence event (which may involve also proposing
                 // one or more speciation events)
-//                _log_weights[i] = p.proposeCoalescence(update_seeds[i], step, i, proposal, /*compute_partial*/true);
-//                p.showParticle(); // TODO: there is some copying issue where other particles are getting lineages added on as other particles get modified - but only happens with large numbers of particles?
+                p.setSeed(update_seeds_two[count]);
+                
                 p.proposal();
                 _log_weights[i] = p.getLogWeight();
                 
                 // Return particle to its original state
-//                p.reverseProposal(proposal);
                 p.reverseProposal();
-//                p.showParticle();
 
                 n--;
                 i++;
+                
+                count++;
             }
             
 //            p.stowAllPartials();
@@ -2604,10 +2606,20 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
                         _log_weights.assign(_nparticles, 0.0);
 
                         if (g > 0) {
+#if defined (COMPRESS_PARTICLES_TWO)
+                            seed_num = 0;
+                            unsigned psuffix = 1;
+                            for (unsigned p=0; p<_nparticles; p++) {
+                                unsigned seed = rng.randint(1,9999) + psuffix;
+                                update_seeds_two[seed_num] = seed;
+                                seed_num++;
+                                psuffix += 2;
+                            }
+#else
                             // set particle random number seeds
                             seed_num = 0;
                             unsigned psuffix = 1;
-                            for (auto &p:my_list) {
+                            for (auto &p:my_list) { // TODO: when compressing particles, this list may now be smaller but you need more seeds?
                                 unsigned seed = rng.randint(1,9999) + psuffix;
 //                                p.setSeed(rng.randint(1,9999) + psuffix);
                                 p.setSeed(seed);
@@ -2622,18 +2634,20 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
                                 seed_num++;
                                 psuffix += 2;
                             }
+#endif
                         }
                         //taxon joining and reweighting step
 #if defined (COMPRESS_PARTICLES)
                         proposeParticles(my_vec, g, nsteps);
 #elif defined (COMPRESS_PARTICLES_TWO)
-                        if (g == 37) {
-                            cout << "x";
-                        }
                         proposeParticlesCompressed(my_list, update_seeds_two);
 #else
-//                        proposeParticles(my_vec);
                         proposeParticles(my_list);
+//                        if (g == 1) {
+//                            for (auto &p:my_list) {
+//                                p.showParticle();
+//                            }
+//                        }
 #endif
 
                         unsigned num_species_particles_proposed = 0;
@@ -2652,20 +2666,24 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
                             filter = false;
                         }
                         
+//                        for (auto &p:my_list) {
+//                            p.showParticle();
+//                        }
+                        
                         if (filter) {
                             
 #if defined (COMPRESS_PARTICLES)
                             double ess = filterParticles(g, my_vec, update_seeds);
 #elif defined (COMPRESS_PARTICLES_TWO)
-//                            for (auto &p:my_list) {
-//                                p.showParticle();
-//                            }
                             double ess = filterParticles(g, my_list, _log_weights, counts_two, update_seeds_two);
 #else
 //                            double ess = filterParticles(g, my_vec);
                             double ess = filterParticles(g, my_list);
 #endif
-
+//                            for (auto &p:my_list) {
+//                                p.showParticle();
+//                            }
+                            
                             unsigned species_count = 0;
                             
                             if (_verbose > 1) {

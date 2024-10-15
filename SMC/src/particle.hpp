@@ -156,6 +156,7 @@ class Particle {
         void                                            setCount(unsigned cnt) {_count = cnt;}
         void                                            regrowParticle(unsigned seed);
         void                                            regrowSpeciesTree();
+        void                                            finalizeProposal();
 #endif
         void                                            reverseProposal();
 
@@ -1048,7 +1049,15 @@ inline vector<double> Particle::getVectorPrior() {
         _t_by_gene = _t_by_gene_prev;
         _next_species_number_by_gene = _next_species_number_by_gene_prev;
         _next_species_number = _next_species_number_prev;
-        // TODO: also reset species numbers by gene
+        
+        // reset log likelihood - can just save previous and reset
+        _forests[gene_to_unjoin].recalcPartials();
+        _forests[gene_to_unjoin].calcLogLikelihood();
+        
+        _log_likelihood = 0.0;
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _log_likelihood += _forests[i]._gene_tree_log_likelihood;
+        }
         
 #endif
     }
@@ -1916,6 +1925,29 @@ inline vector<double> Particle::getVectorPrior() {
     inline void Particle::regrowSpeciesTree() {
         _forests[0].rejoinSpecies(_t_prev);
     }
+#endif
+
+#if defined (COMPRESS_PARTICLES_TWO)
+//    inline void Particle::finalizeProposal() {
+//        // Clear _prev_species_stack for all nodes in species tree and all gene trees
+//        unsigned num_speciations = (unsigned) _speciations.size();
+//        if (num_speciations > 0) {
+//            // Empty the _prev_species_stack for all nodes in the species tree
+//            for (auto & nd : _forests[0]._nodes) {
+//                nd.emptyPrevSpeciesStack();
+//            }
+//            
+//            // Empty the _prev_species_stack for all nodes in all gene trees
+//            for (unsigned i=1; i<_forests.size(); i++) {
+////            for (auto & gf : _gene_forests) {
+//                for (auto & nd : _forests[i]._nodes) {
+//                    nd.emptyPrevSpeciesStack();
+//                }
+//            }
+//        }
+//        
+//        debugCheckAllPrevSpeciesStacksEmpty();
+//    }
 #endif
 
     inline void Particle::rebuildSpeciesTree() {
