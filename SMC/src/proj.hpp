@@ -2649,10 +2649,10 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
                         proposeParticlesCompressed(my_list, update_seeds_two);
 #else
                         proposeParticles(my_list);
-#endif
 //                        for (auto &p:my_list) {
 //                            p.showParticle();
 //                        }
+#endif
                         unsigned num_species_particles_proposed = 0;
 
                         if (_verbose > 1) {
@@ -2674,6 +2674,9 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
 //                        }
                         
                         if (filter) {
+                            if (g == 12) {
+                                cout << "stop";
+                            }
                             
 #if defined (COMPRESS_PARTICLES)
                             double ess = filterParticles(g, my_vec, update_seeds);
@@ -2683,8 +2686,10 @@ inline void Proj::saveAllForests(list<Particle> &v) const {
 //                            double ess = filterParticles(g, my_vec);
                             double ess = filterParticles(g, my_list);
 #endif
-//                            for (auto &p:my_list) {
-//                                p.showParticle();
+//                            if (g == 12) {
+//                                for (auto &p:my_list) {
+//                                    p.showParticle();
+//                                }
 //                            }
                             
                             unsigned species_count = 0;

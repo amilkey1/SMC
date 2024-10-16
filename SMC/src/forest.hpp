@@ -128,6 +128,7 @@ class Forest {
         void                        saveSpeciesPartition();
         void                        resetSpeciesPartition(tuple<string, string, string> species_info);
         void                        rejoinSpecies(vector<pair<tuple<string, string, string>, double>> species_info);
+        void                        tearDownSpeciesTree();
 #endif
         void                        recalcPartials();
 
@@ -2486,6 +2487,33 @@ class Forest {
             }
         }
     }
+        
+#if defined (COMPRESS_PARTICLES_TWO)
+    inline void Forest::tearDownSpeciesTree() {
+        while (_lineages.size() < Forest::_nspecies) {
+            Node* parent = _lineages.back();
+            Node* child1 = parent->_left_child;
+            Node* child2 = parent->_left_child->_right_sib;
+            
+            revertNodeVector(_lineages, child1, child2, parent);
+            //reset siblings and parents of original nodes back to 0
+            child1->resetNode(); //subtree1
+            child2->resetNode(); //subtree2
+
+            // clear parent from _nodes
+            //clear parent node
+            parent->clear(); //new_nd
+            _nodes.pop_back();
+            _ninternals--;
+        }
+        for (auto &nd:_lineages) {
+            nd->_edge_length = 0.0;
+        }
+        _last_edge_length = 0.0;
+        _log_joining_prob = 0.0;
+        _increments_and_priors.clear();
+    }
+#endif
         
 #if defined (COMPRESS_PARTICLES_TWO)
     inline void Forest::reverseForestProposal() {

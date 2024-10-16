@@ -689,6 +689,11 @@ inline vector<double> Particle::getVectorPrior() {
         else {
             _log_weight = 0.0;
         }
+        
+        _log_likelihood = 0.0;
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _log_likelihood += _forests[i]._gene_tree_log_likelihood;
+        }
     }
 
 #if defined (COMPRESS_PARTICLES_TWO)
@@ -705,16 +710,21 @@ inline vector<double> Particle::getVectorPrior() {
         _forests[next_gene].calcLogLikelihood();
             bool calc_weight = false;
             
-//            if (_generation == 0) {
-//                buildEntireSpeciesTree();
-//                // make a separate species tree information vector for each gene
-//                for (unsigned i=1; i<_forests.size(); i++) {
-//                    _t_by_gene.push_back(_t);
-//                    _next_species_number_by_gene.push_back(0); // TODO: don't want to redo this when regrowing particle?
-//                }
-//            }
-    //        else {
-            if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc" && _generation > 0) { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+            if (_generation == 0) { // TODO: need to redo this because this uses some random numbers
+                _forests[0].tearDownSpeciesTree(); // TODO: don't clear this, reset to tips
+                _t_by_gene.clear();
+                _t_prev.clear();
+                _t.clear();
+                _t_by_gene.clear();
+                buildEntireSpeciesTree();
+//                 make a separate species tree information vector for each gene
+                for (unsigned i=1; i<_forests.size(); i++) {
+                    _t_by_gene.push_back(_t);
+                    _next_species_number_by_gene.push_back(0); // TODO: don't want to redo this when regrowing particle?
+                }
+            }
+//            else {
+            else if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc" && _generation > 0) { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
                 // TODO: don't do any of this for gen 0 if regrowing
                 // don't rebuild the species tree at every step when simulating data
                 trimSpeciesTree();
