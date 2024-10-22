@@ -93,6 +93,7 @@ namespace proj {
             map<string, string>         _taxon_map;
             unsigned                    _nthreads;
             void                        handleBaseFrequencies();
+            void                        handleRelativeRates();
             void                        handleNTaxaPerSpecies();
             void                        checkOutgroupName();
             void                        debugSpeciesTree(vector<Particle> &particles);
@@ -114,6 +115,8 @@ namespace proj {
             bool                        _fix_theta_for_simulations;
             bool                        _fix_theta;
             double                      _starting_log_likelihood;
+            string                      _string_relative_rates;
+            vector<double>              _double_relative_rates;
     };
 
     inline Proj::Proj() {
@@ -133,6 +136,8 @@ namespace proj {
         _nparticles = 50000;
         _data = nullptr;
         _small_enough = 0.0000001;
+        _string_relative_rates.clear();
+        _double_relative_rates.clear();
     }
 
 //    inline void Proj::saveAllForests(const vector<Particle> &v) const {
@@ -764,7 +769,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         treef.close();
     }
 
-    inline void Proj::processCommandLineOptions(int argc, const char * argv[]) {
+    inline void Proj::processCommandLineOptions(int argc, const char * argv[]) { // TODO: add relative rates
         std::vector<std::string> partition_subsets;
         boost::program_options::variables_map vm;
         boost::program_options::options_description desc("Allowed options");
@@ -804,6 +809,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
         ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(false), "set to true to fix one theta for all populations")
         ("fix_theta",  boost::program_options::value(&_fix_theta)->default_value(false), "set to true to fix one theta for all populations")
+        ("relative_rates", boost::program_options::value(&_string_relative_rates)->default_value("1.0"))
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -840,6 +846,10 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         // If user specified "base_frequencies" in conf file, convert them to a vector<double>
         if (vm.count("base_frequencies") > 0) {
             handleBaseFrequencies();
+        }
+        
+        if (vm.count("relative_rates") > 0) {
+            handleRelativeRates();
         }
             
         // if user specified "ntaxaperspecies" in conf file, convert them to a vector<unsigned>
@@ -938,6 +948,17 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             throw XProj(format("base frequencies (%s) don't add to 1")%Forest::_string_base_frequencies);
         }
         assert (fabs(sum-1) < 0.000001);
+    }
+
+    inline void Proj::handleRelativeRates() {
+        vector <string> temp;
+        assert (_double_relative_rates.size() == 0);
+        split(temp, _string_relative_rates, is_any_of(","));
+        // iterate through temp
+        for (auto &i:temp) {
+            double f = stof(i);
+            _double_relative_rates.push_back(f);
+        }
     }
 
     inline void Proj::summarizeData(Data::SharedPtr) {
@@ -1766,6 +1787,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             particles[i].setData(_data, _taxon_map, partials);
             partials = false;
             particles[i].mapSpecies(_taxon_map, _species_names);
+            particles[i].setRelativeRatesByGene(_double_relative_rates);
         }
     }
 
@@ -1784,6 +1806,10 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 p.setData(_data, _taxon_map, partials);
                 partials = false;
                 p.mapSpecies(_taxon_map, _species_names);
+                
+                // TODO: initialize relative rates
+                p.setRelativeRatesByGene(_double_relative_rates);
+                
             }
         }
 
@@ -1793,6 +1819,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             bool partials = true;
             particles[0].setData(_data, _taxon_map, partials);
             particles[0].mapSpecies(_taxon_map, _species_names);
+            particles[0].setRelativeRatesByGene(_double_relative_rates);
 
             if (particles.size() > 1) {
                 // divide up the remaining particles as evenly as possible across threads
@@ -2011,6 +2038,26 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             sites_vector.push_back(get<1>(s) - get<0>(s) + 1);
         }
 
+#if defined (RATE_HET_SIM)
+        // TODO: hard coding this for now
+        vector<double> rates;
+        for (unsigned s=0; s<nsubsets; s++) {
+            if (s == 0) {
+                rates.push_back(10.0);
+            }
+            else {
+                rates.push_back(1.0);
+            }
+        }
+        sim_vec[0].setRelativeRatesByGene(rates);
+#else
+        vector<double> rates;
+        for (unsigned s=0; s<nsubsets; s++) {
+            rates.push_back(1.0);
+        }
+        sim_vec[0].setRelativeRatesByGene(rates);
+#endif
+        
         sim_vec[0].simulateData(sites_vector);
 
         _data->compressPatterns();

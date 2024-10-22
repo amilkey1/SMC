@@ -137,6 +137,7 @@ class Particle {
         void                                            setGeneOrder(vector<unsigned> gene_order) {_gene_order = gene_order;}
         void                                            trimSpeciesTree();
         void                                            setFixTheta(bool fix) {_fix_theta = fix;}
+        void                                            setRelativeRatesByGene(vector<double> rel_rates);
 #if defined (FASTER_UPGMA_TREE)
         void                                            calcStartingUPGMAMatrix();
         vector<vector<double>>                          getStartingUPGMAMatrix();
@@ -170,6 +171,7 @@ class Particle {
         vector<double>                          _starting_log_likelihoods;
         vector<unsigned>                        _gene_order;
         bool                                    _fix_theta;
+        vector<double>                          _relative_rates_by_gene;
 };
 
     inline Particle::Particle() {
@@ -228,6 +230,7 @@ class Particle {
         _next_species_number_by_gene.clear();
         _gene_order.clear();
         _fix_theta = false;
+        _relative_rates_by_gene.clear();
     }
 
     inline void Particle::showSpeciesTree() {
@@ -1578,6 +1581,14 @@ inline vector<double> Particle::getVectorPrior() {
         }
     }
 
+    inline void Particle::setRelativeRatesByGene(vector<double> rel_rates) {
+        _relative_rates_by_gene = rel_rates;
+        
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i]._relative_rate = rel_rates[i-1];
+        }
+    }
+
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_species_weight = other._log_species_weight;
@@ -1600,6 +1611,7 @@ inline vector<double> Particle::getVectorPrior() {
         _next_species_number_by_gene = other._next_species_number_by_gene;
         _gene_order = other._gene_order;
         _fix_theta = other._fix_theta;
+        _relative_rates_by_gene = other._relative_rates_by_gene;
     };
 }
 

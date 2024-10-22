@@ -82,6 +82,7 @@ class Forest {
         void                        calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree);
         void                        clearPartials();
         void                        setStartMode(string mode) {_start_mode = mode;}
+        void                        setRelativeRate(double rel_rate) {_relative_rate = rel_rate;}
         unsigned                    getDeepCoal(tuple <string, string, string> species_joined);
         void                        resetDepthVector(tuple<string, string, string> species_joined);
         vector<pair<double, pair<string, string>>>             getMinDepths();
@@ -168,6 +169,7 @@ class Forest {
         vector<string>              _species_names;
         vector<double>              _starting_dij;
         map<Node*,  unsigned>       _starting_row;
+        double                      _relative_rate;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -648,11 +650,11 @@ class Forest {
             double transition_prob = 0.0;
             assert (_model == "JC");
             if (from == to) {
-                transition_prob = 0.25 + 0.75*exp(-4.0*edge_length/3.0);
+                transition_prob = 0.25 + 0.75*exp(-4.0*_relative_rate*edge_length/3.0);
             }
 
             else {
-                transition_prob = 0.25 - 0.25*exp(-4.0*edge_length/3.0);
+                transition_prob = 0.25 - 0.25*exp(-4.0*_relative_rate*edge_length/3.0);
             }
             return transition_prob;
         }
@@ -661,7 +663,7 @@ class Forest {
         double child_transition_prob = 0.0;
 
         if (_model == "JC" ) {
-            double expterm = exp(-4.0*(child->_edge_length)/3.0);
+            double expterm = exp(-4.0*(child->_edge_length)*_relative_rate/3.0); // TODO: double check relative rate
             double prsame = 0.25+0.75*expterm;
             double prdif = 0.25 - 0.25*expterm;
 
@@ -680,7 +682,7 @@ class Forest {
             double PI_J = 0.0;
 
             double phi = (pi_A+pi_G)*(pi_C+pi_T)+_kappa*(pi_A*pi_G+pi_C*pi_T);
-            double beta_t = 0.5*(child->_edge_length)/phi;
+            double beta_t = 0.5*(child->_edge_length * _relative_rate )/phi; // TODO: double check relative rate
 
             // transition prob depends only on ending state
             if (s_child == 0) {
@@ -732,7 +734,7 @@ class Forest {
         return child_transition_prob;
     }
 
-    inline double Forest::calcLogLikelihood() {
+    inline double Forest::calcLogLikelihood() { // TODO: if relative rates specified, multiply branch lengths by rel rate for the locus when calculating the likelihood
         //calc likelihood for each lineage separately
         auto &counts = _data->getPatternCounts();
         _gene_tree_log_likelihood = 0.0;
@@ -881,6 +883,7 @@ class Forest {
         _outgroup = other._outgroup;
         _run_on_empty = other._run_on_empty;
         _start_mode = other._start_mode;
+        _relative_rate = other._relative_rate;
         _depths = other._depths;
         _nincrements = other._nincrements;
         _preorder.resize(other._preorder.size());
@@ -2631,11 +2634,11 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
                 double population_coalescence_rate = 0.0;
 #if defined (DRAW_NEW_THETA)
                     double population_theta = _theta_map[s.first];
-#if defined (RATE_HET_SIM)
-                if (_index == 1) {
-                    population_theta *= 100.0;
-                }
-#endif
+//#if defined (RATE_HET_SIM)
+//                if (_index == 1) {
+//                    population_theta *= 10.0;
+//                }
+//#endif
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
 #else
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/_theta;
