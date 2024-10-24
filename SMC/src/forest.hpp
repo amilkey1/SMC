@@ -91,6 +91,7 @@ class Forest {
         void                        refreshPreorder();
         void                        createThetaMap(Lot::SharedPtr lot);
         void                        createThetaMapFixedTheta(Lot::SharedPtr lot);
+        void                        createSpeciesIndices();
         void                        updateThetaMap(Lot::SharedPtr lot, string new_species_name);
         void                        updateThetaMapFixedTheta(Lot::SharedPtr lot, string new_species_name);
         void                        resetThetaMap(Lot::SharedPtr lot);
@@ -1016,6 +1017,7 @@ class Forest {
     }
 
     inline void Forest::chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth) {
+// TODO: BE CAREFUL
         assert (max_depth >= 0.0);
         if (max_depth > 0.0) {
             double rate = (_lambda)*_lineages.size();
@@ -1023,6 +1025,9 @@ class Forest {
             double u = lot->uniform();
             double inner_term = 1-exp(-rate*max_depth);
             _last_edge_length = -log(1-u*inner_term)/rate;
+            // TODO: BE CAREFUL
+//            _last_edge_length = 0.15;
+            // TODO: BE CAREFUL
             assert (_last_edge_length < max_depth);
 
             for (auto nd:_lineages) {
@@ -2759,6 +2764,14 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         _theta_map[new_species_name] = Forest::_theta;
     }
         
+    inline void Forest::createSpeciesIndices() {
+        unsigned number = 0;
+        for (auto &s:_species_partition) {
+            number++;
+            _species_indices[s.first] = number - 1;
+        }
+    }
+        
     inline void Forest::createThetaMapFixedTheta(Lot::SharedPtr lot) {
         // map should be 2*nspecies - 1 size
         unsigned number = 0;
@@ -3260,7 +3273,9 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         
             for (auto &s:_species_partition) { // TODO: how to check if gene tree violates species tree?
                 if (gamma_b.size() > 0 && gamma_b[0] != neg_inf) {
-                    count = _species_indices[s.first];
+//                    count = _species_indices[s.first];
+                    assert (_species_indices.size() > 0);
+                    count = _species_indices.at(s.first);
                     
                     bool done = false;
                     cum_time = 0.0;

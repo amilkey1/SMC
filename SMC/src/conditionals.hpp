@@ -33,3 +33,6 @@
 #define FASTER_UPGMA_TREE
 
 //#define RATE_HET_SIM // only turn this on while simulating under rate het conditions
+
+
+//#define COAL_LIKE_TEST

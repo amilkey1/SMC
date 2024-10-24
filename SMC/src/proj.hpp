@@ -1086,6 +1086,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         
         unsigned count = 0;
         for (auto &p:my_vec) {
+            p.createSpeciesIndices();
             vector<string> particle_newicks;
             for (int i = 0; i<newicks.size(); i++) {
                 particle_newicks.push_back(newicks[i][count]);
@@ -1262,6 +1263,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     }
 
                     proposeSpeciesParticles(use_vec);
+//                    use_vec[0].showParticle();
                     
                     
                     double ess = filterSpeciesParticles(s, use_vec);
@@ -2043,10 +2045,10 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         vector<double> rates;
         for (unsigned s=0; s<nsubsets; s++) {
             if (s == 0) {
-                rates.push_back(10.0);
+                rates.push_back(100.0/19.0);
             }
             else {
-                rates.push_back(1.0);
+                rates.push_back(10.0/19.0);
             }
         }
         sim_vec[0].setRelativeRatesByGene(rates);

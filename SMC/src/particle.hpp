@@ -146,6 +146,7 @@ class Particle {
         void                                            setStartingRowCount(vector<map<Node*,  unsigned>> starting_row_count_by_gene);
         void                                            calcStartingRowCount();
 #endif
+        void                                            createSpeciesIndices();
 
     private:
 
@@ -172,6 +173,7 @@ class Particle {
         vector<unsigned>                        _gene_order;
         bool                                    _fix_theta;
         vector<double>                          _relative_rates_by_gene;
+        unsigned                                _species_branches;
 };
 
     inline Particle::Particle() {
@@ -231,6 +233,7 @@ class Particle {
         _gene_order.clear();
         _fix_theta = false;
         _relative_rates_by_gene.clear();
+        _species_branches = 0;
     }
 
     inline void Particle::showSpeciesTree() {
@@ -595,7 +598,13 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::speciesOnlyProposalIntegratingOutTheta() {
+//        for (unsigned i=0; i<10; i++) {
+//            double u = _lot->uniform();
+//            cout << u << endl;
+//        }
+        
         if (_generation == 0) {
+            _species_branches = Forest::_nspecies;
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i].refreshPreorder();
                 _forests[i].calcMinDepth();
@@ -604,11 +613,19 @@ inline vector<double> Particle::getVectorPrior() {
                 if (i > 1) {
                     _forests[i]._theta_mean = _forests[1]._theta_mean;
                 }
+//                else if (i == 1) {
+//                    _forests[1]._theta_map.clear();
+//                    _forests[1].resetThetaMap(_lot); // reset tip thetas and ancestral pop theta
+//                }
+                // TODO: careful - trying so random seed order matches non jones coalescent like version
             }
         }
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
         double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
+        
+//        _forests[0].showForest();
+#if !defined (COAL_LIKE_TEST)
         
             if (_forests[0]._last_edge_length > 0.0) {
             // choose species to join if past the first species generation for each forest vector
@@ -621,11 +638,13 @@ inline vector<double> Particle::getVectorPrior() {
                     string species1 = get<0>(species_joined);
                     string species2 = get<1>(species_joined);
                         
+//                    _forests[i].showForest();
                     if (_forests[0]._lineages.size() > 1 && species1 != "null") {
                         // if using Jones formula, species partition update will happen in coalescent likelihood calculation
                         _forests[i].resetDepthVector(species_joined);
                     }
 
+//                    _forests[i].showForest();
                     max_depth = (_forests[i].getMinDepths())[0].first;
                     max_depth_vector.push_back(max_depth);
                 }
@@ -637,6 +656,7 @@ inline vector<double> Particle::getVectorPrior() {
                 
                 if (_forests[0]._lineages.size() > 1) {
 #if !defined (UNCONSTRAINED_PROPOSAL)
+                    
                     assert (max_depth > 0.0);
                     
                     _forests[0].chooseSpeciesIncrementOnly(_lot, max_depth);
@@ -652,10 +672,12 @@ inline vector<double> Particle::getVectorPrior() {
                 _log_coalescent_likelihood = 0.0;
         
             assert (_log_coalescent_likelihood == 0.0);
+#endif
 
         if (!Forest::_run_on_empty) {
-            unsigned nbranches = Forest::_nspecies*2 - 1;
-            _log_coalescent_likelihood = 2 * nbranches * log(_forests[1]._theta_mean) - nbranches * boost::math::lgamma(2);
+            _species_branches += 1;
+//            unsigned nbranches = Forest::_nspecies*2 - 1;
+            _log_coalescent_likelihood = 2 * _species_branches * log(_forests[1]._theta_mean) - _species_branches * boost::math::lgamma(2);
             
             vector<double> gamma_jb;
             vector<unsigned> q_jb;
@@ -664,12 +686,19 @@ inline vector<double> Particle::getVectorPrior() {
             for (int i = 1; i<_forests.size(); i++) {
                 if (_log_coalescent_likelihood != neg_inf) {
                     pair<vector<double>, vector<unsigned>> params;
+#if defined (COAL_LIKE_TEST)
+                    showParticle();
+                    Forest::_theta = 0.07;
+//                    calcInitialCoalescentLikelihood();
+                    params = _forests[i].calcInitialCoalescentLikelihoodIntegratingOutTheta();
+#else
                     if (_forests[0]._lineages.size() > 1) {
                         params = _forests[i].calcCoalescentLikelihoodIntegratingOutTheta(_forests[0]._species_build);
                     }
                     else {
                         params = _forests[i].calcCoalescentLikelihoodIntegratingOutThetaLastStep(_forests[0]._species_build); // not using this right now
                     }
+#endif
                     if (i == 1) {
                         for (auto &g:params.first) {
                             if (g == neg_inf) {
@@ -706,6 +735,7 @@ inline vector<double> Particle::getVectorPrior() {
                     }
                     
                     if (_log_coalescent_likelihood != neg_inf) {
+                        double test = log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + boost::math::lgamma(2 + q_b);
                         _log_coalescent_likelihood += log_rb - (2+q_b)*log(_forests[1]._theta_mean + gamma_b) + boost::math::lgamma(2 + q_b);
                     }
                 }
@@ -729,6 +759,12 @@ inline vector<double> Particle::getVectorPrior() {
             }
         }
 
+#if defined (COAL_LIKE_TEST)
+        double max_depth = 0.0;
+        double constrained_factor = 0.0;
+#endif
+        
+#if !defined (COAL_LIKE_TEST)
         double constrained_factor = 0.0;
 #if !defined (UNCONSTRAINED_PROPOSAL)
         if (!Forest::_run_on_empty) {
@@ -739,6 +775,7 @@ inline vector<double> Particle::getVectorPrior() {
             }
             constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
         }
+#endif
         
 #endif
             _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
@@ -1334,7 +1371,7 @@ inline vector<double> Particle::getVectorPrior() {
             _forests[i]._log_coalescent_likelihood = 0.0;
             _forests[i]._data = nullptr;
             _forests[i]._log_weight = 0.0;
-            _forests[i]._species_indices.clear();
+//            _forests[i]._species_indices.clear(); // TODO: need to save this for use in jones coalescent likelihood calculation
         }
         _gene_order.clear();
         _next_species_number_by_gene.clear();
@@ -1433,6 +1470,13 @@ inline vector<double> Particle::getVectorPrior() {
         }
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i]._theta_map = theta_map;
+        }
+    }
+
+
+    inline void Particle::createSpeciesIndices() {
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i].createSpeciesIndices();
         }
     }
 
@@ -1612,6 +1656,7 @@ inline vector<double> Particle::getVectorPrior() {
         _gene_order = other._gene_order;
         _fix_theta = other._fix_theta;
         _relative_rates_by_gene = other._relative_rates_by_gene;
+        _species_branches = other._species_branches;
     };
 }
 
