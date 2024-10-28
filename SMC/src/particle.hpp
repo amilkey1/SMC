@@ -147,6 +147,11 @@ class Particle {
         void                                            calcStartingRowCount();
 #endif
         void                                            createSpeciesIndices();
+        void                                            drawParticleLambda();
+        double                                          getParticleLambda(){return _forests[0]._lambda;}
+        void                                            setParticleLambda(double lambda){_forests[0]._lambda = lambda;}
+        
+        static double                                   _lambda_prior_mean;
 
     private:
 
@@ -605,6 +610,9 @@ inline vector<double> Particle::getVectorPrior() {
         
         if (_generation == 0) {
             _species_branches = Forest::_nspecies;
+            if (_lambda_prior_mean > 0.0) {
+                _forests[0]._lambda = _lot->gamma(1, _lambda_prior_mean);
+            }
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i].refreshPreorder();
                 _forests[i].calcMinDepth();
@@ -773,7 +781,8 @@ inline vector<double> Particle::getVectorPrior() {
             if (nlineages == 1) {
                 nlineages = 2; // for last step, constraint was before final two species were joined
             }
-            constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
+//            constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
+            constrained_factor = log(1 - exp(-1*nlineages*_forests[0]._lambda*max_depth));
         }
 #endif
         
@@ -797,6 +806,9 @@ inline vector<double> Particle::getVectorPrior() {
 #else
         
         if (_generation == 0) {
+            if (_lambda_prior_mean > 0.0) {
+                _forests[0]._lambda = _lot->gamma(1, _lambda_prior_mean);
+            }
             _forests[1]._vector_prior.clear();
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i].refreshPreorder();
@@ -1480,6 +1492,13 @@ inline vector<double> Particle::getVectorPrior() {
         }
     }
 
+    inline void Particle::drawParticleLambda() {
+        if (_lambda_prior_mean > 0.0) {
+            // otherwise, lambda is fixed and not estimated
+            _forests[0]._lambda = _lot->gamma(1, _lambda_prior_mean);
+        }
+    }
+
     inline void Particle::rebuildSpeciesTree() {
         bool trim_to_previous_join = false;
         
@@ -1657,6 +1676,7 @@ inline vector<double> Particle::getVectorPrior() {
         _fix_theta = other._fix_theta;
         _relative_rates_by_gene = other._relative_rates_by_gene;
         _species_branches = other._species_branches;
+        _lambda_prior_mean = other._lambda_prior_mean;
     };
 }
 

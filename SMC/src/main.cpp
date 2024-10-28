@@ -24,7 +24,7 @@ string       Proj::_start_mode          = "smc";
 unsigned Forest::_nspecies = 4;
 unsigned Forest::_ntaxa = 12;
 double Forest::_theta = 0.05;
-double Forest::_lambda = 1;
+//double Forest::_lambda = 1;
 unsigned Particle::_nsubsets = 1;
 const double Node::_smallest_edge_length=1.0e-12;
 string Forest::_proposal;
@@ -39,6 +39,7 @@ double Forest::_ploidy = 2.0;
 double Forest::_theta_proposal_mean = 0.0;
 double Forest::_theta_prior_mean = 0.0;
 string Forest::_start_mode = "smc";
+double Particle::_lambda_prior_mean = 0.0;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT

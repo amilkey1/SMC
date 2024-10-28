@@ -192,7 +192,8 @@ class Forest {
         static double               _theta;
         static double               _theta_proposal_mean;
         static double               _theta_prior_mean;
-        static double               _lambda;
+        double                      _lambda;
+//        static double               _lambda;
         static string               _proposal;
         static string               _model;
         static double               _kappa;
@@ -901,6 +902,7 @@ class Forest {
         _species_indices = other._species_indices;
         _vector_prior = other._vector_prior;
         _infinity = other._infinity;
+        _lambda = other._lambda;
 #if defined(BUILD_UPGMA_TREE)
         _upgma_additions = other._upgma_additions;
         _upgma_starting_edgelen = other._upgma_starting_edgelen;

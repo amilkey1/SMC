@@ -117,6 +117,7 @@ namespace proj {
             double                      _starting_log_likelihood;
             string                      _string_relative_rates;
             vector<double>              _double_relative_rates;
+            double                      _lambda;
     };
 
     inline Proj::Proj() {
@@ -250,7 +251,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 #endif
             }
 
-            logf << "\t" << Forest::_lambda;
+            logf << "\t" << p.getParticleLambda();
+//            logf << "\t" << Forest::_lambda;
 
             vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
             vector<double> gene_tree_priors = p.getGeneTreePriors();
@@ -383,7 +385,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 #endif
             }
 
-            logf << "\t" << Forest::_lambda;
+            logf << "\t" << p.getParticleLambda();
+//            logf << "\t" << Forest::_lambda;
 
             vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
             vector<double> gene_tree_priors = p.getGeneTreeCoalescentLikelihoods();
@@ -487,7 +490,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
             logf << "\t" << p.getPopMean() / 4.0; // beast uses Ne * u = theta / 4
 
-            logf << "\t" << Forest::_lambda;
+            logf << "\t" << p.getParticleLambda();
+//            logf << "\t" << Forest::_lambda;
 
             logf << endl;
         }
@@ -784,7 +788,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000), "number of particles")
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
         ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.0), "theta")
-        ("lambda", boost::program_options::value(&Forest::_lambda)->default_value(1), "speciation rate")
+        ("lambda", boost::program_options::value(&_lambda)->default_value(0.0), "speciation rate")
+//        ("lambda", boost::program_options::value(&Forest::_lambda)->default_value(1), "speciation rate")
         ("proposal",  boost::program_options::value(&Forest::_proposal)->default_value("prior-prior"), "a string defining a proposal (prior-prior or prior-post)")
         ("model", boost::program_options::value(&Forest::_model)->default_value("JC"), "a string defining a substitution model")
         ("kappa",  boost::program_options::value(&Forest::_kappa)->default_value(1.0), "value of kappa")
@@ -806,6 +811,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("ngenes", boost::program_options::value(&_ngenes_provided)->default_value(0), "number of gene newick files specified")
         ("theta_proposal_mean", boost::program_options::value(&Forest::_theta_proposal_mean)->default_value(0.0), "theta proposal mean")
         ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
+        ("lambda_prior_mean", boost::program_options::value(&Particle::_lambda_prior_mean)->default_value(0.0), "lambda prior mean")
         ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
         ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(false), "set to true to fix one theta for all populations")
         ("fix_theta",  boost::program_options::value(&_fix_theta)->default_value(false), "set to true to fix one theta for all populations")
@@ -1648,7 +1654,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         cout << "theta = " << Forest::_theta << endl;
 #endif
 
-        cout << "speciation rate = " << Forest::_lambda << endl;
+//        cout << "speciation rate = " << Forest::_lambda << endl;
     }
 
     inline void Proj::proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets, unsigned ntaxa) {
@@ -1799,6 +1805,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             partials = false;
             particles[i].mapSpecies(_taxon_map, _species_names);
             particles[i].setRelativeRatesByGene(_double_relative_rates);
+            if (_lambda > 0.0) {
+                particles[i].setParticleLambda(_lambda);
+            }
         }
     }
 
@@ -1818,8 +1827,11 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 partials = false;
                 p.mapSpecies(_taxon_map, _species_names);
                 
-                // TODO: initialize relative rates
                 p.setRelativeRatesByGene(_double_relative_rates);
+                
+                if (_lambda > 0.0) {
+                    p.setParticleLambda(_lambda);
+                }
                 
             }
         }
@@ -1831,6 +1843,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             particles[0].setData(_data, _taxon_map, partials);
             particles[0].mapSpecies(_taxon_map, _species_names);
             particles[0].setRelativeRatesByGene(_double_relative_rates);
+            if (_lambda > 0.0) {
+                particles[0].setParticleLambda(_lambda);
+            }
 
             if (particles.size() > 1) {
                 // divide up the remaining particles as evenly as possible across threads
@@ -2227,6 +2242,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 }
 
                 for (auto &p:my_vec) { // TODO: can parallelize this - is it worth it?
+                    p.drawParticleLambda();
                     if (!Forest::_run_on_empty) {
                         p.setLogLikelihood(starting_log_likelihoods);
                     }
