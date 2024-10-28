@@ -815,7 +815,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
         ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(false), "set to true to fix one theta for all populations")
         ("fix_theta",  boost::program_options::value(&_fix_theta)->default_value(false), "set to true to fix one theta for all populations")
-        ("relative_rates", boost::program_options::value(&_string_relative_rates)->default_value("1.0"))
+        ("relative_rates", boost::program_options::value(&_string_relative_rates)->default_value("null"))
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -960,10 +960,17 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         vector <string> temp;
         assert (_double_relative_rates.size() == 0);
         split(temp, _string_relative_rates, is_any_of(","));
+        if (_string_relative_rates == "null") {
+            for (unsigned i=0; i<_partition->getNumSubsets(); i++) {
+                _double_relative_rates.push_back(1.0); // if no relative rates provided, set them all to 1
+            }
+        }
+        else {
         // iterate through temp
-        for (auto &i:temp) {
-            double f = stof(i);
-            _double_relative_rates.push_back(f);
+            for (auto &i:temp) {
+                double f = stof(i);
+                _double_relative_rates.push_back(f);
+            }
         }
     }
 
