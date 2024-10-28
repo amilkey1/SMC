@@ -2039,6 +2039,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         sim_vec[0].setNextSpeciesNumber(); // need to reset this now that number of species is known
         
         sim_vec[0].setNewTheta(_fix_theta_for_simulations); // TODO: fix theta mean as an option
+        
+        sim_vec[0].setParticleLambda(_lambda);
 
         unsigned nsteps = (unsigned) (_taxon_map.size()-1)*nsubsets;
 
