@@ -1247,11 +1247,11 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
                 index += _particle_increase;
 
-                if (_verbose > 0) {
+                if (_verbose > 1) {
                     cout << "beginning species tree proposals for subset " << a+1 << endl;
                 }
                 for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
-                    if (_verbose > 0) {
+                    if (_verbose > 1) {
                         cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
                     }
 
@@ -1505,48 +1505,57 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         
         // Copy particles
 
+      bool copying_needed = true;
+      
         // Locate first donor
         unsigned donor = 0;
         while (counts[donor] < 2) {
             donor++;
+            if (donor >= counts.size()) {
+                copying_needed = false; // all the particle counts are 1
+                break;
+            }
         }
+        
+        if (copying_needed) {
 
-        // Locate first recipient
-        unsigned recipient = 0;
-        while (counts[recipient] != 0) {
-            recipient++;
-        }
-
-        // Count number of cells with zero count that can serve as copy recipients
-        unsigned nzeros = 0;
-        for (unsigned i = 0; i < nparticles; i++) {
-            if (counts[i] == 0)
-                nzeros++;
-        }
-
-        while (nzeros > 0) {
-            assert(donor < nparticles);
-            assert(recipient < nparticles);
-
-            // Copy donor to recipient
-            particles[recipient] = particles[donor];
-
-            counts[donor]--;
-            counts[recipient]++;
-            nzeros--;
-
-            if (counts[donor] == 1) {
-                // Move donor to next slot with count > 1
-                donor++;
-                while (donor < nparticles && counts[donor] < 2) {
-                    donor++;
-                }
+            // Locate first recipient
+            unsigned recipient = 0;
+            while (counts[recipient] != 0) {
+                recipient++;
             }
 
-            // Move recipient to next slot with count equal to 0
-            recipient++;
-            while (recipient < nparticles && counts[recipient] > 0) {
+            // Count number of cells with zero count that can serve as copy recipients
+            unsigned nzeros = 0;
+            for (unsigned i = 0; i < nparticles; i++) {
+                if (counts[i] == 0)
+                    nzeros++;
+            }
+
+            while (nzeros > 0) {
+                assert(donor < nparticles);
+                assert(recipient < nparticles);
+
+                // Copy donor to recipient
+                particles[recipient] = particles[donor];
+
+                counts[donor]--;
+                counts[recipient]++;
+                nzeros--;
+
+                if (counts[donor] == 1) {
+                    // Move donor to next slot with count > 1
+                    donor++;
+                    while (donor < nparticles && counts[donor] < 2) {
+                        donor++;
+                    }
+                }
+
+                // Move recipient to next slot with count equal to 0
                 recipient++;
+                while (recipient < nparticles && counts[recipient] > 0) {
+                    recipient++;
+                }
             }
         }
         return ess;
@@ -1658,7 +1667,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
             assert(use_vec.size() == _particle_increase);
 
-            if (_verbose > 0) {
+            if (_verbose > 1) {
                 cout << "beginning species tree proposals for subset " << i+1 << endl;
             }
             for (unsigned s = 0; s < nspecies-1; s++) {  // skip last round of filtering because weights are always 0
@@ -1679,7 +1688,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
             } // s loop
             
-            if (_verbose > 0) {
+            if (_verbose > 1) {
                 cout << "finished with species tree proposals for subset " << i+1 << endl;
             }
             
@@ -2478,11 +2487,11 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
                         index += _particle_increase;
 
-                        if (_verbose > 0) {
+                        if (_verbose > 1) {
                             cout << "beginning species tree proposals for subset " << a+1 << endl;
                         }
                         for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
-                            if (_verbose > 0) {
+                            if (_verbose > 1) {
                                 cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
                             }
 
