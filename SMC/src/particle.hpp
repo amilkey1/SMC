@@ -118,6 +118,7 @@ class Particle {
         vector<double>                                  getVectorPrior();
         void                                            simulateData(vector<unsigned> sites_vector);
         unsigned                                        getNumDeepCoalescences() {return _num_deep_coalescences;}
+        unsigned                                        getMaxDeepCoalescences(){return _max_deep_coal;}
         void                                            resetSpecies();
         void                                            setForest(Forest f, unsigned forest_number);
         Forest                                          getForest(unsigned i) {return _forests[i];} // TODO: should return a pointer?
@@ -150,6 +151,7 @@ class Particle {
         void                                            drawParticleLambda();
         double                                          getParticleLambda(){return _forests[0]._lambda;}
         void                                            setParticleLambda(double lambda){_forests[0]._lambda = lambda;}
+        void                                            setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species);
         
         static double                                   _lambda_prior_mean;
 
@@ -167,6 +169,7 @@ class Particle {
         double                                  _log_coalescent_likelihood;
         mutable                                 Lot::SharedPtr _lot;
         unsigned                                _num_deep_coalescences;
+        unsigned                                _max_deep_coal;
         double                                  _species_tree_height;
         unsigned                                _psuffix;
         unsigned                                _next_species_number;
@@ -227,6 +230,7 @@ class Particle {
         _species_join_proposed = false;
         _log_coalescent_likelihood = 0.0;
         _num_deep_coalescences = 0.0;
+        _max_deep_coal = 0.0;
         _species_tree_height = 0.0;
         _t.clear();
         _psuffix = 0;
@@ -524,6 +528,7 @@ inline vector<double> Particle::getVectorPrior() {
                             _forests[next_gene].addIncrement(species_increment);
                             
                             _num_deep_coalescences += _forests[next_gene].getDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
+                            _max_deep_coal += _forests[next_gene].getMaxDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
                             
                             _forests[next_gene].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
                             assert (next_species_index < _t_by_gene[next_gene-1].size());
@@ -1652,6 +1657,12 @@ inline vector<double> Particle::getVectorPrior() {
         }
     }
 
+    inline void Particle::setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species) {
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i].setNTaxaPerSpecies(ntaxa_per_species);
+        }
+    }
+
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_species_weight = other._log_species_weight;
@@ -1664,6 +1675,7 @@ inline vector<double> Particle::getVectorPrior() {
         _species_join_proposed = other._species_join_proposed;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _num_deep_coalescences = other._num_deep_coalescences;
+        _max_deep_coal = other._max_deep_coal;
         _species_tree_height = other._species_tree_height;
         _t = other._t;
         _psuffix = other._psuffix;

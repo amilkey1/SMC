@@ -510,6 +510,16 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             logf << "\t" << p.getNumDeepCoalescences();
             count++;
         }
+        
+        ofstream logftwo("max_deep_coalescences.txt");
+        logftwo << "particle ";
+        logftwo << "\t" << "max num deep coalescences " << endl;
+        unsigned counttwo = 0;
+        for (auto &p:v) {
+            logftwo << "\n" << counttwo;
+            logftwo << "\t" << p.getMaxDeepCoalescences();
+            counttwo++;
+        }
     }
 
     inline void Proj::writeThetaFile(vector<Particle> &v) {
@@ -814,7 +824,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("lambda_prior_mean", boost::program_options::value(&Particle::_lambda_prior_mean)->default_value(0.0), "lambda prior mean")
         ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
         ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(false), "set to true to fix one theta for all populations")
-        ("fix_theta",  boost::program_options::value(&_fix_theta)->default_value(false), "set to true to fix one theta for all populations")
+        ("fix_theta",  boost::program_options::value(&_fix_theta)->default_value(true), "set to true to fix one theta for all populations")
         ("relative_rates", boost::program_options::value(&_string_relative_rates)->default_value("null"))
         ;
 
@@ -2048,6 +2058,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         sim_vec[0].setNewTheta(_fix_theta_for_simulations); // TODO: fix theta mean as an option
         
         sim_vec[0].setParticleLambda(_lambda);
+        
+        sim_vec[0].setNTaxaPerSpecies(_ntaxaperspecies);
 
         unsigned nsteps = (unsigned) (_taxon_map.size()-1)*nsubsets;
 
@@ -2056,6 +2068,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
         
         sim_vec[0].getNumDeepCoalescences();
+        sim_vec[0].getMaxDeepCoalescences();
 
         cout << "\nBuilding species tree and associated gene trees....\n";
         vector<string> taxon_names;

@@ -84,6 +84,8 @@ class Forest {
         void                        setStartMode(string mode) {_start_mode = mode;}
         void                        setRelativeRate(double rel_rate) {_relative_rate = rel_rate;}
         unsigned                    getDeepCoal(tuple <string, string, string> species_joined);
+        unsigned                    getMaxDeepCoal(tuple <string, string, string> species_joined);
+        void                        setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species);
         void                        resetDepthVector(tuple<string, string, string> species_joined);
         vector<pair<double, pair<string, string>>>             getMinDepths();
         void                        calcMinDepth();
@@ -171,6 +173,7 @@ class Forest {
         vector<double>              _starting_dij;
         map<Node*,  unsigned>       _starting_row;
         double                      _relative_rate;
+        vector<pair<string, unsigned>>  _lineages_per_species;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -249,6 +252,7 @@ class Forest {
         _species_names.clear();
         _starting_dij.clear();
         _starting_row.clear();
+        _lineages_per_species.clear();
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -795,6 +799,54 @@ class Forest {
         return log_weight_choices_sum;
     }
 
+    inline unsigned Forest::getMaxDeepCoal(tuple <string, string, string> species_joined) {
+        // TODO: need to know the number of lineages in each tip species
+        string species1 = get<0>(species_joined);
+        string species2 = get<1>(species_joined);
+        string species3 = get<2>(species_joined);
+        
+        unsigned lineages_to_coalesce = 0;
+        for (auto &m:_lineages_per_species) {
+            if (m.first == species1) {
+                lineages_to_coalesce += m.second;
+            }
+            else if (m.first == species2) {
+                lineages_to_coalesce += m.second;
+            }
+        }
+        
+        assert (lineages_to_coalesce > 0);
+        
+        unsigned max_deep_coal = lineages_to_coalesce - 1;
+        
+        // update _lineages_per_species
+        for (auto it = _lineages_per_species.begin(); it != _lineages_per_species.end();) {
+            if (it->first == species1) {
+                it = _lineages_per_species.erase(it);
+            }
+            else if (it->first == species2) {
+                it = _lineages_per_species.erase(it);
+            }
+            else {
+                it++;
+            }
+        }
+        
+        _lineages_per_species.push_back(make_pair(species3, lineages_to_coalesce));
+        // TODO: add new element to _lienages_per_species
+        
+        
+        return max_deep_coal;
+    }
+
+    inline void Forest::setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species) {
+        unsigned i = 0;
+        for (auto &s:_species_partition) {
+            _lineages_per_species.push_back(make_pair(s.first, ntaxa_per_species[i]));
+            i++;
+        }
+    }
+
     inline unsigned Forest::getDeepCoal(tuple <string, string, string> species_joined) {
         unsigned num_deep_coal = 0;
         
@@ -903,6 +955,7 @@ class Forest {
         _vector_prior = other._vector_prior;
         _infinity = other._infinity;
         _lambda = other._lambda;
+        _lineages_per_species = other._lineages_per_species;
 #if defined(BUILD_UPGMA_TREE)
         _upgma_additions = other._upgma_additions;
         _upgma_starting_edgelen = other._upgma_starting_edgelen;
