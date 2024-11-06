@@ -2814,11 +2814,13 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
 
     inline void Forest::updateThetaMap(Lot::SharedPtr lot, string new_species_name) {
         // add a new theta for the most recently drawn species
-        double scale = (2.01 - 1.0) / (_theta_mean);
+//        double scale = (2.01 - 1.0) / (_theta_mean);
+        double scale = (2.0 - 1.0) / _theta_mean;
         assert (scale > 0.0);
         double new_theta = 0.0;
         if (new_theta < _small_enough) {
-            new_theta = 1 / (lot->gamma(2.01, scale));
+//            new_theta = 1 / (lot->gamma(2.01, scale));
+            new_theta = 1 / (lot->gamma(2.0, scale));
             assert (new_theta > 0.0);
             _theta_map[new_species_name] = new_theta;
         }
@@ -2907,12 +2909,14 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             _theta_mean = Forest::_theta; // if no proposal distribution specified, use one theta mean for all particles
         }
         
-        double scale = (2.01 - 1.0) / (_theta_mean);
+//        double scale = (2.01 - 1.0) / (_theta_mean);
+        double scale = (2.0 - 1.0) / _theta_mean;
         assert (scale > 0.0);
         for (auto &name:_species_names) {
             double new_theta = 0.0;
             if (new_theta < _small_enough) {
-                new_theta = 1 / (lot->gamma(2.01, scale));
+                new_theta = 1 / (lot->gamma(2.0, scale));
+//                new_theta = 1 / (lot->gamma(2.01, scale));
                 assert (new_theta > 0.0);
                 _theta_map[name] = new_theta;
             }

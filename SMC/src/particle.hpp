@@ -559,6 +559,7 @@ inline vector<double> Particle::getVectorPrior() {
              done = true;
         
 #if defined (INV_GAMMA_PRIOR_TWO)
+        // TODO: use 2.0, not 2.01, for the inv gamma, then don't include a correction
             // include inverse gamma prior correction for every species population for every locus at every step
             // TODO: can make this faster by calculating these as the thetas are drawn, but for now, calculate them all each time
             double theta_mean = _forests[1]._theta_mean;
