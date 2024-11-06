@@ -527,8 +527,10 @@ inline vector<double> Particle::getVectorPrior() {
                             assert (_forests[next_gene]._species_partition.size() > 1);
                             _forests[next_gene].addIncrement(species_increment);
                             
-                            _num_deep_coalescences += _forests[next_gene].getDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
-                            _max_deep_coal += _forests[next_gene].getMaxDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
+                            if (Forest::_start_mode == "sim") {
+                                _num_deep_coalescences += _forests[next_gene].getDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
+                                _max_deep_coal += _forests[next_gene].getMaxDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
+                            }
                             
                             _forests[next_gene].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
                             assert (next_species_index < _t_by_gene[next_gene-1].size());

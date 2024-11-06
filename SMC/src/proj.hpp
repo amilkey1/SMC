@@ -823,8 +823,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
         ("lambda_prior_mean", boost::program_options::value(&Particle::_lambda_prior_mean)->default_value(0.0), "lambda prior mean")
         ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
-        ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(false), "set to true to fix one theta for all populations")
-        ("fix_theta",  boost::program_options::value(&_fix_theta)->default_value(true), "set to true to fix one theta for all populations")
+        ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(true), "set to true to fix one theta for all populations")
+        ("fix_theta",  boost::program_options::value(&_fix_theta)->default_value(false), "set to true to fix one theta for all populations")
         ("relative_rates", boost::program_options::value(&_string_relative_rates)->default_value("null"))
         ;
 
