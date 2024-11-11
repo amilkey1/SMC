@@ -502,24 +502,25 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
     inline void Proj::writeDeepCoalescenceFile(vector<Particle> &v) {
         ofstream logf("deep_coalescences.txt");
-        logf << "particle ";
-        logf << "\t" << "num deep coalescences " << endl;
-        unsigned count = 0;
-        for (auto &p:v) {
-            logf << "\n" << count;
-            logf << "\t" << p.getNumDeepCoalescences();
-            count++;
-        }
+        logf << "num deep coalescences = " << v[0].getNumDeepCoalescences() << endl;
+        logf << "Maximum number of deep coalescences = " << v[0].getMaxDeepCoalescences() << endl;
+        logf << "\n";
+//        unsigned count = 0;
+//        for (auto &p:v) {
+//            logf << "\n" << count;
+//            logf << "\t" << p.getNumDeepCoalescences();
+//            count++;
+//        }
         
-        ofstream logftwo("max_deep_coalescences.txt");
-        logftwo << "particle ";
-        logftwo << "\t" << "max num deep coalescences " << endl;
-        unsigned counttwo = 0;
-        for (auto &p:v) {
-            logftwo << "\n" << counttwo;
-            logftwo << "\t" << p.getMaxDeepCoalescences();
-            counttwo++;
-        }
+//        ofstream logftwo("max_deep_coalescences.txt");
+//        logftwo << "particle ";
+//        logftwo << "\t" << "max num deep coalescences " << endl;
+//        unsigned counttwo = 0;
+//        for (auto &p:v) {
+//            logftwo << "\n" << counttwo;
+//            logftwo << "\t" << p.getMaxDeepCoalescences();
+//            counttwo++;
+//        }
     }
 
     inline void Proj::writeThetaFile(vector<Particle> &v) {
