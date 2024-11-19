@@ -166,7 +166,6 @@ class Forest {
         double                      _theta_mean;
         vector<pair<Node*, Node*>>  _node_choices;
         vector<double>              _log_likelihood_choices;
-        double                      _infinity = numeric_limits<double>::infinity();
      // TODO: only define these as needed with conditionals
         stack<Node *>               _upgma_additions;
         map<Node *, double>         _upgma_starting_edgelen;
@@ -178,7 +177,7 @@ class Forest {
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
-        double                      calcSimTransitionProbability(unsigned from, unsigned to, double edge_length);
+        double                      calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length);
         double                      getTreeHeight();
         double                      getTreeLength();
         double                      getSpeciesTreeIncrement();
@@ -187,8 +186,10 @@ class Forest {
         void                        simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
         double                      calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
         pair<vector<double>, vector<unsigned>>        calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build);
-        inline pair<vector<double>, vector<unsigned>> calcInitialCoalescentLikelihoodIntegratingOutTheta();
+        pair<vector<double>, vector<unsigned>> calcInitialCoalescentLikelihoodIntegratingOutTheta();
         pair<vector<double>, vector<unsigned>>        calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build);
+        
+        unsigned                    multinomialDraw(Lot::SharedPtr lot, const vector<double> & probs);
 
     public:
 
@@ -197,7 +198,6 @@ class Forest {
         static double               _theta_proposal_mean;
         static double               _theta_prior_mean;
         double                      _lambda;
-//        static double               _lambda;
         static string               _proposal;
         static string               _model;
         static double               _kappa;
@@ -208,6 +208,10 @@ class Forest {
         static bool                 _run_on_empty;
         static double               _ploidy;
         static string               _start_mode;
+        static double               _edge_rate_variance;
+        static double               _asrv_shape;
+        static double               _comphet;
+        static double               _infinity;
 };
 
 
@@ -653,18 +657,42 @@ class Forest {
         }   // child loop
     }
 
-        inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, double edge_length) {
-            double transition_prob = 0.0;
-            assert (_model == "JC");
-            if (from == to) {
-                transition_prob = 0.25 + 0.75*exp(-4.0*_relative_rate*edge_length/3.0);
-            }
+    inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length) {
+        assert(pi.size() == 4);
+        assert(fabs(accumulate(pi.begin(), pi.end(), 0.0) - 1.0) < Forest::_small_enough);
+        assert(_relative_rate > 0.0);
+        double transition_prob = 0.0;
+        
+        // F81 transition probabilities
+        double Pi[] = {pi[0] + pi[2], pi[1] + pi[3], pi[0] + pi[2], pi[1] + pi[3]};
+        bool is_transition = (from == 0 && to == 2) || (from == 1 && to == 3) || (from == 2 && to == 0) || (from == 3 && to == 1);
+        bool is_same = (from == 0 && to == 0) || (from == 1 && to == 1) | (from == 2 && to == 2) | (from == 3 && to == 3);
+        bool is_transversion = !(is_same || is_transition);
 
-            else {
-                transition_prob = 0.25 - 0.25*exp(-4.0*_relative_rate*edge_length/3.0);
-            }
-            return transition_prob;
+        // HKY expected number of substitutions per site
+        //  v = betat*(AC + AT + CA + CG + GC + GT + TA + TG) + kappa*betat*(AG + CT + GA + TC)
+        //    = 2*betat*(AC + AT + CG + GT + kappa(AG + CT))
+        //    = 2*betat*((A + G)*(C + T) + kappa(AG + CT))
+        //  betat = v/[2*( (A + G)(C + T) + kappa*(AG + CT) )]
+        double kappa = 1.0;
+        double betat = 0.5*_relative_rate*edge_length/((pi[0] + pi[2])*(pi[1] + pi[3]) + kappa*(pi[0]*pi[2] + pi[1]*pi[3]));
+        
+        if (is_transition) {
+            double pi_j = pi[to];
+            double Pi_j = Pi[to];
+            transition_prob = pi_j*(1.0 + (1.0 - Pi_j)*exp(-betat)/Pi_j - exp(-betat*(kappa*Pi_j + 1.0 - Pi_j))/Pi_j);
         }
+        else if (is_transversion) {
+            double pi_j = pi[to];
+            transition_prob = pi_j*(1.0 - exp(-betat));
+        }
+        else {
+            double pi_j = pi[to];
+            double Pi_j = Pi[to];
+            transition_prob = pi_j*(1.0 + (1.0 - Pi_j)*exp(-betat)/Pi_j) + (Pi_j - pi_j)*exp(-betat*(kappa*Pi_j + 1.0 - Pi_j))/Pi_j;
+        }
+        return transition_prob;
+    }
 
     inline double Forest::calcTransitionProbability(Node* child, double s, double s_child) {
         double child_transition_prob = 0.0;
@@ -915,6 +943,9 @@ class Forest {
     inline void Forest::operator=(const Forest & other) {
         _nstates = other._nstates;
         _npatterns = other._npatterns;
+        _edge_rate_variance = other._edge_rate_variance;
+        _asrv_shape = other._asrv_shape;
+        _comphet = other._comphet;
         _nodes.clear();
         _nodes.resize(other._nodes.size());
         _lineages.resize(other._lineages.size());
@@ -3634,6 +3665,41 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             return 0.0;
         }
     }
+        
+    inline unsigned Forest::multinomialDraw(Lot::SharedPtr lot, const vector<double> & probs) {
+        // Compute cumulative probababilities
+        vector<double> cumprobs(probs.size());
+        partial_sum(probs.begin(), probs.end(), cumprobs.begin());
+        assert(fabs(*(cumprobs.rbegin()) - 1.0) < 0.0001);
+
+        // Draw a Uniform(0,1) random deviate
+        double u = lot->uniform();
+
+        // Find first element in cumprobs greater than u
+        // e.g. probs = {0.2, 0.3, 0.4, 0.1}, u = 0.6, should return 2
+        // because u falls in the third bin
+        //
+        //   |   0   |     1     |        2      | 3 | <-- bins
+        //   |---+---+---+---+---+---+---+---+---+---|
+        //   |       |           |   |           |   |
+        //   0      0.2         0.5  |          0.9  1 <-- cumulative probabilities
+        //                          0.6 <-- u
+        //
+        // cumprobs = {0.2, 0.5, 0.9, 1.0}, u = 0.6
+        //               |         |
+        //               begin()   it
+        // returns 2 = 2 - 0
+        auto it = find_if(cumprobs.begin(), cumprobs.end(), [u](double cumpr){return cumpr > u;});
+        if (it == cumprobs.end()) {
+            double last_cumprob = *(cumprobs.rbegin());
+            throw XProj(format("G::multinomialDraw failed: u = %.9f, last cumprob = %.9f") % u % last_cumprob);
+        }
+
+        auto d = std::distance(cumprobs.begin(), it);
+        assert(d >= 0);
+        assert(d < probs.size());
+        return (unsigned)d;
+    }
 
     inline void Forest::simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites) {
         if (_model != "JC") {
@@ -3658,13 +3724,29 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         //    R      0101        5
         //    Y      1010       10
         
+        // Draw equilibrium base frequencies from Dirichlet
+        // having parameter G::_comphet
+        vector<double> basefreq = {0.25, 0.25, 0.25, 0.25};
+        if (Forest::_comphet != Forest::_infinity) {
+            // Draw 4 Gamma(G::_comphet, 1) variates
+            double A = lot->gamma(Forest::_comphet, 1.0);
+            double C = lot->gamma(Forest::_comphet, 1.0);
+            double G = lot->gamma(Forest::_comphet, 1.0);
+            double T = lot->gamma(Forest::_comphet, 1.0);
+            double total = A + C + G + T;
+            basefreq[0] = A/total;
+            basefreq[1] = C/total;
+            basefreq[2] = G/total;
+            basefreq[3] = T/total;
+        }
+        
         // Simulate starting sequence at the root node
 
         Node * nd = *(_lineages.begin());
         unsigned ndnum = nd->_number;
         assert(ndnum < nnodes);
         for (unsigned i = 0; i < nsites; i++) {
-            sequences[ndnum][i] = lot->randint(0,3);
+            sequences[ndnum][i] = multinomialDraw(lot, basefreq);
         }
         
         nd = findNextPreorder(nd);
@@ -3676,14 +3758,34 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             assert(nd->_parent);
             unsigned parnum = nd->_parent->_number;
             assert(parnum < nnodes);
+            
+            // Choose relative rate for this node's edge
+            // Lognormal m=mean v=variance
+            //   sigma^2 = log(v/m^2 + 1)
+            //   mu = log m - sigma^2/2
+            // Mean m=1 because these are relative rates, so
+            //   sigma^2 = log(v + 1)
+            //   mu = -sigma^2/2
+            double edge_relrate = 1.0;
+            if (Forest::_edge_rate_variance > 0.0) {
+                double sigma2 = log(1.0 + Forest::_edge_rate_variance);
+                double sigma = sqrt(sigma2);
+                double mu = -0.5*sigma2;
+                double normal_variate = sigma*lot->normal() + mu;
+                edge_relrate = exp(normal_variate);
+            }
 
             // Evolve nd's sequence given parent's sequence and edge length
             for (unsigned i = 0; i < nsites; i++) {
+                // Choose relative rate for this site
+                double site_relrate = 1.0;
+                if (Forest::_asrv_shape != _infinity)
+                    site_relrate = lot->gamma(Forest::_asrv_shape, 1.0/Forest::_asrv_shape);
                 unsigned from_state = sequences[parnum][i];
                 double cum_prob = 0.0;
                 double u = lot->uniform();
                 for (unsigned to_state = 0; to_state < 4; to_state++) {
-                    cum_prob += calcSimTransitionProbability(from_state, to_state, nd->_edge_length);
+                    cum_prob += calcSimTransitionProbability(from_state, to_state, basefreq, site_relrate*edge_relrate*nd->_edge_length);
                     if (u < cum_prob) {
                         sequences[ndnum][i] = to_state;
                         break;
@@ -3708,7 +3810,6 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
                 dm[t].resize(starting_site + nsites);
 
                 // Get reference to nd's sequence
-//                unsigned ndnum = _nodes[t]._number;
                 unsigned ndnum = nd._number;
 
                 // Translate to state codes and copy

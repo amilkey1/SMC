@@ -827,7 +827,10 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(true), "set to true to fix one theta for all populations")
         ("fix_theta",  boost::program_options::value(&_fix_theta)->default_value(false), "set to true to fix one theta for all populations")
         ("relative_rates", boost::program_options::value(&_string_relative_rates)->default_value("null"))
-        ("occupancy", boost::program_options::value(&Data::_occupancy)->default_value(1.0), "probability that any given taxon will have data for any given locus; 1-_occupancy is prob. all missing data for a taxon (used only if startmode is) 'sim'")
+        ("simoccupancy", boost::program_options::value(&Data::_occupancy)->default_value(1.0), "probability that any given taxon will have data for any given locus; 1-_occupancy is prob. all missing data for a taxon (used only if startmode is) 'sim'")
+        ("simedgeratevar",   boost::program_options::value(&Forest::_edge_rate_variance)->default_value(0.0), "variance of lognormal relative rate distribution across edges in gene trees (used only if startmode is 'sim')")
+        ("simasrvshape",   boost::program_options::value(&Forest::_asrv_shape)->default_value(Forest::_infinity), "Shape of gamma among-site rate heterogeneity within a locus (used only if startmode is 'sim')")
+        ("simcomphet",   boost::program_options::value(&Forest::_comphet)->default_value(Forest::_infinity), "Dirichlet parameter governing compositional heterogeneity (default value results in compositional homogeneity (used only if startmode is 'sim')")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -2062,6 +2065,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         sim_vec[0].setParticleLambda(_lambda);
         
         sim_vec[0].setNTaxaPerSpecies(_ntaxaperspecies);
+        
+        sim_vec[0].setRelativeRatesByGene(_double_relative_rates);
 
         unsigned nsteps = (unsigned) (_taxon_map.size()-1)*nsubsets;
 
@@ -2087,26 +2092,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         for (auto &s:sites_tuples) {
             sites_vector.push_back(get<1>(s) - get<0>(s) + 1);
         }
-
-#if defined (RATE_HET_SIM)
-        // TODO: hard coding this for now
-        vector<double> rates;
-        for (unsigned s=0; s<nsubsets; s++) {
-            if (s == 0) {
-                rates.push_back(100.0/19.0);
-            }
-            else {
-                rates.push_back(10.0/19.0);
-            }
-        }
-        sim_vec[0].setRelativeRatesByGene(rates);
-#else
-        vector<double> rates;
-        for (unsigned s=0; s<nsubsets; s++) {
-            rates.push_back(1.0);
-        }
-        sim_vec[0].setRelativeRatesByGene(rates);
-#endif
         
         sim_vec[0].simulateData(sites_vector);
         

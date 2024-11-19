@@ -41,6 +41,10 @@ double Forest::_theta_prior_mean = 0.0;
 string Forest::_start_mode = "smc";
 double Particle::_lambda_prior_mean = 0.0;
 double Data::_occupancy = 1.0;
+double Forest::_edge_rate_variance = 0.0;
+double Forest::_asrv_shape = numeric_limits<double>::infinity();
+double Forest::_infinity = numeric_limits<double>::infinity();
+double Forest::_comphet = numeric_limits<double>::infinity();
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT
