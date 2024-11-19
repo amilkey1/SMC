@@ -784,7 +784,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         treef.close();
     }
 
-    inline void Proj::processCommandLineOptions(int argc, const char * argv[]) { // TODO: add relative rates
+    inline void Proj::processCommandLineOptions(int argc, const char * argv[]) {
         std::vector<std::string> partition_subsets;
         boost::program_options::variables_map vm;
         boost::program_options::options_description desc("Allowed options");
@@ -827,6 +827,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(true), "set to true to fix one theta for all populations")
         ("fix_theta",  boost::program_options::value(&_fix_theta)->default_value(false), "set to true to fix one theta for all populations")
         ("relative_rates", boost::program_options::value(&_string_relative_rates)->default_value("null"))
+        ("occupancy", boost::program_options::value(&Data::_occupancy)->default_value(1.0), "probability that any given taxon will have data for any given locus; 1-_occupancy is prob. all missing data for a taxon (used only if startmode is) 'sim'")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -2108,7 +2109,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 #endif
         
         sim_vec[0].simulateData(sites_vector);
-
+        
         _data->compressPatterns();
         _data->writeDataToFile(_sim_file_name);
 

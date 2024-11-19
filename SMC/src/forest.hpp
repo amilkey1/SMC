@@ -140,6 +140,7 @@ class Forest {
         Data::SharedPtr             _data;
         static unsigned             _nspecies;
         static unsigned             _ntaxa;
+    
         unsigned                    _first_pattern = 0;
         unsigned                    _index;
         map<string, list<Node*> >   _species_partition;
@@ -1850,7 +1851,7 @@ class Forest {
                         assert (_data->_original_data_matrix.size() > 0);
                         unsigned end = get<1>(sites_tuples[start_index]); // include last site
                         for (unsigned m = start; m<end; m++) {
-                            if (_data->_original_data_matrix[i][m] < 15 && _data->_original_data_matrix[j][m] < 15) { // 15 is ambiguity?
+                            if (_data->_original_data_matrix[i][m] < 15 && _data->_original_data_matrix[j][m] < 15) {// 15 is ambiguity?
                                 if (_data->_original_data_matrix[i][m] != _data->_original_data_matrix[j][m]) {
                                     ndiff++;
                                 }
