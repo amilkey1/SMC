@@ -15,7 +15,6 @@
 #include "ncl/nxsmultiformat.h"
 #include <boost/algorithm/string/join.hpp>
 #include "lot.hpp"
-//#include "forest.hpp"
 
 extern proj::Lot rng;
 
@@ -99,6 +98,7 @@ namespace proj {
 //#endif
     };
 
+//#include "forest.hpp"
     inline Data::Data() {
         //std::cout << "Creating a Data object" << std::endl;
         clear();

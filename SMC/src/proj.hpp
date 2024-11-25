@@ -504,23 +504,20 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ofstream logf("deep_coalescences.txt");
         logf << "num deep coalescences = " << v[0].getNumDeepCoalescences() << endl;
         logf << "Maximum number of deep coalescences = " << v[0].getMaxDeepCoalescences() << endl;
-        logf << "\n";
-//        unsigned count = 0;
-//        for (auto &p:v) {
-//            logf << "\n" << count;
-//            logf << "\t" << p.getNumDeepCoalescences();
-//            count++;
-//        }
+        logf << "True species tree height = " << v[0].getSpeciesTreeHeight() << endl;
         
-//        ofstream logftwo("max_deep_coalescences.txt");
-//        logftwo << "particle ";
-//        logftwo << "\t" << "max num deep coalescences " << endl;
-//        unsigned counttwo = 0;
-//        for (auto &p:v) {
-//            logftwo << "\n" << counttwo;
-//            logftwo << "\t" << p.getMaxDeepCoalescences();
-//            counttwo++;
-//        }
+        // Expected height of species tree is (1/2 + 1/3 + ... + 1/nspecies)/lambda
+        // Approximation to (1/2 + 1/3 + ... + 1/nspecies) is
+        //   ln(nspecies) + 0.58 (Euler's constant)
+        //   see http://www.dimostriamogoldbach.it/en/inverses-integers-sum/
+        double expected_species_tree_height = 0.0;
+        for (unsigned i = 2; i <= _sim_nspecies; i++) {
+            expected_species_tree_height += 1.0/i;
+        }
+        expected_species_tree_height /= v[0].getLambda();
+
+        logf << "Expected species tree height = " << expected_species_tree_height << endl;
+        logf << "\n";
     }
 
     inline void Proj::writeThetaFile(vector<Particle> &v) {

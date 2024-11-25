@@ -116,6 +116,7 @@ class Particle {
         double                                          getAllPriors();
         double                                          getAllPriorsFirstRound();
         vector<double>                                  getVectorPrior();
+        double                                          getLambda(){return _forests[0]._lambda;}
         void                                            simulateData(vector<unsigned> sites_vector);
         unsigned                                        getNumDeepCoalescences() {return _num_deep_coalescences;}
         unsigned                                        getMaxDeepCoalescences(){return _max_deep_coal;}
