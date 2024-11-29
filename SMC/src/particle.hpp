@@ -11,6 +11,11 @@ using namespace boost;
 #include "lot.hpp"
 #include "conditionals.hpp"
 
+#if defined (FOSSILS)
+    #include "fossil.hpp"
+    #include "taxset.hpp"
+#endif
+
 extern proj::Lot rng;
 std::mutex mutx;
 
@@ -152,9 +157,15 @@ class Particle {
         void                                            drawParticleLambda();
         double                                          getParticleLambda(){return _forests[0]._lambda;}
         void                                            setParticleLambda(double lambda){_forests[0]._lambda = lambda;}
+        void                                            setParticleExtinctionRate(double extinction_rate){_forests[0]._extinction_rate = extinction_rate;}
         void                                            setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species);
-        
+//
         static double                                   _lambda_prior_mean;
+//        vector<string>                                  _fossil;
+#if defined(FOSSILS)
+        static vector<Fossil>           _fossils;
+        static vector<TaxSet>           _taxsets;
+#endif
 
     private:
 

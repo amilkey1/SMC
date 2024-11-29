@@ -28,6 +28,8 @@
 
 /* Begin PBXFileReference section */
 		220195C127BD892B00E8A1CF /* partial_store.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = partial_store.hpp; sourceTree = "<group>"; };
+		224AE6A62CF9FD9000BEEAF8 /* fossil.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = fossil.hpp; sourceTree = "<group>"; };
+		224AE6A72CF9FDCB00BEEAF8 /* taxset.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = taxset.hpp; sourceTree = "<group>"; };
 		2267216B2A841C5800CBC17D /* conditionals.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = conditionals.hpp; sourceTree = "<group>"; };
 		2286C59526FE2D6C001BF8AA /* SMC */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SMC; sourceTree = BUILT_PRODUCTS_DIR; };
 		2286C5A926FE3596001BF8AA /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = main.cpp; path = SMC/src/main.cpp; sourceTree = SOURCE_ROOT; };
@@ -97,6 +99,7 @@
 			isa = PBXGroup;
 			children = (
 				22BD6F8F2707555A00DEB698 /* forest.hpp */,
+				224AE6A72CF9FDCB00BEEAF8 /* taxset.hpp */,
 				22BD6F902710806700DEB698 /* proj.hpp */,
 				2267216B2A841C5800CBC17D /* conditionals.hpp */,
 				22A40D852713541300DFFCA0 /* rbcl10.nex */,
@@ -111,6 +114,7 @@
 				22A40D6D2710A8B800DFFCA0 /* partition.hpp */,
 				22A40D6E2710AD5500DFFCA0 /* data.hpp */,
 				220195C127BD892B00E8A1CF /* partial_store.hpp */,
+				224AE6A62CF9FD9000BEEAF8 /* fossil.hpp */,
 			);
 			path = src;
 			sourceTree = "<group>";

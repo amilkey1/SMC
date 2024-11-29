@@ -4,6 +4,12 @@
 #include "particle.hpp"
 #include "conditionals.hpp"
 
+#if defined(FOSSILS)
+#   include <codecvt>
+#   include "fossil.hpp"
+#   include "taxset.hpp"
+#endif
+
 // Initialize our random number generator here so it will be a global variable
 #include "lot.hpp"
 proj::Lot rng;
@@ -46,6 +52,11 @@ double Forest::_asrv_shape = numeric_limits<double>::infinity();
 double Forest::_infinity = numeric_limits<double>::infinity();
 double Forest::_comphet = numeric_limits<double>::infinity();
 
+#if defined(FOSSILS)
+vector<Fossil>                      Particle::_fossils;
+vector<TaxSet>                      Particle::_taxsets;
+#endif
+
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT
     {"standard",             "KNKNTTTTRSRSIIMIQHQHPPPPRRRRLLLLEDEDAAAAGGGGVVVV*Y*YSSSS*CWCLFLF"},
@@ -71,6 +82,33 @@ int main(int argc, const char * argv[]) {
     Proj proj;
     try {
         proj.processCommandLineOptions(argc, argv);
+        
+#if defined(FOSSILS)
+        //temporary!
+        cout << "\n";
+        if (Particle::_fossils.size() > 0) {
+            cout << "\nFossils defined:\n";
+            for (auto f : Particle::_fossils) {
+                cout << (format("  \"%s\" | %.5f <-- %.5f --> %.5f\n") % f._name % f._lower % f._age % f._upper);
+            }
+        } else {
+            cout << "\nNo fossils were defined\n";
+        }
+        
+        if (Particle::_taxsets.size() > 0) {
+            cout << "\nTaxon sets defined:\n";
+            for (auto t : Particle::_taxsets) {
+                cout << format("\n  \"%s\":\n") % t._name;
+                for (auto s : t._species_included) {
+                    cout << format("    \"%s\"\n") % s;
+                }
+            }
+        } else {
+            cout << "\nNo taxon sets were defined\n";
+        }
+        cout << "\n";
+#endif
+        
         proj.run();
     }
     catch(std::exception & x) {

@@ -33,3 +33,5 @@
 #define FASTER_UPGMA_TREE
 
 //#define COAL_LIKE_TEST
+
+#define FOSSILS

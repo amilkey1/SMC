@@ -198,6 +198,7 @@ class Forest {
         static double               _theta_proposal_mean;
         static double               _theta_prior_mean;
         double                      _lambda;
+        double                      _extinction_rate;
         static string               _proposal;
         static string               _model;
         static double               _kappa;
