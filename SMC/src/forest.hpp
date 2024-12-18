@@ -66,6 +66,9 @@ class Forest {
         void                        setUpGeneForest(map<string, string> &taxon_map);
         void                        setUpSpeciesForest(vector<string> &species_names);
         tuple<string,string, string> speciesTreeProposal(Lot::SharedPtr lot);
+#if defined (FOSSILS)
+        tuple<string,string, string> speciesTreeProposalFossils(vector<string> possible_species_to_join, Lot::SharedPtr lot);
+#endif
         void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
         void                        revertNodeVector(vector<Node *> & node_vector, Node * addnode1, Node * addnode2, Node * delnode1);
@@ -1105,7 +1108,6 @@ class Forest {
     }
 
     inline void Forest::chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth) {
-// TODO: BE CAREFUL
         assert (max_depth >= 0.0);
         if (max_depth > 0.0) {
             double rate = (_lambda)*_lineages.size();
@@ -1113,9 +1115,6 @@ class Forest {
             double u = lot->uniform();
             double inner_term = 1-exp(-rate*max_depth);
             _last_edge_length = -log(1-u*inner_term)/rate;
-            // TODO: BE CAREFUL
-//            _last_edge_length = 0.001;
-            // TODO: BE CAREFUL
             assert (_last_edge_length < max_depth);
 
             for (auto nd:_lineages) {
@@ -1179,19 +1178,7 @@ class Forest {
     //        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
             assert (lot != nullptr);
             pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
-            // TODO: be careful
-//            if (_lineages.size() == 5) {
-//                t = make_pair(1,4);
-//            }
-//            else if (_lineages.size() == 4) {
-//                t = make_pair(0,3);
-//            }
-//            else if (_lineages.size() == 3) {
-//                t = make_pair(1,2);
-//            }
-//            else if (_lineages.size() == 2) {
-//                t = make_pair(0,1);
-//            }
+            
             assert (t.first != t.second);
             subtree1=_lineages[t.first];
             subtree2=_lineages[t.second];
@@ -1238,6 +1225,85 @@ class Forest {
             _species_joined = make_pair(subtree1, subtree2); // last step just joins remaining two
         }
 #endif
+        
+        calcTopologyPrior((int) _lineages.size()+1);
+
+        _species_build.push_back(make_pair(make_tuple(subtree1->_name, subtree2->_name, new_nd->_name), 0.0));
+        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
+    }
+
+    inline tuple<string,string, string> Forest::speciesTreeProposalFossils(vector<string> possible_species_to_join, Lot::SharedPtr lot) {
+        // TODO: this is wrong
+        _cum_height = 0.0; // reset cum height for a new lineage
+        // this function creates a new node and joins two species
+        
+        bool done = false;
+        Node* subtree1 = nullptr;
+        Node* subtree2 = nullptr;
+        
+        
+        while (!done) {
+        
+    //        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
+            pair<unsigned, unsigned> t = lot->nchoose2((unsigned) possible_species_to_join.size());
+            
+            assert (t.first != t.second);
+            string spp1 = possible_species_to_join[t.first];
+            string spp2 = possible_species_to_join[t.second];
+            
+
+            assert (t.first < possible_species_to_join.size());
+            assert (t.second < possible_species_to_join.size());
+            
+            for (auto &nd:_lineages) {
+                if (nd->_name == spp1) {
+                    nd = subtree1;
+                }
+                else if (nd->_name == spp2) {
+                    nd = subtree2;
+                }
+            }
+            assert(!subtree1->_parent && !subtree2->_parent);
+            
+            if (_outgroup != "none") {
+                if (subtree1->_name != _outgroup && subtree2->_name != _outgroup && _lineages.size() > 2) { // outgroup can only be chosen on the last step
+                    done = true;
+                }
+                else if (_lineages.size() == 2) {
+                    done = true;
+                }
+            }
+            else {
+                done = true;
+            }
+            if (_outgroup == "none") {
+                assert (done == true);
+            }
+        }
+        
+        Node nd;
+        _nodes.push_back(nd);
+        Node* new_nd = &_nodes.back();
+        new_nd->_parent=0;
+        new_nd->_number=_nleaves+_ninternals;
+        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+        new_nd->_right_sib=0;
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+        
+        updateNodeVector (_lineages, subtree1, subtree2, new_nd);
+
+    #if defined (DEBUG_MODE)
+        if (_lineages.size() > 1) {
+            _species_joined = make_pair(subtree1, subtree2); // last step just joins remaining two
+        }
+    #endif
         
         calcTopologyPrior((int) _lineages.size()+1);
 

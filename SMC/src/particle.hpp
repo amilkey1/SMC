@@ -32,6 +32,7 @@ class Particle {
         void                                    showParticle();
         void                                    showSpeciesParticle();
         void                                    proposal();
+        void                                    proposalFossils();
         void                                    setData(Data::SharedPtr d, map<string, string> &taxon_map, bool partials) {
                                                     _nsubsets = d->getNumSubsets();
                                                     _data = d;
@@ -140,6 +141,9 @@ class Particle {
         unsigned                                        showPrevForestNumber(){return _prev_forest_number;}
         string                                          getTranslateBlock();
         void                                            buildEntireSpeciesTree();
+#if defined (FOSSILS)
+        void                                            buildEntireSpeciesTreeWithFossils();
+#endif
         void                                            rebuildSpeciesTree();
         void                                            setGeneOrder(vector<unsigned> gene_order) {_gene_order = gene_order;}
         void                                            trimSpeciesTree();
@@ -159,9 +163,8 @@ class Particle {
         void                                            setParticleLambda(double lambda){_forests[0]._lambda = lambda;}
         void                                            setParticleExtinctionRate(double extinction_rate){_forests[0]._extinction_rate = extinction_rate;}
         void                                            setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species);
-//
+
         static double                                   _lambda_prior_mean;
-//        vector<string>                                  _fossil;
 #if defined(FOSSILS)
         static vector<Fossil>           _fossils;
         static vector<TaxSet>           _taxsets;
@@ -455,6 +458,9 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::proposal() {
+#if defined (FOSSILS)
+        proposalFossils();
+#else
         double inv_gamma_modifier = 0.0;
 //        double log_weight_modifier = 0.0;
         
@@ -609,10 +615,175 @@ inline vector<double> Particle::getVectorPrior() {
         else {
             _log_weight = 0.0;
         }
-        
+#endif
             }
 
-    vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {
+    inline void Particle::proposalFossils() {
+        // TODO: the framework will be the same as proposal(), but fossil needs to be included
+        // TODO: need to figure out how to restrict fossil to a certain clade
+        // TODO: need to constrain fossil by age - for now, just use specified age and not the distribution
+        // TODO: need to constrain all clades to taxset, even when sampling from the prior
+        
+        // TODO: choose one species, then find the set it's in
+        // TODO: then choose another species from that set
+        // TODO: mark the chosen species as you go, and don't move onto another set until the whole set has been chosen
+        cout << "test";
+        
+        double inv_gamma_modifier = 0.0;
+//        double log_weight_modifier = 0.0;
+        
+        unsigned next_gene = _gene_order[_generation];
+        bool calc_weight = false;
+        
+        if (_generation == 0) {
+            buildEntireSpeciesTreeWithFossils();
+            // make a separate species tree information vector for each gene
+            for (unsigned i=1; i<_forests.size(); i++) {
+                _t_by_gene.push_back(_t);
+                _next_species_number_by_gene.push_back(0);
+            }
+        }
+//        else {
+        else if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+            // don't rebuild the species tree at every step when simulating data
+            trimSpeciesTree(); // TODO: with fossils
+            if (_forests[0]._lineages.size() > 1) {
+                rebuildSpeciesTree(); // TODO: with  fossils
+            }
+        }
+        
+        _species_join_proposed = false;
+        bool done = false;
+                
+            while (!done) {
+                vector<pair<double, string>> rates_by_species = _forests[next_gene].calcForestRate(_lot);
+                double total_rate = 0.0;
+                double gene_increment = -1.0;
+                if (rates_by_species.size() > 0) {
+                    for (auto &r:rates_by_species) {
+                        total_rate += r.first;
+                    }
+                    assert (total_rate > 0.0);
+                    gene_increment = -log(1.0 - _lot->uniform())/total_rate;
+                    assert (gene_increment > 0.0);
+                }
+                
+                unsigned next_species_index = _next_species_number_by_gene[next_gene-1];
+                double species_increment = _t_by_gene[next_gene-1][next_species_index].second;
+                
+                string species_name = "species";
+                
+              // if total rate is 0, gene increment will be -1.0, which will be taken care of
+
+                    if ((gene_increment < species_increment || species_increment == 0.0) && gene_increment != -1.0) { // if species increment is 0.0, choose a coalescent event because the species tree is finished
+
+                        
+                        assert (gene_increment > 0.0);
+                        _forests[next_gene].addIncrement(gene_increment);
+                        
+                        vector<double> event_choice_rates;
+                        for (auto &r:rates_by_species) {
+                            event_choice_rates.push_back(r.first / total_rate);
+                        }
+                        
+                        unsigned index = selectEventLinearScale(event_choice_rates); // TODO: do the rates have to be in order?
+                        string species_name = rates_by_species[index].second;
+                        _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
+                                   
+                        if (Forest::_start_mode == "smc") {
+# if defined (BUILD_UPGMA_TREE)
+# if defined (BUILD_UPGMA_TREE_CONSTRAINED)
+                        _forests[next_gene].buildRestOfTree(_lot, _t);
+#else
+                        _forests[next_gene].buildRestOfTree(_lot);
+#endif
+#endif
+                        }
+                            
+                        if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
+                            _t_by_gene[next_gene-1][next_species_index].second -= gene_increment; // update species tree increments
+                        }
+                            calc_weight = true;
+                        }
+                        else {
+                            // carry out speciation event
+                            assert (species_increment > 0.0);
+                            assert (_forests[next_gene]._species_partition.size() > 1);
+                            _forests[next_gene].addIncrement(species_increment);
+                            
+                            if (Forest::_start_mode == "sim") {
+                                _num_deep_coalescences += _forests[next_gene].getDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
+                                _max_deep_coal += _forests[next_gene].getMaxDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
+                            }
+                            
+                            _forests[next_gene].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
+                            assert (next_species_index < _t_by_gene[next_gene-1].size());
+                            _t_by_gene[next_gene-1][next_species_index].second -= species_increment; // update species tree increments
+                            assert (_t_by_gene[next_gene-1][next_species_index].second == 0.0);
+                            if (_forests[next_gene]._species_partition.size() > 1) {
+                                _next_species_number_by_gene[next_gene-1]++;
+                            }
+                    }
+                    
+            
+                if (calc_weight) { // calc weight just means coalescent event has been proposed
+                    done = true;
+                }
+            }
+            
+
+             if (_forests[1]._theta_mean == 0.0) {
+                 assert (_forests[1]._theta > 0.0);
+                 for (int i=1; i<_forests.size(); i++) {
+                     _forests[i]._theta_mean = _forests[1]._theta;
+                 }
+             }
+             assert (_forests[1]._theta_mean > 0.0);
+             
+             done = true;
+        
+#if defined (INV_GAMMA_PRIOR_TWO)
+        // TODO: use 2.0, not 2.01, for the inv gamma, then don't include a correction
+            // include inverse gamma prior correction for every species population for every locus at every step
+            // TODO: can make this faster by calculating these as the thetas are drawn, but for now, calculate them all each time
+            double theta_mean = _forests[1]._theta_mean;
+            double eps = 0.01;
+            double a = 2.0;
+            
+            inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
+            
+            for (auto &t:_forests[next_gene]._theta_map) {
+
+                double y = t.second; // theta
+                inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
+            }
+#endif
+        
+#if defined (WEIGHT_MODIFIER)
+        // modifier only happens on first round // TODO: unsure - does gene order matter?
+        if (_generation == 0 && _forests[1]._theta_prior_mean > 0.0 && _forests[1]._theta_proposal_mean > 0.0) {
+            if (_forests[1]._theta_prior_mean != _forests[1]._theta_proposal_mean) {
+                // else, log weight modifier is 0
+                double prior_rate = 1.0/_forests[1]._theta_prior_mean;
+                double proposal_rate = 1.0/_forests[1]._theta_proposal_mean;
+                double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
+
+                _log_weight += log_weight_modifier;
+            }
+        }
+#endif
+        
+        _generation++;
+        
+        if (Forest::_start_mode == "smc") {
+            _log_weight = _forests[next_gene]._log_weight + inv_gamma_modifier;
+        }
+        else {
+            _log_weight = 0.0;
+        }
+    }
+
+    inline vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {
         vector<double> increments;
         increments.resize(event_choice_rates.size());
         
@@ -623,11 +794,6 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::speciesOnlyProposalIntegratingOutTheta() {
-//        for (unsigned i=0; i<10; i++) {
-//            double u = _lot->uniform();
-//            cout << u << endl;
-//        }
-        
         if (_generation == 0) {
             _species_branches = Forest::_nspecies;
             if (_lambda_prior_mean > 0.0) {
@@ -1642,6 +1808,41 @@ inline vector<double> Particle::getVectorPrior() {
         }
  
     }
+
+#if defined (FOSSILS)
+    inline void Particle::buildEntireSpeciesTreeWithFossils() {
+        // TODO: this needs to be modified for fossils, same with rebuilding
+        _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
+        double edge_len = _forests[0]._last_edge_length;
+        
+        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+        _t.push_back(make_pair(species_joined, edge_len));
+
+        for (unsigned i=0; i < _forests[0]._nspecies-1; i++) {
+            if (_forests[0]._lineages.size() > 1) {
+                // TODO: choose a taxon set first, then choose a species in that set
+                unsigned ntaxsets = (unsigned) _taxsets.size();
+                unsigned taxon_set_num = _lot->randint(0, ntaxsets);
+                
+                // TODO: can the taxon sets overlap?
+                // TODO: start with smallest taxon set - most constraints? but don't want to always make that one join first
+                // TODO: choose a species, find it in the sets, choose the smallest set it's in, and your next species chosen have to be other ones in that set
+                
+                vector<string> species_in_tax_set_to_join = _taxsets[taxon_set_num]._species_included;
+                
+                species_joined = _forests[0].speciesTreeProposalFossils(species_in_tax_set_to_join, _lot);
+//                species_joined = _forests[0].speciesTreeProposal(_lot);
+                
+                double edge_len = 0.0;
+                if (_forests[0]._lineages.size() > 1) {
+                    _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
+                    edge_len = _forests[0]._last_edge_length;
+                }
+                _t.push_back(make_pair(species_joined, edge_len));
+            }
+        }
+    }
+#endif
 
     inline void Particle::buildEntireSpeciesTree() {
         _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);

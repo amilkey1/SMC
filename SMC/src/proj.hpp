@@ -822,8 +822,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
         ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.0), "theta")
         ("lambda", boost::program_options::value(&_lambda)->default_value(0.0), "speciation rate")
-        ("extinction_rate", boost::program_options::value(&_lambda)->default_value(0.0), "extinction rate")
-//        ("lambda", boost::program_options::value(&Forest::_lambda)->default_value(1), "speciation rate")
+        ("extinction_rate", boost::program_options::value(&_extinction_rate)->default_value(0.0), "extinction rate")
         ("proposal",  boost::program_options::value(&Forest::_proposal)->default_value("prior-prior"), "a string defining a proposal (prior-prior or prior-post)")
         ("model", boost::program_options::value(&Forest::_model)->default_value("JC"), "a string defining a substitution model")
         ("kappa",  boost::program_options::value(&Forest::_kappa)->default_value(1.0), "value of kappa")
@@ -2064,6 +2063,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 if (_lambda > 0.0) {
                     p.setParticleLambda(_lambda);
                 }
+                if (_extinction_rate > 0.0) {
+                    p.setParticleExtinctionRate(_extinction_rate);
+                }
                 
             }
         }
@@ -2077,6 +2079,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             particles[0].setRelativeRatesByGene(_double_relative_rates);
             if (_lambda > 0.0) {
                 particles[0].setParticleLambda(_lambda);
+            }
+            if (_extinction_rate > 0.0) {
+                particles[0].setParticleExtinctionRate(_extinction_rate);
             }
 
             if (particles.size() > 1) {
@@ -2273,6 +2278,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         sim_vec[0].setNewTheta(_fix_theta_for_simulations); // TODO: fix theta mean as an option
         
         sim_vec[0].setParticleLambda(_lambda);
+        if (_extinction_rate > 0.0) {
+            sim_vec[0].setParticleExtinctionRate(_extinction_rate);
+        }
         
         sim_vec[0].setNTaxaPerSpecies(_ntaxaperspecies);
         
