@@ -118,6 +118,7 @@ namespace proj {
             string                      _string_relative_rates;
             vector<double>              _double_relative_rates;
             double                      _lambda;
+            bool                        _save_gene_trees_separately;
     };
 
     inline Proj::Proj() {
@@ -752,18 +753,34 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
 
         else {
-            // save true species tree
-            ofstream treef("true-gene-trees.tre");
-            treef << "#nexus\n\n";
-            treef << "begin trees;\n";
-            for (auto &p:v) {
-                    for (int i=1; i<ngenes+1; i++) {
-                        treef << "tree gene" << i << " = [&R] " << p.saveGeneNewick(i)  << ";\n";
+            if (_save_gene_trees_separately) {
+                for (auto &p:v) {
+                    for (unsigned i=1; i<ngenes+1; i++) {
+                        string fname = "gene" + to_string(i) + ".trees";
+                        ofstream treef(fname);
+                        treef << "#nexus\n\n";
+                        treef << "begin trees;\n";
+                        treef << "  tree gene" << i << " = [&R] " << p.saveGeneNewick(i)  << ";\n";
+                        treef << endl;
+                        treef << "end;\n";
+                        treef.close();
+                    }
                 }
-                treef << endl;
             }
-            treef << "end;\n";
-            treef.close();
+            else {
+                // save true species tree
+                ofstream treef("true-gene-trees.tre");
+                treef << "#nexus\n\n";
+                treef << "begin trees;\n";
+                for (auto &p:v) {
+                        for (unsigned i=1; i<ngenes+1; i++) {
+                            treef << "tree gene" << i << " = [&R] " << p.saveGeneNewick(i)  << ";\n";
+                    }
+                    treef << endl;
+                }
+                treef << "end;\n";
+                treef.close();
+            }
         }
     }
 
@@ -797,7 +814,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
         ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.0), "theta")
         ("lambda", boost::program_options::value(&_lambda)->default_value(0.0), "speciation rate")
-//        ("lambda", boost::program_options::value(&Forest::_lambda)->default_value(1), "speciation rate")
         ("proposal",  boost::program_options::value(&Forest::_proposal)->default_value("prior-prior"), "a string defining a proposal (prior-prior or prior-post)")
         ("model", boost::program_options::value(&Forest::_model)->default_value("JC"), "a string defining a substitution model")
         ("kappa",  boost::program_options::value(&Forest::_kappa)->default_value(1.0), "value of kappa")
@@ -828,6 +844,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("simedgeratevar",   boost::program_options::value(&Forest::_edge_rate_variance)->default_value(0.0), "variance of lognormal relative rate distribution across edges in gene trees (used only if startmode is 'sim')")
         ("simasrvshape",   boost::program_options::value(&Forest::_asrv_shape)->default_value(Forest::_infinity), "Shape of gamma among-site rate heterogeneity within a locus (used only if startmode is 'sim')")
         ("simcomphet",   boost::program_options::value(&Forest::_comphet)->default_value(Forest::_infinity), "Dirichlet parameter governing compositional heterogeneity (default value results in compositional homogeneity (used only if startmode is 'sim')")
+        ("save_gene_trees_separately", boost::program_options::value(&_save_gene_trees_separately)->default_value(false), "for simulations, save gene trees in separate files")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -1114,6 +1131,10 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             p.createSpeciesIndices();
             vector<string> particle_newicks;
             for (int i = 0; i<newicks.size(); i++) {
+                // if number of particles > size of newicks, just use the same newick for each particle
+                if (newicks[i].size() <= count) {
+                    count = 0;
+                }
                 particle_newicks.push_back(newicks[i][count]);
             }
             assert (particle_newicks.size() == nsubsets);
