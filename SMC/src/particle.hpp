@@ -71,6 +71,7 @@ class Particle {
         double                                  getThetaMean(){return _forests[1]._theta_mean;}
         string                                  saveForestNewick() {
             return _forests[0].makeNewick(8, true);}
+        string                                  saveForestNewickAlt() {return _forests[0].makeAltNewick(8, false);}
             
         string                                  saveGeneNewick(unsigned i) {
             return _forests[i].makeNewick(8, true);}

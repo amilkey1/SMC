@@ -67,6 +67,7 @@ namespace proj {
             double              filterParticles(unsigned step, vector<Particle> & particles);
             double              filterSpeciesParticles(unsigned step, vector<Particle> & particles);
             double              computeEffectiveSampleSize(const vector<double> & probs) const;
+            void                saveSpeciesTreesAltHierarchical(vector<Particle> &v) const;
 
 
         private:
@@ -628,6 +629,22 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
         logf.close();
     }
+
+    inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
+            string filename1 = "alt_species_trees.trees";
+            assert (_start_mode != "sim");
+
+            unsigned count = 0;
+            // save all species trees
+            std::ofstream treef;
+
+            treef.open(filename1, std::ios_base::app);
+            for (auto &p:v) {
+                treef << "  tree test = [&R] " << p.saveForestNewickAlt()  << ";\n";
+                count++;
+            }
+            treef.close();
+            }
 
     inline void Proj::saveSpeciesTreesHierarchical(vector<Particle> &v, string filename1, string filename2) const {
         // save only unique species trees
@@ -1194,6 +1211,32 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
         
         cout << "\n";
+        
+        string altfname = "alt_species_trees.trees";
+        if (filesystem::remove(altfname)) {
+            if (_verbose > 0) {
+               cout << "existing file " << altfname << " removed and replaced\n";
+            }
+            
+            ofstream alttrf(altfname);
+
+            alttrf << "#nexus\n\n";
+            alttrf << "Begin trees;" << endl;
+            string translate_block = my_vec[0].getTranslateBlock();
+            alttrf << translate_block << endl;
+        }
+        else {
+            ofstream alttrf(altfname);
+
+            alttrf << "#nexus\n\n";
+            alttrf << "Begin trees;" << endl;
+            string translate_block = my_vec[0].getTranslateBlock();
+            alttrf << translate_block << endl;
+            
+            if (_verbose > 0) {
+                cout << "created new file " << altfname << "\n";
+            }
+        }
 
         unsigned ngroups = round(_nparticles * _thin);
         if (ngroups == 0) {
@@ -1338,6 +1381,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 }
 
                 saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
+                saveSpeciesTreesAltHierarchical(use_vec);
                 writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nsubsets, nspecies, ntaxa, use_vec, filename3, a);
                 if (a == 0) {
                     writeLoradFileAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec); // testing the marginal likelihood by writing to file for lorad for first species group only
@@ -1757,6 +1801,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
             mtx.lock(); // TODO: does this slow things down?
             saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
+            saveSpeciesTreesAltHierarchical(use_vec);
             _count++;
             if (_gene_newicks_specified) {
                 writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nsubsets, nspecies, ntaxa, use_vec, filename3, i);
@@ -2419,6 +2464,33 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         cout << "created new file " << filename3 << "\n";
                     }
                 }
+                
+                string altfname = "alt_species_trees.trees";
+                if (filesystem::remove(altfname)) {
+                    
+                    if (_verbose > 0) {
+                       cout << "existing file " << altfname << " removed and replaced\n";
+                    }
+                    
+                    ofstream alttrf(altfname);
+
+                    alttrf << "#nexus\n\n";
+                    alttrf << "Begin trees;" << endl;
+                    string translate_block = my_vec[0].getTranslateBlock();
+                    alttrf << translate_block << endl;
+                }
+                else {
+                    ofstream alttrf(altfname);
+
+                    alttrf << "#nexus\n\n";
+                    alttrf << "Begin trees;" << endl;
+                    string translate_block = my_vec[0].getTranslateBlock();
+                    alttrf << translate_block << endl;
+                    
+                    if (_verbose > 0) {
+                        cout << "created new file " << altfname << "\n";
+                    }
+                }
                 cout << "\n";
 
                 unsigned ngroups = round(_nparticles * _thin);
@@ -2469,6 +2541,12 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 if (parallelize_by_group) {
                 // don't bother with this if not multithreading
                     proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3, nsubsets, ntaxa);
+                    
+                    ofstream altfname;
+                    altfname.open("alt_species_trees.trees", std::ios::app);
+                    altfname << "end;" << endl;
+                    altfname.close();
+                    
                     ofstream strees;
                     strees.open("species_trees.trees", std::ios::app);
                     strees << "end;" << endl;
@@ -2585,6 +2663,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         }
 
                         saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
+                        saveSpeciesTreesAltHierarchical(use_vec);
                         writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, a);
                         if (a == 0) {
                             writeLoradFileAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec); // testing the marginal likelihood by writing to file for lorad for first species group only
@@ -2601,6 +2680,11 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     unique_treef.open(filename2, std::ios_base::app);
                     unique_treef << "end;\n";
                     unique_treef.close();
+                    
+                    std::ofstream alttrf;
+                    alttrf.open("alt_species_trees.trees", std::ios_base::app);
+                    alttrf << "end;\n";
+                    alttrf.close();
                     
                     // add iterations to params file
                     string line;
