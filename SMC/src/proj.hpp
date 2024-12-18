@@ -119,6 +119,7 @@ namespace proj {
             vector<double>              _double_relative_rates;
             double                      _lambda;
             bool                        _save_gene_trees_separately;
+            string                      _newick_path;
     };
 
     inline Proj::Proj() {
@@ -845,6 +846,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("simasrvshape",   boost::program_options::value(&Forest::_asrv_shape)->default_value(Forest::_infinity), "Shape of gamma among-site rate heterogeneity within a locus (used only if startmode is 'sim')")
         ("simcomphet",   boost::program_options::value(&Forest::_comphet)->default_value(Forest::_infinity), "Dirichlet parameter governing compositional heterogeneity (default value results in compositional homogeneity (used only if startmode is 'sim')")
         ("save_gene_trees_separately", boost::program_options::value(&_save_gene_trees_separately)->default_value(false), "for simulations, save gene trees in separate files")
+        ("newick_path", boost::program_options::value(&_newick_path)->default_value("."), "path to gene newicks are if starting from gene newicks and only performing SMC on second round")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -1064,7 +1066,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         
         for (int i=1; i<_ngenes_provided+1; i++) {
             vector<string> current_gene_newicks;
-            string file_name = "gene" + to_string(i) + ".trees"; // file must be named gene1.trees, gene2.trees, etc.
+
+            string file_name = _newick_path + "/" + "gene" + to_string(i) + ".trees"; // file must be named gene1.trees, gene2.trees, etc.
             ifstream infile (file_name);
             string newick;
             unsigned size_before = (unsigned) current_gene_newicks.size();
@@ -1072,8 +1075,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             while (getline(infile, newick)) { // file newicks must start with the word "tree"
                 if (current_gene_newicks.size() < _nparticles) { // stop adding newicks once the number of particles has been reached // TODO: add option to randomize this?
 //                size_t found = newick.find("tree");
-                if (newick.find("tree") == 2) { // TODO: not sure why / if this works - switch to checking for parenthesis?
-                    // TODO: also need to start at the parenthesis?
+                if (newick.find("tree") == 2) { // TODO: this only works if 2 spaces before gene tree description - find a better way to do this
                         size_t pos = newick.find("("); //find location of parenthesis
                         newick.erase(0,pos); //delete everything prior to location found
                         current_gene_newicks.push_back(newick);
