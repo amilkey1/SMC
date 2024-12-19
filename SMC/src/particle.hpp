@@ -85,6 +85,8 @@ class Particle {
         }
 
         static void                                     setNumSubsets(unsigned n);
+        void                                            setGroupNumber(unsigned n) {_group_number = n;} // group number for parallelization
+        unsigned                                        getGroupNumber() {return _group_number;}// group number for parallelization
         vector<Forest> &                                getForests() {return _forests;}
         void                                            showSpeciesIncrement();
         void                                            showSpeciesJoined();
@@ -184,6 +186,7 @@ class Particle {
         bool                                    _fix_theta;
         vector<double>                          _relative_rates_by_gene;
         unsigned                                _species_branches;
+        unsigned                                _group_number;
 };
 
     inline Particle::Particle() {
@@ -245,6 +248,7 @@ class Particle {
         _fix_theta = false;
         _relative_rates_by_gene.clear();
         _species_branches = 0;
+        _group_number = 0;
     }
 
     inline void Particle::showSpeciesTree() {
@@ -1694,6 +1698,7 @@ inline vector<double> Particle::getVectorPrior() {
         _relative_rates_by_gene = other._relative_rates_by_gene;
         _species_branches = other._species_branches;
         _lambda_prior_mean = other._lambda_prior_mean;
+        _group_number = other._group_number;
     };
 }
 

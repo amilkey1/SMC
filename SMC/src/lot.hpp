@@ -20,6 +20,7 @@ namespace proj {
                                             ~Lot();
             
             void                            setSeed(unsigned seed);
+            unsigned                        getSeed(){return _seed;}
             double                          uniform();
             int                             randint(int low, int high);
             pair<unsigned, unsigned>        nchoose2(unsigned n);

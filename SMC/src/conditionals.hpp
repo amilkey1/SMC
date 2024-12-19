@@ -18,7 +18,7 @@
 #define GRAHAM_JONES_COALESCENT_LIKELIHOOD // if defined, also define DRAW_NEW_THETA or turn off HIERARCHICAL_FILTERING
 // do not define this if fix_theta defined in conf file
 
-#define PARALLELIZE_BY_GROUP
+#define PARALLELIZE_BY_GROUP // do not turn this off if doing second level filtering - will be slower, and params file cannot be read by tracer
 
 //#define DEBUG_MODE
 

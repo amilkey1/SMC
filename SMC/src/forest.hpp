@@ -1250,22 +1250,8 @@ class Forest {
         
         while (!done) {
         
-    //        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
             assert (lot != nullptr);
             pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
-            // TODO: be careful
-//            if (_lineages.size() == 5) {
-//                t = make_pair(1,4);
-//            }
-//            else if (_lineages.size() == 4) {
-//                t = make_pair(0,3);
-//            }
-//            else if (_lineages.size() == 3) {
-//                t = make_pair(1,2);
-//            }
-//            else if (_lineages.size() == 2) {
-//                t = make_pair(0,1);
-//            }
             assert (t.first != t.second);
             subtree1=_lineages[t.first];
             subtree2=_lineages[t.second];

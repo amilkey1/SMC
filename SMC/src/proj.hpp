@@ -15,6 +15,7 @@
 #include <random>
 #include <cstdio>
 #include <mutex>
+#include <random>
 
 using namespace std;
 using namespace boost;
@@ -82,7 +83,6 @@ namespace proj {
             unsigned                    _nparticles;
             unsigned                    _random_seed;
 
-
             static string               _program_name;
             static unsigned             _major_version;
             static unsigned             _minor_version;
@@ -121,6 +121,7 @@ namespace proj {
             double                      _lambda;
             bool                        _save_gene_trees_separately;
             string                      _newick_path;
+            vector<Lot::SharedPtr>      _group_rng;
     };
 
     inline Proj::Proj() {
@@ -1141,8 +1142,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             my_vec[i] = Particle();
         }
 
-        bool use_first = true;
-
         initializeParticles(my_vec); // initialize in parallel with multithreading
         
         unsigned count = 0;
@@ -1244,19 +1243,28 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
         }
 
-        random_shuffle(my_vec.begin(), my_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
-        // delete first (1-_thin) % of particles
-        my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (_nparticles-ngroups)));
-        assert(my_vec.size() == ngroups);
-
-        _nparticles = ngroups;
-
         for (auto &p:my_vec) {
             // reset forest species partitions
             p.clearPartials(); // no more likelihood calculations
             p.resetSpecies();
             p.mapSpecies(_taxon_map, _species_names);
         }
+        
+        unsigned seed = rng.getSeed();
+        std::shuffle(my_vec.begin(), my_vec.end(), std::default_random_engine(seed)); // shuffle particles using group seed
+        
+        // delete first (1-_thin) % of particles
+        my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (_nparticles-ngroups)));
+        assert(my_vec.size() == ngroups);
+
+        _nparticles = ngroups;
+
+//        for (auto &p:my_vec) {
+//            // reset forest species partitions
+//            p.clearPartials(); // no more likelihood calculations
+//            p.resetSpecies();
+//            p.mapSpecies(_taxon_map, _species_names);
+//        }
 
         vector<Particle> new_vec;
 
@@ -1271,8 +1279,26 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 #endif
         }
         
+        // set group rng
+        _group_rng.resize(ngroups);
+        unsigned a=0;
+        unsigned psuffix = 1;
+        for (auto &g:_group_rng) {
+            g.reset(new Lot());
+            g->setSeed(rng.randint(1,9999)+psuffix);
+            a++;
+            psuffix += 2;
+        }
+        
         if (parallelize_by_group) {
         // don't bother with this if not multithreading
+            
+            unsigned group_number = 0;
+            for (auto &p:my_vec) {
+                p.setGroupNumber(group_number);
+                group_number++;
+            }
+            
             proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3, nsubsets, ntaxa);
             ofstream strees;
             strees.open("species_trees.trees", std::ios::app);
@@ -1321,14 +1347,18 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
          
         else {
+            
+            unsigned group_number = 0;
+            for (auto &p:my_vec) {
+                p.setGroupNumber(group_number);
+                group_number++;
+            } // need to set group numbers because they are used in filtering
+            
             for (unsigned a=0; a < ngroups; a++) {
 //                        _log_species_tree_marginal_likelihood = 0.0; // TODO: for now, write lorad file for first set of species tree filtering and report the marginal likelihood for comparison
-                
-                use_first = true;
-                
+                                
                 vector<Particle> use_vec;
                 Particle p = my_vec[a];
-                
                 
                 use_vec.resize(_particle_increase);
                 
@@ -1347,14 +1377,14 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     }
 
                     // set particle random number seeds
+                    unsigned group_number = use_vec[0].getGroupNumber();
                     unsigned psuffix = 1;
                     for (auto &p:use_vec) {
-                        p.setSeed(rng.randint(1,9999) + psuffix);
+                        p.setSeed(_group_rng[group_number]->randint(1,9999) + psuffix);
                         psuffix += 2;
                     }
 
                     proposeSpeciesParticles(use_vec);
-//                    use_vec[0].showParticle();
                     
                     
                     double ess = filterSpeciesParticles(s, use_vec);
@@ -1373,8 +1403,11 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         cout << "\n";
                         sample_size = _particle_increase;
                     }
-
-                    random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
+                    
+                    unsigned group_number = use_vec[0].getGroupNumber();
+                    unsigned seed = _group_rng[group_number]->getSeed();
+                    std::shuffle(use_vec.begin(), use_vec.end(), std::default_random_engine(seed)); // shuffle particles using group seed
+                    
                     // delete first (1-_thin) % of particles
                     use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
                     assert (use_vec.size() == sample_size);
@@ -1587,8 +1620,11 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         vector<unsigned> counts (nparticles, 0);
 
         // Throw _nparticles darts
+        unsigned group_number = particles[0].getGroupNumber();
+        
         for (unsigned i=0; i<nparticles; i++) {
-            double u = rng.uniform();
+//            double u = rng.uniform();
+            double u = _group_rng[group_number]->uniform();
             auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
             assert(it != probs.end());
             unsigned which = (unsigned)std::distance(probs.begin(), it);
@@ -1650,6 +1686,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 }
             }
         }
+        
         return ess;
     }
 
@@ -1763,11 +1800,12 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 cout << "beginning species tree proposals for subset " << i+1 << endl;
             }
             for (unsigned s = 0; s < nspecies-1; s++) {  // skip last round of filtering because weights are always 0
-
+                
                 // set particle random number seeds
                 unsigned psuffix = 1;
+                unsigned group_number = use_vec[0].getGroupNumber();
                 for (auto &p:use_vec) {
-                    p.setSeed(rng.randint(1,9999) + psuffix);
+                    p.setSeed(_group_rng[group_number]->randint(1,9999) + psuffix);
                     psuffix += 2;
                 }
 
@@ -1793,7 +1831,11 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     sample_size = _particle_increase;
                 }
 
-                random_shuffle(use_vec.begin(), use_vec.end()); // shuffle particles, random_shuffle will always shuffle in same order
+                unsigned group_number = use_vec[0].getGroupNumber();
+               
+                unsigned seed = _group_rng[group_number]->getSeed();
+                std::shuffle(use_vec.begin(), use_vec.end(), std::default_random_engine(seed)); // shuffle particles using group seed
+
                 // delete first (1-_thin) % of particles
                 use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
                 assert (use_vec.size() == sample_size);
@@ -2289,7 +2331,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     }
                     else {
                         p.setStartingUPGMAMatrix(my_vec[0].getStartingUPGMAMatrix());
-//                        p.setStartingRowCount(my_vec[0].getStartingRowCount());
                     }
                     p.calcStartingRowCount();
                     particle_num++;
@@ -2504,8 +2545,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                   counts.push_back(index);
                 }
                       
-                srand(rng.uniform());
-                random_shuffle(counts.begin(), counts.end()); // shuffle particle numbers, random_shuffle will always shuffle in same order
+                unsigned seed = rng.getSeed();
+                std::shuffle(counts.begin(), counts.end(), std::default_random_engine(seed));
+                
                 counts.erase(next(counts.begin(), 0), next(counts.begin(), (ngroups))); // choose what to delete - erase (thin) % of particle numbers
                 sort (counts.begin(), counts.end(), greater<int>()); // sort highest to lowest for deletion of particles later
 
@@ -2531,6 +2573,16 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 unsigned index = 0;
                 
                 bool parallelize_by_group = false;
+            
+                // set group rng
+                _group_rng.resize(ngroups);
+                unsigned a=0;
+                for (auto &g:_group_rng) {
+                    g.reset(new Lot());
+                    g->setSeed(rng.randint(1,9999)+psuffix);
+                    a++;
+                    psuffix += 2;
+                }
                 
                 if (_nthreads > 1) {
 #if defined PARALLELIZE_BY_GROUP
@@ -2540,6 +2592,11 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 
                 if (parallelize_by_group) {
                 // don't bother with this if not multithreading
+                    unsigned group_number = 0;
+                    for (auto &p:my_vec) {
+                        p.setGroupNumber(group_number);
+                        group_number++;
+                    }
                     proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3, nsubsets, ntaxa);
                     
                     ofstream altfname;
@@ -2594,11 +2651,16 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 }
                  
                 else {
+                    unsigned group_number = 0;
+                    for (auto &p:my_vec) {
+                        p.setGroupNumber(group_number);
+                        group_number++;
+                    } // need to set group numbers because they are used in filtering
+                    
                     for (unsigned a=0; a < ngroups; a++) {
 //                        _log_species_tree_marginal_likelihood = 0.0; // for now, write lorad file for first set of species tree filtering and report the marginal likelihood for comparison
                         
                         vector<Particle> use_vec;
-                        
                         
                         use_vec.resize(_particle_increase);
                         
@@ -2617,11 +2679,12 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                             if (_verbose > 1) {
                                 cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
                             }
-
+                            
                             // set particle random number seeds
+                            unsigned group_number = use_vec[0].getGroupNumber();
                             unsigned psuffix = 1;
                             for (auto &p:use_vec) {
-                                p.setSeed(rng.randint(1,9999) + psuffix);
+                                p.setSeed(_group_rng[group_number]->randint(1,9999) + psuffix);
                                 psuffix += 2;
                             }
 
@@ -2644,24 +2707,15 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                                 sample_size = _particle_increase;
                             }
 
-                            vector<unsigned> counts;
-                            for (unsigned index=0; index<my_vec.size(); index++) {
-                                counts.push_back(index);
-                            }
+                            unsigned group_number = use_vec[0].getGroupNumber();
+                            unsigned seed = _group_rng[group_number]->getSeed();
+                            std::shuffle(use_vec.begin(), use_vec.end(), std::default_random_engine(seed)); // shuffle particles using group seed
                             
-                            srand(rng.uniform());
-                            random_shuffle(counts.begin(), counts.end()); // shuffle particle numbers, random_shuffle will always shuffle in same order
-                            counts.erase(next(counts.begin(), 0), next(counts.begin(), (ngroups))); // choose what to delete - erase (thin) % of particle numbers
-                            sort (counts.begin(), counts.end(), greater<int>()); // sort highest to lowest for deletion of particles later
-                            
-                            // delete particles corresponding to those numbers
-                            for (unsigned c=0; c<counts.size(); c++) {
-                                use_vec.erase(my_vec.begin() + counts[c]);
-                            }
-                            
-                            assert (my_vec.size() == ngroups);
+                            // delete first (1-_thin) % of particles
+                            use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
+                             assert (use_vec.size() == sample_size);
                         }
-
+                        
                         saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
                         saveSpeciesTreesAltHierarchical(use_vec);
                         writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, use_vec, filename3, a);
