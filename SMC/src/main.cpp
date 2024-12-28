@@ -3,10 +3,13 @@
 #include "proj.hpp"
 #include "particle.hpp"
 #include "conditionals.hpp"
+#include "stopwatch.hpp"
 
 // Initialize our random number generator here so it will be a global variable
 #include "lot.hpp"
 proj::Lot rng;
+
+proj::StopWatch stopwatch;
 
 #include "partial_store.hpp"
 proj::PartialStore ps;

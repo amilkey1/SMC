@@ -3,6 +3,7 @@
 #include <iostream>
 #include "data.hpp"
 #include "partition.hpp"
+#include "stopwatch.hpp"
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include "xproj.hpp"
@@ -24,6 +25,7 @@ using namespace boost::algorithm;
 #include "partial_store.hpp"
 extern proj::PartialStore ps;
 extern proj::Lot rng;
+extern proj::StopWatch stopwatch;
 
 namespace proj {
 
@@ -122,6 +124,7 @@ namespace proj {
             bool                        _save_gene_trees_separately;
             string                      _newick_path;
             vector<Lot::SharedPtr>      _group_rng;
+
     };
 
     inline Proj::Proj() {
@@ -1259,13 +1262,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
         _nparticles = ngroups;
 
-//        for (auto &p:my_vec) {
-//            // reset forest species partitions
-//            p.clearPartials(); // no more likelihood calculations
-//            p.resetSpecies();
-//            p.mapSpecies(_taxon_map, _species_names);
-//        }
-
         vector<Particle> new_vec;
 
         _nparticles = _particle_increase;
@@ -2016,26 +2012,30 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
         else {
           // divide up the particles as evenly as possible across threads
-          unsigned first = 0;
-          unsigned incr = _nparticles/_nthreads + (_nparticles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
-          unsigned last = incr;
+            unsigned first = 0;
+            unsigned last = 0;
+            unsigned stride = _nparticles / _nthreads; // divisor
+            unsigned r = _nparticles % _nthreads; // remainder
+            
+            // need a vector of threads because we have to wait for each one to finish
+            vector<thread> threads;
 
-          // need a vector of threads because we have to wait for each one to finish
-          vector<thread> threads;
-
-            while (true) {
-            // create a thread to handle particles first through last - 1
-              threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles)));
-            // update first and last
-            first = last;
-            last += incr;
-            if (last > _nparticles) {
-              last = _nparticles;
-              }
-            if (first>=_nparticles) {
-                break;
+            for (unsigned i=0; i<_nthreads; i++) {
+                first = last;
+                last = first + stride;
+                
+                if (r > 0) {
+                    last += 1;
+                    r -= 1;
+                }
+                
+                if (last > _nparticles) {
+                    last = _nparticles;
+                }
+                
+                threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles)));
             }
-          }
+
 
           // the join function causes this loop to pause until the ith thread finishes
           for (unsigned i = 0; i < threads.size(); i++) {
@@ -2397,7 +2397,12 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
                         //taxon joining and reweighting step
                         
+//                        StopWatch sw;
+//                        sw.start();
                         proposeParticles(my_vec);
+//                        double total_seconds = sw.stop();
+//                        cout << "\nTotal time for proposal step " << g << " : " << total_seconds << endl;
+//                        cout << total_seconds << endl;
 
                         unsigned num_species_particles_proposed = 0;
 
@@ -2417,7 +2422,13 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         
                         if (filter) {
                             
+                            StopWatch sw;
+                            
+//                            sw.start();
                             double ess = filterParticles(g, my_vec);
+//                            double total_seconds = sw.stop();
+//                            cout << "\nTotal time for filtering step " << g << " : " << total_seconds << endl;
+//                            cout << total_seconds << endl;
 
                             unsigned species_count = 0;
                             
