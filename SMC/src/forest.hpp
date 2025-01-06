@@ -60,6 +60,7 @@ class Forest {
         void                        setSimData(Data::SharedPtr d, int index, map<string, string> &taxon_map, unsigned ntaxa);
         Node *                      findNextPreorder(Node * nd);
         string                      makeNewick(unsigned precision, bool use_names);
+        string                      makeAltNewick(unsigned precision, bool use_names);
         string                      makePartialNewick(unsigned precision, bool use_names);
         pair<unsigned, unsigned>    chooseTaxaToJoin(double s, Lot::SharedPtr lot);
         void                        calcPartialArray(Node* new_nd);
@@ -508,6 +509,80 @@ class Forest {
         }
 
     inline string Forest::makeNewick(unsigned precision, bool use_names) {
+            if (_lineages.size() > 1) {
+                return makePartialNewick(precision, use_names);
+            }
+
+            else {
+                string newick = "";
+                const boost::format tip_node_name_format( boost::str(boost::format("%%s:%%.%df") % precision) );
+                const boost::format tip_node_number_format( boost::str(boost::format("%%d:%%.%df") % precision) );
+                const boost::format internal_node_format( boost::str(boost::format("):%%.%df") % precision) );
+                stack<Node *> node_stack;
+
+                    unsigned i = 0;
+                    unsigned a = 0;
+                    for (auto &lineage : _lineages) {
+                        Node * nd = lineage;
+                        while (nd) {
+                            if (nd->_left_child) {
+                                a++;
+                                // internal node
+                                newick += "(";
+                                node_stack.push(nd);
+                            }
+                            else {
+                                a++;
+                                // leaf node
+                                    if (use_names) {
+                                        newick += boost::str(boost::format(tip_node_name_format)
+                                            % nd->_name
+                                            % nd->_edge_length);
+                                        } else {
+                                        newick += boost::str(boost::format(tip_node_number_format)
+                                            % (nd->_number + 1)
+                                            % nd->_edge_length);
+                                    }
+                                    if (nd->_right_sib)
+                                        newick += ",";
+                                    else {
+                                        Node * popped = (node_stack.empty() ? 0 : node_stack.top());
+                                        while (popped && !popped->_right_sib) {
+                                            node_stack.pop();
+                                            if (node_stack.empty()) {
+                                                //newick += ")";
+                                                if (lineage->_edge_length != 0.0) {
+                                                    newick += boost::str(boost::format(internal_node_format) % lineage->_edge_length);
+                                                }
+                                                popped = 0;
+                                            }
+                                            else {
+                                                newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                                                popped = node_stack.top();
+                                            }
+                                        }
+                                        if (popped && popped->_right_sib) {
+                                            node_stack.pop();
+                                            newick += boost::str(boost::format(internal_node_format) % popped->_edge_length);
+                                            newick += ",";
+                                        }
+                                }   // leaf node
+                            }
+                            nd = findNextPreorder(nd);
+                        }   // while (subnd)...
+
+                        if (i < _lineages.size() - 1)
+                            newick += ",";
+                        ++i;
+                    }
+                    newick += ")";
+
+                    return newick;
+                }
+            }
+
+    inline string Forest::makeAltNewick(unsigned precision, bool use_names) {
+            use_names = false;
             if (_lineages.size() > 1) {
                 return makePartialNewick(precision, use_names);
             }
