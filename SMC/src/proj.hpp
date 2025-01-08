@@ -2319,6 +2319,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             for (int i=0; i<_sim_nspecies-1; i++) {
                 _ntaxaperspecies.push_back(ntaxa);
             }
+            ntaxa = _ntaxaperspecies[0] * _sim_nspecies;
         }
         else {
             for (auto &t:_ntaxaperspecies) {
