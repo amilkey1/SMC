@@ -86,6 +86,7 @@ class Forest {
         void                        allowCoalescence(string species_name, double increment, Lot::SharedPtr lot);
         vector<pair<double, string>>      calcForestRate(Lot::SharedPtr lot);
         void                        updateSpeciesPartition(tuple<string, string, string> species_info);
+        void                        updateSpeciesPartitionFossils(tuple<string, string, string> species_info, string new_name);
         double                      calcTopologyPrior(unsigned nlineages);
         void                        calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree);
         void                        clearPartials();
@@ -130,6 +131,7 @@ class Forest {
         void                        buildStartingUPGMAMatrix();
         void                        buildStartingRow();
 #endif
+        string                      getParentName(string node_name);
 
     
         map<string, double>         _theta_map;
@@ -1252,7 +1254,7 @@ class Forest {
         
 //        _last_edge_length = lot->gamma(1.0, 1.0/rate);
         
-        if (species_tree_height < next_fossil_time || next_fossil_time == 0.0) {
+        if ((species_tree_height < next_fossil_time || next_fossil_time == 0.0) && (_lineages.size() > 1)) {
             _last_edge_length = edge_len;
             for (auto nd:_lineages) {
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
@@ -1319,8 +1321,7 @@ class Forest {
         double rate = (_lambda - _extinction_rate) * _lineages.size(); // TODO: unsure, also number of lineages changes based on whether fossil has been added
             
         assert (lot != nullptr);
-        double edge_len = lot->gamma(1.0, 1.0/rate);
-        edge_len = 100.0; // TODO: BE CAREFUL
+        double edge_len = lot->gamma(1.0, 1.0/rate) * _clock_rate; // TODO: unsure about clock rate
         double species_tree_height = getTreeHeight() + edge_len;
                 
         if (species_tree_height < next_fossil_time || next_fossil_time == 0.0) {
@@ -1411,7 +1412,6 @@ class Forest {
         
         while (!done) {
         
-    //        pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
             assert (lot != nullptr);
             pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
             
@@ -1438,12 +1438,27 @@ class Forest {
             }
         }
         
+        bool add_fossil_name = false;
+        // if  you are joining two fossils, keep the fossil name in the new node for use in building the gene trees
+        
+        string name1 = subtree1->_name;
+        string name2 = subtree2->_name;
+        string ending = "_FOSSIL";
+        
+        if ((equal(ending.rbegin(), ending.rend(), name1.rbegin())) && equal(ending.rbegin(), ending.rend(), name2.rbegin())) {
+            add_fossil_name = true;
+        }
+        
         Node nd;
         _nodes.push_back(nd);
         Node* new_nd = &_nodes.back();
         new_nd->_parent=0;
         new_nd->_number=_nleaves+_ninternals;
         new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
+        
+        if (add_fossil_name) {
+            new_nd->_name += "_FOSSIL"; // add "_FOSSIL" to indicate this node has only fossil descendants
+        }
         new_nd->_edge_length=0.0;
         _ninternals++;
         new_nd->_right_sib=0;
@@ -1507,12 +1522,27 @@ class Forest {
             }
         }
         
+        bool add_fossil_name = false;
+        
+        string name1 = subtree1->_name;
+        string name2 = subtree2->_name;
+        string ending = "_FOSSIL";
+        
+        if ((equal(ending.rbegin(), ending.rend(), name1.rbegin())) && equal(ending.rbegin(), ending.rend(), name2.rbegin())) {
+            add_fossil_name = true;
+        }
+        
         Node nd;
         _nodes.push_back(nd);
         Node* new_nd = &_nodes.back();
         new_nd->_parent=0;
         new_nd->_number=_nleaves+_ninternals;
         new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
+        
+        if (add_fossil_name) {
+            new_nd->_name += "_FOSSIL"; // add "_FOSSIL" to indicate this node has only fossil descendants
+        }
+        
         new_nd->_edge_length=0.0;
         _ninternals++;
         new_nd->_right_sib=0;
@@ -1554,6 +1584,22 @@ class Forest {
         if (spp1 != "null") {
             assert (_species_partition.size() == before - 1);
         }
+    }
+
+    inline void Forest::updateSpeciesPartitionFossils(tuple<string, string, string> species_info, string new_name) {
+        string spp1 = get<0>(species_info);
+        string spp2 = get<1>(species_info);
+//        string new_spp = get<2>(species_info);
+        
+        unsigned before = (int) _species_partition.size();
+
+        list<Node*> &nodes = _species_partition[new_name]; // TODO: better way to do this other than copying?
+        copy(_species_partition[spp1].begin(), _species_partition[spp1].end(), back_inserter(nodes));
+//        copy(_species_partition[spp2].begin(), _species_partition[spp2].end(), back_inserter(nodes));
+        _species_partition.erase(spp1);
+//        _species_partition.erase(spp2);
+        
+        assert (_species_partition.size() == before); // species partition should not change size because nothing was joined
     }
 
     inline void Forest::showSpeciesJoined() {
@@ -4195,6 +4241,16 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         }
         else
             throw XProj(boost::str(boost::format("%s is not interpretable as an edge length") % edge_length_string));
+    }
+        
+    inline string Forest::getParentName(string node_name) {
+        string parent_name;
+        for (auto &nd:_nodes) {
+            if (nd._name == node_name) {
+                parent_name = nd._parent->_name;
+            }
+        }
+        return parent_name;
     }
 
     inline vector<tuple<string, string, string>> Forest::buildFromNewickTopology(string newick) {
