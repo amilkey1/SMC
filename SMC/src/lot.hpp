@@ -22,6 +22,7 @@ namespace proj {
             void                            setSeed(unsigned seed);
             unsigned                        getSeed(){return _seed;}
             double                          uniform();
+            double                          uniformConstrained(double lower, double upper);
             int                             randint(int low, int high);
             pair<unsigned, unsigned>        nchoose2(unsigned n);
             double                          normal();
@@ -35,20 +36,24 @@ namespace proj {
         private:
         
             typedef boost::variate_generator<boost::mt19937 &, boost::random::uniform_01<> >                uniform_variate_generator_t;
+            typedef boost::variate_generator<boost::mt19937 &, boost::random::uniform_real_distribution<> >  uniform_variate_generator_constrained_t;
             typedef boost::variate_generator<boost::mt19937 &, boost::random::normal_distribution<> >       normal_variate_generator_t;
             typedef boost::variate_generator<boost::mt19937 &, boost::random::gamma_distribution<> >        gamma_variate_generator_t;
 //            typedef boost::variate_generator<boost::mt19937 &, boost::math::inverse_gamma_distribution<> >      inverse_gamma_variate_generator_t;
             typedef boost::variate_generator<boost::mt19937 &, boost::random::uniform_int_distribution<> >  uniform_int_generator_t;
             typedef boost::variate_generator<boost::mt19937 &, boost::random::lognormal_distribution<> >    lognormal_variate_generator_t;
+//            typedef boost::variate_generator<boost::mt19937 &, boost::random::uniform_int_distribution<> >    int_generator_t;
 
             unsigned                                        _seed;
             boost::mt19937                                  _generator;
             std::shared_ptr<uniform_variate_generator_t>    _uniform_variate_generator;
+            std::shared_ptr<uniform_variate_generator_constrained_t>    _uniform_variate_generator_constrained;
             std::shared_ptr<normal_variate_generator_t>     _normal_variate_generator;
             std::shared_ptr<gamma_variate_generator_t>      _gamma_variate_generator;
 //            std::shared_ptr<inverse_gamma_variate_generator_t>      _inverse_gamma_variate_generator;
             std::shared_ptr<uniform_int_generator_t>        _uniform_int_generator;
             std::shared_ptr<lognormal_variate_generator_t>      _lognormal_variate_generator;
+//            std::shared_ptr<int_generator_t>                    _int_generator;
 
             double                                          _gamma_shape;
 //            double                                          _inverse_gamma_shape;
@@ -67,6 +72,8 @@ namespace proj {
 //        _inverse_gamma_variate_generator = std::shared_ptr<inverse_gamma_variate_generator_t>(new inverse_gamma_variate_generator_t(_generator, boost::math::inverse_gamma_distribution<>(_inverse_gamma_shape)));
         _uniform_int_generator = std::shared_ptr<uniform_int_generator_t>(new uniform_int_generator_t(_generator, boost::random::uniform_int_distribution<>(_low, _high)));
         _lognormal_variate_generator = std::shared_ptr<lognormal_variate_generator_t>(new lognormal_variate_generator_t(_generator, boost::random::lognormal_distribution<>(_lognormal_mu, _lognormal_sigma)));
+        _uniform_variate_generator_constrained = std::shared_ptr<uniform_variate_generator_constrained_t>(new uniform_variate_generator_constrained_t(_generator, boost::random::uniform_real_distribution<>(_low, _high)));
+//        _int_generator = std::shared_ptr<int_generator_t>(new int_generator_t(_generator, boost::random::uniform_int_distribution<>(_low, _high)));
     }
         
     inline Lot::~Lot() {
@@ -86,6 +93,15 @@ namespace proj {
         double u = (*_uniform_variate_generator)();
         while (u <= 0.0)
             u = (*_uniform_variate_generator)();
+        return u;
+    }
+
+    inline double Lot::uniformConstrained(double lower, double upper) {
+        _low = lower;
+        _high = upper;
+        double u = (*_uniform_variate_generator_constrained)();
+        while (u <= lower || u >= upper)
+            u = (*_uniform_variate_generator_constrained)();
         return u;
     }
 

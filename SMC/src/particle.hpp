@@ -481,13 +481,15 @@ inline vector<double> Particle::getVectorPrior() {
                 _next_species_number_by_gene.push_back(0);
             }
         }
-//        else {
-        else if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
-            // don't rebuild the species tree at every step when simulating data
-            // TODO: do this at every step, not just after filtering all loci once? - did not work as well on simulation grid
-            trimSpeciesTree();
-            if (_forests[0]._lineages.size() > 1) {
-                rebuildSpeciesTree();
+        bool rebuild = false;
+        if (rebuild) {
+            else if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+                // don't rebuild the species tree at every step when simulating data
+                // TODO: do this at every step, not just after filtering all loci once? - did not work as well on simulation grid
+                trimSpeciesTree();
+                if (_forests[0]._lineages.size() > 1) {
+                    rebuildSpeciesTree();
+                }
             }
         }
         
@@ -633,7 +635,6 @@ inline vector<double> Particle::getVectorPrior() {
         // TODO: choose one species, then find the set it's in
         // TODO: then choose another species from that set
         // TODO: mark the chosen species as you go, and don't move onto another set until the whole set has been chosen
-        cout << "test";
         
         double inv_gamma_modifier = 0.0;
 //        double log_weight_modifier = 0.0;
@@ -1817,36 +1818,129 @@ inline vector<double> Particle::getVectorPrior() {
 
 #if defined (FOSSILS)
     inline void Particle::buildEntireSpeciesTreeWithFossils() {
-        // TODO: this needs to be modified for fossils, same with rebuilding
-        _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
-        double edge_len = _forests[0]._last_edge_length;
+        // TODO: need to do the increment, then the join
+    
+//        _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
+        
+        // draw an age for each fossil, using the upper and lower bounds as specified
+        for (auto &f:_fossils) {
+            f._age = _lot->uniformConstrained(f._lower, f._upper); // TODO: unsure if this lot function is working correctly
+        }
+        
+        // sort fossils by age
+        sort(_fossils.begin(), _fossils.end(), [](Fossil & left, Fossil & right) {
+            return left._age < right._age;
+        });
+        
+        vector<pair<string, unsigned>> fossils_and_taxset_number; // TODO: can make this a global variable
+        
+        for (unsigned f = 0; f < _fossils.size(); f++) {
+            for (unsigned a=0; a<_taxsets.size(); a++) {
+                for (auto &s:_taxsets[a]._species_included) {
+                    if (s == _fossils[f]._name) {
+                        fossils_and_taxset_number.push_back(make_pair(_fossils[f]._name, a));
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // add fossils that are not part of a set; use number one past end of taxsets
+        bool found = false;
+        for (auto &f:_fossils) {
+            found = false;
+            for (auto t:fossils_and_taxset_number) {
+                if (f._name == t.first) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                fossils_and_taxset_number.push_back(make_pair(f._name, _taxsets.size()));
+            }
+        }
+        
+//        double edge_len = _forests[0]._last_edge_length;
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-        _t.push_back(make_pair(species_joined, edge_len));
+        double edge_len = 0.0;
+//        _t.push_back(make_pair(species_joined, edge_len));
 
-        for (unsigned i=0; i < _forests[0]._nspecies-1; i++) {
+        unsigned nfossils = (unsigned) _fossils.size();
+        unsigned nsteps = _forests[0]._nspecies-1 + nfossils;
+        
+        // TODO: find next fossil and all of its associated taxon sets
+        string name = fossils_and_taxset_number[0].first;
+        vector<unsigned> set_numbers;
+        
+        for (auto &n:fossils_and_taxset_number) {
+            if (n.first == name) {
+                set_numbers.push_back(n.second);
+            }
+        }
+        
+        bool fossil_join = false;
+        for (unsigned i=0; i < nsteps; i++) {
             if (_forests[0]._lineages.size() > 1) {
-                // TODO: choose a taxon set first, then choose a species in that set
-                unsigned ntaxsets = (unsigned) _taxsets.size();
-                unsigned taxon_set_num = _lot->randint(0, ntaxsets);
+                // TODO: only worry about the next fossil to join, not other taxon sets
                 
-                // TODO: can the taxon sets overlap?
-                // TODO: start with smallest taxon set - most constraints? but don't want to always make that one join first
-                // TODO: choose a species, find it in the sets, choose the smallest set it's in, and your next species chosen have to be other ones in that set
+                // TODO: check the next fossil to be joined, then draw a speciation event
+                // TODO: if the speciation event goes past where the fossil goes, add the fossil
+                // TODO: also need to be worried about the fossil taxon set - some fossils must be joined with extant lineages - start with just time for now
                 
-                vector<string> species_in_tax_set_to_join = _taxsets[taxon_set_num]._species_included;
+                if (i == 0) {
+                    assert (_fossils.size() > 0);
+                    fossil_join = _forests[0].chooseSpeciesIncrementFossilFirstStep(_lot, _fossils[0]._age, _fossils[0]._name);
+                }
                 
-                species_joined = _forests[0].speciesTreeProposalFossils(species_in_tax_set_to_join, _lot);
-//                species_joined = _forests[0].speciesTreeProposal(_lot);
+                else {
+                    // join lineages
+                    if (fossil_join) {
+                        species_joined = _forests[0].speciesTreeProposalFossils(_lot);
+                        _fossils.erase(_fossils.begin()); // pop front
+                    }
+                    else {
+                        assert (!fossil_join);
+                        species_joined = _forests[0].speciesTreeProposal(_lot);
+                    }
+
+                    if (_fossils.size() > 0) {
+                        fossil_join = _forests[0].chooseSpeciesIncrementFossil(_lot, _fossils[0]._age, _fossils[0]._name);
+                    }
+                    else {
+                        fossil_join = _forests[0].chooseSpeciesIncrementFossil(_lot, 0.0, "null");
+                    }
+                }
+//                else {
+//                    if (fossil_join) {
+//                        species_joined = _forests[0].speciesTreeProposalFossils(_lot);
+//                        _fossils.erase(_fossils.begin()); // pop front
+//                    }
+//                    else if (!fossil_join) {
+//                        species_joined = _forests[0].speciesTreeProposal(_lot);
+//                    }
+//
+////                    fossil_join = _forests[0].chooseSpeciesIncrementFossil(_lot, 0.0, "null");
+////                    assert (!fossil_join);
+//                }
+//                if (fossil_join && i > 0) {
+//                    species_joined = _forests[0].speciesTreeProposalFossils(_lot);
+//                    _fossils.erase(_fossils.begin()); // pop front
+//                }
+//                else if (!fossil_join && i > 0) {
+//                    species_joined = _forests[0].speciesTreeProposal(_lot); // TODO: need to fix this for fossils
+//                }
                 
-                double edge_len = 0.0;
+//                double edge_len = 0.0;
                 if (_forests[0]._lineages.size() > 1) {
-                    _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
+//                    _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
                     edge_len = _forests[0]._last_edge_length;
                 }
                 _t.push_back(make_pair(species_joined, edge_len));
+                // TODO: erase fossils as they are dealt with
             }
         }
+        _forests[0].showForest();
     }
 #endif
 
