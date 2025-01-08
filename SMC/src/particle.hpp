@@ -481,15 +481,12 @@ inline vector<double> Particle::getVectorPrior() {
                 _next_species_number_by_gene.push_back(0);
             }
         }
-        bool rebuild = false;
-        if (rebuild) {
-            else if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
-                // don't rebuild the species tree at every step when simulating data
-                // TODO: do this at every step, not just after filtering all loci once? - did not work as well on simulation grid
-                trimSpeciesTree();
-                if (_forests[0]._lineages.size() > 1) {
-                    rebuildSpeciesTree();
-                }
+        else if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+            // don't rebuild the species tree at every step when simulating data
+            // TODO: do this at every step, not just after filtering all loci once? - did not work as well on simulation grid
+            trimSpeciesTree();
+            if (_forests[0]._lineages.size() > 1) {
+                rebuildSpeciesTree();
             }
         }
         
@@ -650,13 +647,15 @@ inline vector<double> Particle::getVectorPrior() {
                 _next_species_number_by_gene.push_back(0);
             }
         }
-//        else {
-        else if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
-            // don't rebuild the species tree at every step when simulating data
-            trimSpeciesTree(); // TODO: with fossils
-            if (_forests[0]._lineages.size() > 1) {
-                rebuildSpeciesTree(); // TODO: with  fossils
-            }
+        bool rebuild = false;
+        if (rebuild) {
+//        else if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+//            // don't rebuild the species tree at every step when simulating data
+//            trimSpeciesTree(); // TODO: with fossils
+//            if (_forests[0]._lineages.size() > 1) {
+//                rebuildSpeciesTree(); // TODO: with  fossils
+//            }
+//        }
         }
         
         _species_join_proposed = false;
@@ -723,6 +722,9 @@ inline vector<double> Particle::getVectorPrior() {
                                 _max_deep_coal += _forests[next_gene].getMaxDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
                             }
                             
+                            // TODO: check if species name ends with "__FOSSIL"
+                            // TODO: if it does, need to move onto the next species
+                            // TODO: when you build _t_by_gene, don't include the fossils - how hard is this? then the rest of this functions normally
                             _forests[next_gene].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
                             assert (next_species_index < _t_by_gene[next_gene-1].size());
                             _t_by_gene[next_gene-1][next_species_index].second -= species_increment; // update species tree increments
@@ -1867,7 +1869,7 @@ inline vector<double> Particle::getVectorPrior() {
 //        _t.push_back(make_pair(species_joined, edge_len));
 
         unsigned nfossils = (unsigned) _fossils.size();
-        unsigned nsteps = _forests[0]._nspecies-1 + nfossils;
+        unsigned nsteps = _forests[0]._nspecies + nfossils;
         
         // TODO: find next fossil and all of its associated taxon sets
         string name = fossils_and_taxset_number[0].first;
@@ -1881,7 +1883,7 @@ inline vector<double> Particle::getVectorPrior() {
         
         bool fossil_join = false;
         for (unsigned i=0; i < nsteps; i++) {
-            if (_forests[0]._lineages.size() > 1) {
+            if (_forests[0]._lineages.size() > 1 || _fossils.size() > 0) {
                 // TODO: only worry about the next fossil to join, not other taxon sets
                 
                 // TODO: check the next fossil to be joined, then draw a speciation event
@@ -1911,35 +1913,20 @@ inline vector<double> Particle::getVectorPrior() {
                         fossil_join = _forests[0].chooseSpeciesIncrementFossil(_lot, 0.0, "null");
                     }
                 }
-//                else {
-//                    if (fossil_join) {
-//                        species_joined = _forests[0].speciesTreeProposalFossils(_lot);
-//                        _fossils.erase(_fossils.begin()); // pop front
-//                    }
-//                    else if (!fossil_join) {
-//                        species_joined = _forests[0].speciesTreeProposal(_lot);
-//                    }
-//
-////                    fossil_join = _forests[0].chooseSpeciesIncrementFossil(_lot, 0.0, "null");
-////                    assert (!fossil_join);
-//                }
-//                if (fossil_join && i > 0) {
-//                    species_joined = _forests[0].speciesTreeProposalFossils(_lot);
-//                    _fossils.erase(_fossils.begin()); // pop front
-//                }
-//                else if (!fossil_join && i > 0) {
-//                    species_joined = _forests[0].speciesTreeProposal(_lot); // TODO: need to fix this for fossils
-//                }
-                
-//                double edge_len = 0.0;
                 if (_forests[0]._lineages.size() > 1) {
-//                    _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
                     edge_len = _forests[0]._last_edge_length;
                 }
                 _t.push_back(make_pair(species_joined, edge_len));
-                // TODO: erase fossils as they are dealt with
+                
+                if (_forests[0]._lineages.size() == 2 && _fossils.size() == 0) { // only join last two lineages if there are no more fossils to add
+                    species_joined = _forests[0].speciesTreeProposal(_lot);
+                    edge_len = _forests[0]._last_edge_length;
+                    _t.push_back(make_pair(species_joined, edge_len));
+                }
             }
         }
+        assert (_fossils.size() == 0);
+        assert (_forests[0]._lineages.size() == 1);
         _forests[0].showForest();
     }
 #endif

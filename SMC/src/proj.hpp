@@ -897,6 +897,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 #if defined(FOSSILS)
         ("fossil",  boost::program_options::value(&fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
         ("taxset",  boost::program_options::value(&taxsets), "a string defining a taxon set, e.g. 'Ursinae: Helarctos_malayanus Melursus_ursinus Ursus_abstrusus Ursus_americanus Ursus_arctos Ursus_maritimus Ursus_spelaeus Ursus_thibetanus'")
+        ("clock_rate",  boost::program_options::value(&Forest::_clock_rate), "global clock rate")
 #endif
         ;
 

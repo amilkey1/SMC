@@ -221,6 +221,7 @@ class Forest {
         static double               _asrv_shape;
         static double               _comphet;
         static double               _infinity;
+        static double               _clock_rate;
 };
 
 
@@ -1246,8 +1247,7 @@ class Forest {
         double rate = (_lambda - _extinction_rate) * _lineages.size(); // TODO: unsure, also number of lineages changes based on whether fossil has been added
             
         assert (lot != nullptr);
-        double edge_len = lot->gamma(1.0, 1.0/rate);
-        edge_len = 100.0; // TODO: BE CAREFUL
+        double edge_len = lot->gamma(1.0, 1.0/rate) * _clock_rate; // TODO: unsure
         double species_tree_height = getTreeHeight() + edge_len;
         
 //        _last_edge_length = lot->gamma(1.0, 1.0/rate);
@@ -1536,83 +1536,6 @@ class Forest {
         _species_build.push_back(make_pair(make_tuple(subtree1->_name, subtree2->_name, new_nd->_name), 0.0));
         
         return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
-//        // this function is exactly the same as no fossils, but the new fossil must be one of the taxa chosen to be joined
-//
-//        _cum_height = 0.0; // reset cum height for a new lineage
-//        // this function creates a new node and joins two species
-//
-//        bool done = false;
-//        Node* subtree1 = nullptr;
-//        Node* subtree2 = nullptr;
-//
-//
-//        while (!done) {
-//
-//            pair<unsigned, unsigned> t = chooseTaxaToJoin(_lineages.size(), lot);
-////            pair<unsigned, unsigned> t = lot->nchoose2((unsigned) possible_species_to_join.size());
-//
-//            assert (t.first != t.second);
-////            string spp1 = possible_species_to_join[t.first];
-////            string spp2 = possible_species_to_join[t.second];
-//
-//
-//            assert (t.first < possible_species_to_join.size());
-//            assert (t.second < possible_species_to_join.size());
-//
-//            for (auto &nd:_lineages) {
-//                if (nd->_name == spp1) {
-//                    nd = subtree1;
-//                }
-//                else if (nd->_name == spp2) {
-//                    nd = subtree2;
-//                }
-//            }
-//            assert(!subtree1->_parent && !subtree2->_parent);
-//
-//            if (_outgroup != "none") {
-//                if (subtree1->_name != _outgroup && subtree2->_name != _outgroup && _lineages.size() > 2) { // outgroup can only be chosen on the last step
-//                    done = true;
-//                }
-//                else if (_lineages.size() == 2) {
-//                    done = true;
-//                }
-//            }
-//            else {
-//                done = true;
-//            }
-//            if (_outgroup == "none") {
-//                assert (done == true);
-//            }
-//        }
-//
-//        Node nd;
-//        _nodes.push_back(nd);
-//        Node* new_nd = &_nodes.back();
-//        new_nd->_parent=0;
-//        new_nd->_number=_nleaves+_ninternals;
-//        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
-//        new_nd->_edge_length=0.0;
-//        _ninternals++;
-//        new_nd->_right_sib=0;
-//
-//        new_nd->_left_child=subtree1;
-//        subtree1->_right_sib=subtree2;
-//
-//        subtree1->_parent=new_nd;
-//        subtree2->_parent=new_nd;
-//
-//        updateNodeVector (_lineages, subtree1, subtree2, new_nd);
-//
-//    #if defined (DEBUG_MODE)
-//        if (_lineages.size() > 1) {
-//            _species_joined = make_pair(subtree1, subtree2); // last step just joins remaining two
-//        }
-//    #endif
-//
-//        calcTopologyPrior((int) _lineages.size()+1);
-//
-//        _species_build.push_back(make_pair(make_tuple(subtree1->_name, subtree2->_name, new_nd->_name), 0.0));
-//        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
     }
 
     inline void Forest::updateSpeciesPartition(tuple<string, string, string> species_info) {

@@ -51,6 +51,7 @@ double Forest::_edge_rate_variance = 0.0;
 double Forest::_asrv_shape = numeric_limits<double>::infinity();
 double Forest::_infinity = numeric_limits<double>::infinity();
 double Forest::_comphet = numeric_limits<double>::infinity();
+double Forest::_clock_rate = 1.0;
 
 #if defined(FOSSILS)
 vector<Fossil>                      Particle::_fossils;
