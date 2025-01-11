@@ -200,6 +200,7 @@ class Forest {
         pair<vector<double>, vector<unsigned>>        calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build);
         
         unsigned                    multinomialDraw(Lot::SharedPtr lot, const vector<double> & probs);
+        void                        createSpeciesNames();
 
     public:
 
@@ -1277,7 +1278,15 @@ class Forest {
         else {
             // time chosen exceed fossil; add fossil instead
             species_tree_height -= edge_len;
+            if (next_fossil_time < species_tree_height) {
+                showForest();
+            }
             double edge_len = next_fossil_time - species_tree_height;
+            if (edge_len < 0.0) {
+                cout << "next fossil time = " << next_fossil_time << endl;
+                cout << "species tree height = " << species_tree_height << endl;
+                showForest();
+            }
             assert (edge_len > 0.0);
             _last_edge_length = edge_len;
             
@@ -1295,7 +1304,9 @@ class Forest {
             new_nd->_edge_length=edge_len;
             _ninternals++;
             new_nd->_right_sib=0;
+            new_nd->_position_in_lineages = (unsigned) _lineages.size(); // TODO: why don't we need to add _position_in_lineages for non fossils?
             _lineages.push_back(new_nd);
+            // TODO: need to add _position_in_lineages for fossil?
                         
             double nChooseTwo = _lineages.size()*(_lineages.size() - 1);
             double log_prob_join = log(2/nChooseTwo);
@@ -1366,6 +1377,7 @@ class Forest {
             new_nd->_edge_length=edge_len;
             _ninternals++;
             new_nd->_right_sib=0;
+            new_nd->_position_in_lineages = (unsigned) _lineages.size(); // TODO: why don't we need to add _position_in_lineages for non fossils?
             _lineages.push_back(new_nd);
             
             double nChooseTwo = _lineages.size()*(_lineages.size() - 1);
@@ -1589,15 +1601,31 @@ class Forest {
     inline void Forest::updateSpeciesPartitionFossils(tuple<string, string, string> species_info, string new_name) {
         string spp1 = get<0>(species_info);
         string spp2 = get<1>(species_info);
-//        string new_spp = get<2>(species_info);
         
         unsigned before = (int) _species_partition.size();
+        
+        string ending = "_FOSSIL";
+        bool fossil1 = false;
+        bool fossil2 = false; // figure out which species is the fossil
 
-        list<Node*> &nodes = _species_partition[new_name]; // TODO: better way to do this other than copying?
-        copy(_species_partition[spp1].begin(), _species_partition[spp1].end(), back_inserter(nodes));
-//        copy(_species_partition[spp2].begin(), _species_partition[spp2].end(), back_inserter(nodes));
-        _species_partition.erase(spp1);
-//        _species_partition.erase(spp2);
+        if (equal(ending.rbegin(), ending.rend(), spp1.rbegin())) {
+            fossil1 = true;
+        }
+        if (equal(ending.rbegin(), ending.rend(), spp2.rbegin())) {
+            fossil2 = true;
+        }
+        assert (fossil1 != fossil2);
+        
+        if (fossil2) {
+            list<Node*> &nodes = _species_partition[new_name]; // TODO: better way to do this other than copying?
+            copy(_species_partition[spp1].begin(), _species_partition[spp1].end(), back_inserter(nodes));
+            _species_partition.erase(spp1);
+        }
+        else {
+            list<Node*> &nodes = _species_partition[new_name]; // TODO: better way to do this other than copying?
+            copy(_species_partition[spp2].begin(), _species_partition[spp2].end(), back_inserter(nodes));
+            _species_partition.erase(spp2);
+        }
         
         assert (_species_partition.size() == before); // species partition should not change size because nothing was joined
     }
@@ -3041,13 +3069,99 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
     }
 
     inline double Forest::getTreeHeight() {
+        // TODO: I think this is not always working
+//        showForest();
         double sum_height = 0.0;
-
-        // calculate height of lineage
-        Node* base_node = _lineages[0];
-        sum_height += base_node->getEdgeLength();
-        for (Node* child=base_node->_left_child; child; child=child->_left_child) {
-            sum_height += child->getEdgeLength();
+//        bool fossil = false;
+//
+//        // calculate height of lineage
+//        Node* base_node = _lineages[0];
+//
+//        string ending = "_FOSSIL";
+//        string name = base_node->_name;
+//
+//        if (equal(ending.rbegin(), ending.rend(), name.rbegin())) {
+//            fossil = true;
+//        }
+//
+//        if (!fossil) {
+//            sum_height += base_node->getEdgeLength();
+//            for (Node* child=base_node->_left_child; child; child=child->_left_child) {
+//                sum_height += child->getEdgeLength();
+//            }
+//        }
+//        else {
+        Node* tip_node = &_nodes.front();
+            // locate a tip node and go through parents, adding branch lengths
+            // if the tip node has a parent, this should work
+        for (auto &nd:_nodes) {
+            if (nd._parent) {
+                tip_node = &nd;
+                break;
+            }
+        }
+            
+//        showForest();
+        if (tip_node->_parent) {
+            sum_height += tip_node->getEdgeLength();
+            
+            for (Node* parent=tip_node->_parent; parent; parent=parent->_parent) {
+                sum_height += parent->getEdgeLength();
+            }
+        }
+        else {
+            sum_height += tip_node->getEdgeLength();
+        }
+        
+//        bool test = false;
+//        if (test == true) {
+//            sum_height = 0.0;
+//            bool fossil = false;
+//
+//            // calculate height of lineage
+//            Node* base_node = _lineages[0];
+//
+//            string ending = "_FOSSIL";
+//            string name = base_node->_name;
+//
+//            if (equal(ending.rbegin(), ending.rend(), name.rbegin())) {
+//                fossil = true;
+//            }
+//
+//            if (!fossil) {
+//                sum_height += base_node->getEdgeLength();
+//                for (Node* child=base_node->_left_child; child; child=child->_left_child) {
+//                    sum_height += child->getEdgeLength();
+//                }
+//            }
+//        }
+        
+        if (sum_height == 0) {
+//            showForest();
+//            cout << "stop";
+            
+            double test_sum = 0.0;
+            Node* tip_node_test = &_nodes.front();
+                // locate a tip node and go through parents, adding branch lengths
+                // if the tip node has a parent, this should work
+            for (auto &nd:_nodes) {
+                if (nd._parent) {
+                    tip_node_test = &nd;
+                    break;
+                }
+            }
+                
+            if (tip_node_test->_parent) {
+                test_sum += tip_node_test->getEdgeLength();
+                
+                for (Node* parent=tip_node_test->_parent; parent; parent=parent->_parent) {
+                    test_sum += parent->getEdgeLength();
+                }
+            }
+            else {
+                test_sum += tip_node_test->getEdgeLength();
+            }
+//            cout << test_sum << endl;
         }
         return sum_height;
     }
@@ -3295,6 +3409,16 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
             _vector_prior.push_back(log_inv_gamma_prior);
 
+        }
+    }
+    
+    inline void Forest::createSpeciesNames() {
+        assert (_index == 0);
+        
+        _species_names.clear();
+        
+        for (auto &nd:_nodes) {
+            _species_names.push_back(nd._name);
         }
     }
 

@@ -147,10 +147,12 @@ class Particle {
         void                                            buildEntireSpeciesTree();
 #if defined (FOSSILS)
         void                                            buildEntireSpeciesTreeWithFossils();
+        void                                            rebuildSpeciesTreeWithFossils();
 #endif
         void                                            rebuildSpeciesTree();
         void                                            setGeneOrder(vector<unsigned> gene_order) {_gene_order = gene_order;}
         void                                            trimSpeciesTree();
+        void                                            trimSpeciesTreeFossils();
         void                                            setFixTheta(bool fix) {_fix_theta = fix;}
         void                                            setRelativeRatesByGene(vector<double> rel_rates);
 #if defined (FASTER_UPGMA_TREE)
@@ -173,6 +175,7 @@ class Particle {
         static vector<Fossil>           _fossils;
         static vector<TaxSet>           _taxsets;
         vector<Fossil>                  _fossils_to_modify;
+        vector<double>                  _fossil_ages;
 #endif
 
     private:
@@ -266,6 +269,7 @@ class Particle {
         _species_branches = 0;
         _group_number = 0;
         _fossils_to_modify.clear();
+        _fossil_ages.clear();
     }
 
     inline void Particle::showSpeciesTree() {
@@ -626,9 +630,7 @@ inline vector<double> Particle::getVectorPrior() {
             }
 
     inline void Particle::proposalFossils() {
-        // TODO: the framework will be the same as proposal(), but fossil needs to be included
         // TODO: need to figure out how to restrict fossil to a certain clade
-        // TODO: need to constrain fossil by age - for now, just use specified age and not the distribution
         // TODO: need to constrain all clades to taxset, even when sampling from the prior
         
         // TODO: choose one species, then find the set it's in
@@ -649,15 +651,13 @@ inline vector<double> Particle::getVectorPrior() {
                 _next_species_number_by_gene.push_back(0);
             }
         }
-        bool rebuild = false;
-        if (rebuild) {
-//        else if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
-//            // don't rebuild the species tree at every step when simulating data
-//            trimSpeciesTree(); // TODO: with fossils
-//            if (_forests[0]._lineages.size() > 1) {
-//                rebuildSpeciesTree(); // TODO: with  fossils
-//            }
-//        }
+
+        else if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+            // don't rebuild the species tree at every step when simulating data
+            trimSpeciesTreeFossils(); // TODO: with fossils
+            if (_forests[0]._lineages.size() > 1) {
+                rebuildSpeciesTreeWithFossils(); // TODO: with  fossils
+            }
         }
         
         _species_join_proposed = false;
@@ -715,6 +715,10 @@ inline vector<double> Particle::getVectorPrior() {
                         }
                         else {
                             // carry out speciation event
+                            if (species_increment <= 0.0) {
+                                cout << "species increment is: " << species_increment << endl;
+                                _forests[0].showForest();
+                            }
                             assert (species_increment > 0.0);
                             assert (_forests[next_gene]._species_partition.size() > 1);
                             _forests[next_gene].addIncrement(species_increment);
@@ -730,17 +734,12 @@ inline vector<double> Particle::getVectorPrior() {
                             
                             // TODO: check if species name ends with "__FOSSIL"
                             // TODO: if it does, need to move onto the next species
-                            // TODO: when you build _t_by_gene, don't include the fossils - how hard is this? then the rest of this functions normally
                             tuple<string, string, string> current = _t_by_gene[next_gene-1][next_species_index+1].first;
                             string name1 = get<0>(current);
                             string name2 = get<1>(current);
                             
                             string ending = "_FOSSIL";
                             
-                            // if either species to be added is a fossil, skip the joining for this step; just add branch length
-//                            if ((equal(ending.rbegin(), ending.rend(), name1.rbegin())) || equal(ending.rbegin(), ending.rend(), name2.rbegin())) {
-//                                skip = true;
-//                            }
                             if (equal(ending.rbegin(), ending.rend(), name1.rbegin())) {
                                 skip = true;
                                 fossil1 = true;
@@ -758,15 +757,19 @@ inline vector<double> Particle::getVectorPrior() {
                                 // update the species partition with the new name of the species
                                 // if both species are fossils, do nothing for now
                                 if (fossil1 || fossil2) {
-                                    assert (fossil1 != fossil2);
-                                    
-                                    if (fossil1) {
-                                        string new_name = _forests[0].getParentName(name1);
-                                        _forests[next_gene].updateSpeciesPartitionFossils(_t_by_gene[next_gene-1][next_species_index+1].first, new_name);
+                                    if (fossil1 != fossil2) {
+                                        if (fossil1) {
+                                            string new_name = _forests[0].getParentName(name1);
+                                            _forests[next_gene].updateSpeciesPartitionFossils(_t_by_gene[next_gene-1][next_species_index+1].first, new_name);
+                                        }
+                                        if (fossil2) {
+                                            string new_name = _forests[0].getParentName(name2);
+                                            _forests[next_gene].updateSpeciesPartitionFossils(_t_by_gene[next_gene-1][next_species_index+1].first, new_name);
+                                        }
                                     }
-                                    if (fossil2) {
-                                        string new_name = _forests[0].getParentName(name2);
-                                        _forests[next_gene].updateSpeciesPartitionFossils(_t_by_gene[next_gene-1][next_species_index+1].first, new_name);
+                                    else {
+                                        // TODO: what if you have two fossils?
+                                        cout << "x";
                                     }
                                 }
                             }
@@ -834,7 +837,6 @@ inline vector<double> Particle::getVectorPrior() {
         else {
             _log_weight = 0.0;
         }
-//        _forests[1].showForest();
     }
 
     inline vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {
@@ -872,7 +874,6 @@ inline vector<double> Particle::getVectorPrior() {
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
         double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
         
-//        _forests[0].showForest();
 #if !defined (COAL_LIKE_TEST)
         
             if (_forests[0]._last_edge_length > 0.0) {
@@ -886,13 +887,11 @@ inline vector<double> Particle::getVectorPrior() {
                     string species1 = get<0>(species_joined);
                     string species2 = get<1>(species_joined);
                         
-//                    _forests[i].showForest();
                     if (_forests[0]._lineages.size() > 1 && species1 != "null") {
                         // if using Jones formula, species partition update will happen in coalescent likelihood calculation
                         _forests[i].resetDepthVector(species_joined);
                     }
 
-//                    _forests[i].showForest();
                     max_depth = (_forests[i].getMinDepths())[0].first;
                     max_depth_vector.push_back(max_depth);
                 }
@@ -1638,9 +1637,167 @@ inline vector<double> Particle::getVectorPrior() {
         _forests[forest_number] = f;
     }
 
+    inline void Particle::trimSpeciesTreeFossils() {
+//        _forests[0].showForest();
+//        _forests[1].showForest();
+//        for (auto &nd:_forests[0]._lineages) {
+//            assert (nd->_edge_length >= 0.0);
+//        }
+        unsigned fossil_number = (unsigned) _fossils.size() - 1;
+        map<string, double> theta_map = _forests[1]._theta_map; // TODO: need to add this in eventually
+//        vector<string> species_names = _forests[1]._species_names;
+        
+        _forests[0].createSpeciesNames(); // need to redo this every time because the order with fossils changes
+        vector<string> species_names = _forests[0]._species_names; // fossils are included in the species names
+        
+        assert (species_names.size() > 0);
+        
+        unsigned spp_count = (unsigned) species_names.size() + (unsigned) _fossils.size();
+        
+        bool trim = true;
+        vector<double> gene_tree_heights;
+        for (unsigned i=1; i<_forests.size(); i++) {
+            if (_forests[i]._species_partition.size() > 1) {
+                gene_tree_heights.push_back(_forests[i].getTreeHeight());
+            }
+            else {
+                trim = false;
+                break;
+            }
+        }
+        
+        if (trim) {
+            
+            double max_gene_tree_height = *max_element(gene_tree_heights.begin(), gene_tree_heights.end());
+            
+            bool done = false;
+            unsigned count = (unsigned) _t.size();
+            
+            while (!done) {
+//                if (count == 3) {
+//                    cout << "stop";
+//                }
+//                _forests[0].showForest();
+                double species_tree_height = _forests[0].getTreeHeight();
+                double amount_to_trim = 0.0;
+                
+                // TODO: if the node is a fossil, just remove it because it won't have any children and will need to be re added later
+                // TODO: add the fossil back to _fossils_to_modify
+                // TODO: draw new ages for fossils when tree is being rebuilt?
+                
+                bool fossil = false;
+                
+                Node* nd = _forests[0]._lineages.back();
+                
+                string name1 = nd->_name;
+                string ending = "_FOSSIL";
+                if (equal(ending.rbegin(), ending.rend(), name1.rbegin())) {
+                    fossil = true;
+                }
+                
+                if (fossil) {
+                    // TODO: need to save the fossil ages
+//                    _fossils_to_modify.push_back(_fossils[fossil_number]);
+                    _fossils_to_modify.insert(_fossils_to_modify.begin(), 1, _fossils[fossil_number]);
+                    _fossils_to_modify.front()._age = _fossil_ages[fossil_number];
+//                    _fossils_to_modify.back()._age = _fossil_ages[fossil_number];
+                    _forests[0]._lineages.pop_back();
+                    _forests[0]._nodes.pop_back();
+                    fossil_number--;
+                    _forests[0]._ninternals--;
+                }
+                    
+                if (_forests[0]._lineages.size() < Forest::_nspecies && !fossil) {
+                    Node* subtree1 = nd->_left_child;
+                    Node* subtree2 = nd->_left_child->_right_sib;
+                    
+//                    _forests[0].showForest();
+                    _forests[0].revertNodeVector(_forests[0]._lineages, subtree1, subtree2, nd);
+                    
+                    // reset siblings and parents of original nodes back to 0
+                    subtree1->resetNode(); //subtree1
+                    subtree2->resetNode(); //subtree2
+
+                    // clear new node from _nodes
+                    //clear new node that was just created
+                    nd->clear(); //new_nd
+                    
+//                    _forests[0].showForest();
+                    
+                    _forests[0]._nodes.pop_back();
+                    
+//                    amount_to_trim = _t[count - 2].second;
+                    
+                    _t.pop_back();
+                    
+                    for (auto &g:_t_by_gene) {
+                        g.pop_back();
+                    }
+                    _forests[0]._ninternals--;
+                    
+//                    theta_map[species_names[spp_count-1]] = -1.0; // TODO: need to add this in eventually
+                    
+                    spp_count--;
+                }
+                
+                if (!fossil) {
+                    amount_to_trim = _t[count - 2].second; // TODO: not sure
+                    if (species_tree_height - amount_to_trim > max_gene_tree_height) {
+                        for (auto &nd:_forests[0]._lineages) {
+                            nd->_edge_length -= amount_to_trim;
+    //                        if (nd->_edge_length < 0.0) {
+    //                            nd->_edge_length += amount_to_trim;
+    //                            _forests[0].showForest();
+    //                            cout << "species tree height is: " << species_tree_height << " and calculated as " << _forests[0].getTreeHeight() << endl;
+    //                            _forests[1].showForest();
+    //                        }
+    //                        assert (nd->_edge_length >= 0.0);
+                        }
+//                        _forests[0].showForest();
+                    }
+                    else {
+                        amount_to_trim = species_tree_height - max_gene_tree_height;
+                        if (amount_to_trim < 0.0) {
+                            _forests[0].showForest();
+                            _forests[1].showForest();
+                            cout << "species tree height is " << species_tree_height;
+                        }
+                        assert (amount_to_trim > 0.0);
+                        for (auto &nd:_forests[0]._lineages) {
+                            nd->_edge_length -= amount_to_trim;
+                        }
+                        _t[count-2].second -= amount_to_trim;
+                        
+                        for (auto &g:_t_by_gene) {
+                            g[count-2].second -= amount_to_trim;
+                        }
+                        done = true;
+                    }
+                } // TODO: unsure if should be trimming if fossil
+                
+                if (!fossil) {
+                    count--;
+                }
+            }
+
+        }
+        
+//        for (auto &nd:_forests[0]._lineages) {
+//            assert (nd->_edge_length >= 0.0);
+//        }
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i]._theta_map = theta_map;
+        }
+        
+        // sort fossils by age
+        sort(_fossils_to_modify.begin(), _fossils_to_modify.end(), [](Fossil & left, Fossil & right) {
+            return left._age < right._age;
+        });
+    }
+
     inline void Particle::trimSpeciesTree() {
         map<string, double> theta_map = _forests[1]._theta_map;
-        vector<string> species_names = _forests[1]._species_names;
+        vector<string> species_names = _forests[1]._species_names; // TODO: need to get species names
         
         unsigned spp_count = (unsigned) species_names.size();
         
@@ -1750,6 +1907,7 @@ inline vector<double> Particle::getVectorPrior() {
             double min_branch_length = _forests[0]._lineages.back()->_edge_length; // species tree must remain at least as tall as it was after initial trimming
             for (auto &nd:_forests[0]._lineages) {
                 nd->_edge_length -= min_branch_length;
+//                assert (nd->_edge_length >= 0.0);
             }
 
             _t.back().second -= min_branch_length;
@@ -1768,6 +1926,7 @@ inline vector<double> Particle::getVectorPrior() {
                 if (edge_increment < min_branch_length) { // TODO: there must be a better way to do this
                     for (auto &nd:_forests[0]._lineages) {
                         nd->_edge_length -= edge_increment;
+//                        assert (nd->_edge_length >= 0.0);
                     }
                 }
             }
@@ -1787,6 +1946,7 @@ inline vector<double> Particle::getVectorPrior() {
                     if (_forests[0]._lineages.size() > 1) {
                         _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
                         edge_len = _forests[0]._last_edge_length;
+                        assert (edge_len >= 0.0);
                     }
                     _t.push_back(make_pair(species_joined, edge_len));
                     
@@ -1861,29 +2021,137 @@ inline vector<double> Particle::getVectorPrior() {
             }
         }
  
+//        for (auto &nd:_forests[0]._lineages) {
+//            assert (nd->_edge_length >= 0.0);
+//        }
     }
+
+#if defined (FOSSILS)
+    inline void Particle::rebuildSpeciesTreeWithFossils() {
+//        map<string, double> theta_map = _forests[1]._theta_map; // TODO: add theta later
+        
+        // _fossils_to_modify should already be correct and sorted from previous step // TODO: draw new age?
+        
+        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+        double edge_len = 0.0;
+        
+        unsigned nfossils = (unsigned) _fossils_to_modify.size();
+        unsigned nsteps = (unsigned) _forests[0]._lineages.size() + nfossils;
+        bool fossil_join = false;
+        
+//        _forests[0].showForest();
+//        _forests[1].showForest();
+        
+        for (unsigned i=0; i < nsteps; i++) {
+            if (_forests[0]._lineages.size() > 1 || _fossils_to_modify.size() > 0) {
+                // TODO: only worry about the next fossil to join, not other taxon sets
+                
+                // TODO: check the next fossil to be joined, then draw a speciation event
+                // TODO: if the speciation event goes past where the fossil goes, add the fossil
+                // TODO: also need to be worried about the fossil taxon set - some fossils must be joined with extant lineages - start with just time for now
+                
+                if (i == 0) {
+//                    assert (_fossils_to_modify.size() > 0); // TODO: don't necessarily need fossils at this point - what if they have all been added already? - only applies to first step
+                    if (_fossils_to_modify.size() > 0) {
+                        fossil_join = _forests[0].chooseSpeciesIncrementFossilFirstStep(_lot, _fossils_to_modify[0]._age, _fossils_to_modify[0]._name);
+                    }
+                    else {
+                        fossil_join = _forests[0].chooseSpeciesIncrementFossilFirstStep(_lot, 0.0, "null");
+                    }
+                }
+                
+                else {
+                    // join lineages
+                    if (fossil_join) {
+                        species_joined = _forests[0].speciesTreeProposalFossils(_lot);
+                        _fossils_to_modify.erase(_fossils_to_modify.begin()); // pop front
+                    }
+                    else {
+                        assert (!fossil_join);
+                        species_joined = _forests[0].speciesTreeProposal(_lot);
+                    }
+
+                    if (_forests[0]._lineages.size() == 1 && _fossils_to_modify.size() == 0) {
+                        // the species tree is done, assert we are on the last step
+                        assert (i == nsteps - 1);
+                    }
+                    else {
+                        if (_fossils_to_modify.size() > 0) {
+                            fossil_join = _forests[0].chooseSpeciesIncrementFossil(_lot, _fossils_to_modify[0]._age, _fossils_to_modify[0]._name);
+                        }
+                        else {
+                            fossil_join = _forests[0].chooseSpeciesIncrementFossil(_lot, 0.0, "null");
+                        }
+                    }
+                }
+                if (_forests[0]._lineages.size() > 1) {
+                    edge_len = _forests[0]._last_edge_length;
+                }
+                if (i == 0) {
+                    _t.back().second += edge_len;
+                    for (auto &g:_t_by_gene) {
+                        g.back().second += edge_len;
+                    }
+                }
+                else {
+                    _t.push_back(make_pair(species_joined, edge_len));
+                    for (auto &g:_t_by_gene) {
+                        g.push_back(make_pair(species_joined, edge_len));
+                    }
+                }
+                
+                if (_forests[0]._lineages.size() == 2 && _fossils_to_modify.size() == 0) { // only join last two lineages if there are no more fossils to add
+                    species_joined = _forests[0].speciesTreeProposal(_lot); // TODO: what if this is also i = 0?
+//                    edge_len = _forests[0]._last_edge_length;
+                    edge_len = 0.0;
+                    _t.push_back(make_pair(species_joined, edge_len));
+                    
+                    for (auto &g:_t_by_gene) {
+                        g.push_back(make_pair(species_joined, edge_len));
+                    }
+                    
+                }
+            }
+//            _forests[0].showForest();
+        }
+        _t.back().second = 0.0;
+        for (auto &g:_t_by_gene) {
+            g.back().second = 0.0;
+        }
+        assert (_fossils_to_modify.size() == 0);
+        assert (_forests[0]._lineages.size() == 1);
+    }
+#endif
 
 #if defined (FOSSILS)
     inline void Particle::buildEntireSpeciesTreeWithFossils() {
         _fossils_to_modify = _fossils;
-        // TODO: need to do the increment, then the join
-    
-//        _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
+        
+        // TODO: if any fossil ages are similar, fossils may not be in the right order
         
         // draw an age for each fossil, using the upper and lower bounds as specified
-//        for (auto &f:_fossils) {
-        for (auto &f:_fossils_to_modify) {
+         for (auto &f:_fossils_to_modify) {
             f._age = _lot->uniformConstrained(f._lower, f._upper); // TODO: unsure if this lot function is working correctly
         }
-        
-        // sort fossils by age
-//        sort(_fossils.begin(), _fossils.end(), [](Fossil & left, Fossil & right) {
         
         sort(_fossils_to_modify.begin(), _fossils_to_modify.end(), [](Fossil & left, Fossil & right) {
             return left._age < right._age;
         });
         
+//        for (unsigned i=0; i<_fossils_to_modify.size(); i++) {
+//            _fossils[i]._age = _fossils_to_modify[i]._age;
+//        } // do this to ensure _fossils and _fossils_to_modify sort in the same order
+        
+        sort(_fossils.begin(), _fossils.end(), [](Fossil & left, Fossil & right) {
+            return left._age < right._age;
+        }); // TODO: this could be a problem at some point if there are 2+ fossils with overlapping ranges - fossils and fossils_to_modify may not sort in the same order
+        
+        
         vector<pair<string, unsigned>> fossils_and_taxset_number; // TODO: can make this a global variable
+        
+        for (auto &f:_fossils_to_modify) {
+            _fossil_ages.push_back(f._age);
+        }
         
         for (unsigned f = 0; f < _fossils_to_modify.size(); f++) {
             for (unsigned a=0; a<_taxsets.size(); a++) {
@@ -1986,9 +2254,9 @@ inline vector<double> Particle::getVectorPrior() {
                 }
             }
         }
+        _t.back().second = 0.0;
         assert (_fossils_to_modify.size() == 0);
         assert (_forests[0]._lineages.size() == 1);
-//        _forests[0].showForest();
     }
 #endif
 
@@ -2055,6 +2323,7 @@ inline vector<double> Particle::getVectorPrior() {
         _lambda_prior_mean = other._lambda_prior_mean;
         _group_number = other._group_number;
         _fossils_to_modify = other._fossils_to_modify;
+        _fossil_ages = other._fossil_ages;
     };
 }
 
