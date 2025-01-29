@@ -1,24 +1,22 @@
-#pragma once    
+#pragma once
 
 #include <string>
 #include <vector>
 #include  <iostream>
 #include "split.hpp"
+#include "partial_store.hpp"
+#include "conditionals.hpp"
 
-namespace strom {
+namespace proj {
 
-    class Tree;
-    class TreeManip;
     class Likelihood;
-    class Updater;
     class Forest;
+    class Particle;
 
     class Node {
-        friend class Tree;
-        friend class TreeManip;
         friend class Likelihood;
-        friend class Updater;
         friend class Forest;
+        friend class Particle;
 
         public:
                                         Node();
@@ -30,34 +28,14 @@ namespace strom {
                     int                 getNumber()                 {return _number;}
                     std::string         getName()                   {return _name;}
                     Split               getSplit()                  {return _split;}
-        
-                    bool                isSelected()                {return _flags & Flag::Selected;}
-                    void                select()                    {_flags |= Flag::Selected;}
-                    void                deselect()                  {_flags &= ~Flag::Selected;}
-
-                    bool                isSelPartial()              {return _flags & Flag::SelPartial;}
-                    void                selectPartial()             {_flags |= Flag::SelPartial;}
-                    void                deselectPartial()           {_flags &= ~Flag::SelPartial;}
-
-                    bool                isSelTMatrix()              {return _flags & Flag::SelTMatrix;}
-                    void                selectTMatrix()             {_flags |= Flag::SelTMatrix;}
-                    void                deselectTMatrix()           {_flags &= ~Flag::SelTMatrix;}
-
-                    bool                isAltPartial()              {return _flags & Flag::AltPartial;}
-                    void                setAltPartial()             {_flags |= Flag::AltPartial;}
-                    void                clearAltPartial()           {_flags &= ~Flag::AltPartial;}
-
-                    bool                isAltTMatrix()              {return _flags & Flag::AltTMatrix;}
-                    void                setAltTMatrix()             {_flags |= Flag::AltTMatrix;}
-                    void                clearAltTMatrix()           {_flags &= ~Flag::AltTMatrix;}
-                    
-                    void                flipTMatrix()               {isAltTMatrix() ? clearAltTMatrix() : setAltTMatrix();}
-                    void                flipPartial()               {isAltPartial() ? clearAltPartial() : setAltPartial();}
 
                     double              getEdgeLength()             {return _edge_length;}
                     void                setEdgeLength(double v);
+        
+                    unsigned            countChildren() const;
 
-                    void                clearPointers()             {_left_child = _right_sib = _parent = 0;}   
+                    void                clearPointers()             {_left_child = _right_sib = _parent = 0;}
+            void                resetNode();
                                         
             static const double _smallest_edge_length;
 
@@ -84,6 +62,8 @@ namespace strom {
             double              _edge_length;
             Split               _split;
             int                 _flags;
+            PartialStore::partial_t _partial;
+            int                 _position_in_lineages;
     };
     
     
@@ -96,19 +76,30 @@ namespace strom {
         //std::cout << "Destroying Node object" << std::endl;
     }
 
-    inline void Node::clear() { 
+    inline void Node::clear() {
         _flags = 0;
-        clearPointers();    
-        //_left_child = 0;
-        //_right_sib = 0;
-        //_parent = 0;      
+        clearPointers();
         _number = -1;
         _name = "";
         _edge_length = _smallest_edge_length;
-    }   
+        _partial.reset();
+    }
 
     inline void Node::setEdgeLength(double v) {
         _edge_length = (v < _smallest_edge_length ? _smallest_edge_length : v);
     }
 
+    inline unsigned Node::countChildren() const {
+        unsigned n_children = 0;
+        for (Node * child = _left_child; child; child=child->_right_sib) {
+            n_children ++;
+        }
+        return n_children;
+    }
+
+    inline void Node::resetNode() {
+        _parent=0;
+        _right_sib=0;
+    }
 }
+

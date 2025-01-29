@@ -1,0 +1,1 @@
+This folder contains simulated data as well as true gene and species trees. When the program is conditioned on one set of gene trees or one species tree, the species tree or gene tree marginal likelihood can be estimated and compared to the LoRaD estimate.

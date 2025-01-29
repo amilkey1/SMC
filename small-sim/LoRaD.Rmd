@@ -1,0 +1,79 @@
+---
+title: "LoRaD for simulated example"
+author: "Paul Lewis"
+date: "2023-09-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/Users/analisamilkey/Documents/projects/loradML2/test2")
+library(lorad)
+```
+
+# Read in gene tree data
+
+```{r}
+gene_params <- read.table('gene1.log', header=TRUE)
+dim(gene_params)
+colnames(gene_params)
+```
+
+# Column specifications for gene tree data
+
+```{r}
+colspec <- c("iter"="iteration", "gene_tree_log_like"="posterior", "gene_tree_increment"="nonnegative", "increment_prior"="posterior", "gene_tree_increment.1"="nonnegative", "increment_prior.1"="posterior", "gene_tree_increment.2"="nonnegative", "increment_prior.2"="posterior", "gene_tree_topology_prior"="posterior")
+colspec
+```
+
+# Density plots for gene tree data
+
+```{r}
+d0 <- density(gene_params$gene_tree_increment)
+d1 <- density(gene_params$gene_tree_increment.1)
+d2 <- density(gene_params$gene_tree_increment.2)
+xmax <- max(d0$x,d1$x,d2$x)
+ymax <- max(d0$y,d1$y,d2$y)
+plot(d0, lwd=2, col="black", bty="L", xlim=c(0,xmax), ylim=c(0,ymax), main="Densities for increment parameters")
+lines(d1, lwd=2, col="purple")
+lines(d2, lwd=2, col="blue")
+```
+
+# Run LoRaD for gene tree data
+
+```{r}
+lorad_estimate(gene_params, colspec, 0.5, "random", 0.1)
+```
+
+
+
+
+# Read in species tree data
+
+```{r}
+species_params <- read.table('species_params.log', header=TRUE)
+dim(species_params)
+colnames(species_params)
+```
+
+# Column specifications for species tree data
+
+```{r}
+colspec <- c("iter"="iteration", "theta"="ignore", "species_tree_increment"="nonnegative", "increment_prior"="posterior", "species_tree_topology_prior"="posterior", "log_coal_like"="posterior", "species_tree_height"="ignore")
+colspec
+```
+
+# Density plots for species tree data
+
+```{r}
+d0 <- density(species_params$species_tree_increment)
+xmax <- max(d0$x)
+ymax <- max(d0$y)
+plot(d0, lwd=2, col="black", bty="L", xlim=c(0,xmax), ylim=c(0,ymax), main="Densities for increment parameters")
+```
+
+# Run LoRaD for species tree data
+
+```{r}
+lorad_estimate(species_params, colspec, 0.5, "random", 0.1)
+```

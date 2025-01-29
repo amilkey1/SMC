@@ -7,7 +7,7 @@
 #include <climits>
 #include <cassert>
 
-namespace strom {
+namespace proj {
 
     class Split {
         public:
@@ -41,18 +41,16 @@ namespace strom {
             split_metrics_t                                     getSplitMetrics() const;
 
         private:
-
+        
             split_unit_t                                        _mask;
             split_t                                             _bits;
             unsigned                                            _bits_per_unit;
             unsigned                                            _nleaves;
 
         public:
-
+        
             typedef std::shared_ptr< Split >                    SharedPtr;
     };
-
-    // member function bodies go here
 
     inline Split::Split() {
         _mask = 0L;
@@ -219,5 +217,4 @@ namespace strom {
     inline bool Split::conflictsWith(const Split & other) const {
         return !isCompatible(other);
     }
-
 }
