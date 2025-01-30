@@ -6,7 +6,7 @@ The file proj.conf is used to specify program settings:
 
 `seed`: specify random number seed
   - default is 1
-`theta`: specify the population-scaled mutation rate
+`theta`: specify the population-scaled mutation rate\
 `lambda`: specify the speciation rate
 `subset`: specify the gene partitions in the data file. For example:
 *`subset = gene1:1-1000`
