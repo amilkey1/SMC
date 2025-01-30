@@ -21,7 +21,7 @@ specifies that bases 1-1000 correspond to gene 1 and bases 1001-2000 correspond 
 `verbose`: 0, 1, or 2 determines level of output\
 `save_memory`: set to true to throw away partials in likelihood calculations after they are used\
 `outgroup`: set to species name\
-`startmode`: set to smc or sim to perform SMC or simulate data\
+`startmode`: set to smc or sim to perform SMC or simulate data
 
 The following settings apply to SMC option:
 `datafile`: specify the name of the nexus file containing the raw sequence data
@@ -33,11 +33,18 @@ The following settings apply to SMC option:
 `theta_proposal_mean`: mean of proposal distribution when estimating `theta`; if nothing provided, mean will be set to `theta`
 `theta_prior_mean`: mean of prior distribution when estimating `theta`
 `lambda_prior_mean`: mean of prior distribution when estimating `lambda`
-
-specify the name of a .txt file containing gene newicks obtained from another program. Gene newicks must be ultrametric and have no zero length branches.
+`newick_path`: specify the path to a file containing gene newicks obtained from another program. Only second-level SMC will be performed. Gene newicks must be ultrametric and have no zero length branches.
+`fix_theta`: set to true to fix one theta for all populations
+`relative_rates`: relative substitution rate for each locus. Relative rates must average to 1.0. Ex. `relative_rates = 0.5, 1.5` for 2 loci.
 
 The following settings apply to simulation option:
 `filename`: name of file to write simulated data to
 `nspecies`: number of species to simulate data for
 `ntaxaperspecies`: number of samples per species
 `fix_theta_for_simulations`: set to true to fix one theta for all populations
+`save_gene_trees_separately`: set to true to save gene newicks in separate files rather than all in one file.
+`simoccupancy`: probability that any given taxon will have data for any given locus; 1-_occupancy is prob. all missing data for a taxon
+`simedgeratevar`: variance of lognormal relative rate distribution across edges in gene trees
+`simasrvshape`: shape of gamma among-site rate heterogeneity within a locus
+`simcomphet`: Dirichlet parameter governing compositional heterogeneity (default value results in compositional homogeneity
+
