@@ -34,7 +34,7 @@ The file proj.conf is used to specify program settings:
 `newick_path`: specify the path to a file containing gene newicks obtained from another program. Only second-level SMC will be performed. Gene newicks must be ultrametric and have no zero length branches.\
 `fix_theta`: set to true to fix one theta for all populations\
 `relative_rates`: relative substitution rate for each locus. Relative rates must average to 1.0. Ex. `relative_rates = 0.5, 1.5` for 2 loci\
-`run_on_empty`: set to true to sample from the prior
+`run_on_empty`: set to true to sample from the prior\
 `save_memory`: set to true to throw away partials in likelihood calculations after they are used. This option may take longer but may use less memory.\
 
 ## The following settings apply to simulation option:
