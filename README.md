@@ -8,9 +8,9 @@ The file proj.conf is used to specify program settings:
 `theta`: specify the population-scaled mutation rate\
 `lambda`: specify the speciation rate\
 `subset`: specify the gene partitions in the data file. For example:\
-  `subset = gene1:1-1000`\
-  `subset = gene2:1001-2000`\
-specifies that bases 1-1000 correspond to gene 1 and bases 1001-2000 correspond to gene 2. If no subset is specified, the entire file will be read as one gene
+  *`subset = gene1:1-1000`\
+  *`subset = gene2:1001-2000`\
+      specifies that bases 1-1000 correspond to gene 1 and bases 1001-2000 correspond to gene 2. If no subset is specified, the entire file will be read as one gene
 
 `model`: the model to use in first-level SMC. Current options are JC or HKY\
 `kappa`: if HKY is chosen, set kappa\
