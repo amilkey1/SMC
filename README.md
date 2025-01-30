@@ -4,25 +4,24 @@ This program uses a sequential Monte Carlo approach to sample the posterior dist
 # conf tutorial
 The file proj.conf is used to specify program settings:
 
-`seed`: specify random number seed
-  - default is 1
+`seed`: specify random number seed. Default is 1. \
 `theta`: specify the population-scaled mutation rate\
-`lambda`: specify the speciation rate
+`lambda`: specify the speciation rate\
 `subset`: specify the gene partitions in the data file. For example:
-*`subset = gene1:1-1000`
-*`subset = gene2:1001-2000`
-specifies that bases 1-1000 correspond to gene 1 and bases 1001-2000 correspond to gene 2. If no subset is specified, the entire file will be read as one gene
+  `subset = gene1:1-1000`
+  `subset = gene2:1001-2000`
+specifies that bases 1-1000 correspond to gene 1 and bases 1001-2000 correspond to gene 2. If no subset is specified, the entire file will be read as one gene\
 
-`nparticles`: number of particles to use in the first-level SMC
-`model`: the model to use in first-level SMC. Current options are JC or HKY.
-`kappa`: if HKY is chosen, set kappa
-`base_frequencies`: if HKY is chosen, set base frequencies
-`run_on_empty`: set to true to sample from the prior
-`nthreads`: set to >1 for multithreading
-`verbose`: 0, 1, or 2 determines level of output
-`save_memory`: set to true to throw away partials in likelihood calculations after they are used
-`outgroup`: set to species name
-`startmode`: set to smc or sim to perform SMC or simulate data
+`nparticles`: number of particles to use in the first-level SMC\
+`model`: the model to use in first-level SMC. Current options are JC or HKY\
+`kappa`: if HKY is chosen, set kappa\
+`base_frequencies`: if HKY is chosen, set base frequencies\
+`run_on_empty`: set to true to sample from the prior\
+`nthreads`: set to >1 for multithreading\
+`verbose`: 0, 1, or 2 determines level of output\
+`save_memory`: set to true to throw away partials in likelihood calculations after they are used\
+`outgroup`: set to species name\
+`startmode`: set to smc or sim to perform SMC or simulate data\
 
 The following settings apply to SMC option:
 `datafile`: specify the name of the nexus file containing the raw sequence data
