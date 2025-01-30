@@ -16,7 +16,6 @@ specifies that bases 1-1000 correspond to gene 1 and bases 1001-2000 correspond 
 `kappa`: if HKY is chosen, set kappa\
 `base_frequencies`: if HKY is chosen, set base frequencies\
 `verbose`: 0, 1, or 2 determines level of output\
-`save_memory`: set to true to throw away partials in likelihood calculations after they are used\
 `outgroup`: set to species name\
 `startmode`: set to smc or sim to perform SMC or simulate data
 
@@ -36,6 +35,7 @@ specifies that bases 1-1000 correspond to gene 1 and bases 1001-2000 correspond 
 `fix_theta`: set to true to fix one theta for all populations\
 `relative_rates`: relative substitution rate for each locus. Relative rates must average to 1.0. Ex. `relative_rates = 0.5, 1.5` for 2 loci\
 `run_on_empty`: set to true to sample from the prior
+`save_memory`: set to true to throw away partials in likelihood calculations after they are used. This option may take longer but may use less memory.\
 
 ## The following settings apply to simulation option:
 `filename`: name of file to write simulated data to\
