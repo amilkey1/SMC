@@ -466,7 +466,6 @@ inline vector<double> Particle::getVectorPrior() {
 //        else {
         else if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
             // don't rebuild the species tree at every step when simulating data
-            // TODO: do this at every step, not just after filtering all loci once? - did not work as well on simulation grid
             trimSpeciesTree();
             if (_forests[0]._lineages.size() > 1) {
                 rebuildSpeciesTree();
@@ -507,7 +506,7 @@ inline vector<double> Particle::getVectorPrior() {
                             event_choice_rates.push_back(r.first / total_rate);
                         }
                         
-                        unsigned index = selectEventLinearScale(event_choice_rates); // TODO: do the rates have to be in order?
+                        unsigned index = selectEventLinearScale(event_choice_rates);
                         string species_name = rates_by_species[index].second;
                         _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
                                    
@@ -565,9 +564,8 @@ inline vector<double> Particle::getVectorPrior() {
              done = true;
         
 #if defined (INV_GAMMA_PRIOR_TWO)
-        // TODO: use 2.0, not 2.01, for the inv gamma, then don't include a correction
+        // turn this off when using 2.0, not 2.01, for the inverse gamma - don't include a correction in this case
             // include inverse gamma prior correction for every species population for every locus at every step
-            // TODO: can make this faster by calculating these as the thetas are drawn, but for now, calculate them all each time
             double theta_mean = _forests[1]._theta_mean;
             double eps = 0.01;
             double a = 2.0;
@@ -582,7 +580,7 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
         
 #if defined (WEIGHT_MODIFIER)
-        // modifier only happens on first round // TODO: unsure - does gene order matter?
+        // modifier only happens on first round
         if (_generation == 0 && _forests[1]._theta_prior_mean > 0.0 && _forests[1]._theta_proposal_mean > 0.0) {
             if (_forests[1]._theta_prior_mean != _forests[1]._theta_proposal_mean) {
                 // else, log weight modifier is 0
@@ -617,11 +615,6 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::speciesOnlyProposalIntegratingOutTheta() {
-//        for (unsigned i=0; i<10; i++) {
-//            double u = _lot->uniform();
-//            cout << u << endl;
-//        }
-        
         if (_generation == 0) {
             _species_branches = Forest::_nspecies;
             if (_lambda_prior_mean > 0.0) {
@@ -635,18 +628,12 @@ inline vector<double> Particle::getVectorPrior() {
                 if (i > 1) {
                     _forests[i]._theta_mean = _forests[1]._theta_mean;
                 }
-//                else if (i == 1) {
-//                    _forests[1]._theta_map.clear();
-//                    _forests[1].resetThetaMap(_lot); // reset tip thetas and ancestral pop theta
-//                }
-                // TODO: careful - trying so random seed order matches non jones coalescent like version
             }
         }
         
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
         double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
         
-//        _forests[0].showForest();
 #if !defined (COAL_LIKE_TEST)
         
             if (_forests[0]._last_edge_length > 0.0) {
@@ -660,13 +647,11 @@ inline vector<double> Particle::getVectorPrior() {
                     string species1 = get<0>(species_joined);
                     string species2 = get<1>(species_joined);
                         
-//                    _forests[i].showForest();
                     if (_forests[0]._lineages.size() > 1 && species1 != "null") {
                         // if using Jones formula, species partition update will happen in coalescent likelihood calculation
                         _forests[i].resetDepthVector(species_joined);
                     }
 
-//                    _forests[i].showForest();
                     max_depth = (_forests[i].getMinDepths())[0].first;
                     max_depth_vector.push_back(max_depth);
                 }
@@ -1397,7 +1382,7 @@ inline vector<double> Particle::getVectorPrior() {
             _forests[i]._log_coalescent_likelihood = 0.0;
             _forests[i]._data = nullptr;
             _forests[i]._log_weight = 0.0;
-//            _forests[i]._species_indices.clear(); // TODO: need to save this for use in jones coalescent likelihood calculation
+//            _forests[i]._species_indices.clear(); // save this for use in jones coalescent likelihood calculation
         }
         _gene_order.clear();
         _next_species_number_by_gene.clear();
@@ -1518,9 +1503,7 @@ inline vector<double> Particle::getVectorPrior() {
         
         if (trim_to_previous_join) {
             map<string, double> theta_map = _forests[1]._theta_map;
-            
-            // TODO: testing trimming species tree all the way back to the previous join
-            
+                        
             double min_branch_length = _forests[0]._lineages.back()->_edge_length; // species tree must remain at least as tall as it was after initial trimming
             for (auto &nd:_forests[0]._lineages) {
                 nd->_edge_length -= min_branch_length;
@@ -1539,7 +1522,7 @@ inline vector<double> Particle::getVectorPrior() {
                 // draw an increment and add to existing species lineages, don't join anything else at this stage
                 _forests[0].chooseSpeciesIncrementOnly(_lot, 0.0);
                 edge_increment = _forests[0]._last_edge_length;
-                if (edge_increment < min_branch_length) { // TODO: there must be a better way to do this
+                if (edge_increment < min_branch_length) {
                     for (auto &nd:_forests[0]._lineages) {
                         nd->_edge_length -= edge_increment;
                     }
@@ -1577,7 +1560,7 @@ inline vector<double> Particle::getVectorPrior() {
                         _forests[1].updateThetaMapFixedTheta(_lot, t.first);
                     }
                     else {
-                        _forests[1].updateThetaMap(_lot, t.first); // TODO: make sure this works regardless of gene order
+                        _forests[1].updateThetaMap(_lot, t.first);
                     }
                 }
             }
@@ -1624,7 +1607,7 @@ inline vector<double> Particle::getVectorPrior() {
             // update theta map
             for (auto t:theta_map) {
                 if (t.second == -1.0)  {
-                    _forests[1].updateThetaMap(_lot, t.first); // TODO: make sure this works regardless of gene order
+                    _forests[1].updateThetaMap(_lot, t.first);
                 }
             }
             

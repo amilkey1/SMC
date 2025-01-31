@@ -1056,8 +1056,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             string newick;
         int size_before = (int) newick.size();
             while (getline(infile, newick)) { // file newicks must start with the word "tree" two spaces from the left margin
-            if (newick.find("tree") == 2) { // TODO: not sure why / if this works - switch to checking for parenthesis?
-                // TODO: also need to start at the parenthesis?
+            if (newick.find("tree") == 2) { // TODO: this only works if there are exactly 2 spaces before the newick - try starting at parenthesis
                     size_t pos = newick.find("("); //find location of parenthesis
                     newick.erase(0,pos); //delete everything prior to location found
                 newick_string = newick;
@@ -1073,7 +1072,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             }
             
             for (auto &p:particles) {
-                p.processSpeciesNewick(newick_string); // TODO: can do this once and copy to all particles
+                p.processSpeciesNewick(newick_string);
                 p.mapSpecies(_taxon_map, _species_names);
             }
     }
@@ -1096,7 +1095,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             while (getline(infile, newick)) { // file newicks must start with the word "tree"
                 if (current_gene_newicks.size() < _nparticles) { // stop adding newicks once the number of particles has been reached // TODO: add option to randomize this?
 //                size_t found = newick.find("tree");
-                if (newick.find("tree") == 2) { // TODO: this only works if 2 spaces before gene tree description - find a better way to do this
+                if (newick.find("tree") == 2) { // TODO: this only works if there are exactly 2 spaces before the newick - try starting at parenthesis
                         size_t pos = newick.find("("); //find location of parenthesis
                         newick.erase(0,pos); //delete everything prior to location found
                         current_gene_newicks.push_back(newick);
@@ -1600,7 +1599,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
     //        // Compute component of the log marginal likelihood due to this step
     //        _species_log_marginal_likelihood += log_sum_weights - log(nparticles);
     //        if (step == 0) {
-    //            _species_log_marginal_likelihood += 0; // TODO: not sure
+    //            _species_log_marginal_likelihood += 0;
     //        }
         
         double ess = 0.0;
@@ -1735,7 +1734,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
     }
 
     inline void Proj::createSpeciesMap(Data::SharedPtr d) {
-        // TODO: this only works if names are in taxon^species format (no _)
+        // this only works if names are in taxon^species format (no _)
         const vector<string> &names = d->getTaxonNames();
         for (auto &name:names) {
             regex re(".+\\^(.+)");
@@ -1837,7 +1836,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 assert (use_vec.size() == sample_size);
             }
 
-            mtx.lock(); // TODO: does this slow things down?
+            mtx.lock();
             saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
             saveSpeciesTreesAltHierarchical(use_vec);
             _count++;
@@ -1947,7 +1946,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
 
         if (_nthreads == 1) {
-            for (auto & p:particles ) { // TODO: can initialize some of these things in parallel?
+            for (auto & p:particles ) { // TODO: can initialize some of these things in parallel - probably not worth it
                 p.setData(_data, _taxon_map, partials);
                 partials = false;
                 p.mapSpecies(_taxon_map, _species_names);
@@ -2167,7 +2166,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
         sim_vec[0].setNextSpeciesNumber(); // need to reset this now that number of species is known
         
-        sim_vec[0].setNewTheta(_fix_theta_for_simulations); // TODO: fix theta mean as an option
+        sim_vec[0].setNewTheta(_fix_theta_for_simulations);
         
         sim_vec[0].setParticleLambda(_lambda);
         

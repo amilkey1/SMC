@@ -1049,7 +1049,7 @@ class Forest {
         _nincrements = other._nincrements;
         _preorder.resize(other._preorder.size());
         _panmictic_coalescent_likelihood = other._panmictic_coalescent_likelihood;
-        _theta_map = other._theta_map; // TODO: unsure if this will copy correctly
+        _theta_map = other._theta_map;
         _small_enough = other._small_enough;
         _theta_proposal_mean = other._theta_proposal_mean;
         _theta_mean = other._theta_mean;
@@ -1088,7 +1088,7 @@ class Forest {
             unsigned number = strow.first->_number;
             Node* nd = &*next(_nodes.begin(), number);
             _starting_row[nd] = strow.second;
-        } // TODO: check this is copying correctly
+        }
 #endif
 
         for (auto othernd : other._nodes) {
@@ -1179,7 +1179,6 @@ class Forest {
     }
 
     inline void Forest::chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth) {
-// TODO: BE CAREFUL
         assert (max_depth >= 0.0);
         if (max_depth > 0.0) {
             double rate = (_lambda)*_lineages.size();
@@ -1187,9 +1186,6 @@ class Forest {
             double u = lot->uniform();
             double inner_term = 1-exp(-rate*max_depth);
             _last_edge_length = -log(1-u*inner_term)/rate;
-            // TODO: BE CAREFUL
-//            _last_edge_length = 0.001;
-            // TODO: BE CAREFUL
             assert (_last_edge_length < max_depth);
 
             for (auto nd:_lineages) {
@@ -1568,7 +1564,6 @@ class Forest {
     inline void Forest::buildRestOfTree(Lot::SharedPtr lot) {
 #endif
         
-        // TODO: try using starting distances rather than likelihood minimizer
 # if defined (FASTER_UPGMA_TREE)
         buildRestOfTreeFaster();
 #else
@@ -2106,7 +2101,7 @@ class Forest {
             unsigned temp1 = _lineages.back()->_left_child->_right_sib->_position_in_lineages;
             unsigned temp2 = _lineages.back()->_left_child->_position_in_lineages;
             unsigned i_to_delete = temp1;
-            unsigned j_to_delete = temp2; // TODO: does i need to be the larger number?
+            unsigned j_to_delete = temp2; // i is larger number
 
             if (temp2 > temp1) {
                 i_to_delete = temp2;
@@ -2475,7 +2470,7 @@ class Forest {
 
            // sum unnormalized weights before choosing the pair
            // must include the likelihoods of all pairs in the final particle weight
-           double log_weight_choices_sum = getRunningSumChoices(log_weight_choices); // TODO: just push back node numbers to _node_choices?
+           double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
            _log_weight = log_weight_choices_sum;
            for (unsigned b=0; b < log_weight_choices.size(); b++) {
                log_weight_choices[b] -= log_weight_choices_sum;
@@ -3071,8 +3066,6 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
                             double log_prob_join = log(2/nChooseTwo);
                             log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
 
-    //                            cout << "pr coalescence = " << log_prob_join + log(coalescence_rate) - (increment * coalescence_rate) << endl;
-
                             bool found = (find(s.second.begin(), s.second.end(), node->_right_sib) != s.second.end());
 
                             if (found) {
@@ -3095,8 +3088,6 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
                             double coalescence_rate = nlineages*(nlineages-1) / _theta;
 #endif
                             log_coalescent_likelihood -= increment * coalescence_rate;
-
-    //                            cout << "pr no coalescence = " << -1 * increment * coalescence_rate << endl;
                         }
                     }
 
@@ -3184,8 +3175,6 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
                         double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
                         log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
 
-    //                        cout << "pr coalescence = " << log_prob_join + log(coalescence_rate) - (increment * coalescence_rate) << endl;
-
                         updateNodeList(s.second, node, node->_right_sib, node->_parent); // update the species lineage
                         a++;
                         cum_time += increment;
@@ -3197,7 +3186,6 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         }
         _log_coalescent_likelihood += log_coalescent_likelihood;
         return log_coalescent_likelihood;
-//#endif
     }
 
     inline pair<vector<double>, vector<unsigned>> Forest::calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build) {
@@ -3611,7 +3599,6 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         // find children of node and determine if children are in the same species
         // if children are in different species, calculate the node height
         vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
-    //        vector<double> depths;
     // post order traversal is the reverse of pre order, now sorted by node heights
         string spp_left_child;
         string spp_right_child;
@@ -3642,7 +3629,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
                         
                         if (spp_left_child == "") {
                             if (left_child->_left_child) {
-                                left_child = left_child->_left_child; // TODO: not sure about these; will the parent get accounted for later?
+                                left_child = left_child->_left_child;
                                 // this is saying if the species of the node is not found, the parent will be dealt with later & ignore the node for now
                                 done = true;
                             }
