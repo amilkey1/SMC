@@ -207,6 +207,7 @@ class Forest {
         static bool                 _save_memory;
         static string               _outgroup;
         static bool                 _run_on_empty;
+        static bool                 _run_on_empty_first_level_only;
         static double               _ploidy;
         static string               _start_mode;
         static double               _edge_rate_variance;
@@ -378,6 +379,150 @@ class Forest {
             }
         }
 
+# if defined  (LIKELIHOOD_TEST)
+        for (auto &nd:_lineages) {
+            nd->_edge_length += 0.1299;
+        }
+        calcLogLikelihood();
+        
+        Node* subtree1 = _lineages[3];
+        Node* subtree2 = _lineages[4];
+        
+        Node nd;
+        _nodes.push_back(nd);
+        Node* new_nd = &_nodes.back();
+        new_nd->_parent=0;
+        new_nd->_number=_nleaves+_ninternals;
+        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+        new_nd->_right_sib=0;
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+        
+        updateNodeVector (_lineages, subtree1, subtree2, new_nd);
+        
+        assert (new_nd->_partial == nullptr);
+        new_nd->_partial=ps.getPartial(_npatterns*4);
+        assert(new_nd->_left_child->_right_sib);
+        
+        _relative_rate = 1.0;
+        calcPartialArray(new_nd);
+        
+        showForest();
+        calcLogLikelihood();
+        
+        // next step
+        for (auto &nd:_lineages) {
+            nd->_edge_length += .6703;
+        }
+        subtree1 = _lineages[2];
+        subtree2 = _lineages[3];
+        
+        Node nd2;
+        _nodes.push_back(nd2);
+        Node* new_nd2 = &_nodes.back();
+        new_nd2->_parent=0;
+        new_nd2->_number=_nleaves+_ninternals;
+        new_nd2->_name=boost::str(boost::format("node-%d")%new_nd2->_number);
+        new_nd2->_edge_length=0.0;
+        _ninternals++;
+        new_nd2->_right_sib=0;
+
+        new_nd2->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd2;
+        subtree2->_parent=new_nd2;
+        
+        updateNodeVector (_lineages, subtree1, subtree2, new_nd2);
+        
+        assert (new_nd2->_partial == nullptr);
+        new_nd2->_partial=ps.getPartial(_npatterns*4);
+        assert(new_nd2->_left_child->_right_sib);
+        
+        calcPartialArray(new_nd2);
+        
+        showForest();
+        calcLogLikelihood();
+        
+        // third step
+        for (auto &nd:_lineages) {
+            nd->_edge_length += 0.1277;
+        }
+        subtree1 = _lineages[2];
+        subtree2 = _lineages[0];
+        
+        Node nd3;
+        _nodes.push_back(nd3);
+        Node* new_nd3 = &_nodes.back();
+        new_nd3->_parent=0;
+        new_nd3->_number=_nleaves+_ninternals;
+        new_nd3->_name=boost::str(boost::format("node-%d")%new_nd3->_number);
+        new_nd3->_edge_length=0.0;
+        _ninternals++;
+        new_nd3->_right_sib=0;
+
+        new_nd3->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd3;
+        subtree2->_parent=new_nd3;
+        
+        updateNodeVector (_lineages, subtree1, subtree2, new_nd3);
+        
+        assert (new_nd3->_partial == nullptr);
+        new_nd3->_partial=ps.getPartial(_npatterns*4);
+        assert(new_nd3->_left_child->_right_sib);
+        
+        
+        showForest();
+        
+        calcPartialArray(new_nd3);
+        
+        calcLogLikelihood();
+        
+        // fourth step
+        for (auto &nd:_lineages) {
+            nd->_edge_length += 0.0721;
+        }
+        subtree1 = _lineages[0];
+        subtree2 = _lineages[1];
+        
+        Node nd4;
+        _nodes.push_back(nd4);
+        Node* new_nd4 = &_nodes.back();
+        new_nd4->_parent=0;
+        new_nd4->_number=_nleaves+_ninternals;
+        new_nd4->_name=boost::str(boost::format("node-%d")%new_nd4->_number);
+        new_nd4->_edge_length=0.0;
+        _ninternals++;
+        new_nd4->_right_sib=0;
+
+        new_nd4->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd4;
+        subtree2->_parent=new_nd4;
+        
+        updateNodeVector (_lineages, subtree1, subtree2, new_nd4);
+        
+        assert (new_nd4->_partial == nullptr);
+        new_nd4->_partial=ps.getPartial(_npatterns*4);
+        assert(new_nd4->_left_child->_right_sib);
+        
+        
+        showForest();
+        
+        calcPartialArray(new_nd4);
+        
+        calcLogLikelihood();
+#endif
+        
     }
 
     inline unsigned Forest::numLeaves() const {
@@ -1043,6 +1188,7 @@ class Forest {
         _cum_height = other._cum_height;
         _outgroup = other._outgroup;
         _run_on_empty = other._run_on_empty;
+        _run_on_empty_first_level_only = other._run_on_empty_first_level_only;
         _start_mode = other._start_mode;
         _relative_rate = other._relative_rate;
         _depths = other._depths;

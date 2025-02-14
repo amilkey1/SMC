@@ -37,6 +37,7 @@ double Forest::_kappa = 1.0;
 vector<double> Forest::_base_frequencies;
 string Forest::_string_base_frequencies;
 bool Forest::_run_on_empty;
+bool Forest::_run_on_empty_first_level_only;
 bool Forest::_save_memory;
 double Forest::_ploidy = 2.0;
 double Forest::_theta_proposal_mean = 0.0;

@@ -513,9 +513,13 @@ inline vector<double> Particle::getVectorPrior() {
                         if (Forest::_start_mode == "smc") {
 # if defined (BUILD_UPGMA_TREE)
 # if defined (BUILD_UPGMA_TREE_CONSTRAINED)
-                        _forests[next_gene].buildRestOfTree(_lot, _t);
+                            if (!Forest::_run_on_empty) {
+                                _forests[next_gene].buildRestOfTree(_lot, _t);
+                            }
 #else
-                        _forests[next_gene].buildRestOfTree(_lot);
+                            if (!Forest::_run_on_empty) {
+                                _forests[next_gene].buildRestOfTree(_lot);
+                            }
 #endif
 #endif
                         }
@@ -595,7 +599,7 @@ inline vector<double> Particle::getVectorPrior() {
         
         _generation++;
         
-        if (Forest::_start_mode == "smc") {
+        if (Forest::_start_mode == "smc" && !Forest::_run_on_empty) {
             _log_weight = _forests[next_gene]._log_weight + inv_gamma_modifier;
         }
         else {
@@ -681,7 +685,7 @@ inline vector<double> Particle::getVectorPrior() {
             assert (_log_coalescent_likelihood == 0.0);
 #endif
 
-        if (!Forest::_run_on_empty) {
+        if (!Forest::_run_on_empty || Forest::_run_on_empty_first_level_only) {
             _species_branches += 1;
 //            unsigned nbranches = Forest::_nspecies*2 - 1;
             _log_coalescent_likelihood = 2 * _species_branches * log(_forests[1]._theta_mean) - _species_branches * boost::math::lgamma(2);
@@ -792,7 +796,7 @@ inline vector<double> Particle::getVectorPrior() {
             assert(test != -0); // assert coalescent likelihood is not -inf
 #endif
         
-        if (Forest::_run_on_empty) {
+        if (Forest::_run_on_empty && !Forest::_run_on_empty_first_level_only) {
             assert (_log_coalescent_likelihood == 0.0);
             assert (_log_species_weight == 0.0);
         }

@@ -842,6 +842,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("base_frequencies", boost::program_options::value(&Forest::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ("nthreads",  boost::program_options::value(&_nthreads)->default_value(1), "number of threads for multi threading")
         ("run_on_empty", boost::program_options::value(&Forest::_run_on_empty)->default_value(false), "run program without data")
+        ("run_on_empty_first_level_only", boost::program_options::value(&Forest::_run_on_empty_first_level_only)->default_value(false), "run program without data only for the first level; if setting this to true, also set run_on_empty = true")
         ("verbose", boost::program_options::value(&_verbose)->default_value(1), "set amount of output printed")
         ("save_memory", boost::program_options::value(&Forest::_save_memory)->default_value(false), "save memory at the expense of time")
         ("outgroup", boost::program_options::value(&Forest::_outgroup)->default_value("none"), "a string defining the outgroup")
