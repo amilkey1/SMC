@@ -70,6 +70,7 @@ namespace proj {
             void                handleSpeciesNewick(vector<Particle> particles);
             double              filterParticles(unsigned step, vector<Particle> & particles);
             void                mixParticlePopulations(vector<vector<Particle>> & particles);
+            unsigned            multinomialDraw(const vector<double> & probs);
             double              filterSpeciesParticles(unsigned step, vector<Particle> & particles);
             double              computeEffectiveSampleSize(const vector<double> & probs) const;
             void                saveSpeciesTreesAltHierarchical(vector<Particle> &v) const;
@@ -1513,6 +1514,41 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         return ess;
     }
 
+    inline unsigned Proj::multinomialDraw(const vector<double> & probs) {
+        // Compute cumulative probababilities
+        vector<double> cumprobs(probs.size());
+        partial_sum(probs.begin(), probs.end(), cumprobs.begin());
+        assert(fabs(*(cumprobs.rbegin()) - 1.0) < 0.0001);
+
+        // Draw a Uniform(0,1) random deviate
+        double u = rng.uniform();
+
+        // Find first element in cumprobs greater than u
+        // e.g. probs = {0.2, 0.3, 0.4, 0.1}, u = 0.6, should return 2
+        // because u falls in the third bin
+        //
+        //   |   0   |     1     |        2      | 3 | <-- bins
+        //   |---+---+---+---+---+---+---+---+---+---|
+        //   |       |           |   |           |   |
+        //   0      0.2         0.5  |          0.9  1 <-- cumulative probabilities
+        //                          0.6 <-- u
+        //
+        // cumprobs = {0.2, 0.5, 0.9, 1.0}, u = 0.6
+        //               |         |
+        //               begin()   it
+        // returns 2 = 2 - 0
+        auto it = find_if(cumprobs.begin(), cumprobs.end(), [u](double cumpr){return cumpr > u;});
+        if (it == cumprobs.end()) {
+            double last_cumprob = *(cumprobs.rbegin());
+            throw XProj(format("G::multinomialDraw failed: u = %.9f, last cumprob = %.9f") % u % last_cumprob);
+        }
+
+        auto d = std::distance(cumprobs.begin(), it);
+        assert(d >= 0);
+        assert(d < probs.size());
+        return (unsigned)d;
+    }
+
     inline void Proj::mixParticlePopulations(vector<vector<Particle>> &particles) {
         // move particles between populations
         // Shuffle elements between vectors
@@ -1520,44 +1556,68 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         unsigned ngroups = (unsigned) particles.size();
         unsigned nparticles = (unsigned) particles[0].size();
         
-        
-        
-        // make new vector of particles containing all the particles
-        //  TODO: this is really slow
-        // TODO: shuffle all the indices, then make pairs of indices and swap those particles?
+        // TODO: multinomial draw from all particles
+        vector<double> probs;
+        double prob = (double) 1 / (ngroups*nparticles);
+        probs.resize(ngroups*nparticles, prob);
         
         vector<unsigned> indices;
+        
         for (unsigned a=0; a<ngroups*nparticles; a++) {
-            indices.push_back(a);
+            unsigned index = multinomialDraw(probs);
+            indices.push_back(index);
         }
         
-        std::shuffle(indices.begin(), indices.end(), std::default_random_engine(_random_seed)); // shuffle indices
+        // make new vector of particles containing all the particles // TODO: this is really slow
+        vector<Particle> temp_vec;
         
-        // make pairs of indices
-        unsigned pair_count=0;
-        vector<pair<unsigned, unsigned>> index_pairs;
-        for (unsigned a=0; a<(ngroups*nparticles)/2; a++) {
-            index_pairs.push_back(make_pair(indices[pair_count], indices[pair_count+1]));
-            pair_count+=2;
+        for (unsigned i=0; i<ngroups; i++) {
+            for (auto &p:particles[i]) {
+                temp_vec.push_back(p);
+            }
+        }
+            
+        for (unsigned a=0; a <ngroups*nparticles; a++) {
+            unsigned index = indices[a];
+            
+            index = index % nparticles; // remainder is the index within the group
+            unsigned group = index / nparticles;
+            
+            particles[group][index] = temp_vec[a];
         }
         
-        for (auto &p:index_pairs) {
-            unsigned index1 = p.first;
-            unsigned index2 = p.second;
-            
-            unsigned group1 = p.first / _nparticles;
-            index1 = p.first % nparticles;
-            
-            unsigned group2 = p.second / _nparticles;
-            index2 = p.second % nparticles;
-            
-            // index 30 = 30 / 4 = 7 R 2
-            // group 7, index 2-1
-            
-            // TODO: figure out which group and index each particle is
-            
-            std::swap(particles[group1][index1], particles[group2][index2]);
-        }
+//        vector<unsigned> indices;
+//        for (unsigned a=0; a<ngroups*nparticles; a++) {
+//            indices.push_back(a);
+//        }
+        
+//        std::shuffle(indices.begin(), indices.end(), std::default_random_engine(_random_seed)); // shuffle indices
+//
+//        // make pairs of indices
+//        unsigned pair_count=0;
+//        vector<pair<unsigned, unsigned>> index_pairs;
+//        for (unsigned a=0; a<(ngroups*nparticles)/2; a++) {
+//            index_pairs.push_back(make_pair(indices[pair_count], indices[pair_count+1]));
+//            pair_count+=2;
+//        }
+//
+//        for (auto &p:index_pairs) {
+//            unsigned index1 = p.first;
+//            unsigned index2 = p.second;
+//
+//            unsigned group1 = p.first / _nparticles;
+//            index1 = p.first % nparticles;
+//
+//            unsigned group2 = p.second / _nparticles;
+//            index2 = p.second % nparticles;
+//
+//            // index 30 = 30 / 4 = 7 R 2
+//            // group 7, index 2-1
+//
+//            // TODO: figure out which group and index each particle is
+//
+//            std::swap(particles[group1][index1], particles[group2][index2]);
+//        }
         
 
 //        vector<Particle> temp_particles;
@@ -2336,7 +2396,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
         else {
             
-            unsigned ngroups = 4; // TODO: fixing this for now
+            unsigned ngroups = 10; // TODO: fixing this for now
             
             _first_line = true;
             if (_verbose > 0) {
@@ -2546,12 +2606,30 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 //                            sw.start();
                             for (unsigned i=0; i<ngroups; i++) {
                                 double ess = filterParticles(g, my_vec[i]);
+                                
+                                if (_verbose > 1) {
+                                    cout << "\t" << "ESS is : " << ess << endl;
+                                }
 //                            double total_seconds = sw.stop();
 //                            cout << "\nTotal time for filtering step " << g << " : " << total_seconds << endl;
 //                            cout << total_seconds << endl;
                             }
                             
+//                            for (unsigned i=0; i<ngroups; i++) {
+//                                for (auto &p:my_vec[i]) {
+//                                    p.showParticle();
+//                                }
+//                            }
+                            
                             mixParticlePopulations(my_vec);
+
+//                            cout << "XXXXXXXXXXX" << endl;
+                            
+//                            for (unsigned i=0; i<ngroups; i++) {
+//                                for (auto &p:my_vec[i]) {
+//                                    p.showParticle();
+//                                }
+//                            }
 
                             unsigned species_count = 0;
                             
