@@ -61,7 +61,9 @@ namespace proj {
             void                proposeSpeciesGroups(vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets, unsigned ntaxa);
             void                proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets, unsigned ntaxa);
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
+            void                proposeParticleGroupRange(unsigned first, unsigned last, vector<vector<Particle>> &particles);
             void                proposeParticles(vector<Particle> &particles);
+            void                proposeParticlesParallelizeByGroup(vector<vector<Particle>> &particles);
             void                simulateData();
             void                writePaupFile(vector<Particle> particles, vector<string> taxpartition);
             void                initializeParticles(vector<Particle> &particles);
@@ -1552,40 +1554,72 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
     inline void Proj::mixParticlePopulations(vector<vector<Particle>> &particles) {
         // move particles between populations
         // Shuffle elements between vectors
+        
+        // TODO: can maybe combine all of them into one vector, then set all the weights equal, then just filter the particles as usual, then move them back into their group structure?
     
         unsigned ngroups = (unsigned) particles.size();
         unsigned nparticles = (unsigned) particles[0].size();
         
-        // TODO: multinomial draw from all particles
-        vector<double> probs;
-        double prob = (double) 1 / (ngroups*nparticles);
-        probs.resize(ngroups*nparticles, prob);
-        
-        vector<unsigned> indices;
-        
-        for (unsigned a=0; a<ngroups*nparticles; a++) {
-            unsigned index = multinomialDraw(probs);
-            indices.push_back(index);
-        }
-        
-        // make new vector of particles containing all the particles // TODO: this is really slow
-        vector<Particle> temp_vec;
+        double weight = (double) 1 / (ngroups*nparticles);
         
         for (unsigned i=0; i<ngroups; i++) {
-            for (auto &p:particles[i]) {
-                temp_vec.push_back(p);
+            for (int p=nparticles-1; p>-1; p--) {
+                particles[i][p].setLogWeight(weight);
+                if (i > 0) {
+                    particles[0].push_back(particles[i][p]);
+                    particles[i].erase(particles[i].begin() + p);
+                }
             }
         }
-            
-        for (unsigned a=0; a <ngroups*nparticles; a++) {
-            unsigned index = indices[a];
-            
-            index = index % nparticles; // remainder is the index within the group
-            unsigned group = index / nparticles;
-            
-            particles[group][index] = temp_vec[a];
+        
+        filterParticles(0, particles[0]);
+        
+        // TODO: restructure particles into groups
+        
+        unsigned particle_index = (nparticles * ngroups) - 1;
+        
+        for (unsigned i=1; i<ngroups; i++) {
+            for (int p=0; p < nparticles; p++) {
+                particles[i].push_back(particles[0][particle_index]);
+                particles[0].erase(particles[0].begin() + particle_index);
+                particle_index--;
+            }
         }
         
+        assert (particle_index == nparticles - 1); // group 0 doesn't get reset
+        
+//        particles[0].resize(nparticles); // delete extra particles from particles
+                
+        // multinomial draw from all particles
+//        vector<double> probs;
+//        double prob = (double) 1 / (ngroups*nparticles);
+//        probs.resize(ngroups*nparticles, prob);
+//
+//        vector<unsigned> indices;
+//
+//        for (unsigned a=0; a<ngroups*nparticles; a++) {
+//            unsigned index = multinomialDraw(probs);
+//            indices.push_back(index);
+//        }
+//
+//        // make new vector of particles containing all the particles // TODO: this is really slow
+//        vector<Particle> temp_vec;
+//
+//        for (unsigned i=0; i<ngroups; i++) {
+//            for (auto &p:particles[i]) {
+//                temp_vec.push_back(p);
+//            }
+//        }
+//
+//        for (unsigned a=0; a <ngroups*nparticles; a++) {
+//            unsigned index = indices[a];
+//
+//            index = index % nparticles; // remainder is the index within the group
+//            unsigned group = index / nparticles;
+//
+//            particles[group][index] = temp_vec[a];
+//        }
+//
 //        vector<unsigned> indices;
 //        for (unsigned a=0; a<ngroups*nparticles; a++) {
 //            indices.push_back(a);
@@ -2157,6 +2191,53 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
     }
 
+    inline void Proj::proposeParticlesParallelizeByGroup(vector<vector<Particle>> &particles) {
+        assert (_nthreads > 0);
+        
+        unsigned ngroups = (unsigned) particles.size();
+        
+        if (_nthreads == 1) {
+            for (unsigned i=0; i<ngroups; i++) {
+                for (auto &p:particles[i]) {
+                    p.proposal();
+                }
+            }
+        }
+        else {
+            // run each group separately
+            // divide up the groups as evenly as possible across threads
+            unsigned first = 0;
+            unsigned last = 0;
+            unsigned stride = ngroups / _nthreads; // divisor
+            unsigned r = ngroups % _nthreads; // remainder
+
+            // need a vector of threads because we have to wait for each one to finish
+            vector<thread> threads;
+
+            for (unsigned i=0; i<_nthreads; i++) {
+                first = last;
+                last = first + stride;
+
+                if (r > 0) {
+                    last += 1;
+                    r -= 1;
+                }
+
+                if (last > ngroups) {
+                    last = ngroups;
+                }
+
+                threads.push_back(thread(&Proj::proposeParticleGroupRange, this, first, last, std::ref(particles)));
+            }
+
+
+          // the join function causes this loop to pause until the ith thread finishes
+          for (unsigned i = 0; i < threads.size(); i++) {
+            threads[i].join();
+          }
+        }
+    }
+
     inline void Proj::proposeParticles(vector<Particle> &particles) {
         assert(_nthreads > 0);
         if (_nthreads == 1) {
@@ -2195,6 +2276,14 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
           for (unsigned i = 0; i < threads.size(); i++) {
             threads[i].join();
           }
+        }
+    }
+
+    inline void Proj::proposeParticleGroupRange(unsigned first, unsigned last, vector<vector<Particle>> &particles) {
+        for (unsigned i=first; i<last; i++){
+            for (auto &p:particles[i]) {
+                p.proposal();
+            }
         }
     }
 
@@ -2574,9 +2663,10 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         
 //                        StopWatch sw;
 //                        sw.start();
-                        for (unsigned i=0; i<ngroups; i++) {
-                            proposeParticles(my_vec[i]);
-                        }
+//                        for (unsigned i=0; i<ngroups; i++) {
+//                            proposeParticles(my_vec[i]);
+//                        }
+                        proposeParticlesParallelizeByGroup(my_vec);
 //                        double total_seconds = sw.stop();
 //                        cout << "\nTotal time for proposal step " << g << " : " << total_seconds << endl;
 //                        cout << total_seconds << endl;
