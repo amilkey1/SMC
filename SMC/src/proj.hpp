@@ -129,6 +129,7 @@ namespace proj {
             bool                        _save_gene_trees_separately;
             string                      _newick_path;
             vector<Lot::SharedPtr>      _group_rng;
+            unsigned                    _ngroups;
 
     };
 
@@ -200,9 +201,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         logf << endl;
 
         int iter = 0;
-        unsigned ngroups = (unsigned) v.size();
         
-        for (unsigned j=0; j<ngroups; j++) {
+        for (unsigned j=0; j<_ngroups; j++) {
             for (auto &p:v[j]) {
                 logf << iter;
                 iter++;
@@ -721,13 +721,12 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
     }
 
     inline void Proj::saveAllSpeciesTrees(vector<vector<Particle>> &v) const {
-        unsigned ngroups = (unsigned) v.size();
         
         // save all species trees
         ofstream treef("species_trees.trees");
         treef << "#nexus\n\n";
         treef << "begin trees;\n";
-        for (unsigned i=0; i<ngroups; i++) {
+        for (unsigned i=0; i<_ngroups; i++) {
                 for (auto &p:v[i]) {
                     treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
                 }
@@ -837,8 +836,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         treef << "#nexus\n\n";
         treef << "begin trees;\n";
         
-        unsigned ngroups = (unsigned) v.size();
-        for (unsigned i=0; i<ngroups; i++) {
+        for (unsigned i=0; i<_ngroups; i++) {
             for (auto &p:v[i]) {
                 treef << "  tree test = [&R] " << p.saveGeneNewick(gene_number)  << ";\n";
                 treef << endl;
@@ -899,6 +897,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         ("simcomphet",   boost::program_options::value(&Forest::_comphet)->default_value(Forest::_infinity), "Dirichlet parameter governing compositional heterogeneity (default value results in compositional homogeneity (used only if startmode is 'sim')")
         ("save_gene_trees_separately", boost::program_options::value(&_save_gene_trees_separately)->default_value(false), "for simulations, save gene trees in separate files")
         ("newick_path", boost::program_options::value(&_newick_path)->default_value("."), "path to gene newicks are if starting from gene newicks and only performing SMC on second round")
+        ("ngroups", boost::program_options::value(&_ngroups)->default_value(5), "number of populations")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -1557,12 +1556,11 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         
         // TODO: can maybe combine all of them into one vector, then set all the weights equal, then just filter the particles as usual, then move them back into their group structure?
     
-        unsigned ngroups = (unsigned) particles.size();
         unsigned nparticles = (unsigned) particles[0].size();
         
-        double weight = (double) 1 / (ngroups*nparticles);
+        double weight = (double) 1 / (_ngroups*nparticles);
         
-        for (unsigned i=0; i<ngroups; i++) {
+        for (unsigned i=0; i<_ngroups; i++) {
             for (int p=nparticles-1; p>-1; p--) {
                 particles[i][p].setLogWeight(weight);
                 if (i > 0) {
@@ -1576,9 +1574,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         
         // TODO: restructure particles into groups
         
-        unsigned particle_index = (nparticles * ngroups) - 1;
+        unsigned particle_index = (nparticles * _ngroups) - 1;
         
-        for (unsigned i=1; i<ngroups; i++) {
+        for (unsigned i=1; i<_ngroups; i++) {
             for (int p=0; p < nparticles; p++) {
                 particles[i].push_back(particles[0][particle_index]);
                 particles[0].erase(particles[0].begin() + particle_index);
@@ -2193,11 +2191,9 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
     inline void Proj::proposeParticlesParallelizeByGroup(vector<vector<Particle>> &particles) {
         assert (_nthreads > 0);
-        
-        unsigned ngroups = (unsigned) particles.size();
-        
+                
         if (_nthreads == 1) {
-            for (unsigned i=0; i<ngroups; i++) {
+            for (unsigned i=0; i<_ngroups; i++) {
                 for (auto &p:particles[i]) {
                     p.proposal();
                 }
@@ -2208,8 +2204,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             // divide up the groups as evenly as possible across threads
             unsigned first = 0;
             unsigned last = 0;
-            unsigned stride = ngroups / _nthreads; // divisor
-            unsigned r = ngroups % _nthreads; // remainder
+            unsigned stride = _ngroups / _nthreads; // divisor
+            unsigned r = _ngroups % _nthreads; // remainder
 
             // need a vector of threads because we have to wait for each one to finish
             vector<thread> threads;
@@ -2223,8 +2219,8 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                     r -= 1;
                 }
 
-                if (last > ngroups) {
-                    last = ngroups;
+                if (last > _ngroups) {
+                    last = _ngroups;
                 }
 
                 threads.push_back(thread(&Proj::proposeParticleGroupRange, this, first, last, std::ref(particles)));
@@ -2484,9 +2480,6 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
             }
         }
         else {
-            
-            unsigned ngroups = 10; // TODO: fixing this for now
-            
             _first_line = true;
             if (_verbose > 0) {
                 cout << "Starting..." << endl;
@@ -2538,19 +2531,19 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 
                 vector<vector<Particle>> my_vec;
 //                my_vec.resize(nparticles);
-                my_vec.resize(ngroups);
+                my_vec.resize(_ngroups);
                 
-                for (unsigned i=0; i<ngroups; i++) {
+                for (unsigned i=0; i<_ngroups; i++) {
                     my_vec[i].resize(nparticles);
                 }
 
-                for (unsigned i=0; i<ngroups; i++) {
+                for (unsigned i=0; i<_ngroups; i++) {
                     for (unsigned j=0; j<nparticles; j++) {
                         my_vec[i][j] = Particle();
                     }
                 }
 
-                for (unsigned i=0; i<ngroups; i++) {
+                for (unsigned i=0; i<_ngroups; i++) {
                     initializeParticles(my_vec[i]); // initialize in parallel with multithreading
                 }
       
@@ -2577,7 +2570,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 assert (gene_order.size() == list_size);
                 
                 unsigned particle_num = 0;
-                for (unsigned i=0; i<ngroups; i++) {
+                for (unsigned i=0; i<_ngroups; i++) {
                     for (auto &p:my_vec[i]) {
                         p.setGeneOrder(gene_order);
     #if defined (FASTER_UPGMA_TREE)
@@ -2607,14 +2600,14 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 }
 
                 unsigned psuffix = 1;
-                for (unsigned i=0; i<ngroups; i++) {
+                for (unsigned i=0; i<_ngroups; i++) {
                     for (auto &p:my_vec[i]) {
                         p.setSeed(rng.randint(1,9999) + psuffix);
                         psuffix += 2;
                     }
                 }
 
-                for (unsigned i=0; i<ngroups; i++) {
+                for (unsigned i=0; i<_ngroups; i++) {
                     for (auto &p:my_vec[i]) { // TODO: can parallelize this - is it worth it?
                         p.drawParticleLambda();
                         if (!Forest::_run_on_empty) {
@@ -2634,7 +2627,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 }
                 
                 if (Forest::_save_memory) {
-                    for (unsigned i=0; i<ngroups; i++) {
+                    for (unsigned i=0; i<_ngroups; i++) {
                         my_vec[i][0].clearPartials(); // all other particles should have no partials
                     }
                 }
@@ -2651,7 +2644,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         unsigned psuffix = 1;
                         if (g > 0) {
                             // set particle random number seeds
-                                for (unsigned i=0; i<ngroups; i++) {
+                                for (unsigned i=0; i<_ngroups; i++) {
                                 for (auto &p:my_vec[i]) {
                                     p.setSeed(rng.randint(1,9999) + psuffix);
                                     psuffix += 2;
@@ -2663,7 +2656,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         
 //                        StopWatch sw;
 //                        sw.start();
-//                        for (unsigned i=0; i<ngroups; i++) {
+//                        for (unsigned i=0; i<_ngroups; i++) {
 //                            proposeParticles(my_vec[i]);
 //                        }
                         proposeParticlesParallelizeByGroup(my_vec);
@@ -2674,7 +2667,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                         unsigned num_species_particles_proposed = 0;
 
                         if (_verbose > 1) {
-                            for (unsigned i=0; i<ngroups; i++) {
+                            for (unsigned i=0; i<_ngroups; i++) {
                                 for (auto &p:my_vec[i]) {
                                     if (p.speciesJoinProposed()) {
                                         num_species_particles_proposed++;
@@ -2694,7 +2687,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                             StopWatch sw;
                             
 //                            sw.start();
-                            for (unsigned i=0; i<ngroups; i++) {
+                            for (unsigned i=0; i<_ngroups; i++) {
                                 double ess = filterParticles(g, my_vec[i]);
                                 
                                 if (_verbose > 1) {
@@ -2705,7 +2698,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 //                            cout << total_seconds << endl;
                             }
                             
-//                            for (unsigned i=0; i<ngroups; i++) {
+//                            for (unsigned i=0; i<_ngroups; i++) {
 //                                for (auto &p:my_vec[i]) {
 //                                    p.showParticle();
 //                                }
@@ -2715,7 +2708,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
 //                            cout << "XXXXXXXXXXX" << endl;
                             
-//                            for (unsigned i=0; i<ngroups; i++) {
+//                            for (unsigned i=0; i<_ngroups; i++) {
 //                                for (auto &p:my_vec[i]) {
 //                                    p.showParticle();
 //                                }
@@ -2740,7 +2733,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 } // g loop
                 
                 if (_save_gene_trees) {
-//                    for (unsigned i=0; i<ngroups; i++) {
+//                    for (unsigned i=0; i<_ngroups; i++) {
                         for (int i=1; i<nsubsets+1; i++) {
                             saveGeneTree(i, my_vec);
                         }
@@ -2753,7 +2746,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 }
 
 #if !defined (HIERARCHICAL_FILTERING)
-//                for (unsigned i=0; i<ngroups; i++) {
+//                for (unsigned i=0; i<_ngroups; i++) {
 //                    saveSpeciesTrees(my_vec[i]);
                     writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
 //                }
