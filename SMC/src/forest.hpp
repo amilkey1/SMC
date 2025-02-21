@@ -381,11 +381,11 @@ class Forest {
 
 # if defined  (LIKELIHOOD_TEST)
         for (auto &nd:_lineages) {
-            nd->_edge_length += 0.1299;
+            nd->_edge_length += 1.4617;
         }
         calcLogLikelihood();
         
-        Node* subtree1 = _lineages[3];
+        Node* subtree1 = _lineages[5];
         Node* subtree2 = _lineages[4];
         
         Node nd;
@@ -418,9 +418,10 @@ class Forest {
         
         // next step
         for (auto &nd:_lineages) {
-            nd->_edge_length += .6703;
+            nd->_edge_length += 4.1553;
+//            nd->_edge_length += 0.01;
         }
-        subtree1 = _lineages[2];
+        subtree1 = _lineages[1];
         subtree2 = _lineages[3];
         
         Node nd2;
@@ -452,10 +453,10 @@ class Forest {
         
         // third step
         for (auto &nd:_lineages) {
-            nd->_edge_length += 0.1277;
+            nd->_edge_length += 0.4611;
         }
         subtree1 = _lineages[2];
-        subtree2 = _lineages[0];
+        subtree2 = _lineages[4];
         
         Node nd3;
         _nodes.push_back(nd3);
@@ -488,10 +489,11 @@ class Forest {
         
         // fourth step
         for (auto &nd:_lineages) {
-            nd->_edge_length += 0.0721;
+            nd->_edge_length += 9.4541;
+//            nd->_edge_length += 0.1;
         }
-        subtree1 = _lineages[0];
-        subtree2 = _lineages[1];
+        subtree1 = _lineages[1];
+        subtree2 = _lineages[2];
         
         Node nd4;
         _nodes.push_back(nd4);
@@ -521,6 +523,8 @@ class Forest {
         calcPartialArray(new_nd4);
         
         calcLogLikelihood();
+        
+        showForest();
 #endif
         
     }

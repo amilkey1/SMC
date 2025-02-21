@@ -71,7 +71,7 @@ namespace proj {
             void                handleGeneNewicks();
             void                handleSpeciesNewick(vector<Particle> particles);
             double              filterParticles(unsigned step, vector<Particle> & particles);
-            void                mixParticlePopulations(vector<vector<Particle>> & particles);
+            void                filterParticlesMixing(vector<vector<Particle>> & particles);
             unsigned            multinomialDraw(const vector<double> & probs);
             double              filterSpeciesParticles(unsigned step, vector<Particle> & particles);
             double              computeEffectiveSampleSize(const vector<double> & probs) const;
@@ -1550,127 +1550,103 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         return (unsigned)d;
     }
 
-    inline void Proj::mixParticlePopulations(vector<vector<Particle>> &particles) {
-        // move particles between populations
-        // Shuffle elements between vectors
+    inline void Proj::filterParticlesMixing(vector<vector<Particle>> & particles) {
+        // set all particle weights equal and filter particles between populations
         
-        // TODO: can maybe combine all of them into one vector, then set all the weights equal, then just filter the particles as usual, then move them back into their group structure?
-    
         unsigned nparticles = (unsigned) particles[0].size();
+        unsigned ngroups = (unsigned) particles.size();
+        
+        unsigned total_n_particles = nparticles * ngroups;
         
         double weight = (double) 1 / (_ngroups*nparticles);
         
-        for (unsigned i=0; i<_ngroups; i++) {
-            for (int p=nparticles-1; p>-1; p--) {
-                particles[i][p].setLogWeight(weight);
-                if (i > 0) {
-                    particles[0].push_back(particles[i][p]);
-                    particles[i].erase(particles[i].begin() + p);
-                }
-            }
-        }
-        
-        filterParticles(0, particles[0]);
-        
-        // TODO: restructure particles into groups
-        
-        unsigned particle_index = (nparticles * _ngroups) - 1;
-        
-        for (unsigned i=1; i<_ngroups; i++) {
-            for (int p=0; p < nparticles; p++) {
-                particles[i].push_back(particles[0][particle_index]);
-                particles[0].erase(particles[0].begin() + particle_index);
-                particle_index--;
-            }
-        }
-        
-        assert (particle_index == nparticles - 1); // group 0 doesn't get reset
-        
-//        particles[0].resize(nparticles); // delete extra particles from particles
-                
-        // multinomial draw from all particles
-//        vector<double> probs;
-//        double prob = (double) 1 / (ngroups*nparticles);
-//        probs.resize(ngroups*nparticles, prob);
-//
-//        vector<unsigned> indices;
-//
-//        for (unsigned a=0; a<ngroups*nparticles; a++) {
-//            unsigned index = multinomialDraw(probs);
-//            indices.push_back(index);
-//        }
-//
-//        // make new vector of particles containing all the particles // TODO: this is really slow
-//        vector<Particle> temp_vec;
-//
-//        for (unsigned i=0; i<ngroups; i++) {
-//            for (auto &p:particles[i]) {
-//                temp_vec.push_back(p);
-//            }
-//        }
-//
-//        for (unsigned a=0; a <ngroups*nparticles; a++) {
-//            unsigned index = indices[a];
-//
-//            index = index % nparticles; // remainder is the index within the group
-//            unsigned group = index / nparticles;
-//
-//            particles[group][index] = temp_vec[a];
-//        }
-//
-//        vector<unsigned> indices;
-//        for (unsigned a=0; a<ngroups*nparticles; a++) {
-//            indices.push_back(a);
-//        }
-        
-//        std::shuffle(indices.begin(), indices.end(), std::default_random_engine(_random_seed)); // shuffle indices
-//
-//        // make pairs of indices
-//        unsigned pair_count=0;
-//        vector<pair<unsigned, unsigned>> index_pairs;
-//        for (unsigned a=0; a<(ngroups*nparticles)/2; a++) {
-//            index_pairs.push_back(make_pair(indices[pair_count], indices[pair_count+1]));
-//            pair_count+=2;
-//        }
-//
-//        for (auto &p:index_pairs) {
-//            unsigned index1 = p.first;
-//            unsigned index2 = p.second;
-//
-//            unsigned group1 = p.first / _nparticles;
-//            index1 = p.first % nparticles;
-//
-//            unsigned group2 = p.second / _nparticles;
-//            index2 = p.second % nparticles;
-//
-//            // index 30 = 30 / 4 = 7 R 2
-//            // group 7, index 2-1
-//
-//            // TODO: figure out which group and index each particle is
-//
-//            std::swap(particles[group1][index1], particles[group2][index2]);
-//        }
-        
+        // Copy log weights for all bundles to prob vector
+        vector<double> probs(total_n_particles, weight);
+          
 
-//        vector<Particle> temp_particles;
-//        for (unsigned i=0; i<ngroups; i++) {
-//            for (auto &p:particles[i]) {
-//                temp_particles.push_back(p);
-//            }
-//        }
-        
-//        std::shuffle(temp_particles.begin(), temp_particles.end(), std::default_random_engine(_random_seed)); // shuffle particles using seed
-        
-//        unsigned count = 0;
-        // replacing existing particle vec with new, shuffled particles
-//            for (unsigned i=0; i<ngroups; i++) {
-//                for (unsigned j = 0; j<nparticles; j++) {
-//                    particles[i][j] = temp_particles[count];
-//                    count++;
-//                    assert (count < temp_particles.size()+1);
-//                }
-//            }
+          // Normalize log_weights to create discrete probability distribution
+          double log_sum_weights = getRunningSum(probs);
+
+          transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
+
+          // Compute cumulative probabilities
+          partial_sum(probs.begin(), probs.end(), probs.begin());
+
+          // Initialize vector of counts storing number of darts hitting each particle
+          vector<unsigned> counts (total_n_particles, 0);
+
+          // Throw _nparticles darts
+          for (unsigned i=0; i<total_n_particles; i++) {
+              double u = rng.uniform();
+              auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
+              assert(it != probs.end());
+              unsigned which = (unsigned)std::distance(probs.begin(), it);
+              counts[which]++;
+          }
+
+          // Copy particles
+
+        bool copying_needed = true;
+
+          // Locate first donor
+          unsigned donor = 0;
+          while (counts[donor] < 2) {
+              donor++;
+              if (donor >= counts.size()) {
+                  copying_needed = false; // all the particle counts are 1
+                  break;
+              }
+          }
+
+        if (copying_needed) {
+              // Locate first recipient
+              unsigned recipient = 0;
+              while (counts[recipient] != 0) {
+                  recipient++;
+              }
+
+              // Count number of cells with zero count that can serve as copy recipients
+              unsigned nzeros = 0;
+              for (unsigned i = 0; i < nparticles; i++) {
+                  if (counts[i] == 0)
+                      nzeros++;
+              }
+
+              while (nzeros > 0) {
+                  assert(donor < total_n_particles);
+                  assert(recipient < total_n_particles);
+                  
+                  unsigned recipient_group = recipient / nparticles;
+                  unsigned recipient_index = recipient % nparticles;
+                  
+                  unsigned donor_group = donor / nparticles;
+                  unsigned donor_index = donor % nparticles;
+                  
+                  // Copy donor to recipient
+                  particles[recipient_group][recipient_index] = particles[donor_group][donor_index];
+//                  particles[recipient] = particles[donor];
+
+                  counts[donor]--;
+                  counts[recipient]++;
+                  nzeros--;
+
+                  if (counts[donor] == 1) {
+                      // Move donor to next slot with count > 1
+                      donor++;
+                      while (donor < nparticles && counts[donor] < 2) {
+                          donor++;
+                      }
+                  }
+
+                  // Move recipient to next slot with count equal to 0
+                  recipient++;
+                  while (recipient < nparticles && counts[recipient] > 0) {
+                      recipient++;
+                  }
+              }
         }
+      }
+
 
     inline double Proj::filterParticles(unsigned step, vector<Particle> & particles) {
           unsigned nparticles = (unsigned) particles.size();
@@ -2698,21 +2674,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 //                            cout << total_seconds << endl;
                             }
                             
-//                            for (unsigned i=0; i<_ngroups; i++) {
-//                                for (auto &p:my_vec[i]) {
-//                                    p.showParticle();
-//                                }
-//                            }
-                            
-                            mixParticlePopulations(my_vec);
-
-//                            cout << "XXXXXXXXXXX" << endl;
-                            
-//                            for (unsigned i=0; i<_ngroups; i++) {
-//                                for (auto &p:my_vec[i]) {
-//                                    p.showParticle();
-//                                }
-//                            }
+                            filterParticlesMixing(my_vec);
 
                             unsigned species_count = 0;
                             
@@ -2746,10 +2708,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                 }
 
 #if !defined (HIERARCHICAL_FILTERING)
-//                for (unsigned i=0; i<_ngroups; i++) {
-//                    saveSpeciesTrees(my_vec[i]);
-                    writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
-//                }
+                writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
                 
                 saveAllSpeciesTrees(my_vec);
 #endif
