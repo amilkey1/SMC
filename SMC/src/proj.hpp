@@ -1550,11 +1550,13 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         return (unsigned)d;
     }
 
+
     inline void Proj::filterParticlesMixing(vector<vector<Particle>> & particles) {
-        // set all particle weights equal and filter particles between populations
-        
         unsigned nparticles = (unsigned) particles[0].size();
         unsigned ngroups = (unsigned) particles.size();
+        
+        assert (nparticles == _nparticles);
+        assert (ngroups == _ngroups);
         
         unsigned total_n_particles = nparticles * ngroups;
         
@@ -1570,7 +1572,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
           transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
 
           // Compute cumulative probabilities
-          partial_sum(probs.begin(), probs.end(), probs.begin());
+          partial_sum(probs.begin(), probs.end(), probs.begin()); // TODO: assert sum to 1
 
           // Initialize vector of counts storing number of darts hitting each particle
           vector<unsigned> counts (total_n_particles, 0);
@@ -1607,7 +1609,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
               // Count number of cells with zero count that can serve as copy recipients
               unsigned nzeros = 0;
-              for (unsigned i = 0; i < nparticles; i++) {
+              for (unsigned i = 0; i < total_n_particles; i++) {
                   if (counts[i] == 0)
                       nzeros++;
               }
@@ -1633,14 +1635,15 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                   if (counts[donor] == 1) {
                       // Move donor to next slot with count > 1
                       donor++;
-                      while (donor < nparticles && counts[donor] < 2) {
+                      while (donor < total_n_particles && counts[donor] < 2) {
                           donor++;
                       }
                   }
 
                   // Move recipient to next slot with count equal to 0
                   recipient++;
-                  while (recipient < nparticles && counts[recipient] > 0) {
+                  while (recipient < total_n_particles && counts[recipient] > 0) {
+//                  while (recipient < nparticles && counts[recipient] > 0) {
                       recipient++;
                   }
               }
