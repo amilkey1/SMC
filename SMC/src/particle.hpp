@@ -61,6 +61,7 @@ class Particle {
         double                                  getLogWeight() const {return _log_weight;}
         double                                  getSpeciesIncrement () {return _forests[0]._last_edge_length;}
         double                                  getSpeciesLogWeight() const {return _log_species_weight;}
+        unsigned                                getPartialCount();
         void                                    setLogWeight(double w){_log_weight = w;}
         void                                    setLogSpeciesWeight(double w){_log_species_weight = w;}
         void                                    setLogLikelihood(vector<double> forest_likelihoods);
@@ -413,7 +414,10 @@ class Particle {
         // starbeast3 does not include gene tree priors separately - this is already accounted for in coalescent likelihood
         total_prior += species_tree_prior;
     #if defined (DRAW_NEW_THETA)
-        total_prior += log(Forest::_theta_prior_mean) - (_forests[1]._theta * Forest::_theta_prior_mean);
+        if (Forest::_theta_prior_mean > 0.0) {
+            total_prior += log(Forest::_theta_prior_mean) - (_forests[1]._theta * Forest::_theta_prior_mean);
+        }
+        // TODO: what if theta mean is set?
     #endif
         return total_prior;
     }
@@ -1657,6 +1661,14 @@ inline vector<double> Particle::getVectorPrior() {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].setNTaxaPerSpecies(ntaxa_per_species);
         }
+    }
+
+    inline unsigned Particle::getPartialCount() {
+        unsigned partial_count = 0;
+        for (auto &f:_forests) {
+            partial_count += f._partials_calculated_count;
+        }
+        return partial_count;
     }
 
     inline void Particle::operator=(const Particle & other) {

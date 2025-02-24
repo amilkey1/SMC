@@ -52,6 +52,7 @@ namespace proj {
             void                writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<vector<Particle>> &v) const;
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v, string filename, unsigned group_number);
             void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v, string filename, unsigned group_number);
+            void                writePartialCountFile(vector<vector<Particle>> &particles);
             void                createSpeciesMap(Data::SharedPtr);
             void                simSpeciesMap();
             string              inventName(unsigned k, bool lower_case);
@@ -154,8 +155,7 @@ namespace proj {
         _double_relative_rates.clear();
     }
 
-//    inline void Proj::saveAllForests(const vector<Particle> &v) const {
-inline void Proj::saveAllForests(vector<Particle> &v) const {
+    inline void Proj::saveAllForests(vector<Particle> &v) const {
         ofstream treef("forest.trees");
         treef << "#nexus\n\n";
         treef << "begin trees;\n";
@@ -164,6 +164,20 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         }
         treef << "end;\n";
         treef.close();
+    }
+
+    inline void Proj::writePartialCountFile(vector<vector<Particle>> &particles) {
+        ofstream partialf("partial_count.txt");
+        partialf << "total times partials calculated: ";
+        
+        unsigned partial_count = 0;
+        for (unsigned g=0; g<_ngroups; g++) {
+            for (auto &p:particles[g]) {
+                partial_count += p.getPartialCount();
+            }
+        }
+        partialf << partial_count << "\n";
+        partialf.close();
     }
 
     inline void Proj::writeParamsFileForBeastComparison(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<vector<Particle>> &v) const {
@@ -1162,15 +1176,14 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
         rng.setSeed(_random_seed);
 
 //          create vector of particles
-        unsigned nparticles = _nparticles;
 
         unsigned nsubsets = _data->getNumSubsets();
         Particle::setNumSubsets(nsubsets);
         
         vector<Particle> my_vec;
-        my_vec.resize(nparticles);
+        my_vec.resize(_nparticles);
 
-        for (unsigned i=0; i<nparticles; i++) {
+        for (unsigned i=0; i<_nparticles; i++) {
             my_vec[i] = Particle();
         }
 
@@ -1552,27 +1565,21 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
 
     inline void Proj::filterParticlesMixing(vector<vector<Particle>> & particles) {
-        unsigned nparticles = (unsigned) particles[0].size();
-        unsigned ngroups = (unsigned) particles.size();
+        unsigned total_n_particles = _nparticles * _ngroups;
         
-        assert (nparticles == _nparticles);
-        assert (ngroups == _ngroups);
-        
-        unsigned total_n_particles = nparticles * ngroups;
-        
-        double weight = (double) 1 / (_ngroups*nparticles);
+        double weight = (double) 1 / (_ngroups*_nparticles);
         
         // Copy log weights for all bundles to prob vector
         vector<double> probs(total_n_particles, weight);
-          
+        
+        
+        // Normalize log_weights to create discrete probability distribution
+        double log_sum_weights = getRunningSum(probs);
 
-          // Normalize log_weights to create discrete probability distribution
-          double log_sum_weights = getRunningSum(probs);
+        transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
 
-          transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
-
-          // Compute cumulative probabilities
-          partial_sum(probs.begin(), probs.end(), probs.begin()); // TODO: assert sum to 1
+        // Compute cumulative probabilities
+        partial_sum(probs.begin(), probs.end(), probs.begin());
 
           // Initialize vector of counts storing number of darts hitting each particle
           vector<unsigned> counts (total_n_particles, 0);
@@ -1586,19 +1593,19 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
               counts[which]++;
           }
 
-          // Copy particles
+        // Copy particles
 
         bool copying_needed = true;
 
-          // Locate first donor
-          unsigned donor = 0;
-          while (counts[donor] < 2) {
-              donor++;
-              if (donor >= counts.size()) {
-                  copying_needed = false; // all the particle counts are 1
-                  break;
-              }
+        // Locate first donor
+        unsigned donor = 0;
+        while (counts[donor] < 2) {
+          donor++;
+          if (donor >= counts.size()) {
+              copying_needed = false; // all the particle counts are 1
+              break;
           }
+        }
 
         if (copying_needed) {
               // Locate first recipient
@@ -1618,15 +1625,14 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                   assert(donor < total_n_particles);
                   assert(recipient < total_n_particles);
                   
-                  unsigned recipient_group = recipient / nparticles;
-                  unsigned recipient_index = recipient % nparticles;
+                  unsigned recipient_group = recipient / _nparticles;
+                  unsigned recipient_index = recipient % _nparticles;
                   
-                  unsigned donor_group = donor / nparticles;
-                  unsigned donor_index = donor % nparticles;
+                  unsigned donor_group = donor / _nparticles;
+                  unsigned donor_index = donor % _nparticles;
                   
                   // Copy donor to recipient
                   particles[recipient_group][recipient_index] = particles[donor_group][donor_index];
-//                  particles[recipient] = particles[donor];
 
                   counts[donor]--;
                   counts[recipient]++;
@@ -1643,12 +1649,11 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
                   // Move recipient to next slot with count equal to 0
                   recipient++;
                   while (recipient < total_n_particles && counts[recipient] > 0) {
-//                  while (recipient < nparticles && counts[recipient] > 0) {
                       recipient++;
                   }
               }
         }
-      }
+    }
 
 
     inline double Proj::filterParticles(unsigned step, vector<Particle> & particles) {
@@ -2712,6 +2717,7 @@ inline void Proj::saveAllForests(vector<Particle> &v) const {
 
 #if !defined (HIERARCHICAL_FILTERING)
                 writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
+                writePartialCountFile(my_vec);
                 
                 saveAllSpeciesTrees(my_vec);
 #endif

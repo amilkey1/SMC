@@ -175,6 +175,7 @@ class Forest {
         map<Node*,  unsigned>       _starting_row;
         double                      _relative_rate;
         vector<pair<string, unsigned>>  _lineages_per_species;
+        unsigned                    _partials_calculated_count;
     
         void                        showSpeciesJoined();
         double                      calcTransitionProbability(Node* child, double s, double s_child);
@@ -260,6 +261,7 @@ class Forest {
         _starting_dij.clear();
         _starting_row.clear();
         _lineages_per_species.clear();
+        _partials_calculated_count = 0;
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -831,6 +833,8 @@ class Forest {
     }
                                                         
     inline void Forest::calcPartialArray(Node* new_nd) {
+        _partials_calculated_count++;
+        
         assert (_index > 0);
         
         if (!new_nd->_left_child) {
@@ -1053,7 +1057,6 @@ class Forest {
     }
 
     inline unsigned Forest::getMaxDeepCoal(tuple <string, string, string> species_joined) {
-        // TODO: need to know the number of lineages in each tip species
         string species1 = get<0>(species_joined);
         string species2 = get<1>(species_joined);
         string species3 = get<2>(species_joined);
@@ -1086,7 +1089,6 @@ class Forest {
         }
         
         _lineages_per_species.push_back(make_pair(species3, lineages_to_coalesce));
-        // TODO: add new element to _lienages_per_species
         
         
         return max_deep_coal;
@@ -1220,6 +1222,7 @@ class Forest {
         _starting_row = other._starting_row;
 #endif
         _species_names = other._species_names;
+        _partials_calculated_count = other._partials_calculated_count;
 
         // copy tree itself
 
