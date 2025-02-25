@@ -2343,8 +2343,8 @@ namespace proj {
           // divide up the particles as evenly as possible across threads
             unsigned first = 0;
             unsigned last = 0;
-            unsigned stride = _nparticles / _nthreads; // divisor
-            unsigned r = _nparticles % _nthreads; // remainder
+            unsigned stride = (_nparticles*_ngroups) / _nthreads; // divisor
+            unsigned r = (_nparticles*_ngroups) % _nthreads; // remainder
             
             // need a vector of threads because we have to wait for each one to finish
             vector<thread> threads;
@@ -2358,8 +2358,8 @@ namespace proj {
                     r -= 1;
                 }
                 
-                if (last > _nparticles) {
-                    last = _nparticles;
+                if (last > (_nparticles*_ngroups)) {
+                    last = (_nparticles*_ngroups);
                 }
                 
                 threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles)));
