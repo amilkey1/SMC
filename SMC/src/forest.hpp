@@ -16,6 +16,7 @@
 #include <map>
 
 #include "lot.hpp"
+#include "g.hpp"
 extern proj::Lot rng;
 std::mutex mtx;
 
@@ -82,7 +83,6 @@ class Forest {
         double                      calcTopologyPrior(unsigned nlineages);
         void                        calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree);
         void                        clearPartials();
-        void                        setStartMode(string mode) {_start_mode = mode;}
         void                        setRelativeRate(double rel_rate) {_relative_rate = rel_rate;}
         unsigned                    getDeepCoal(tuple <string, string, string> species_joined);
         unsigned                    getMaxDeepCoal(tuple <string, string, string> species_joined);
@@ -196,21 +196,8 @@ class Forest {
     public:
 
         typedef std::shared_ptr<Forest> SharedPtr;
-        static double               _theta;
-        static double               _theta_proposal_mean;
-        static double               _theta_prior_mean;
-        double                      _lambda;
-        static string               _proposal;
-        static string               _model;
         static double               _kappa;
-        static vector<double>       _base_frequencies;
-        static string               _string_base_frequencies;
-        static bool                 _save_memory;
-        static string               _outgroup;
-        static bool                 _run_on_empty;
-        static bool                 _run_on_empty_first_level_only;
         static double               _ploidy;
-        static string               _start_mode;
         static double               _edge_rate_variance;
         static double               _asrv_shape;
         static double               _comphet;
@@ -366,7 +353,7 @@ class Forest {
                   boost::replace_all(name, " ", "_");
                 nd->_name = name;
 
-                if (!_save_memory || (_save_memory && partials)) { // if save memory setting, don't set tip partials yet
+                if (!G::_save_memory || (G::_save_memory && partials)) { // if save memory setting, don't set tip partials yet
                     nd->_partial=ps.getPartial(_npatterns*4);
                     for (unsigned p=0; p<_npatterns; p++) {
                         unsigned pp = _first_pattern+p;
@@ -839,7 +826,7 @@ class Forest {
         
         if (!new_nd->_left_child) {
             auto &data_matrix=_data->getDataMatrix();
-            assert (_save_memory || _start_mode == "sim");
+            assert (G::_save_memory || G::_start_mode == "sim");
             if (!new_nd->_left_child) {
                 new_nd->_partial=ps.getPartial(_npatterns*4);
                 for (unsigned p=0; p<_npatterns; p++) {
@@ -925,7 +912,7 @@ class Forest {
     inline double Forest::calcTransitionProbability(Node* child, double s, double s_child) {
         double child_transition_prob = 0.0;
 
-        if (_model == "JC" ) {
+        if (G::_model == "JC" ) {
             double expterm = exp(-4.0*(child->_edge_length)*_relative_rate/3.0); // TODO: double check relative rate
             double prsame = 0.25+0.75*expterm;
             double prdif = 0.25 - 0.25*expterm;
@@ -935,11 +922,11 @@ class Forest {
             return child_transition_prob;
         }
 
-        if (_model == "HKY") {
-            double pi_A = _base_frequencies[0];
-            double pi_C = _base_frequencies[1];
-            double pi_G = _base_frequencies[2];
-            double pi_T = _base_frequencies[3];
+        if (G::_model == "HKY") {
+            double pi_A = G::_base_frequencies[0];
+            double pi_C = G::_base_frequencies[1];
+            double pi_G = G::_base_frequencies[2];
+            double pi_T = G::_base_frequencies[3];
 
             double pi_j = 0.0;
             double PI_J = 0.0;
@@ -1192,10 +1179,6 @@ class Forest {
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
         _cum_height = other._cum_height;
-        _outgroup = other._outgroup;
-        _run_on_empty = other._run_on_empty;
-        _run_on_empty_first_level_only = other._run_on_empty_first_level_only;
-        _start_mode = other._start_mode;
         _relative_rate = other._relative_rate;
         _depths = other._depths;
         _nincrements = other._nincrements;
@@ -1203,9 +1186,7 @@ class Forest {
         _panmictic_coalescent_likelihood = other._panmictic_coalescent_likelihood;
         _theta_map = other._theta_map;
         _small_enough = other._small_enough;
-        _theta_proposal_mean = other._theta_proposal_mean;
         _theta_mean = other._theta_mean;
-        _theta_prior_mean = other._theta_prior_mean;
         _ancestral_species_name = other._ancestral_species_name;
         _ploidy = other._ploidy;
         _species_build = other._species_build;
@@ -1213,7 +1194,6 @@ class Forest {
         _species_indices = other._species_indices;
         _vector_prior = other._vector_prior;
         _infinity = other._infinity;
-        _lambda = other._lambda;
         _lineages_per_species = other._lineages_per_species;
 #if defined(BUILD_UPGMA_TREE)
         _upgma_additions = other._upgma_additions;
@@ -1334,7 +1314,7 @@ class Forest {
     inline void Forest::chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth) {
         assert (max_depth >= 0.0);
         if (max_depth > 0.0) {
-            double rate = (_lambda)*_lineages.size();
+            double rate = (G::_lambda)*_lineages.size();
             
             double u = lot->uniform();
             double inner_term = 1-exp(-rate*max_depth);
@@ -1351,7 +1331,7 @@ class Forest {
             _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior)); // do not include constrained factor in increment prior
         }
         else {
-            double rate = _lambda*_lineages.size();
+            double rate = G::_lambda*_lineages.size();
             
             assert (lot != nullptr);
             _last_edge_length = lot->gamma(1.0, 1.0/rate);
@@ -1378,7 +1358,7 @@ class Forest {
 
 
     inline void Forest::chooseSpeciesIncrement(Lot::SharedPtr lot) {
-        double rate = _lambda*_lineages.size();
+        double rate = G::_lambda*_lineages.size();
         
         assert (lot != nullptr);
         _last_edge_length = lot->gamma(1.0, 1.0/rate);
@@ -1408,8 +1388,8 @@ class Forest {
             assert (t.second < _lineages.size());
             assert(!subtree1->_parent && !subtree2->_parent);
             
-            if (_outgroup != "none") {
-                if (subtree1->_name != _outgroup && subtree2->_name != _outgroup && _lineages.size() > 2) { // outgroup can only be chosen on the last step
+            if (G::_outgroup != "none") {
+                if (subtree1->_name != G::_outgroup && subtree2->_name != G::_outgroup && _lineages.size() > 2) { // outgroup can only be chosen on the last step
                     done = true;
                 }
                 else if (_lineages.size() == 2) {
@@ -1419,7 +1399,7 @@ class Forest {
             else {
                 done = true;
             }
-            if (_outgroup == "none") {
+            if (G::_outgroup == "none") {
                 assert (done == true);
             }
         }
@@ -1575,7 +1555,7 @@ class Forest {
             else {
                 // species tree
                 if (coalesced_gene) {
-                    double rate = _lambda*(_lineages.size());
+                    double rate = G::_lambda*(_lineages.size());
                     // calculate increment prior
                     double nChooseTwo = (_lineages.size())*(_lineages.size()-1);
                     double log_prob_join = log(2/nChooseTwo);
@@ -1584,7 +1564,7 @@ class Forest {
                     log_increment_prior = log(rate) - (increment*rate) + log_prob_join;
                 }
                 else {
-                    double rate = _lambda*(_lineages.size());
+                    double rate = G::_lambda*(_lineages.size());
                     // calculate increment prior
                     log_increment_prior = - (increment*rate);
                 }
@@ -2726,8 +2706,8 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
              one_choice = true;
          }
 
-         if (Forest::_proposal == "prior-post" && (!one_choice)) {
-             if (_save_memory) {
+         if (G::_proposal == "prior-post" && (!one_choice)) {
+             if (G::_save_memory) {
                  for (auto &nd:_lineages) {
     //                for (auto &nd:nodes) {
                      if (nd->_partial == nullptr) {
@@ -2744,7 +2724,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
          }
          
          else {
-             assert (Forest::_proposal == "prior-prior" || one_choice);
+             assert (G::_proposal == "prior-prior" || one_choice);
              // prior-prior proposal
              pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
              auto it1 = std::next(nodes.begin(), t.first);
@@ -2775,13 +2755,13 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
          subtree1->_parent=new_nd;
          subtree2->_parent=new_nd;
 
-         if (!_run_on_empty) {
+         if (!G::_run_on_empty) {
              //always calculating partials now
              assert (new_nd->_partial == nullptr);
              new_nd->_partial=ps.getPartial(_npatterns*4);
              assert(new_nd->_left_child->_right_sib);
 
-             if (_save_memory) {
+             if (G::_save_memory) {
                  for (auto &nd:_lineages) {
                      if (nd->_partial == nullptr) {
                          nd->_partial = ps.getPartial(_npatterns*4);
@@ -2802,12 +2782,12 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         _species_partition[species_name] = nodes;
 
 # if !defined (BUILD_UPGMA_TREE)
-             if ((_proposal == "prior-prior" || one_choice) && (!_run_on_empty) ) {
+             if ((G::_proposal == "prior-prior" || one_choice) && (!G::_run_on_empty) ) {
                  _gene_tree_log_likelihood = calcLogLikelihood();
                  _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
              }
         
-        if (_save_memory) {
+        if (G::_save_memory) {
             for (auto &nd:_nodes) {
                 nd._partial=nullptr;
             }
@@ -3006,11 +2986,11 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         // for all other populations, theta = -1
         
 //        assert (_theta_proposal_mean > 0.0);
-        if (_theta_proposal_mean == 0.0) {
-            assert (_theta > 0.0);
-            _theta_proposal_mean = _theta;
+        if (G::_theta_proposal_mean == 0.0) {
+            assert (G::_theta > 0.0);
+            G::_theta_proposal_mean = G::_theta;
         }
-        double scale = 1 / _theta_proposal_mean;
+        double scale = 1 / G::_theta_proposal_mean;
         
         unsigned count = 0;
         for (auto &name:species_names) {
@@ -3074,7 +3054,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
     }
         
     inline void Forest::updateThetaMapFixedTheta(Lot::SharedPtr lot, string new_species_name) {
-        _theta_map[new_species_name] = Forest::_theta;
+        _theta_map[new_species_name] = G::_theta;
     }
         
     inline void Forest::createSpeciesIndices() {
@@ -3110,10 +3090,10 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             _species_indices[name] = number - 1;
         }
         
-        _theta_mean = Forest::_theta;
+        _theta_mean = G::_theta;
         
         for (auto &name:_species_names) {
-            _theta_map[name] = Forest::_theta;
+            _theta_map[name] = G::_theta;
         }
     }
 
@@ -3142,12 +3122,12 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         // shape = 2.0 to be consistent with starbeast3
         // scale = 1 / mean;
         
-        if (_theta_proposal_mean > 0.0) {
+        if (G::_theta_proposal_mean > 0.0) {
             assert (_theta_mean == 0.0);
-            _theta_mean = lot->gamma(1, _theta_proposal_mean); // equivalent to exponential(exponential_rate)
+            _theta_mean = lot->gamma(1, G::_theta_proposal_mean); // equivalent to exponential(exponential_rate)
         }
         else {
-            _theta_mean = Forest::_theta; // if no proposal distribution specified, use one theta mean for all particles
+            _theta_mean = G::_theta; // if no proposal distribution specified, use one theta mean for all particles
         }
         
 //        double scale = (2.01 - 1.0) / (_theta_mean);
@@ -3903,7 +3883,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
     }
 
     inline void Forest::simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites) {
-        if (_model != "JC") {
+        if (G::_model != "JC") {
             throw XProj("must use JC model for data simulations");
         }
         

@@ -1,9 +1,13 @@
 #include <iostream>
 #include <vector>
+
 #include "proj.hpp"
-#include "particle.hpp"
+//#include "g.hpp"
+//#include "particle.hpp"
 #include "conditionals.hpp"
 #include "stopwatch.hpp"
+
+#include "g.hpp"
 
 // Initialize our random number generator here so it will be a global variable
 #include "lot.hpp"
@@ -19,31 +23,57 @@ using namespace std;
 
 #include "forest.hpp"
 #include "data.hpp"
-std::string  Proj::_program_name        = "proj";
-unsigned     Proj::_major_version       = 1;
-unsigned     Proj::_minor_version       = 0;
-string       Proj::_start_mode          = "smc";
+#include "particle.hpp"
+
+string      G::_program_name        = "smc";
+unsigned    G::_major_version       = 1;
+unsigned    G::_minor_version       = 0;
+string      G::_start_mode          = "smc";
+string      G::_proposal = "prior-prior";
+string      G::_model = "JC";
+string      G::_outgroup = "none";
+bool        G::_run_on_empty = false;
+bool        G::_run_on_empty_first_level_only = false;
+bool        G::_save_memory = false;
+unsigned    G::_nparticles = 100;
+unsigned    G::_nthreads = 1;
+bool        G::_use_gpu = true;
+bool        G::_ambig_missing = true;
+unsigned    G::_verbose = 1;
+unsigned    G::_sim_nspecies = 4;
+string      G::_string_ntaxaperspecies = "";
+string      G::_sim_file_name = "sim.nex";
+unsigned    G::_particle_increase = 100;
+double      G::_thin = 1.0;
+vector<unsigned>    G::_ntaxaperspecies;
+unsigned    G::_save_every = 1.0;
+bool        G::_save_gene_trees = true;
+bool        G::_gene_newicks_specified = false;
+unsigned    G::_ngenes_provided = 2;
+string      G::_species_newick_name = "";
+bool        G::_fix_theta_for_simulations = true;
+bool        G::_fix_theta = true;
+double      G::_theta = 0.1;
+double      G::_theta_proposal_mean = 0.1;
+double      G::_theta_prior_mean = 0.1;
+string      G::_string_relative_rates = "";
+vector<double>  G::_double_relative_rates;
+string      G::_data_file_name = "sim.nex";
+bool        G::_save_gene_trees_separately = false;
+string      G::_newick_path = ".";
+double      G::_lambda = 10.0;
+unsigned    G::_ngroups = 1;
+
 
 unsigned Forest::_nspecies = 4;
 unsigned Forest::_ntaxa = 12;
-double Forest::_theta = 0.05;
 //double Forest::_lambda = 1;
 unsigned Particle::_nsubsets = 1;
 const double Node::_smallest_edge_length=1.0e-12;
-string Forest::_proposal;
-string Forest::_model;
-string Forest::_outgroup;
 double Forest::_kappa = 1.0;
-vector<double> Forest::_base_frequencies;
-string Forest::_string_base_frequencies;
-bool Forest::_run_on_empty;
-bool Forest::_run_on_empty_first_level_only;
-bool Forest::_save_memory;
+vector<double> G::_base_frequencies;
+string G::_string_base_frequencies;
 double Forest::_ploidy = 2.0;
-double Forest::_theta_proposal_mean = 0.0;
-double Forest::_theta_prior_mean = 0.0;
-string Forest::_start_mode = "smc";
-double Particle::_lambda_prior_mean = 0.0;
 double Data::_occupancy = 1.0;
 double Forest::_edge_rate_variance = 0.0;
 double Forest::_asrv_shape = numeric_limits<double>::infinity();

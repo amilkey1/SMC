@@ -23,6 +23,7 @@ using namespace boost;
 using namespace boost::algorithm;
 
 #include "partial_store.hpp"
+#include "g.hpp"
 extern proj::PartialStore ps;
 extern proj::Lot rng;
 extern proj::StopWatch stopwatch;
@@ -80,56 +81,26 @@ namespace proj {
 
         private:
 
-            std::string                 _data_file_name;
             Partition::SharedPtr        _partition;
             Data::SharedPtr             _data;
             double                      _log_marginal_likelihood = 0.0;
             double                      _log_species_tree_marginal_likelihood = 0.0;
-            bool                        _use_gpu;
-            bool                        _ambig_missing;
-            unsigned                    _nparticles;
             unsigned                    _random_seed;
-
-            static string               _program_name;
-            static unsigned             _major_version;
-            static unsigned             _minor_version;
-            static string               _start_mode;
             void                        summarizeData(Data::SharedPtr);
             unsigned                    setNumberTaxa(Data::SharedPtr);
             double                      getRunningSum(const vector<double> &) const;
             vector<string>              _species_names;
             map<string, string>         _taxon_map;
-            unsigned                    _nthreads;
             void                        handleBaseFrequencies();
             void                        handleRelativeRates();
             void                        handleNTaxaPerSpecies();
             void                        checkOutgroupName();
             void                        debugSpeciesTree(vector<Particle> &particles);
             double                      _small_enough;
-            unsigned                    _verbose;
-            unsigned                    _sim_nspecies;
-            vector<unsigned>            _ntaxaperspecies;
-            string                      _string_ntaxaperspecies;
-            string                      _sim_file_name;
-            unsigned                    _particle_increase;
-            double                      _thin;
-            unsigned                    _save_every;
-            bool                        _save_gene_trees;
             bool                        _first_line;
             unsigned                    _count; // counter for params output file
-            bool                        _gene_newicks_specified;
-            unsigned                    _ngenes_provided;
-            string                      _species_newick_name;
-            bool                        _fix_theta_for_simulations;
-            bool                        _fix_theta;
             double                      _starting_log_likelihood;
-            string                      _string_relative_rates;
-            vector<double>              _double_relative_rates;
-            double                      _lambda;
-            bool                        _save_gene_trees_separately;
-            string                      _newick_path;
             vector<Lot::SharedPtr>      _group_rng;
-            unsigned                    _ngroups;
 
     };
 
@@ -143,15 +114,9 @@ namespace proj {
     }
 
     inline void Proj::clear() {
-        _data_file_name = "";
         _partition.reset(new Partition());
-        _use_gpu        = true;
-        _ambig_missing  = true;
-        _nparticles = 50000;
         _data = nullptr;
         _small_enough = 0.0000001;
-        _string_relative_rates.clear();
-        _double_relative_rates.clear();
     }
 
     inline void Proj::saveAllForests(vector<Particle> &v) const {
@@ -276,7 +241,7 @@ namespace proj {
     #endif
                 }
 
-                logf << "\t" << p.getParticleLambda();
+                logf << "\t" << G::_lambda; // TODO: not estimating lambda for now
             
                 vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
                 vector<double> gene_tree_priors = p.getGeneTreePriors();
@@ -338,9 +303,9 @@ namespace proj {
             logf << endl;
         }
 
-        unsigned sample_size = round(double (_particle_increase) / double(_save_every) );
+        unsigned sample_size = round(double (G::_particle_increase) / double(G::_save_every) );
         if (sample_size == 0) {
-            sample_size = _particle_increase;
+            sample_size = G::_particle_increase;
         }
         
         for (auto &p:v) {
@@ -398,7 +363,7 @@ namespace proj {
 
             for (int i=0; i<(nspecies*2-1); i++) {
 #if defined (DRAW_NEW_THETA)
-                if (!_gene_newicks_specified) {
+                if (!G::_gene_newicks_specified) {
                     vector<double> theta_vec = p.getThetaVector();
                     logf << "\t" << theta_vec[i] / 4.0;
                 }
@@ -407,7 +372,7 @@ namespace proj {
 #endif
             }
 
-            logf << "\t" << p.getParticleLambda();
+            logf << "\t" << G::_lambda; // TODO: not estimating lambda for now
 
             vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
             vector<double> gene_tree_priors = p.getGeneTreeCoalescentLikelihoods();
@@ -462,9 +427,9 @@ namespace proj {
             logf << endl;
         }
 
-        unsigned sample_size = round(double (_particle_increase) / double(_save_every) );
+        unsigned sample_size = round(double (G::_particle_increase) / double(G::_save_every) );
         if (sample_size == 0) {
-            sample_size = _particle_increase;
+            sample_size = G::_particle_increase;
         }
         
         for (auto &p:v) {
@@ -508,7 +473,7 @@ namespace proj {
 
             logf << "\t" << p.getPopMean() / 4.0; // beast uses Ne * u = theta / 4
 
-            logf << "\t" << p.getParticleLambda();
+            logf << "\t" << G::_lambda; // TODO: for now, not using estimate lambda option
 
             logf << endl;
         }
@@ -528,10 +493,10 @@ namespace proj {
         //   ln(nspecies) + 0.58 (Euler's constant)
         //   see http://www.dimostriamogoldbach.it/en/inverses-integers-sum/
         double expected_species_tree_height = 0.0;
-        for (unsigned i = 2; i <= _sim_nspecies; i++) {
+        for (unsigned i = 2; i <= G::_sim_nspecies; i++) {
             expected_species_tree_height += 1.0/i;
         }
-        expected_species_tree_height /= v[0].getLambda();
+        expected_species_tree_height /= G::_lambda;
 
         logf << "Expected species tree height = " << expected_species_tree_height << endl;
         logf << "\n";
@@ -646,7 +611,7 @@ namespace proj {
 
     inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             string filename1 = "alt_species_trees.trees";
-            assert (_start_mode != "sim");
+            assert (G::_start_mode != "sim");
 
             unsigned count = 0;
             // save all species trees
@@ -662,7 +627,7 @@ namespace proj {
 
     inline void Proj::saveSpeciesTreesHierarchical(vector<Particle> &v, string filename1, string filename2) const {
         // save only unique species trees
-        if (!Forest::_run_on_empty) {
+        if (!G::_run_on_empty) {
             vector<vector<pair<double, double>>> unique_increments_and_priors;
 
             std::ofstream unique_treef;
@@ -683,7 +648,7 @@ namespace proj {
             unique_treef.close();
         }
 
-        assert (_start_mode != "sim");
+        assert (G::_start_mode != "sim");
 
         unsigned count = 0;
             // save all species trees
@@ -699,7 +664,7 @@ namespace proj {
 
     inline void Proj::saveSpeciesTreesAfterFirstRound(vector<Particle> &v) const {
         // save only unique species trees
-        if (!Forest::_run_on_empty) {
+        if (!G::_run_on_empty) {
             vector<vector<pair<double, double>>> unique_increments_and_priors;
 
             ofstream unique_treef("unique_species_trees_after_first_round.trees");
@@ -736,7 +701,7 @@ namespace proj {
 
     inline void Proj::saveSpeciesTrees(vector<Particle> &v) const {
         // save only unique species trees
-        if (!Forest::_run_on_empty) {
+        if (!G::_run_on_empty) {
             vector<vector<pair<double, double>>> unique_increments_and_priors;
 
             ofstream unique_treef("unique_species_trees.trees");
@@ -757,7 +722,7 @@ namespace proj {
             unique_treef.close();
         }
 
-        if (_start_mode == "smc") {
+        if (G::_start_mode == "smc") {
             // save all species trees
             ofstream treef("species_trees.trees");
             treef << "#nexus\n\n";
@@ -783,7 +748,7 @@ namespace proj {
         }
 
     inline void Proj::saveGeneTrees(unsigned ngenes, vector<Particle> &v) const {
-        if (_start_mode == "smc") {
+        if (G::_start_mode == "smc") {
             ofstream treef("gene_trees.trees");
             treef << "#nexus\n\n";
             treef << "begin trees;\n";
@@ -798,7 +763,7 @@ namespace proj {
         }
 
         else {
-            if (_save_gene_trees_separately) {
+            if (G::_save_gene_trees_separately) {
                 for (auto &p:v) {
                     for (unsigned i=1; i<ngenes+1; i++) {
                         string fname = "gene" + to_string(i) + ".trees";
@@ -837,48 +802,47 @@ namespace proj {
         desc.add_options()
         ("help,h", "produce help message")
         ("version,v", "show program version")
-        ("datafile,d",  boost::program_options::value(&_data_file_name), "name of a data file in NEXUS format")
+        ("datafile,d",  boost::program_options::value(&G::_data_file_name), "name of a data file in NEXUS format")
         ("subset",  boost::program_options::value(&partition_subsets), "a string defining a partition subset, e.g. 'first:1-1234\3' or 'default[codon:standard]:1-3702'")
-        ("gpu",           boost::program_options::value(&_use_gpu)->default_value(true), "use GPU if available")
-        ("ambigmissing",  boost::program_options::value(&_ambig_missing)->default_value(true), "treat all ambiguities as missing data")
-        ("nparticles",  boost::program_options::value(&_nparticles)->default_value(1000), "number of particles")
+        ("gpu",           boost::program_options::value(&G::_use_gpu)->default_value(true), "use GPU if available")
+        ("ambigmissing",  boost::program_options::value(&G::_ambig_missing)->default_value(true), "treat all ambiguities as missing data")
+        ("nparticles",  boost::program_options::value(&G::_nparticles)->default_value(1000), "number of particles")
         ("seed,z", boost::program_options::value(&_random_seed)->default_value(1), "random seed")
-        ("theta, t", boost::program_options::value(&Forest::_theta)->default_value(0.0), "theta")
-        ("lambda", boost::program_options::value(&_lambda)->default_value(0.0), "speciation rate")
-        ("proposal",  boost::program_options::value(&Forest::_proposal)->default_value("prior-prior"), "a string defining a proposal (prior-prior or prior-post)")
-        ("model", boost::program_options::value(&Forest::_model)->default_value("JC"), "a string defining a substitution model")
+        ("theta, t", boost::program_options::value(&G::_theta)->default_value(0.0), "theta")
+        ("lambda", boost::program_options::value(&G::_lambda)->default_value(0.0), "speciation rate")
+        ("proposal",  boost::program_options::value(&G::_proposal)->default_value("prior-prior"), "a string defining a proposal (prior-prior or prior-post)")
+        ("model", boost::program_options::value(&G::_model)->default_value("JC"), "a string defining a substitution model")
         ("kappa",  boost::program_options::value(&Forest::_kappa)->default_value(1.0), "value of kappa")
-        ("base_frequencies", boost::program_options::value(&Forest::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
-        ("nthreads",  boost::program_options::value(&_nthreads)->default_value(1), "number of threads for multi threading")
-        ("run_on_empty", boost::program_options::value(&Forest::_run_on_empty)->default_value(false), "run program without data")
-        ("run_on_empty_first_level_only", boost::program_options::value(&Forest::_run_on_empty_first_level_only)->default_value(false), "run program without data only for the first level; if setting this to true, also set run_on_empty = true")
-        ("verbose", boost::program_options::value(&_verbose)->default_value(1), "set amount of output printed")
-        ("save_memory", boost::program_options::value(&Forest::_save_memory)->default_value(false), "save memory at the expense of time")
-        ("outgroup", boost::program_options::value(&Forest::_outgroup)->default_value("none"), "a string defining the outgroup")
-        ("startmode", boost::program_options::value(&_start_mode)->default_value("smc"), "a string defining whether to simulate data or perform smc")
-        ("nspecies", boost::program_options::value(&_sim_nspecies)->default_value(0), "number of species to simulate")
-        ("ntaxaperspecies", boost::program_options::value(&_string_ntaxaperspecies)->default_value(""), "number of taxa per species to simulate")
-        ("filename", boost::program_options::value(&_sim_file_name), "name of file to write simulated data to")
-        ("particle_increase", boost::program_options::value(&_particle_increase)->default_value(1), "how much to increase particles for species filtering")
-        ("thin", boost::program_options::value(&_thin)->default_value(1.0), "take this portion of particles for hierarchical species filtering")
-        ("save_every", boost::program_options::value(&_save_every)->default_value(1.0), "take this portion of particles for output")
-        ("save_gene_trees", boost::program_options::value(&_save_gene_trees)->default_value(true), "turn this off to not save gene trees and speed up program")
-        ("gene_newicks", boost::program_options::value(&_gene_newicks_specified)->default_value(false), "set true if user is specifying gene tree files")
-        ("ngenes", boost::program_options::value(&_ngenes_provided)->default_value(0), "number of gene newick files specified")
-        ("theta_proposal_mean", boost::program_options::value(&Forest::_theta_proposal_mean)->default_value(0.0), "theta proposal mean")
-        ("theta_prior_mean", boost::program_options::value(&Forest::_theta_prior_mean)->default_value(0.0), "theta prior mean")
-        ("lambda_prior_mean", boost::program_options::value(&Particle::_lambda_prior_mean)->default_value(0.0), "lambda prior mean")
-        ("species_newick", boost::program_options::value(&_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
-        ("fix_theta_for_simulations",  boost::program_options::value(&_fix_theta_for_simulations)->default_value(true), "set to true to fix one theta for all populations")
-        ("fix_theta",  boost::program_options::value(&_fix_theta)->default_value(false), "set to true to fix one theta for all populations")
-        ("relative_rates", boost::program_options::value(&_string_relative_rates)->default_value("null"))
+        ("base_frequencies", boost::program_options::value(&G::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
+        ("nthreads",  boost::program_options::value(&G::_nthreads)->default_value(1), "number of threads for multi threading")
+        ("run_on_empty", boost::program_options::value(&G::_run_on_empty)->default_value(false), "run program without data")
+        ("run_on_empty_first_level_only", boost::program_options::value(&G::_run_on_empty_first_level_only)->default_value(false), "run program without data only for the first level; if setting this to true, also set run_on_empty = true")
+        ("verbose", boost::program_options::value(&G::_verbose)->default_value(1), "set amount of output printed")
+        ("save_memory", boost::program_options::value(&G::_save_memory)->default_value(false), "save memory at the expense of time")
+        ("outgroup", boost::program_options::value(&G::_outgroup)->default_value("none"), "a string defining the outgroup")
+        ("startmode", boost::program_options::value(&G::_start_mode)->default_value("smc"), "a string defining whether to simulate data or perform smc")
+        ("nspecies", boost::program_options::value(&G::_sim_nspecies)->default_value(0), "number of species to simulate")
+        ("ntaxaperspecies", boost::program_options::value(&G::_string_ntaxaperspecies)->default_value(""), "number of taxa per species to simulate")
+        ("filename", boost::program_options::value(&G::_sim_file_name), "name of file to write simulated data to")
+        ("particle_increase", boost::program_options::value(&G::_particle_increase)->default_value(1), "how much to increase particles for species filtering")
+        ("thin", boost::program_options::value(&G::_thin)->default_value(1.0), "take this portion of particles for hierarchical species filtering")
+        ("save_every", boost::program_options::value(&G::_save_every)->default_value(1.0), "take this portion of particles for output")
+        ("save_gene_trees", boost::program_options::value(&G::_save_gene_trees)->default_value(true), "turn this off to not save gene trees and speed up program")
+        ("gene_newicks", boost::program_options::value(&G::_gene_newicks_specified)->default_value(false), "set true if user is specifying gene tree files")
+        ("ngenes", boost::program_options::value(&G::_ngenes_provided)->default_value(0), "number of gene newick files specified")
+        ("theta_proposal_mean", boost::program_options::value(&G::_theta_proposal_mean)->default_value(0.0), "theta proposal mean")
+        ("theta_prior_mean", boost::program_options::value(&G::_theta_prior_mean)->default_value(0.0), "theta prior mean")
+        ("species_newick", boost::program_options::value(&G::_species_newick_name)->default_value("null"), "name of file containing species newick descriptions")
+        ("fix_theta_for_simulations",  boost::program_options::value(&G::_fix_theta_for_simulations)->default_value(true), "set to true to fix one theta for all populations")
+        ("fix_theta",  boost::program_options::value(&G::_fix_theta)->default_value(false), "set to true to fix one theta for all populations")
+        ("relative_rates", boost::program_options::value(&G::_string_relative_rates)->default_value("null"))
         ("simoccupancy", boost::program_options::value(&Data::_occupancy)->default_value(1.0), "probability that any given taxon will have data for any given locus; 1-_occupancy is prob. all missing data for a taxon (used only if startmode is) 'sim'")
         ("simedgeratevar",   boost::program_options::value(&Forest::_edge_rate_variance)->default_value(0.0), "variance of lognormal relative rate distribution across edges in gene trees (used only if startmode is 'sim')")
         ("simasrvshape",   boost::program_options::value(&Forest::_asrv_shape)->default_value(Forest::_infinity), "Shape of gamma among-site rate heterogeneity within a locus (used only if startmode is 'sim')")
         ("simcomphet",   boost::program_options::value(&Forest::_comphet)->default_value(Forest::_infinity), "Dirichlet parameter governing compositional heterogeneity (default value results in compositional homogeneity (used only if startmode is 'sim')")
-        ("save_gene_trees_separately", boost::program_options::value(&_save_gene_trees_separately)->default_value(false), "for simulations, save gene trees in separate files")
-        ("newick_path", boost::program_options::value(&_newick_path)->default_value("."), "path to gene newicks are if starting from gene newicks and only performing SMC on second round")
-        ("ngroups", boost::program_options::value(&_ngroups)->default_value(5), "number of populations")
+        ("save_gene_trees_separately", boost::program_options::value(&G::_save_gene_trees_separately)->default_value(false), "for simulations, save gene trees in separate files")
+        ("newick_path", boost::program_options::value(&G::_newick_path)->default_value("."), "path to gene newicks are if starting from gene newicks and only performing SMC on second round")
+        ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(5), "number of populations")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -899,7 +863,7 @@ namespace proj {
 
         // If user specified --version on command line, output version and quit
         if (vm.count("version") > 0) {
-            std::cout << boost::str(boost::format("This is %s version %d.%d") % _program_name % _major_version % _minor_version) << std::endl;
+            std::cout << boost::str(boost::format("This is %s version %d.%d") % G::_program_name % G::_major_version % G::_minor_version) << std::endl;
             std::exit(1);
         }
 
@@ -922,58 +886,58 @@ namespace proj {
         }
             
         // if user specified "ntaxaperspecies" in conf file, convert them to a vector<unsigned>
-        if (vm.count("ntaxaperspecies") > 0 && _start_mode == "sim") {
+        if (vm.count("ntaxaperspecies") > 0 && G::_start_mode == "sim") {
             handleNTaxaPerSpecies();
         }
         
         // if save_every > particle_increase, quit
-        if (_save_every > _particle_increase) {
+        if (G::_save_every > G::_particle_increase) {
             throw XProj("particle_increase must be greater than or equal to save_every");
         }
         
-        if (Forest::_model == "JC") {
+        if (G::_model == "JC") {
             cout << "Setting kappa to 1.0 under JC model\n";
             cout << "Setting base frequencies equal under JC model\n";
             if (Forest::_kappa != 1.0) {
                 cout << "\nIgnoring kappa under JC model\n";
             }
         }
-        if (_start_mode == "sim") {
-            if (_data_file_name != "") {
+        if (G::_start_mode == "sim") {
+            if (G::_data_file_name != "") {
                 cout << "\nIgnoring data file name for simulation\n";
             }
-            if (_sim_nspecies == 0) {
+            if (G::_sim_nspecies == 0) {
                 throw XProj("must specify number of species for which to simulate data");
             }
             
-            if (_ntaxaperspecies.size() != 1 && _ntaxaperspecies.size() != _sim_nspecies) {
+            if (G::_ntaxaperspecies.size() != 1 && G::_ntaxaperspecies.size() != G::_sim_nspecies) {
                 throw XProj("ntaxaperspecies must be one number for all species or must match the total number of species specified; ex: ntaxaperspecies = 5 or ntaxaperspecies = 5, 2, 3 if nspecies = 3");
             }
-            if (Forest::_run_on_empty) {
+            if (G::_run_on_empty) {
                 cout << "\nIgnoring start_mode = run_on_empty and simulating data\n";
             }
-            if (_sim_file_name == "") {
+            if (G::_sim_file_name == "") {
                 throw XProj("must specify name of file to write simulated data to; ex. filename = sim.nex");
             }
-            if (Forest::_theta == 0.0 && Forest::_theta_prior_mean == 0.0 && Forest::_theta_proposal_mean == 0.0) {
+            if (G::_theta == 0.0 && G::_theta_prior_mean == 0.0 && G::_theta_proposal_mean == 0.0) {
                 throw XProj("must specify theta or theta proposal / prior mean for simulations");
             }
         }
         else {
-            if (_data_file_name == "") {
+            if (G::_data_file_name == "") {
                 throw XProj("must specify name of data file if smc option is chosen; ex. data file = sim.nex");
             }
-            if (Forest::_theta_prior_mean == 0.0 && Forest::_theta_proposal_mean > 0.0) {
-                cout << boost::format("\nSetting theta prior mean equal to theta proposal mean of %d\n") % Forest::_theta_proposal_mean;
-                Forest::_theta_prior_mean = Forest::_theta_proposal_mean;
+            if (G::_theta_prior_mean == 0.0 && G::_theta_proposal_mean > 0.0) {
+                cout << boost::format("\nSetting theta prior mean equal to theta proposal mean of %d\n") % G::_theta_proposal_mean;
+                G::_theta_prior_mean = G::_theta_proposal_mean;
             }
             // no proposal or prior mean if theta fixed
-            else if (Forest::_theta_prior_mean > 0.0 && Forest::_theta_proposal_mean ==  0.0) {
-                cout << boost::format("\nSetting theta proposal mean equal to theta prior mean of %d\n") % Forest::_theta_prior_mean;
-                Forest::_theta_proposal_mean = Forest::_theta_prior_mean;
+            else if (G::_theta_prior_mean > 0.0 && G::_theta_proposal_mean ==  0.0) {
+                cout << boost::format("\nSetting theta proposal mean equal to theta prior mean of %d\n") % G::_theta_prior_mean;
+                G::_theta_proposal_mean = G::_theta_prior_mean;
             }
-            else if (Forest::_theta_prior_mean == 0.0 && Forest::_theta_proposal_mean == 0.0) {
-                cout << boost::format("\nTheta mean of %d will be fixed for all particles; population sizes will all be drawn from the same theta\n") % Forest::_theta;
+            else if (G::_theta_prior_mean == 0.0 && G::_theta_proposal_mean == 0.0) {
+                cout << boost::format("\nTheta mean of %d will be fixed for all particles; population sizes will all be drawn from the same theta\n") % G::_theta;
             }
         }
     }
@@ -981,7 +945,7 @@ namespace proj {
     inline void Proj::checkOutgroupName() {
         bool found = false;
         for (auto &s:_taxon_map) {
-            if (Forest::_outgroup == s.second) {
+            if (G::_outgroup == s.second) {
                 found = true;
             }
         }
@@ -992,47 +956,47 @@ namespace proj {
 
     inline void Proj::handleNTaxaPerSpecies() {
         vector<string> temp;
-        split(temp, _string_ntaxaperspecies, is_any_of(","));
+        split(temp, G::_string_ntaxaperspecies, is_any_of(","));
         // iterate throgh temp
         if (temp[0] == "") {
             throw XProj("must specify number of taxa per species");
         }
         for (auto &i:temp) {
             double f = stof(i);
-            _ntaxaperspecies.push_back(f);
+            G::_ntaxaperspecies.push_back(f);
         }
     }
 
     inline void Proj::handleBaseFrequencies() {
         vector <string> temp;
-        split(temp, Forest::_string_base_frequencies, is_any_of(","));
+        split(temp, G::_string_base_frequencies, is_any_of(","));
         double sum = 0.0;
         // iterate through temp
         for (auto &i:temp) {
             double f = stof(i);
-            Forest::_base_frequencies.push_back(f);
+            G::_base_frequencies.push_back(f);
             sum +=f;
         }
         if (fabs(sum-1)>0.000001) {
-            throw XProj(format("base frequencies (%s) don't add to 1")%Forest::_string_base_frequencies);
+            throw XProj(format("base frequencies (%s) don't add to 1")%G::_string_base_frequencies);
         }
         assert (fabs(sum-1) < 0.000001);
     }
 
     inline void Proj::handleRelativeRates() {
         vector <string> temp;
-        assert (_double_relative_rates.size() == 0);
-        split(temp, _string_relative_rates, is_any_of(","));
-        if (_string_relative_rates == "null") {
+        assert (G::_double_relative_rates.size() == 0);
+        split(temp, G::_string_relative_rates, is_any_of(","));
+        if (G::_string_relative_rates == "null") {
             for (unsigned i=0; i<_partition->getNumSubsets(); i++) {
-                _double_relative_rates.push_back(1.0); // if no relative rates provided, set them all to 1
+                G::_double_relative_rates.push_back(1.0); // if no relative rates provided, set them all to 1
             }
         }
         else {
         // iterate through temp
             for (auto &i:temp) {
                 double f = stof(i);
-                _double_relative_rates.push_back(f);
+                G::_double_relative_rates.push_back(f);
             }
         }
     }
@@ -1043,7 +1007,7 @@ namespace proj {
 
         std::cout << "\nNumber of taxa: " << _data->getNumTaxa() << std::endl;
         std::cout << "Number of partition subsets: " << nsubsets << std::endl;
-        std::cout << "Number of particles: " << _nparticles << std::endl;
+        std::cout << "Number of particles: " << G::_nparticles << std::endl;
 
         for (unsigned subset = 0; subset < nsubsets; subset++) {
             DataType dt = _partition->getDataTypeForSubset(subset);
@@ -1062,7 +1026,7 @@ namespace proj {
     }
 
     inline void Proj::handleSpeciesNewick(vector<Particle> particles) {
-            ifstream infile(_species_newick_name);
+            ifstream infile(G::_species_newick_name);
             string newick_string;
             string newick;
         int size_before = (int) newick.size();
@@ -1091,20 +1055,20 @@ namespace proj {
     inline void Proj::handleGeneNewicks() {
         vector<vector<string>> newicks; // vector of vector of newicks, 1 vector per gene
         _first_line = true;
-        if (_ngenes_provided == 0) {
+        if (G::_ngenes_provided == 0) {
             throw XProj("must specify number of genes in the conf file");
         }
         
-        for (int i=1; i<_ngenes_provided+1; i++) {
+        for (int i=1; i<G::_ngenes_provided+1; i++) {
             vector<string> current_gene_newicks;
 
-            string file_name = _newick_path + "/" + "gene" + to_string(i) + ".trees"; // file must be named gene1.trees, gene2.trees, etc.
+            string file_name = G::_newick_path + "/" + "gene" + to_string(i) + ".trees"; // file must be named gene1.trees, gene2.trees, etc.
             ifstream infile (file_name);
             string newick;
             unsigned size_before = (unsigned) current_gene_newicks.size();
             
             while (getline(infile, newick)) { // file newicks must start with the word "tree"
-                if (current_gene_newicks.size() < _nparticles) { // stop adding newicks once the number of particles has been reached // TODO: add option to randomize this?
+                if (current_gene_newicks.size() < G::_nparticles) { // stop adding newicks once the number of particles has been reached // TODO: add option to randomize this?
 //                size_t found = newick.find("tree");
                 if (newick.find("tree") == 2) { // TODO: this only works if there are exactly 2 spaces before the newick - try starting at parenthesis
                         size_t pos = newick.find("("); //find location of parenthesis
@@ -1124,15 +1088,15 @@ namespace proj {
 
         _data = Data::SharedPtr(new Data()); // TODO: don't need to set data b/c will not calculate a Felsenstein likelihood
         _data->setPartition(_partition);
-        _data->getDataFromFile(_data_file_name);
+        _data->getDataFromFile(G::_data_file_name);
 
-        if (_verbose > 0) {
+        if (G::_verbose > 0) {
             summarizeData(_data);
         }
         createSpeciesMap(_data);
 
         // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
-        if (Forest::_outgroup != "none") {
+        if (G::_outgroup != "none") {
             checkOutgroupName();
         }
 
@@ -1148,9 +1112,9 @@ namespace proj {
         Particle::setNumSubsets(nsubsets);
         
         vector<Particle> my_vec;
-        my_vec.resize(_nparticles);
+        my_vec.resize(G::_nparticles);
 
-        for (unsigned i=0; i<_nparticles; i++) {
+        for (unsigned i=0; i<G::_nparticles; i++) {
             my_vec[i] = Particle();
         }
 
@@ -1180,7 +1144,7 @@ namespace proj {
             ofstream speciestrf(filename1);
             speciestrf << "#nexus\n\n";
             speciestrf << "begin trees;\n";
-            if (_verbose > 0) {
+            if (G::_verbose > 0) {
                 cout << "existing file " << filename1 << " removed and replaced\n";
             }
         }
@@ -1188,7 +1152,7 @@ namespace proj {
             ofstream speciestrf(filename1);
             speciestrf << "#nexus\n\n";
             speciestrf << "begin trees;\n";
-            if (_verbose > 0) {
+            if (G::_verbose > 0) {
                 cout << "created new file " << filename1 << "\n";
             }
         }
@@ -1196,7 +1160,7 @@ namespace proj {
             ofstream uniquespeciestrf(filename2);
             uniquespeciestrf << "#nexus\n\n";
             uniquespeciestrf << "begin trees;\n";
-            if (_verbose > 0) {
+            if (G::_verbose > 0) {
                 cout << "existing file " << filename2 << " removed and replaced\n";
             }
         }
@@ -1204,19 +1168,19 @@ namespace proj {
             ofstream uniquespeciestrf(filename2);
             uniquespeciestrf << "#nexus\n\n";
             uniquespeciestrf << "begin trees;\n";
-            if (_verbose > 0) {
+            if (G::_verbose > 0) {
                 cout << "created new file " << filename2 << "\n";
             }
         }
         if (filesystem::remove(filename3)) {
             ofstream paramsf(filename3);
-            if (_verbose > 0) {
+            if (G::_verbose > 0) {
                cout << "existing file " << filename3 << " removed and replaced\n";
             }
         }
         else {
             ofstream paramsf(filename3);
-            if (_verbose > 0) {
+            if (G::_verbose > 0) {
                 cout << "created new file " << filename3 << "\n";
             }
         }
@@ -1225,7 +1189,7 @@ namespace proj {
         
         string altfname = "alt_species_trees.trees";
         if (filesystem::remove(altfname)) {
-            if (_verbose > 0) {
+            if (G::_verbose > 0) {
                cout << "existing file " << altfname << " removed and replaced\n";
             }
             
@@ -1244,12 +1208,12 @@ namespace proj {
             string translate_block = my_vec[0].getTranslateBlock();
             alttrf << translate_block << endl;
             
-            if (_verbose > 0) {
+            if (G::_verbose > 0) {
                 cout << "created new file " << altfname << "\n";
             }
         }
 
-        unsigned ngroups = round(_nparticles * _thin);
+        unsigned ngroups = round(G::_nparticles * G::_thin);
         if (ngroups == 0) {
             ngroups = 1;
             cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
@@ -1266,19 +1230,19 @@ namespace proj {
         std::shuffle(my_vec.begin(), my_vec.end(), std::default_random_engine(seed)); // shuffle particles using group seed
         
         // delete first (1-_thin) % of particles
-        my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (_nparticles-ngroups)));
+        my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (G::_nparticles-ngroups)));
         assert(my_vec.size() == ngroups);
 
-        _nparticles = ngroups;
+        G::_nparticles = ngroups;
 
         vector<Particle> new_vec;
 
-        _nparticles = _particle_increase;
+        G::_nparticles = G::_particle_increase; // TODO: G::_nparticles is static? be careful
         unsigned index = 0;
         
         bool parallelize_by_group = false;
         
-        if (_nthreads > 1) {
+        if (G::_nthreads > 1) {
 #if defined PARALLELIZE_BY_GROUP
             parallelize_by_group = true;
 #endif
@@ -1365,19 +1329,19 @@ namespace proj {
                 vector<Particle> use_vec;
                 Particle p = my_vec[a];
                 
-                use_vec.resize(_particle_increase);
+                use_vec.resize(G::_particle_increase);
                 
                 fill(use_vec.begin(), use_vec.end(), p);
                 
-                assert(use_vec.size() == _particle_increase);
+                assert(use_vec.size() == G::_particle_increase);
 
-                index += _particle_increase;
+                index += G::_particle_increase;
 
-                if (_verbose > 1) {
+                if (G::_verbose > 1) {
                     cout << "beginning species tree proposals for subset " << a+1 << endl;
                 }
                 for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
-                    if (_verbose > 1) {
+                    if (G::_verbose > 1) {
                         cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
                     }
 
@@ -1394,19 +1358,19 @@ namespace proj {
                     
                     double ess = filterSpeciesParticles(s, use_vec);
                     
-                    if (_verbose > 1) {
+                    if (G::_verbose > 1) {
                         cout << "   " << "ESS = " << ess << endl;
                     }
 
                 } // s loop
 
-                if (_save_every > 1.0) { // thin sample for output by taking a random sample
-                    unsigned sample_size = round (double (_particle_increase) / double(_save_every));
+                if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
+                    unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
                     if (sample_size == 0) {
                         cout << "\n";
                         cout << "current settings would save 0 species trees; saving every species tree\n";
                         cout << "\n";
-                        sample_size = _particle_increase;
+                        sample_size = G::_particle_increase;
                     }
                     
                     unsigned group_number = use_vec[0].getGroupNumber();
@@ -1414,7 +1378,7 @@ namespace proj {
                     std::shuffle(use_vec.begin(), use_vec.end(), std::default_random_engine(seed)); // shuffle particles using group seed
                     
                     // delete first (1-_thin) % of particles
-                    use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
+                    use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (G::_particle_increase-sample_size)));
                     assert (use_vec.size() == sample_size);
                 }
 
@@ -1532,9 +1496,9 @@ namespace proj {
 
 
     inline void Proj::filterParticlesMixing(vector<Particle> & particles) {
-        unsigned total_n_particles = _nparticles * _ngroups;
+        unsigned total_n_particles = G::_nparticles * G::_ngroups;
                 
-        double weight = (double) 1 / (_ngroups*_nparticles);
+        double weight = (double) 1 / (G::_ngroups*G::_nparticles);
                 
         // Copy log weights for all bundles to prob vector
         vector<double> probs(total_n_particles, weight);
@@ -1623,7 +1587,7 @@ namespace proj {
     inline double Proj::filterParticles(unsigned step, vector<Particle> & particles, unsigned start, unsigned end) {
           // Copy log weights for all bundles to prob vector
         
-          vector<double> probs(_nparticles, 0.0);
+          vector<double> probs(G::_nparticles, 0.0);
           
         unsigned count_index = 0;
         for (unsigned p=start; p<end+1; p++) {
@@ -1631,20 +1595,20 @@ namespace proj {
             count_index++;
           }
         
-        assert (probs.size() == _nparticles);
+        assert (probs.size() == G::_nparticles);
           // Normalize log_weights to create discrete probability distribution
           double log_sum_weights = getRunningSum(probs);
           
           transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
           
           // Compute component of the log marginal likelihood due to this step
-          _log_marginal_likelihood += log_sum_weights - log(_nparticles);
+          _log_marginal_likelihood += log_sum_weights - log(G::_nparticles);
           if (step == 0) {
               _log_marginal_likelihood += _starting_log_likelihood;
           }
           
           double ess = 0.0;
-          if (_verbose > 1) {
+          if (G::_verbose > 1) {
               // Compute effective sample size
               ess = computeEffectiveSampleSize(probs);
           }
@@ -1653,7 +1617,7 @@ namespace proj {
           partial_sum(probs.begin(), probs.end(), probs.begin());
 
           // Initialize vector of counts storing number of darts hitting each particle
-          vector<unsigned> counts (_nparticles, 0);
+          vector<unsigned> counts (G::_nparticles, 0);
 
           // Throw _nparticles darts
         for (unsigned i=start; i<end+1; i++) {
@@ -1687,14 +1651,14 @@ namespace proj {
 
               // Count number of cells with zero count that can serve as copy recipients
               unsigned nzeros = 0;
-              for (unsigned i = 0; i < _nparticles; i++) {
+              for (unsigned i = 0; i < G::_nparticles; i++) {
                   if (counts[i] == 0)
                       nzeros++;
               }
 
               while (nzeros > 0) {
-                  assert(donor < _nparticles);
-                  assert(recipient < _nparticles);
+                  assert(donor < G::_nparticles);
+                  assert(recipient < G::_nparticles);
 
                   // Copy donor to recipient
                   particles[recipient+start] = particles[donor+start];
@@ -1706,14 +1670,14 @@ namespace proj {
                   if (counts[donor] == 1) {
                       // Move donor to next slot with count > 1
                       donor++;
-                      while (donor < _nparticles && counts[donor] < 2) {
+                      while (donor < G::_nparticles && counts[donor] < 2) {
                           donor++;
                       }
                   }
 
                   // Move recipient to next slot with count equal to 0
                   recipient++;
-                  while (recipient < _nparticles && counts[recipient] > 0) {
+                  while (recipient < G::_nparticles && counts[recipient] > 0) {
                       recipient++;
                   }
               }
@@ -1742,7 +1706,7 @@ namespace proj {
     //        }
         
         double ess = 0.0;
-        if (_verbose > 1) {
+        if (G::_verbose > 1) {
         // Compute effective sample size
             ess = computeEffectiveSampleSize(probs);
         }
@@ -1860,10 +1824,10 @@ namespace proj {
         // nspecies is _sim_nspecies
         // ntaxa vector is _ntaxaperspecies
         unsigned count = 0;
-        for (int s=0; s<_sim_nspecies; s++) {
+        for (int s=0; s<G::_sim_nspecies; s++) {
             string species_name;
             species_name = inventName(s, false);
-            for (int t=0; t<_ntaxaperspecies[s]; t++) {
+            for (int t=0; t<G::_ntaxaperspecies[s]; t++) {
                 string taxon_name = inventName(count, true) + "^" + species_name;
                 _taxon_map.insert({taxon_name, species_name});
                 count++;
@@ -1922,15 +1886,15 @@ namespace proj {
             vector<Particle> use_vec;
             Particle p = particles[i];
             
-            use_vec.resize(_particle_increase);
+            use_vec.resize(G::_particle_increase);
             
             fill(use_vec.begin(), use_vec.end(), p);
 
-            assert(use_vec.size() == _particle_increase);
+            assert(use_vec.size() == G::_particle_increase);
 
-            assert(use_vec.size() == _particle_increase);
+            assert(use_vec.size() == G::_particle_increase);
 
-            if (_verbose > 1) {
+            if (G::_verbose > 1) {
                 cout << "beginning species tree proposals for subset " << i+1 << endl;
             }
             for (unsigned s = 0; s < nspecies-1; s++) {  // skip last round of filtering because weights are always 0
@@ -1946,23 +1910,23 @@ namespace proj {
                 proposeSpeciesParticles(use_vec);
 
                 double ess = filterSpeciesParticles(s, use_vec);
-                if (_verbose > 1) {
+                if (G::_verbose > 1) {
                     cout << "   " << "ESS = " << ess << endl;
                 }
 
             } // s loop
             
-            if (_verbose > 1) {
+            if (G::_verbose > 1) {
                 cout << "finished with species tree proposals for subset " << i+1 << endl;
             }
             
-            if (_save_every > 1.0) { // thin sample for output by taking a random sample
-                unsigned sample_size = round (double (_particle_increase) / double(_save_every));
+            if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
+                unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
                 if (sample_size == 0) {
                     cout << "\n";
                     cout << "current settings would save 0 species trees; saving every species tree\n";
                     cout << "\n";
-                    sample_size = _particle_increase;
+                    sample_size = G::_particle_increase;
                 }
 
                 unsigned group_number = use_vec[0].getGroupNumber();
@@ -1971,7 +1935,7 @@ namespace proj {
                 std::shuffle(use_vec.begin(), use_vec.end(), std::default_random_engine(seed)); // shuffle particles using group seed
 
                 // delete first (1-_thin) % of particles
-                use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (_particle_increase-sample_size)));
+                use_vec.erase(next(use_vec.begin(), 0), next(use_vec.begin(), (G::_particle_increase-sample_size)));
                 assert (use_vec.size() == sample_size);
             }
 
@@ -1979,7 +1943,7 @@ namespace proj {
             saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
             saveSpeciesTreesAltHierarchical(use_vec);
             _count++;
-            if (_gene_newicks_specified) {
+            if (G::_gene_newicks_specified) {
                 writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nsubsets, nspecies, ntaxa, use_vec, filename3, i);
             }
             else {
@@ -1991,11 +1955,11 @@ namespace proj {
 
     inline void Proj::proposeSpeciesGroups(vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets, unsigned ntaxa) {
         // ngroups = number of species SMCs to do (i.e. 100 particles for first round, thin = 1.0 means ngroups = 100 for this round)
-        assert (_nthreads > 1);
+        assert (G::_nthreads > 1);
         
         // divide up groups as evenly as possible across threads
         unsigned first = 0;
-        unsigned incr = ngroups/_nthreads + (ngroups % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of groups
+        unsigned incr = ngroups/G::_nthreads + (ngroups % G::_nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of groups
         unsigned last = incr;
         
         // need a vector of threads because we have to wait for each one to finish
@@ -2022,8 +1986,8 @@ namespace proj {
     }
 
     inline void Proj::proposeSpeciesParticles(vector<Particle> &particles) {
-        assert(_nthreads > 0);
-        if (_nthreads == 1) {
+        assert(G::_nthreads > 0);
+        if (G::_nthreads == 1) {
           for (auto & p : particles) {
               p.speciesOnlyProposal();
           }
@@ -2031,7 +1995,7 @@ namespace proj {
         else {
           // divide up the particles as evenly as possible across threads
           unsigned first = 0;
-          unsigned incr = _nparticles/_nthreads + (_nparticles % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
+          unsigned incr = G::_nparticles/G::_nthreads + (G::_nparticles % G::_nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
           unsigned last = incr;
 
           // need a vector of threads because we have to wait for each one to finish
@@ -2043,10 +2007,10 @@ namespace proj {
             // update first and last
             first = last;
             last += incr;
-            if (last > _nparticles) {
-              last = _nparticles;
+            if (last > G::_nparticles) {
+              last = G::_nparticles;
               }
-            if (first>=_nparticles) {
+            if (first>=G::_nparticles) {
                 break;
             }
           }
@@ -2065,34 +2029,27 @@ namespace proj {
             particles[i].setData(_data, _taxon_map, partials);
             partials = false;
             particles[i].mapSpecies(_taxon_map, _species_names);
-            particles[i].setRelativeRatesByGene(_double_relative_rates);
-            if (_lambda > 0.0) {
-                particles[i].setParticleLambda(_lambda);
-            }
+            particles[i].setRelativeRatesByGene(G::_double_relative_rates);
         }
     }
 
     inline void Proj::initializeParticles(vector<Particle> &particles) {
         // set partials for first particle under save_memory setting for initial marginal likelihood calculation
-        assert (_nthreads > 0);
+        assert (G::_nthreads > 0);
 
         bool partials = true;
-        if (_gene_newicks_specified) {
+        if (G::_gene_newicks_specified) {
             partials = false;
-            Forest::_save_memory = true;
+            G::_save_memory = true;
         }
 
-        if (_nthreads == 1) {
+        if (G::_nthreads == 1) {
             for (auto & p:particles ) { // TODO: can initialize some of these things in parallel - probably not worth it
                 p.setData(_data, _taxon_map, partials);
                 partials = false;
                 p.mapSpecies(_taxon_map, _species_names);
                 
-                p.setRelativeRatesByGene(_double_relative_rates);
-                
-                if (_lambda > 0.0) {
-                    p.setParticleLambda(_lambda);
-                }
+                p.setRelativeRatesByGene(G::_double_relative_rates);
                 
             }
         }
@@ -2103,15 +2060,12 @@ namespace proj {
             bool partials = true;
             particles[0].setData(_data, _taxon_map, partials);
             particles[0].mapSpecies(_taxon_map, _species_names);
-            particles[0].setRelativeRatesByGene(_double_relative_rates);
-            if (_lambda > 0.0) {
-                particles[0].setParticleLambda(_lambda);
-            }
+            particles[0].setRelativeRatesByGene(G::_double_relative_rates);
 
             if (particles.size() > 1) {
                 // divide up the remaining particles as evenly as possible across threads
                 unsigned first = 1;
-                unsigned incr = (_nparticles*_ngroups-1) /_nthreads + ((_nparticles*_ngroups - 1) % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
+                unsigned incr = (G::_nparticles*G::_ngroups-1) /G::_nthreads + ((G::_nparticles*G::_ngroups - 1) % G::_nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
 
                 unsigned last = incr;
 
@@ -2125,10 +2079,10 @@ namespace proj {
                   first = last;
                   last += incr;
                   
-                  if (last > _nparticles*_ngroups) {
-                    last = _nparticles*_ngroups;
+                  if (last > G::_nparticles*G::_ngroups) {
+                    last = G::_nparticles*G::_ngroups;
                     }
-                  if (first>=_nparticles*_ngroups) {
+                  if (first>=G::_nparticles*G::_ngroups) {
                       break;
                   }
             }
@@ -2142,10 +2096,10 @@ namespace proj {
     }
 
     inline void Proj::proposeParticlesParallelizeByGroup(vector<vector<Particle>> &particles) {
-        assert (_nthreads > 0);
+        assert (G::_nthreads > 0);
                 
-        if (_nthreads == 1) {
-            for (unsigned i=0; i<_ngroups; i++) {
+        if (G::_nthreads == 1) {
+            for (unsigned i=0; i<G::_ngroups; i++) {
                 for (auto &p:particles[i]) {
                     p.proposal();
                 }
@@ -2156,13 +2110,13 @@ namespace proj {
             // divide up the groups as evenly as possible across threads
             unsigned first = 0;
             unsigned last = 0;
-            unsigned stride = _ngroups / _nthreads; // divisor
-            unsigned r = _ngroups % _nthreads; // remainder
+            unsigned stride = G::_ngroups / G::_nthreads; // divisor
+            unsigned r = G::_ngroups % G::_nthreads; // remainder
 
             // need a vector of threads because we have to wait for each one to finish
             vector<thread> threads;
 
-            for (unsigned i=0; i<_nthreads; i++) {
+            for (unsigned i=0; i<G::_nthreads; i++) {
                 first = last;
                 last = first + stride;
 
@@ -2171,8 +2125,8 @@ namespace proj {
                     r -= 1;
                 }
 
-                if (last > _ngroups) {
-                    last = _ngroups;
+                if (last > G::_ngroups) {
+                    last = G::_ngroups;
                 }
 
                 threads.push_back(thread(&Proj::proposeParticleGroupRange, this, first, last, std::ref(particles)));
@@ -2187,8 +2141,8 @@ namespace proj {
     }
 
     inline void Proj::proposeParticles(vector<Particle> &particles) {
-        assert(_nthreads > 0);
-        if (_nthreads == 1) {
+        assert(G::_nthreads > 0);
+        if (G::_nthreads == 1) {
           for (auto & p : particles) {
               p.proposal();
           }
@@ -2197,13 +2151,13 @@ namespace proj {
           // divide up the particles as evenly as possible across threads
             unsigned first = 0;
             unsigned last = 0;
-            unsigned stride = (_nparticles*_ngroups) / _nthreads; // divisor
-            unsigned r = (_nparticles*_ngroups) % _nthreads; // remainder
+            unsigned stride = (G::_nparticles*G::_ngroups) / G::_nthreads; // divisor
+            unsigned r = (G::_nparticles*G::_ngroups) % G::_nthreads; // remainder
             
             // need a vector of threads because we have to wait for each one to finish
             vector<thread> threads;
 
-            for (unsigned i=0; i<_nthreads; i++) {
+            for (unsigned i=0; i<G::_nthreads; i++) {
                 first = last;
                 last = first + stride;
                 
@@ -2212,8 +2166,8 @@ namespace proj {
                     r -= 1;
                 }
                 
-                if (last > (_nparticles*_ngroups)) {
-                    last = (_nparticles*_ngroups);
+                if (last > (G::_nparticles*G::_ngroups)) {
+                    last = (G::_nparticles*G::_ngroups);
                 }
                 
                 threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles)));
@@ -2265,7 +2219,7 @@ namespace proj {
         paupf << "#NEXUS\n\n";
         paupf << "begin paup;\n";
         paupf << "  log start file=svdout.txt replace;\n";
-        paupf << "  exe " + _sim_file_name + ";\n";
+        paupf << "  exe " + G::_sim_file_name + ";\n";
         paupf << "  taxpartition species (vector) = " << join(taxpartition," ") << ";\n";
         paupf << "svd taxpartition=species bootstrap nreps = 1000 treefile=test.tre replace;\n";
 //        paupf << "  svd taxpartition=species;\n";
@@ -2280,19 +2234,19 @@ namespace proj {
     inline void Proj::simulateData() {
         cout << "\nSimulating data under multispecies coalescent model...\n" << endl;
         // set to one thread
-        _nthreads = 1;
+        G::_nthreads = 1;
         rng.setSeed(_random_seed);
 
         unsigned ntaxa = 0;
         
-        if (_ntaxaperspecies.size() == 1) {
-            ntaxa = _ntaxaperspecies[0];
-            for (int i=0; i<_sim_nspecies-1; i++) {
-                _ntaxaperspecies.push_back(ntaxa);
+        if (G::_ntaxaperspecies.size() == 1) {
+            ntaxa = G::_ntaxaperspecies[0];
+            for (int i=0; i<G::_sim_nspecies-1; i++) {
+                G::_ntaxaperspecies.push_back(ntaxa);
             }
         }
         else {
-            for (auto &t:_ntaxaperspecies) {
+            for (auto &t:G::_ntaxaperspecies) {
                 ntaxa += t;
             }
         }
@@ -2304,8 +2258,8 @@ namespace proj {
         sim_vec[0].setSeed(rng.randint(1,9999) + psuffix);
         psuffix += 2;
 
-        Forest::_run_on_empty = true;
-        Forest::_proposal = "prior-prior";
+        G::_run_on_empty = true;
+        G::_proposal = "prior-prior";
 
         _data = Data::SharedPtr(new Data());
         _data->setPartition(_partition);
@@ -2319,7 +2273,7 @@ namespace proj {
         }
 
         // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
-        if (Forest::_outgroup != "none") {
+        if (G::_outgroup != "none") {
             checkOutgroupName();
         }
 
@@ -2358,13 +2312,11 @@ namespace proj {
 
         sim_vec[0].setNextSpeciesNumber(); // need to reset this now that number of species is known
         
-        sim_vec[0].setNewTheta(_fix_theta_for_simulations);
+        sim_vec[0].setNewTheta(G::_fix_theta_for_simulations);
+                
+        sim_vec[0].setNTaxaPerSpecies(G::_ntaxaperspecies);
         
-        sim_vec[0].setParticleLambda(_lambda);
-        
-        sim_vec[0].setNTaxaPerSpecies(_ntaxaperspecies);
-        
-        sim_vec[0].setRelativeRatesByGene(_double_relative_rates);
+        sim_vec[0].setRelativeRatesByGene(G::_double_relative_rates);
 
         unsigned nsteps = (unsigned) (_taxon_map.size()-1)*nsubsets;
 
@@ -2394,7 +2346,7 @@ namespace proj {
         sim_vec[0].simulateData(sites_vector);
         
         _data->compressPatterns();
-        _data->writeDataToFile(_sim_file_name);
+        _data->writeDataToFile(G::_sim_file_name);
 
         saveGeneTrees(nsubsets, sim_vec);
         saveSpeciesTrees(sim_vec);
@@ -2405,8 +2357,8 @@ namespace proj {
     }
 
     inline void Proj::run() {
-        if (_gene_newicks_specified) {
-            if (_start_mode == "sim") {
+        if (G::_gene_newicks_specified) {
+            if (G::_start_mode == "sim") {
                 throw XProj("cannot specify gene newicks and simulations");
             }
             try {
@@ -2417,8 +2369,8 @@ namespace proj {
             }
         }
         
-        else if (_start_mode == "sim") {
-            if (_gene_newicks_specified) {
+        else if (G::_start_mode == "sim") {
+            if (G::_gene_newicks_specified) {
                 throw XProj("cannot specify gene newicks and simulations");
             }
             
@@ -2433,7 +2385,7 @@ namespace proj {
         }
         else {
             _first_line = true;
-            if (_verbose > 0) {
+            if (G::_verbose > 0) {
                 cout << "Starting..." << endl;
                 cout << "Current working directory: " << boost::filesystem::current_path() << endl;
                 cout << "Random seed: " << _random_seed << endl;
@@ -2442,30 +2394,30 @@ namespace proj {
 #else
                 cout << "Theta: " << Forest::_theta << endl;
 #endif
-                cout << "Number of threads: " << _nthreads << endl;
+                cout << "Number of threads: " << G::_nthreads << endl;
             }
 
-            if (Forest::_run_on_empty) { // if running with no data, choose taxa to join at random
-                Forest::_proposal = "prior-prior";
+            if (G::_run_on_empty) { // if running with no data, choose taxa to join at random
+                G::_proposal = "prior-prior";
             }
 
             try {
-                if (_verbose > 0) {
-                    cout << "\n*** Reading and storing the data in the file " << _data_file_name << endl;
-                    cout << "data file name is " << _data_file_name << endl;
+                if (G::_verbose > 0) {
+                    cout << "\n*** Reading and storing the data in the file " << G::_data_file_name << endl;
+                    cout << "data file name is " << G::_data_file_name << endl;
                 }
                 
                 _data = Data::SharedPtr(new Data());
                 _data->setPartition(_partition);
-                _data->getDataFromFile(_data_file_name);
+                _data->getDataFromFile(G::_data_file_name);
 
-                if (_verbose > 0) {
+                if (G::_verbose > 0) {
                     summarizeData(_data);
                 }
                 createSpeciesMap(_data);
 
                 // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
-                if (Forest::_outgroup != "none") {
+                if (G::_outgroup != "none") {
                     checkOutgroupName();
                 }
 
@@ -2481,7 +2433,7 @@ namespace proj {
                 Particle::setNumSubsets(nsubsets);
                 
                 vector<Particle> my_vec;
-                my_vec.resize(_nparticles * _ngroups);
+                my_vec.resize(G::_nparticles * G::_ngroups);
                 
                 for (unsigned p=0; p<my_vec.size(); p++) {
                     my_vec[p] = Particle();
@@ -2533,7 +2485,6 @@ namespace proj {
                 
                 // reset marginal likelihood
                 _log_marginal_likelihood = 0.0;
-//                vector<double> starting_log_likelihoods = my_vec[0][0].calcGeneTreeLogLikelihoods(); // can't start at 0 because not every gene gets changed
                 vector<double> starting_log_likelihoods = my_vec[0].calcGeneTreeLogLikelihoods(); // can't start at 0 because not every gene gets changed
                 
                 _starting_log_likelihood = 0.0;
@@ -2548,24 +2499,22 @@ namespace proj {
                     }
 
                     for (auto &p:my_vec) { // TODO: can parallelize this - is it worth it?
-                        p.drawParticleLambda();
-                        if (!Forest::_run_on_empty) {
+                        if (!G::_run_on_empty) {
                             p.setLogLikelihood(starting_log_likelihoods);
                         }
                         
-                        if (_fix_theta) {
+                        if (G::_fix_theta) {
                             p.fixTheta();
                             p.setFixTheta(true);
                         }
                         
     #if defined (DRAW_NEW_THETA)
-                        assert (!_fix_theta);
+                        assert (!G::_fix_theta);
                         p.drawTheta();
     #endif
                     }
-//                }
                 
-                if (Forest::_save_memory) {
+                if (G::_save_memory) {
                     my_vec[0].clearPartials(); // all other particles should have no partials
                 }
                 
@@ -2574,7 +2523,7 @@ namespace proj {
                     unsigned nsteps = (ntaxa-1)*nsubsets;
                 
                     for (unsigned g=0; g<nsteps; g++){
-                        if (_verbose > 0) {
+                        if (G::_verbose > 0) {
                             cout << "starting step " << g << " of " << nsteps-1 << endl;
                         }
 
@@ -2598,7 +2547,7 @@ namespace proj {
 
                         bool filter = true;
 
-                        if (Forest::_run_on_empty) {
+                        if (G::_run_on_empty) {
                             filter = false;
                         }
                         
@@ -2607,13 +2556,13 @@ namespace proj {
                             StopWatch sw;
                             
 //                            sw.start();
-                            for (unsigned i=0; i<_ngroups; i++) {
-                                unsigned start = i * _nparticles;
-                                unsigned end = start + (_nparticles - 1);
+                            for (unsigned i=0; i<G::_ngroups; i++) {
+                                unsigned start = i * G::_nparticles;
+                                unsigned end = start + (G::_nparticles - 1);
                                 
                                 double ess = filterParticles(g, my_vec, start, end); // filter only particles within a subgroup
                                 
-                                if (_verbose > 1) {
+                                if (G::_verbose > 1) {
                                     cout << "\t" << "ESS is : " << ess << endl;
                                 }
 //                            double total_seconds = sw.stop();
@@ -2626,12 +2575,12 @@ namespace proj {
                         }
                 } // g loop
                 
-                if (_save_gene_trees) {
+                if (G::_save_gene_trees) {
                         for (int i=1; i<nsubsets+1; i++) {
                             saveGeneTrees(i, my_vec);
                         }
                 }
-                if (_verbose > 0) {
+                if (G::_verbose > 0) {
                     cout << "\n";
                     cout << "marginal likelihood after combined filtering: " << _log_marginal_likelihood << endl;
                     cout << "\n";
@@ -2655,7 +2604,7 @@ namespace proj {
                     ofstream speciestrf(filename1);
                     speciestrf << "#nexus\n\n";
                     speciestrf << "begin trees;\n";
-                    if (_verbose > 0) {
+                    if (G::_verbose > 0) {
                         cout << "existing file " << filename1 << " removed and replaced\n";
                     }
                 }
@@ -2663,7 +2612,7 @@ namespace proj {
                     ofstream speciestrf(filename1);
                     speciestrf << "#nexus\n\n";
                     speciestrf << "begin trees;\n";
-                    if (_verbose > 0) {
+                    if (G::_verbose > 0) {
                         cout << "created new file " << filename1 << "\n";
                     }
                 }
@@ -2671,7 +2620,7 @@ namespace proj {
                     ofstream uniquespeciestrf(filename2);
                     uniquespeciestrf << "#nexus\n\n";
                     uniquespeciestrf << "begin trees;\n";
-                    if (_verbose > 0) {
+                    if (G::_verbose > 0) {
                         cout << "existing file " << filename2 << " removed and replaced\n";
                     }
                 }
@@ -2679,20 +2628,20 @@ namespace proj {
                     ofstream uniquespeciestrf(filename2);
                     uniquespeciestrf << "#nexus\n\n";
                     uniquespeciestrf << "begin trees;\n";
-                    if (_verbose > 0) {
+                    if (G::_verbose > 0) {
                         cout << "created new file " << filename2 << "\n";
                     }
                 }
                 
                 if (filesystem::remove(filename3)) {
                     ofstream paramsf(filename3);
-                    if (_verbose > 0) {
+                    if (G::_verbose > 0) {
                        cout << "existing file " << filename3 << " removed and replaced\n";
                     }
                 }
                 else {
                     ofstream paramsf(filename3);
-                    if (_verbose > 0) {
+                    if (G::_verbose > 0) {
                         cout << "created new file " << filename3 << "\n";
                     }
                 }
@@ -2700,7 +2649,7 @@ namespace proj {
                 string altfname = "alt_species_trees.trees";
                 if (filesystem::remove(altfname)) {
                     
-                    if (_verbose > 0) {
+                    if (G::_verbose > 0) {
                        cout << "existing file " << altfname << " removed and replaced\n";
                     }
                     
@@ -2719,7 +2668,7 @@ namespace proj {
                     string translate_block = my_vec[0].getTranslateBlock();
                     alttrf << translate_block << endl;
                     
-                    if (_verbose > 0) {
+                    if (G::_verbose > 0) {
                         cout << "created new file " << altfname << "\n";
                     }
                 }
@@ -2863,11 +2812,11 @@ namespace proj {
 
                         index += _particle_increase;
 
-                        if (_verbose > 1) {
+                        if (G::_verbose > 1) {
                             cout << "beginning species tree proposals for subset " << a+1 << endl;
                         }
                         for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
-                            if (_verbose > 1) {
+                            if (G::_verbose > 1) {
                                 cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
                             }
                             
@@ -2883,7 +2832,7 @@ namespace proj {
 
                             double ess = filterSpeciesParticles(s, use_vec);
                             
-                            if (_verbose > 1) {
+                            if (G::_verbose > 1) {
                                 cout << "   " << "ESS = " << ess << endl;
                             }
 

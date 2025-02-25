@@ -44,7 +44,6 @@ class Particle {
                                                     int index = 0;
                                                     _forests.resize(_nsubsets+1);
                                                     for (auto &_forest:_forests) {
-                                                        _forest.setStartMode("sim");
                                                         if (index > 0) {
                                                             _forest.setSimData(d, index, taxon_map, ntaxa);
                                                         }
@@ -103,7 +102,6 @@ class Particle {
         void                                            speciesOnlyProposal();
         void                                            speciesOnlyProposalIntegratingOutTheta();
         void                                            calculateIncrementPriors(double increment, string species_name, unsigned forest_number, bool speciation, bool first_step);
-        void                                            changeTheta(unsigned i);
         void                                            drawTheta();
         void                                            fixTheta();
         void                                            clearPartials();
@@ -120,7 +118,6 @@ class Particle {
         double                                          getAllPriors();
         double                                          getAllPriorsFirstRound();
         vector<double>                                  getVectorPrior();
-        double                                          getLambda(){return _forests[0]._lambda;}
         void                                            simulateData(vector<unsigned> sites_vector);
         unsigned                                        getNumDeepCoalescences() {return _num_deep_coalescences;}
         unsigned                                        getMaxDeepCoalescences(){return _max_deep_coal;}
@@ -153,12 +150,7 @@ class Particle {
         void                                            calcStartingRowCount();
 #endif
         void                                            createSpeciesIndices();
-        void                                            drawParticleLambda();
-        double                                          getParticleLambda(){return _forests[0]._lambda;}
-        void                                            setParticleLambda(double lambda){_forests[0]._lambda = lambda;}
         void                                            setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species);
-        
-        static double                                   _lambda_prior_mean;
 
     private:
 
@@ -288,7 +280,7 @@ class Particle {
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
         }
-        if (_generation == 0 && !Forest::_run_on_empty) {
+        if (_generation == 0 && !G::_run_on_empty) {
             _log_weight = log_likelihood;
         }
 
@@ -302,7 +294,7 @@ class Particle {
         //calculate likelihood for each gene tree
         for (unsigned i=1; i<_forests.size(); i++) {
             double gene_tree_log_likelihood  = 0.0;
-            if (!Forest::_run_on_empty) {
+            if (!G::_run_on_empty) {
                 gene_tree_log_likelihood = _forests[i].calcLogLikelihood();
                 assert(!isnan (gene_tree_log_likelihood));
             }
@@ -414,8 +406,8 @@ class Particle {
         // starbeast3 does not include gene tree priors separately - this is already accounted for in coalescent likelihood
         total_prior += species_tree_prior;
     #if defined (DRAW_NEW_THETA)
-        if (Forest::_theta_prior_mean > 0.0) {
-            total_prior += log(Forest::_theta_prior_mean) - (_forests[1]._theta * Forest::_theta_prior_mean);
+        if (G::_theta_prior_mean > 0.0) {
+            total_prior += log(G::_theta_prior_mean) - (G::_theta * G::_theta_prior_mean);
         }
         // TODO: what if theta mean is set?
     #endif
@@ -445,7 +437,7 @@ inline vector<double> Particle::getVectorPrior() {
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
         }
-        if (_generation == 0 && !Forest::_run_on_empty) {
+        if (_generation == 0 && !G::_run_on_empty) {
             _log_weight = log_likelihood;
         }
 
@@ -468,7 +460,7 @@ inline vector<double> Particle::getVectorPrior() {
             }
         }
 //        else {
-        else if (_generation % _nsubsets == 0 && Forest::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+        else if (_generation % _nsubsets == 0 && G::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
             // don't rebuild the species tree at every step when simulating data
             trimSpeciesTree();
             if (_forests[0]._lineages.size() > 1) {
@@ -514,7 +506,7 @@ inline vector<double> Particle::getVectorPrior() {
                         string species_name = rates_by_species[index].second;
                         _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
                                    
-                        if (Forest::_start_mode == "smc") {
+                        if (G::_start_mode == "smc") {
 # if defined (BUILD_UPGMA_TREE)
 # if defined (BUILD_UPGMA_TREE_CONSTRAINED)
                             if (!Forest::_run_on_empty) {
@@ -540,7 +532,7 @@ inline vector<double> Particle::getVectorPrior() {
                             assert (_forests[next_gene]._species_partition.size() > 1);
                             _forests[next_gene].addIncrement(species_increment);
                             
-                            if (Forest::_start_mode == "sim") {
+                            if (G::_start_mode == "sim") {
                                 _num_deep_coalescences += _forests[next_gene].getDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
                                 _max_deep_coal += _forests[next_gene].getMaxDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
                             }
@@ -562,9 +554,9 @@ inline vector<double> Particle::getVectorPrior() {
             
 
              if (_forests[1]._theta_mean == 0.0) {
-                 assert (_forests[1]._theta > 0.0);
+                 assert (G::_theta > 0.0);
                  for (int i=1; i<_forests.size(); i++) {
-                     _forests[i]._theta_mean = _forests[1]._theta;
+                     _forests[i]._theta_mean = G::_theta;
                  }
              }
              assert (_forests[1]._theta_mean > 0.0);
@@ -589,11 +581,11 @@ inline vector<double> Particle::getVectorPrior() {
         
 #if defined (WEIGHT_MODIFIER)
         // modifier only happens on first round
-        if (_generation == 0 && _forests[1]._theta_prior_mean > 0.0 && _forests[1]._theta_proposal_mean > 0.0) {
-            if (_forests[1]._theta_prior_mean != _forests[1]._theta_proposal_mean) {
+        if (_generation == 0 && G::_theta_prior_mean > 0.0 && G::_theta_proposal_mean > 0.0) {
+            if (G::_theta_prior_mean != G::_theta_proposal_mean) {
                 // else, log weight modifier is 0
-                double prior_rate = 1.0/_forests[1]._theta_prior_mean;
-                double proposal_rate = 1.0/_forests[1]._theta_proposal_mean;
+                double prior_rate = 1.0/G::_theta_prior_mean;
+                double proposal_rate = 1.0/G::_theta_proposal_mean;
                 double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
 
                 _log_weight += log_weight_modifier;
@@ -603,7 +595,7 @@ inline vector<double> Particle::getVectorPrior() {
         
         _generation++;
         
-        if (Forest::_start_mode == "smc" && !Forest::_run_on_empty) {
+        if (G::_start_mode == "smc" && !G::_run_on_empty) {
             _log_weight = _forests[next_gene]._log_weight + inv_gamma_modifier;
         }
         else {
@@ -625,9 +617,6 @@ inline vector<double> Particle::getVectorPrior() {
     inline void Particle::speciesOnlyProposalIntegratingOutTheta() {
         if (_generation == 0) {
             _species_branches = Forest::_nspecies;
-            if (_lambda_prior_mean > 0.0) {
-                _forests[0]._lambda = _lot->gamma(1, _lambda_prior_mean);
-            }
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i].refreshPreorder();
                 _forests[i].calcMinDepth();
@@ -689,7 +678,7 @@ inline vector<double> Particle::getVectorPrior() {
             assert (_log_coalescent_likelihood == 0.0);
 #endif
 
-        if (!Forest::_run_on_empty || Forest::_run_on_empty_first_level_only) {
+        if (!G::_run_on_empty || G::_run_on_empty_first_level_only) {
             _species_branches += 1;
 //            unsigned nbranches = Forest::_nspecies*2 - 1;
             _log_coalescent_likelihood = 2 * _species_branches * log(_forests[1]._theta_mean) - _species_branches * boost::math::lgamma(2);
@@ -782,14 +771,14 @@ inline vector<double> Particle::getVectorPrior() {
 #if !defined (COAL_LIKE_TEST)
         double constrained_factor = 0.0;
 #if !defined (UNCONSTRAINED_PROPOSAL)
-        if (!Forest::_run_on_empty) {
+        if (!G::_run_on_empty) {
             assert (max_depth > 0.0);
             double nlineages = _forests[0]._lineages.size();
             if (nlineages == 1) {
                 nlineages = 2; // for last step, constraint was before final two species were joined
             }
 //            constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
-            constrained_factor = log(1 - exp(-1*nlineages*_forests[0]._lambda*max_depth));
+            constrained_factor = log(1 - exp(-1*nlineages*G::_lambda*max_depth));
         }
 #endif
         
@@ -800,7 +789,7 @@ inline vector<double> Particle::getVectorPrior() {
             assert(test != -0); // assert coalescent likelihood is not -inf
 #endif
         
-        if (Forest::_run_on_empty && !Forest::_run_on_empty_first_level_only) {
+        if (G::_run_on_empty && !G::_run_on_empty_first_level_only) {
             assert (_log_coalescent_likelihood == 0.0);
             assert (_log_species_weight == 0.0);
         }
@@ -813,9 +802,6 @@ inline vector<double> Particle::getVectorPrior() {
 #else
         
         if (_generation == 0) {
-            if (_lambda_prior_mean > 0.0) {
-                _forests[0]._lambda = _lot->gamma(1, _lambda_prior_mean);
-            }
             _forests[1]._vector_prior.clear();
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i].refreshPreorder();
@@ -1064,13 +1050,13 @@ inline vector<double> Particle::getVectorPrior() {
             assert (species_names.size() == 2*Forest::_nspecies - 1);
             
             for (auto &name:species_names) {
-                assert (Forest::_theta > 0.0);
-                theta_map[name] = Forest::_theta;         // create a theta map with all the same theta for simulations, set theta_mean to theta
+                assert (G::_theta > 0.0);
+                theta_map[name] = G::_theta;      // create a theta map with all the same theta for simulations, set theta_mean to theta
             }
             
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i]._theta_map = theta_map;
-                _forests[i]._theta_mean = Forest::_theta;
+                _forests[i]._theta_mean = G::_theta;
             }
             
         }
@@ -1104,8 +1090,6 @@ inline vector<double> Particle::getVectorPrior() {
     inline void Particle::fixTheta() {
         _forests[1].createThetaMapFixedTheta(_lot); // create map for one forest, then copy it to all forests
         double theta_mean = _forests[1]._theta_mean;
-        double theta_proposal_mean = _forests[1]._theta_proposal_mean;
-        double theta_prior_mean = _forests[1]._theta_prior_mean;
         map<string, double> theta_map = _forests[1]._theta_map;
         map<string, unsigned> species_indices = _forests[1]._species_indices;
         if (_forests.size() > 2) {
@@ -1113,8 +1097,6 @@ inline vector<double> Particle::getVectorPrior() {
                 _forests[i]._theta_map = theta_map;
                 _forests[i]._species_indices = species_indices;
                 _forests[i]._theta_mean = theta_mean;
-                _forests[i]._theta_proposal_mean = theta_proposal_mean;
-                _forests[i]._theta_prior_mean = theta_prior_mean;
             }
         }
     }
@@ -1126,8 +1108,6 @@ inline vector<double> Particle::getVectorPrior() {
             
         _forests[1].createThetaMap(_lot); // create map for one forest, then copy it to all forests
         double theta_mean = _forests[1]._theta_mean;
-        double theta_proposal_mean = _forests[1]._theta_proposal_mean;
-        double theta_prior_mean = _forests[1]._theta_prior_mean;
         map<string, double> theta_map = _forests[1]._theta_map;
         map<string, unsigned> species_indices = _forests[1]._species_indices;
         if (_forests.size() > 2) {
@@ -1135,58 +1115,7 @@ inline vector<double> Particle::getVectorPrior() {
                 _forests[i]._theta_map = theta_map;
                 _forests[i]._species_indices = species_indices;
                 _forests[i]._theta_mean = theta_mean;
-                _forests[i]._theta_proposal_mean = theta_proposal_mean;
-                _forests[i]._theta_prior_mean = theta_prior_mean;
             }
-        }
-    }
-
-    inline void Particle::changeTheta(unsigned i) {
-        // for snake data set?
-        if (i == 1) {
-            Forest::_theta *= 3.25926;
-        }
-        else if (i == 2) {
-            Forest::_theta *= 0.64160;
-        }
-        else if (i == 3) {
-            Forest::_theta *= 0.75517;
-        }
-        else if (i == 4) {
-            Forest::_theta *= 0.98977;
-        }
-        else if (i == 5) {
-            Forest::_theta *= 0.73621;
-        }
-        else if (i == 6) {
-            Forest::_theta *= 1.45336;
-        }
-        else if (i == 7) {
-            Forest::_theta *= 0.51891;
-        }
-        else if (i == 8) {
-            Forest::_theta *= 1.77001;
-        }
-        else if (i == 9) {
-            Forest::_theta *= 0.57665;
-        }
-        else if (i == 10) {
-            Forest::_theta *= 0.54812;
-        }
-        else if (i == 11) {
-            Forest::_theta *= 0.60184;
-        }
-        else if (i == 12) {
-            Forest::_theta *= 0.54980;
-        }
-        else if (i == 13) {
-            Forest::_theta *= 0.39104;
-        }
-        else if (i == 14) {
-            Forest::_theta *= 0.45743;
-        }
-        else if (i == 15) {
-            Forest::_theta *= 0.52157;
         }
     }
 
@@ -1375,7 +1304,7 @@ inline vector<double> Particle::getVectorPrior() {
 //            _forests[i]._nodes.clear();
             _forests[i].buildFromNewick(newicks[i-1], true, false); // newicks starts at 0
             _forests[i].refreshPreorder();
-            _forests[i]._theta_mean = Forest::_theta; // for now, set theta mean equal to whatever theta user specifies
+            _forests[i]._theta_mean = G::_theta; // for now, set theta mean equal to whatever theta user specifies
         }
     }
 
@@ -1390,7 +1319,7 @@ inline vector<double> Particle::getVectorPrior() {
             _forests[i]._log_coalescent_likelihood = 0.0;
             _forests[i]._data = nullptr;
             _forests[i]._log_weight = 0.0;
-//            _forests[i]._species_indices.clear(); // save this for use in jones coalescent likelihood calculation
+            // do not clear species indices - save this for use in jones coalescent likelihood calculation
         }
         _gene_order.clear();
         _next_species_number_by_gene.clear();
@@ -1496,13 +1425,6 @@ inline vector<double> Particle::getVectorPrior() {
     inline void Particle::createSpeciesIndices() {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].createSpeciesIndices();
-        }
-    }
-
-    inline void Particle::drawParticleLambda() {
-        if (_lambda_prior_mean > 0.0) {
-            // otherwise, lambda is fixed and not estimated
-            _forests[0]._lambda = _lot->gamma(1, _lambda_prior_mean);
         }
     }
 
@@ -1696,7 +1618,6 @@ inline vector<double> Particle::getVectorPrior() {
         _fix_theta = other._fix_theta;
         _relative_rates_by_gene = other._relative_rates_by_gene;
         _species_branches = other._species_branches;
-        _lambda_prior_mean = other._lambda_prior_mean;
         _group_number = other._group_number;
     };
 }
