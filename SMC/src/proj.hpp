@@ -40,21 +40,17 @@ namespace proj {
             void                run();
             void                saveAllForests(vector<Particle> &v) const ;
             void                saveSpeciesTrees(vector<Particle> &v) const;
-//            void                saveAllSpeciesTrees(vector<vector<Particle>> &v) const;
             void                saveAllSpeciesTrees(vector<Particle> &v) const;
             void                saveSpeciesTreesAfterFirstRound(vector<Particle> &v) const;
             void                saveSpeciesTreesHierarchical(vector<Particle> &v, string filename1, string filename2) const;
             void                saveGeneTrees(unsigned ngenes, vector<Particle> &v) const;
-            void                saveGeneTree(unsigned gene_number, vector<vector<Particle>> &v) const;
             void                writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v) const;
             void                writeLoradFileAfterSpeciesFiltering(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v) const;
             void                writeDeepCoalescenceFile(vector<Particle> &v);
             void                writeThetaFile(vector<Particle> &v);
-//            void                writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<vector<Particle>> &v) const;
             void                writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v) const;
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v, string filename, unsigned group_number);
             void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v, string filename, unsigned group_number);
-//            void                writePartialCountFile(vector<vector<Particle>> &particles);
             void                writePartialCountFile(vector<Particle> &particles);
             void                createSpeciesMap(Data::SharedPtr);
             void                simSpeciesMap();
@@ -75,7 +71,6 @@ namespace proj {
             void                handleGeneNewicks();
             void                handleSpeciesNewick(vector<Particle> particles);
             double              filterParticles(unsigned step, vector<Particle> & particles, unsigned start, unsigned end);
-//            void                filterParticlesMixing(vector<vector<Particle>> & particles);
             void                filterParticlesMixing(vector<Particle> & particles);
             unsigned            multinomialDraw(const vector<double> & probs);
             double              filterSpeciesParticles(unsigned step, vector<Particle> & particles);
@@ -170,23 +165,18 @@ namespace proj {
         treef.close();
     }
 
-//    inline void Proj::writePartialCountFile(vector<vector<Particle>> &particles) {
     inline void Proj::writePartialCountFile(vector<Particle> &particles) {
         ofstream partialf("partial_count.txt");
         partialf << "total times partials calculated: ";
         
         unsigned partial_count = 0;
-//        for (unsigned g=0; g<_ngroups; g++) {
-//            for (auto &p:particles[g]) {
             for (auto &p:particles) {
                 partial_count += p.getPartialCount();
             }
-//        }
         partialf << partial_count << "\n";
         partialf.close();
     }
 
-//    inline void Proj::writeParamsFileForBeastComparison(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<vector<Particle>> &v) const {
     inline void Proj::writeParamsFileForBeastComparison(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v) const {
         // this function creates a params file that is comparable to output from starbeast3
         ofstream logf("params-beast-comparison.log");
@@ -223,8 +213,6 @@ namespace proj {
 
         int iter = 0;
         
-//        for (unsigned j=0; j<_ngroups; j++) {
-//            for (auto &p:v[j]) {
         for (auto &p:v) {
                 logf << iter;
                 iter++;
@@ -289,8 +277,7 @@ namespace proj {
                 }
 
                 logf << "\t" << p.getParticleLambda();
-    //            logf << "\t" << Forest::_lambda;
-
+            
                 vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
                 vector<double> gene_tree_priors = p.getGeneTreePriors();
                 assert (gene_tree_log_likelihoods.size() == gene_tree_priors.size());
@@ -305,7 +292,6 @@ namespace proj {
 
                 logf << endl;
             }
-//        }
 
         logf.close();
     }
@@ -316,9 +302,7 @@ namespace proj {
 
         logf.open(filename, std::ios_base::app);
 
-//        if (group_number == 0) { // name columns
         if (_first_line) {
-//            _count = 0;
             _first_line = false;
 #if !defined PARALLELIZE_BY_GROUP
             logf << "iter ";
@@ -424,7 +408,6 @@ namespace proj {
             }
 
             logf << "\t" << p.getParticleLambda();
-//            logf << "\t" << Forest::_lambda;
 
             vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
             vector<double> gene_tree_priors = p.getGeneTreeCoalescentLikelihoods();
@@ -447,7 +430,6 @@ namespace proj {
             }
 
             logf << endl;
-//            _count++;
         }
 
         logf.close();
@@ -460,9 +442,7 @@ namespace proj {
         logf.open(filename, std::ios_base::app);
 
         // no gene tree parameters now
-    //        if (group_number == 0) { // name columns
         if (_first_line) {
-    //            _count = 0;
             _first_line = false;
     #if !defined PARALLELIZE_BY_GROUP
             logf << "iter ";
@@ -529,7 +509,6 @@ namespace proj {
             logf << "\t" << p.getPopMean() / 4.0; // beast uses Ne * u = theta / 4
 
             logf << "\t" << p.getParticleLambda();
-//            logf << "\t" << Forest::_lambda;
 
             logf << endl;
         }
@@ -742,7 +721,6 @@ namespace proj {
         }
     }
 
-//    inline void Proj::saveAllSpeciesTrees(vector<vector<Particle>> &v) const {
     inline void Proj::saveAllSpeciesTrees(vector<Particle> &v) const {
         
         // save all species trees
@@ -849,24 +827,6 @@ namespace proj {
                 treef.close();
             }
         }
-    }
-
-    inline void Proj::saveGeneTree(unsigned gene_number, vector<vector<Particle>> &v) const {
-        string name = "gene" + to_string(gene_number) + ".trees";
-        ofstream treef(name);
-        treef << "#nexus\n\n";
-        treef << "begin trees;\n";
-        
-        for (unsigned i=0; i<_ngroups; i++) {
-            for (auto &p:v[i]) {
-                treef << "  tree test = [&R] " << p.saveGeneNewick(gene_number)  << ";\n";
-                treef << endl;
-            }
-        }
-        treef << "end;\n";
-            
-
-        treef.close();
     }
 
     inline void Proj::processCommandLineOptions(int argc, const char * argv[]) {
@@ -1571,7 +1531,6 @@ namespace proj {
     }
 
 
-//    inline void Proj::filterParticlesMixing(vector<vector<Particle>> & particles) {
     inline void Proj::filterParticlesMixing(vector<Particle> & particles) {
         unsigned total_n_particles = _nparticles * _ngroups;
                 
@@ -1658,109 +1617,16 @@ namespace proj {
                   }
               }
         }
-        
-//        unsigned total_n_particles = _nparticles * _ngroups;
-        
-//        double weight = (double) 1 / (_ngroups*_nparticles);
-        
-        // Copy log weights for all bundles to prob vector
-//        vector<double> probs(total_n_particles, weight);
-        
-        
-        // Normalize log_weights to create discrete probability distribution
-//        double log_sum_weights = getRunningSum(probs);
-
-//        transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
-
-        // Compute cumulative probabilities
-//        partial_sum(probs.begin(), probs.end(), probs.begin());
-
-          // Initialize vector of counts storing number of darts hitting each particle
-//          vector<unsigned> counts (total_n_particles, 0);
-
-          // Throw _nparticles darts
-//          for (unsigned i=0; i<total_n_particles; i++) {
-//              double u = rng.uniform();
-//              auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
-//              assert(it != probs.end());
-//              unsigned which = (unsigned)std::distance(probs.begin(), it);
-//              counts[which]++;
-//          }
-
-        // Copy particles
-
-//        bool copying_needed = true;
-
-//         Locate first donor
-//        unsigned donor = 0;
-//        while (counts[donor] < 2) {
-//          donor++;
-//          if (donor >= counts.size()) {
-//              copying_needed = false; // all the particle counts are 1
-//              break;
-//          }
-//        }
-
-//        if (copying_needed) {
-//              // Locate first recipient
-//              unsigned recipient = 0;
-//              while (counts[recipient] != 0) {
-//                  recipient++;
-//              }
-//
-//              // Count number of cells with zero count that can serve as copy recipients
-//              unsigned nzeros = 0;
-//              for (unsigned i = 0; i < total_n_particles; i++) {
-//                  if (counts[i] == 0)
-//                      nzeros++;
-//              }
-//
-//              while (nzeros > 0) {
-//                  assert(donor < total_n_particles);
-//                  assert(recipient < total_n_particles);
-//
-//                  unsigned recipient_group = recipient / _nparticles;
-//                  unsigned recipient_index = recipient % _nparticles;
-//
-//                  unsigned donor_group = donor / _nparticles;
-//                  unsigned donor_index = donor % _nparticles;
-//
-//                  // Copy donor to recipient
-//                  particles[recipient_group][recipient_index] = particles[donor_group][donor_index];
-//
-//                  counts[donor]--;
-//                  counts[recipient]++;
-//                  nzeros--;
-//
-//                  if (counts[donor] == 1) {
-//                      // Move donor to next slot with count > 1
-//                      donor++;
-//                      while (donor < total_n_particles && counts[donor] < 2) {
-//                          donor++;
-//                      }
-//                  }
-//
-//                  // Move recipient to next slot with count equal to 0
-//                  recipient++;
-//                  while (recipient < total_n_particles && counts[recipient] > 0) {
-//                      recipient++;
-//                  }
-//              }
-//        }
     }
 
 
     inline double Proj::filterParticles(unsigned step, vector<Particle> & particles, unsigned start, unsigned end) {
-//          unsigned nparticles = (unsigned) particles.size();
           // Copy log weights for all bundles to prob vector
-//          vector<double> probs(nparticles, 0.0);
         
           vector<double> probs(_nparticles, 0.0);
           
         unsigned count_index = 0;
-//          for (unsigned p=0; p < _nparticles; p++) {
         for (unsigned p=start; p<end+1; p++) {
-//              probs[p] = particles[p].getLogWeight();
             probs[count_index] = particles[p].getLogWeight();
             count_index++;
           }
@@ -1772,10 +1638,10 @@ namespace proj {
           transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
           
           // Compute component of the log marginal likelihood due to this step
-//          _log_marginal_likelihood += log_sum_weights - log(nparticles);
-//          if (step == 0) {
-//              _log_marginal_likelihood += _starting_log_likelihood;
-//          }
+          _log_marginal_likelihood += log_sum_weights - log(_nparticles);
+          if (step == 0) {
+              _log_marginal_likelihood += _starting_log_likelihood;
+          }
           
           double ess = 0.0;
           if (_verbose > 1) {
@@ -1790,7 +1656,6 @@ namespace proj {
           vector<unsigned> counts (_nparticles, 0);
 
           // Throw _nparticles darts
-//          for (unsigned i=0; i<nparticles; i++) {
         for (unsigned i=start; i<end+1; i++) {
               double u = rng.uniform();
               auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
@@ -1832,7 +1697,6 @@ namespace proj {
                   assert(recipient < _nparticles);
 
                   // Copy donor to recipient
-//                  particles[recipient] = particles[donor];
                   particles[recipient+start] = particles[donor+start];
 
                   counts[donor]--;
@@ -2155,8 +2019,6 @@ namespace proj {
         for (unsigned i = 0; i < threads.size(); i++) {
           threads[i].join();
         }
-        
-//        cout << "stop";
     }
 
     inline void Proj::proposeSpeciesParticles(vector<Particle> &particles) {
@@ -2249,7 +2111,6 @@ namespace proj {
             if (particles.size() > 1) {
                 // divide up the remaining particles as evenly as possible across threads
                 unsigned first = 1;
-//                unsigned incr = (_nparticles-1) /_nthreads + ((_nparticles - 1) % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
                 unsigned incr = (_nparticles*_ngroups-1) /_nthreads + ((_nparticles*_ngroups - 1) % _nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
 
                 unsigned last = incr;
@@ -2270,13 +2131,6 @@ namespace proj {
                   if (first>=_nparticles*_ngroups) {
                       break;
                   }
-                  
-//                  if (last > _nparticles) {
-//                    last = _nparticles;
-//                    }
-//                  if (first>=_nparticles) {
-//                      break;
-//                  }
             }
 
             // the join function causes this loop to pause until the ith thread finishes
@@ -2622,35 +2476,18 @@ namespace proj {
                 rng.setSeed(_random_seed);
 
     //          create vector of particles
-//                unsigned nparticles = _nparticles;
 
                 unsigned nsubsets = _data->getNumSubsets();
                 Particle::setNumSubsets(nsubsets);
                 
-//                vector<vector<Particle>> my_vec;
-                
                 vector<Particle> my_vec;
                 my_vec.resize(_nparticles * _ngroups);
-//                my_vec.resize(nparticles);
-//                my_vec.resize(_ngroups);
-                
-//                for (unsigned i=0; i<_ngroups; i++) {
-//                    my_vec[i].resize(nparticles);
-//                }
-
-//                for (unsigned i=0; i<_ngroups; i++) {
-//                    for (unsigned j=0; j<nparticles; j++) {
-//                        my_vec[i][j] = Particle();
-//                    }
-//                }
                 
                 for (unsigned p=0; p<my_vec.size(); p++) {
                     my_vec[p] = Particle();
                 }
 
-//                for (unsigned i=0; i<_ngroups; i++) {
-                    initializeParticles(my_vec); // initialize in parallel with multithreading
-//                }
+                initializeParticles(my_vec); // initialize in parallel with multithreading
       
                 unsigned list_size = (ntaxa-1)*nsubsets;
                 vector<unsigned> gene_order;
@@ -2675,22 +2512,20 @@ namespace proj {
                 assert (gene_order.size() == list_size);
                 
                 unsigned particle_num = 0;
-//                for (unsigned i=0; i<_ngroups; i++) {
-//                    for (auto &p:my_vec[i]) {
-                    for (auto &p:my_vec) {
-                        p.setGeneOrder(gene_order);
-    #if defined (FASTER_UPGMA_TREE)
-                        if (particle_num == 0) {
-                            p.calcStartingUPGMAMatrix();
-                        }
-                        else {
-                            p.setStartingUPGMAMatrix(my_vec[0][0].getStartingUPGMAMatrix());
-                        }
-                        p.calcStartingRowCount();
-                        particle_num++;
-    #endif
+                
+                for (auto &p:my_vec) {
+                    p.setGeneOrder(gene_order);
+#if defined (FASTER_UPGMA_TREE)
+                    if (particle_num == 0) {
+                        p.calcStartingUPGMAMatrix();
                     }
-//                }
+                    else {
+                        p.setStartingUPGMAMatrix(my_vec[0].getStartingUPGMAMatrix());
+                    }
+                    p.calcStartingRowCount();
+                    particle_num++;
+#endif
+                }
                 
 //                if (_species_newick_name != "null") {
 //                    handleSpeciesNewick(my_vec);
@@ -2707,17 +2542,12 @@ namespace proj {
                 }
 
                 unsigned psuffix = 1;
-//                for (unsigned i=0; i<_ngroups; i++) {
-//                    for (auto &p:my_vec[i]) {
                 for (auto &p:my_vec) {
                         p.setSeed(rng.randint(1,9999) + psuffix);
                         psuffix += 2;
                     }
-//                }
 
-//                for (unsigned i=0; i<_ngroups; i++) {
-//                    for (auto &p:my_vec[i]) { // TODO: can parallelize this - is it worth it?
-                    for (auto &p:my_vec) {
+                    for (auto &p:my_vec) { // TODO: can parallelize this - is it worth it?
                         p.drawParticleLambda();
                         if (!Forest::_run_on_empty) {
                             p.setLogLikelihood(starting_log_likelihoods);
@@ -2737,9 +2567,6 @@ namespace proj {
                 
                 if (Forest::_save_memory) {
                     my_vec[0].clearPartials(); // all other particles should have no partials
-//                    for (unsigned i=0; i<_ngroups; i++) {
-//                        my_vec[i][0].clearPartials(); // all other particles should have no partials
-//                    }
                 }
                 
                 //run through each generation of particles
@@ -2754,39 +2581,20 @@ namespace proj {
                         unsigned psuffix = 1;
                         if (g > 0) {
                             // set particle random number seeds
-//                                for (unsigned i=0; i<_ngroups; i++) {
-//                                for (auto &p:my_vec[i]) {
                             for (auto &p:my_vec) {
                                     p.setSeed(rng.randint(1,9999) + psuffix);
                                     psuffix += 2;
                                 }
-//                            }
                         }
 
                         //taxon joining and reweighting step
                         
 //                        StopWatch sw;
 //                        sw.start();
-//                        for (unsigned i=0; i<_ngroups; i++) {
-//                            proposeParticles(my_vec[i]);
-//                        }
-//                        proposeParticlesParallelizeByGroup(my_vec);
                         proposeParticles(my_vec);
 //                        double total_seconds = sw.stop();
 //                        cout << "\nTotal time for proposal step " << g << " : " << total_seconds << endl;
 //                        cout << total_seconds << endl;
-
-                        unsigned num_species_particles_proposed = 0;
-
-//                        if (_verbose > 1) {
-//                            for (unsigned i=0; i<_ngroups; i++) {
-//                                for (auto &p:my_vec[i]) {
-//                                    if (p.speciesJoinProposed()) {
-//                                        num_species_particles_proposed++;
-//                                    }
-//                                }
-//                            }
-//                        }
 
                         bool filter = true;
 
@@ -2800,24 +2608,10 @@ namespace proj {
                             
 //                            sw.start();
                             for (unsigned i=0; i<_ngroups; i++) {
-                                
                                 unsigned start = i * _nparticles;
                                 unsigned end = start + (_nparticles - 1);
                                 
-//                                cout << start << endl;
-//                                cout << end << endl;
-//                                cout << "\n";
-//                                auto start = my_vec.begin() + X;
-//                                auto end = my_vec.begin() + Y + 1;
-                             
-                                // To store the sliced vector
-//                                vector<Particle> result(Y - X + 1);
-                                
-//                                vector<Particle> test = my_vec.cbegin() + start, my_vec.cbegin() + end;
-                                double ess = filterParticles(g, my_vec, start, end);
-                                
-                                
-//                                double ess = filterParticles(g, my_vec[i]);
+                                double ess = filterParticles(g, my_vec, start, end); // filter only particles within a subgroup
                                 
                                 if (_verbose > 1) {
                                     cout << "\t" << "ESS is : " << ess << endl;
@@ -2827,34 +2621,15 @@ namespace proj {
 //                            cout << total_seconds << endl;
                             }
                             
-//                            filterParticles(g, my_vec, 0, total_n_particles);
                             filterParticlesMixing(my_vec);
 
-                            unsigned species_count = 0;
-                            
-//                            if (_verbose > 1) {
-//                                cout << "\t" << "ESS is : " << ess << endl;
-//                                for (auto &p:my_vec) {
-//                                    if (p.speciesJoinProposed()) {
-//                                        species_count++;
-//                                    }
-//                                }
-//                            }
-
-                            if (_verbose > 1) {
-                                cout << "\t" << "number of species join particles proposed = " << num_species_particles_proposed << endl;
-                                cout << "\t" << "number of species join particles accepted = " << species_count << endl;
-                            }
                         }
                 } // g loop
                 
                 if (_save_gene_trees) {
-//                    for (unsigned i=0; i<_ngroups; i++) {
                         for (int i=1; i<nsubsets+1; i++) {
-//                            saveGeneTree(i, my_vec);
                             saveGeneTrees(i, my_vec);
                         }
-//                    }
                 }
                 if (_verbose > 0) {
                     cout << "\n";
