@@ -1574,14 +1574,13 @@ namespace proj {
 //    inline void Proj::filterParticlesMixing(vector<vector<Particle>> & particles) {
     inline void Proj::filterParticlesMixing(vector<Particle> & particles) {
         unsigned total_n_particles = _nparticles * _ngroups;
+                
+        double weight = (double) 1 / (_ngroups*_nparticles);
+                
+        // Copy log weights for all bundles to prob vector
+        vector<double> probs(total_n_particles, weight);
         
         assert (particles.size() == total_n_particles);
-                
-          vector<double> probs(total_n_particles, 0.0);
-                  
-          for (unsigned p=0; p < total_n_particles; p++) {
-              probs[p] = particles[p].getLogWeight();
-          }
                 
         assert (probs.size() == total_n_particles);
         
@@ -1833,7 +1832,8 @@ namespace proj {
                   assert(recipient < _nparticles);
 
                   // Copy donor to recipient
-                  particles[recipient] = particles[donor];
+//                  particles[recipient] = particles[donor];
+                  particles[recipient+start] = particles[donor+start];
 
                   counts[donor]--;
                   counts[recipient]++;
@@ -2798,11 +2798,6 @@ namespace proj {
                             
                             StopWatch sw;
                             
-                            vector<unsigned> particle_numbers;
-                            for (unsigned n=0; n<particle_numbers.size(); n++) {
-                                particle_numbers.push_back(n);
-                            }
-                            
 //                            sw.start();
                             for (unsigned i=0; i<_ngroups; i++) {
                                 
@@ -2832,10 +2827,6 @@ namespace proj {
 //                            cout << total_seconds << endl;
                             }
                             
-                            unsigned total_n_particles = _ngroups * _nparticles;
-                            for (auto &p:my_vec) {
-                                p.setLogWeight(1/total_n_particles);
-                            }
 //                            filterParticles(g, my_vec, 0, total_n_particles);
                             filterParticlesMixing(my_vec);
 
