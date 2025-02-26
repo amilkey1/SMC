@@ -48,6 +48,7 @@ namespace proj {
         static string               _newick_path;
         static double               _lambda;
         static unsigned             _ngroups;
+        static bool                 _upgma;
         
         // functions
         string inventName(unsigned k, bool lower_case);

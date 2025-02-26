@@ -63,16 +63,16 @@ bool        G::_save_gene_trees_separately = false;
 string      G::_newick_path = ".";
 double      G::_lambda = 10.0;
 unsigned    G::_ngroups = 1;
+bool        G::_upgma;
+vector<double> G::_base_frequencies;
+string      G::_string_base_frequencies;
 
 
 unsigned Forest::_nspecies = 4;
 unsigned Forest::_ntaxa = 12;
-//double Forest::_lambda = 1;
 unsigned Particle::_nsubsets = 1;
 const double Node::_smallest_edge_length=1.0e-12;
 double Forest::_kappa = 1.0;
-vector<double> G::_base_frequencies;
-string G::_string_base_frequencies;
 double Forest::_ploidy = 2.0;
 double Data::_occupancy = 1.0;
 double Forest::_edge_rate_variance = 0.0;

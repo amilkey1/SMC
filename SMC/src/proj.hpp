@@ -843,6 +843,7 @@ namespace proj {
         ("save_gene_trees_separately", boost::program_options::value(&G::_save_gene_trees_separately)->default_value(false), "for simulations, save gene trees in separate files")
         ("newick_path", boost::program_options::value(&G::_newick_path)->default_value("."), "path to gene newicks are if starting from gene newicks and only performing SMC on second round")
         ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(5), "number of populations")
+        ("upgma", boost::program_options::value(&G::_upgma)->default_value(false), "set to true to use UPGMA completion")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -2467,16 +2468,16 @@ namespace proj {
                 
                 for (auto &p:my_vec) {
                     p.setGeneOrder(gene_order);
-#if defined (FASTER_UPGMA_TREE)
-                    if (particle_num == 0) {
-                        p.calcStartingUPGMAMatrix();
+                    if (G::_upgma) {
+                        if (particle_num == 0) {
+                            p.calcStartingUPGMAMatrix();
+                        }
+                        else {
+                            p.setStartingUPGMAMatrix(my_vec[0].getStartingUPGMAMatrix());
+                        }
+                        p.calcStartingRowCount();
+                        particle_num++;
                     }
-                    else {
-                        p.setStartingUPGMAMatrix(my_vec[0].getStartingUPGMAMatrix());
-                    }
-                    p.calcStartingRowCount();
-                    particle_num++;
-#endif
                 }
                 
 //                if (_species_newick_name != "null") {

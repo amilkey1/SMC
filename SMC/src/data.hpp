@@ -202,9 +202,7 @@ namespace proj {
     }
     
     inline unsigned Data::buildSubsetSpecificMaps(unsigned ntaxa, unsigned seqlen, unsigned nsubsets) {
-//#if defined (FASTER_UPGMA_TREE)
         _original_data_matrix = _data_matrix;
-//#endif
         
         pattern_vect_t pattern(ntaxa);
 

@@ -141,14 +141,12 @@ class Particle {
         void                                            trimSpeciesTree();
         void                                            setFixTheta(bool fix) {_fix_theta = fix;}
         void                                            setRelativeRatesByGene(vector<double> rel_rates);
-#if defined (FASTER_UPGMA_TREE)
         void                                            calcStartingUPGMAMatrix();
         vector<vector<double>>                          getStartingUPGMAMatrix();
         void                                            setStartingUPGMAMatrix(vector<vector<double>> starting_upgma_matrices_by_gene);
         vector<map<Node*,  unsigned>>                   getStartingRowCount();
         void                                            setStartingRowCount(vector<map<Node*,  unsigned>> starting_row_count_by_gene);
         void                                            calcStartingRowCount();
-#endif
         void                                            createSpeciesIndices();
         void                                            setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species);
 
@@ -507,17 +505,11 @@ inline vector<double> Particle::getVectorPrior() {
                         _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
                                    
                         if (G::_start_mode == "smc") {
-# if defined (BUILD_UPGMA_TREE)
-# if defined (BUILD_UPGMA_TREE_CONSTRAINED)
-                            if (!Forest::_run_on_empty) {
-                                _forests[next_gene].buildRestOfTree(_lot, _t);
+                            if (G::_upgma) {
+                                if (!G::_run_on_empty) {
+                                    _forests[next_gene].buildRestOfTreeFaster();
+                                }
                             }
-#else
-                            if (!Forest::_run_on_empty) {
-                                _forests[next_gene].buildRestOfTree(_lot);
-                            }
-#endif
-#endif
                         }
                             
                         if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
@@ -929,15 +921,12 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
     }
 
-#if defined (FASTER_UPGMA_TREE)
     inline void Particle::calcStartingUPGMAMatrix() {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].buildStartingUPGMAMatrix(); // TODO: can do this once and copy to all particles
         }
     }
-#endif
 
-#if defined (FASTER_UPGMA_TREE)
     inline vector<vector<double>> Particle::getStartingUPGMAMatrix() {
         vector<vector<double>> starting_upgma_matrices_by_gene;
         for (unsigned i=1; i<_forests.size(); i++) {
@@ -945,17 +934,13 @@ inline vector<double> Particle::getVectorPrior() {
         }
         return starting_upgma_matrices_by_gene;
     }
-#endif
 
-#if defined (FASTER_UPGMA_TREE)
     inline void Particle::setStartingUPGMAMatrix(vector<vector<double>> starting_upgma_matrices_by_gene) {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i]._starting_dij = starting_upgma_matrices_by_gene[i-1];
         }
     }
-#endif
 
-#if defined (FASTER_UPGMA_TREE)
     inline vector<map<Node*,  unsigned>> Particle::getStartingRowCount() {
         vector<map<Node*,  unsigned>> starting_row_count_by_gene;
         for (unsigned i=1; i<_forests.size(); i++) {
@@ -963,23 +948,19 @@ inline vector<double> Particle::getVectorPrior() {
         }
         return starting_row_count_by_gene;
     }
-#endif
 
-#if defined (FASTER_UPGMA_TREE)
+
     inline void Particle::setStartingRowCount(vector<map<Node*,  unsigned>> starting_row_count_by_gene) {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i]._starting_row = starting_row_count_by_gene[i-1];
         }
     }
-#endif
 
-#if defined (FASTER_UPGMA_TREE)
     inline void Particle::calcStartingRowCount() {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].buildStartingRow();
         }
     }
-#endif
 
     inline double Particle::calcInitialCoalescentLikelihood() {
 #if defined GRAHAM_JONES_COALESCENT_LIKELIHOOD

@@ -3,8 +3,6 @@
 //#   include <mpi.h>
 //#endif
 
-//#define SNAKE
-
 //#define NDEBUG // disable asserts for efficiency / memory improvement
 
 #define USE_TOTAL_RATE
@@ -24,13 +22,7 @@
 
 //#define INV_GAMMA_PRIOR_TWO // turn this off if not defining DRAW_NEW_THETA
 
-//#define BUILD_UPGMA_TREE
-
-//#define BUILD_UPGMA_TREE_CONSTRAINED // if this is turned on, also turn on BUILD_UPGMA_TREE
-
 #define WEIGHT_MODIFIER // includes weight correction for differing theta prior mean and proposal mean
-
-//#define FASTER_UPGMA_TREE
 
 //#define COAL_LIKE_TEST
 //
