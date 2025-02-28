@@ -72,7 +72,9 @@ namespace proj {
             void                handleGeneNewicks();
             void                handleSpeciesNewick(vector<Particle> particles);
             double              filterParticles(unsigned step, vector<Particle> & particles, unsigned start, unsigned end);
-            void                filterParticlesMixing(vector<Particle> & particles);
+
+
+            void                filterParticlesMixing(vector<Particle> & particles, unsigned step);
             unsigned            multinomialDraw(const vector<double> & probs);
             double              filterSpeciesParticles(unsigned step, vector<Particle> & particles);
             double              computeEffectiveSampleSize(const vector<double> & probs) const;
@@ -749,17 +751,15 @@ namespace proj {
 
     inline void Proj::saveGeneTrees(unsigned ngenes, vector<Particle> &v) const {
         if (G::_start_mode == "smc") {
-            ofstream treef("gene_trees.trees");
-            treef << "#nexus\n\n";
-            treef << "begin trees;\n";
-            for (auto &p:v) {
-                    for (int i=1; i<ngenes+1; i++) {
-                        treef << "tree gene" << i << " = [&R] " << p.saveGeneNewick(i)  << ";\n";
+            for (unsigned i=1; i<ngenes; i++) {
+                string fname = "gene" + to_string(i) + ".trees";
+                ofstream treef(fname);
+                treef << "#nexus\n\n";
+                treef << "begin trees;\n";
+                for (auto &p:v) {
+                    treef << "tree gene" << i << " = [&R] " << p.saveGeneNewick(i)  << ";\n";
                 }
-                treef << endl;
             }
-            treef << "end;\n";
-            treef.close();
         }
 
         else {
@@ -1496,7 +1496,11 @@ namespace proj {
     }
 
 
-    inline void Proj::filterParticlesMixing(vector<Particle> & particles) {
+    inline void Proj::filterParticlesMixing(vector<Particle> & particles, unsigned step) {
+//        string name = "mixing_count-" + to_string(step) + ".txt";
+//        ofstream logf(name);
+//        logf << "recipient_group" << "\t" << "donor_group" << endl;
+        
         unsigned total_n_particles = G::_nparticles * G::_ngroups;
                 
         double weight = (double) 1 / (G::_ngroups*G::_nparticles);
@@ -1526,7 +1530,7 @@ namespace proj {
               assert(it != probs.end());
               unsigned which = (unsigned)std::distance(probs.begin(), it);
               counts[which]++;
-          }
+          } // TODO: with few groups, may wind up mostly resampling particles in the same pop
                   
           // Copy particles
 
@@ -1559,6 +1563,14 @@ namespace proj {
               while (nzeros > 0) {
                   assert(donor < total_n_particles);
                   assert(recipient < total_n_particles);
+                  
+//                  unsigned recipient_group = recipient / G::_nparticles;
+//                  unsigned recipient_index = recipient % G::_nparticles;
+//
+//                  unsigned donor_group = donor / G::_nparticles;
+//                  unsigned donor_index = donor % G::_nparticles;
+                  
+//                  logf << recipient_group << "\t" << donor_group << endl;
 
                   // Copy donor to recipient
                   particles[recipient] = particles[donor];
@@ -1584,107 +1596,209 @@ namespace proj {
         }
     }
 
-
     inline double Proj::filterParticles(unsigned step, vector<Particle> & particles, unsigned start, unsigned end) {
-          // Copy log weights for all bundles to prob vector
+        // Copy log weights for all bundles to prob vector
+      
+        vector<double> probs(G::_nparticles, 0.0);
         
-          vector<double> probs(G::_nparticles, 0.0);
-          
-        unsigned count_index = 0;
-        for (unsigned p=start; p<end+1; p++) {
-            probs[count_index] = particles[p].getLogWeight();
-            count_index++;
-          }
-        
-        assert (probs.size() == G::_nparticles);
-          // Normalize log_weights to create discrete probability distribution
-          double log_sum_weights = getRunningSum(probs);
-          
-          transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
-          
-          // Compute component of the log marginal likelihood due to this step
-          _log_marginal_likelihood += log_sum_weights - log(G::_nparticles);
-          if (step == 0) {
-              _log_marginal_likelihood += _starting_log_likelihood;
-          }
-          
-          double ess = 0.0;
-          if (G::_verbose > 1) {
-              // Compute effective sample size
-              ess = computeEffectiveSampleSize(probs);
-          }
-
-          // Compute cumulative probabilities
-          partial_sum(probs.begin(), probs.end(), probs.begin());
-
-          // Initialize vector of counts storing number of darts hitting each particle
-          vector<unsigned> counts (G::_nparticles, 0);
-
-          // Throw _nparticles darts
-        for (unsigned i=start; i<end+1; i++) {
-              double u = rng.uniform();
-              auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
-              assert(it != probs.end());
-              unsigned which = (unsigned)std::distance(probs.begin(), it);
-              counts[which]++;
-          }
-          
-          // Copy particles
-
-        bool copying_needed = true;
-        
-          // Locate first donor
-          unsigned donor = 0;
-          while (counts[donor] < 2) {
-              donor++;
-              if (donor >= counts.size()) {
-                  copying_needed = false; // all the particle counts are 1
-                  break;
-              }
-          }
-
-        if (copying_needed) {
-              // Locate first recipient
-              unsigned recipient = 0;
-              while (counts[recipient] != 0) {
-                  recipient++;
-              }
-
-              // Count number of cells with zero count that can serve as copy recipients
-              unsigned nzeros = 0;
-              for (unsigned i = 0; i < G::_nparticles; i++) {
-                  if (counts[i] == 0)
-                      nzeros++;
-              }
-
-              while (nzeros > 0) {
-                  assert(donor < G::_nparticles);
-                  assert(recipient < G::_nparticles);
-
-                  // Copy donor to recipient
-                  particles[recipient+start] = particles[donor+start];
-
-                  counts[donor]--;
-                  counts[recipient]++;
-                  nzeros--;
-
-                  if (counts[donor] == 1) {
-                      // Move donor to next slot with count > 1
-                      donor++;
-                      while (donor < G::_nparticles && counts[donor] < 2) {
-                          donor++;
-                      }
-                  }
-
-                  // Move recipient to next slot with count equal to 0
-                  recipient++;
-                  while (recipient < G::_nparticles && counts[recipient] > 0) {
-                      recipient++;
-                  }
-              }
+      unsigned count_index = 0;
+      for (unsigned p=start; p<end+1; p++) {
+          probs[count_index] = particles[p].getLogWeight();
+          count_index++;
         }
-          return ess;
+      
+      assert (probs.size() == G::_nparticles);
+        // Normalize log_weights to create discrete probability distribution
+        double log_sum_weights = getRunningSum(probs);
+        
+        transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
+        
+        // Compute component of the log marginal likelihood due to this step
+        _log_marginal_likelihood += log_sum_weights - log(G::_nparticles);
+        if (step == 0) {
+            _log_marginal_likelihood += _starting_log_likelihood;
+        }
+        
+        double ess = 0.0;
+        if (G::_verbose > 1) {
+            // Compute effective sample size
+            ess = computeEffectiveSampleSize(probs);
+        }
+
+        // Compute cumulative probabilities
+        partial_sum(probs.begin(), probs.end(), probs.begin());
+
+        // Initialize vector of counts storing number of darts hitting each particle
+        vector<unsigned> counts (G::_nparticles, 0);
+
+        // Throw _nparticles darts
+      for (unsigned i=start; i<end+1; i++) {
+            double u = rng.uniform();
+            auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
+            assert(it != probs.end());
+            unsigned which = (unsigned)std::distance(probs.begin(), it);
+            counts[which]++;
+        }
+        
+        // Copy particles
+
+      bool copying_needed = true;
+      
+        // Locate first donor
+        unsigned donor = 0;
+        while (counts[donor] < 2) {
+            donor++;
+            if (donor >= counts.size()) {
+                copying_needed = false; // all the particle counts are 1
+                break;
+            }
+        }
+
+      if (copying_needed) {
+            // Locate first recipient
+            unsigned recipient = 0;
+            while (counts[recipient] != 0) {
+                recipient++;
+            }
+
+            // Count number of cells with zero count that can serve as copy recipients
+            unsigned nzeros = 0;
+            for (unsigned i = 0; i < G::_nparticles; i++) {
+                if (counts[i] == 0)
+                    nzeros++;
+            }
+
+            while (nzeros > 0) {
+                assert(donor < G::_nparticles);
+                assert(recipient < G::_nparticles);
+
+                // Copy donor to recipient
+                particles[recipient+start] = particles[donor+start];
+
+                counts[donor]--;
+                counts[recipient]++;
+                nzeros--;
+
+                if (counts[donor] == 1) {
+                    // Move donor to next slot with count > 1
+                    donor++;
+                    while (donor < G::_nparticles && counts[donor] < 2) {
+                        donor++;
+                    }
+                }
+
+                // Move recipient to next slot with count equal to 0
+                recipient++;
+                while (recipient < G::_nparticles && counts[recipient] > 0) {
+                    recipient++;
+                }
+            }
       }
+        return ess;
+
+    }
+
+
+//    inline double Proj::filterParticles(unsigned step, vector<Particle> & particles, unsigned start, unsigned end) {
+//          // Copy log weights for all bundles to prob vector
+//
+//          vector<double> probs(G::_nparticles, 0.0);
+//
+//        unsigned count_index = 0;
+//        for (unsigned p=start; p<end+1; p++) {
+//            probs[count_index] = particles[p].getLogWeight();
+//            count_index++;
+//          }
+//
+//        assert (probs.size() == G::_nparticles);
+//          // Normalize log_weights to create discrete probability distribution
+//          double log_sum_weights = getRunningSum(probs);
+//
+//          transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
+//
+//          // Compute component of the log marginal likelihood due to this step
+//          _log_marginal_likelihood += log_sum_weights - log(G::_nparticles);
+//          if (step == 0 && start == 0) {
+//              _log_marginal_likelihood += _starting_log_likelihood;
+//          }
+//
+//          double ess = 0.0;
+//          if (G::_verbose > 1) {
+//              // Compute effective sample size
+//              ess = computeEffectiveSampleSize(probs);
+//          }
+//
+//          // Compute cumulative probabilities
+//          partial_sum(probs.begin(), probs.end(), probs.begin());
+//
+//          // Initialize vector of counts storing number of darts hitting each particle
+//          vector<unsigned> counts (G::_nparticles, 0);
+//
+//          // Throw _nparticles darts
+//        for (unsigned i=start; i<end+1; i++) {
+//              double u = rng.uniform();
+//              auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
+//              assert(it != probs.end());
+//              unsigned which = (unsigned)std::distance(probs.begin(), it);
+//              counts[which]++;
+//          }
+//
+//          // Copy particles
+//
+//        bool copying_needed = true;
+//
+//          // Locate first donor
+//          unsigned donor = 0;
+//          while (counts[donor] < 2) {
+//              donor++;
+//              if (donor >= counts.size()) {
+//                  copying_needed = false; // all the particle counts are 1
+//                  break;
+//              }
+//          }
+//
+//        if (copying_needed) {
+//              // Locate first recipient
+//              unsigned recipient = 0;
+//              while (counts[recipient] != 0) {
+//                  recipient++;
+//              }
+//
+//              // Count number of cells with zero count that can serve as copy recipients
+//              unsigned nzeros = 0;
+//              for (unsigned i = 0; i < G::_nparticles; i++) {
+//                  if (counts[i] == 0)
+//                      nzeros++;
+//              }
+//
+//              while (nzeros > 0) {
+//                  assert(donor < G::_nparticles);
+//                  assert(recipient < G::_nparticles);
+//
+//                  // Copy donor to recipient
+//                  particles[recipient+start] = particles[donor+start];
+//
+//                  counts[donor]--;
+//                  counts[recipient]++;
+//                  nzeros--;
+//
+//                  if (counts[donor] == 1) {
+//                      // Move donor to next slot with count > 1
+//                      donor++;
+//                      while (donor < G::_nparticles && counts[donor] < 2) {
+//                          donor++;
+//                      }
+//                  }
+//
+//                  // Move recipient to next slot with count equal to 0
+//                  recipient++;
+//                  while (recipient < G::_nparticles && counts[recipient] > 0) {
+//                      recipient++;
+//                  }
+//              }
+//        }
+//          return ess;
+//      }
 
     inline double Proj::filterSpeciesParticles(unsigned step, vector<Particle> & particles) {
         unsigned nparticles = (unsigned) particles.size();
@@ -2363,7 +2477,7 @@ namespace proj {
                 throw XProj("cannot specify gene newicks and simulations");
             }
             try {
-//                handleGeneNewicks();
+                handleGeneNewicks();
             }
             catch (XProj & x) {
                 std::cerr << "Proj encountered a problem:\n  " << x.what() << std::endl;
@@ -2558,10 +2672,13 @@ namespace proj {
                             
 //                            sw.start();
                             for (unsigned i=0; i<G::_ngroups; i++) {
+                                
                                 unsigned start = i * G::_nparticles;
-                                unsigned end = start + (G::_nparticles - 1);
+                                unsigned end = start + (G::_nparticles) - 1;
                                 
                                 double ess = filterParticles(g, my_vec, start, end); // filter only particles within a subgroup
+                                
+                                // TODO: can parallelize filtering now
                                 
                                 if (G::_verbose > 1) {
                                     cout << "\t" << "ESS is : " << ess << endl;
@@ -2571,8 +2688,11 @@ namespace proj {
 //                            cout << total_seconds << endl;
                             }
                             
-                            filterParticlesMixing(my_vec);
-
+//                            saveAllSpeciesTrees(my_vec);
+                            filterParticlesMixing(my_vec, g); // TODO: don't filter again at last step?
+                            unsigned seed = rng.getSeed();
+                            std::shuffle(my_vec.begin(), my_vec.end(), std::default_random_engine(seed)); // shuffle particles using group seed // TODO: trying shuffling for now to ensure particles are redistributed among populations
+//                            saveAllSpeciesTrees(my_vec);
                         }
                 } // g loop
                 

@@ -109,8 +109,6 @@ class Forest {
         pair<Node*, Node*>          chooseAllPairs(list<Node*> &nodes, double increment, string species, Lot::SharedPtr lot);
         tuple<Node*, Node*, Node*>  createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, double increment, string species);
         pair<Node*, Node*>          getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
-//    void                            buildRestOfTree(Lot::SharedPtr lot, vector<pair<tuple<string, string, string>, double>> species_info);
-//        void                        buildRestOfTree(Lot::SharedPtr lot);
         void                        debugShowDistanceMatrix(const vector<double> & d) const;
     
         void                        buildRestOfTreeFaster();
@@ -160,7 +158,6 @@ class Forest {
         double                      _theta_mean;
         vector<pair<Node*, Node*>>  _node_choices;
         vector<double>              _log_likelihood_choices;
-     // TODO: only define these as needed with conditionals
         stack<Node *>               _upgma_additions;
         map<Node *, double>         _upgma_starting_edgelen;
         vector<string>              _species_names;
