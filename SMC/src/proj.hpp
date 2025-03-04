@@ -73,7 +73,8 @@ namespace proj {
             void                handleSpeciesNewick(vector<Particle> particles);
 //            double              filterParticles(unsigned step, vector<Particle> & particles, unsigned start, unsigned end);
             double              filterParticles(unsigned step, vector<Particle> & particles, vector<unsigned> &particle_indices, unsigned start, unsigned end);
-
+            void                filterParticlesThreading(vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices);
+            void                filterParticlesRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices);
 
 //            void                filterParticlesMixing(vector<Particle> & particles, unsigned step);
             void                filterParticlesMixing(vector<unsigned> &particle_indices, vector<Particle> &particles);
@@ -1686,6 +1687,65 @@ namespace proj {
 //        }
 //    }
 
+    inline void Proj::filterParticlesRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices) {
+        for (unsigned i=first; i<last; i++){
+            // i is the group number
+            unsigned start = i * G::_nparticles;
+            unsigned end = start + (G::_nparticles) - 1;
+            filterParticles(g, particles, particle_indices, start, end);
+        }
+    }
+
+    inline void Proj::filterParticlesThreading(vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices) {
+        assert(G::_nthreads > 0);
+        
+        if (G::_nthreads == 1) {
+            for (unsigned i=0; i<G::_ngroups; i++) {
+                unsigned start = i * G::_nparticles;
+                unsigned end = start + (G::_nparticles) - 1;
+                            
+                double ess = filterParticles(g, particles, particle_indices, start, end);
+                
+                if (G::_verbose > 1) {
+                    cout << "   " << "ESS = " << ess << endl;
+                }
+            }
+        }
+        else {
+          // divide up the particles as evenly as possible across threads
+            unsigned first = 0;
+            unsigned last = 0;
+            unsigned stride = (G::_ngroups) / G::_nthreads; // divisor
+            unsigned r = (G::_ngroups) % G::_nthreads; // remainder
+            
+            // need a vector of threads because we have to wait for each one to finish
+            vector<thread> threads;
+
+            for (unsigned i=0; i<G::_nthreads; i++) {
+                first = last;
+                last = first + stride;
+                
+                if (r > 0) {
+                    last += 1;
+                    r -= 1;
+                }
+                
+                if (last > (G::_ngroups)) {
+                    last = (G::_ngroups);
+                }
+                
+                threads.push_back(thread(&Proj::filterParticlesRange, this, first, last, std::ref(particles), g, particle_indices));
+            }
+
+
+          // the join function causes this loop to pause until the ith thread finishes
+          for (unsigned i = 0; i < threads.size(); i++) {
+            threads[i].join();
+          }
+        }
+    }
+
+
     inline double Proj::filterParticles(unsigned step, vector<Particle> & particles, vector<unsigned> &particle_indices, unsigned start, unsigned end) {
         // Copy log weights for all bundles to prob vector
 
@@ -1697,6 +1757,10 @@ namespace proj {
           probs[count_index] = particles[particle_number].getLogWeight();
           count_index++;
         }
+        
+//        for (auto &p:probs) {
+//            cout << p << endl;
+//        }
 
       assert (probs.size() == G::_nparticles);
         // Normalize log_weights to create discrete probability distribution
@@ -1706,6 +1770,7 @@ namespace proj {
 
         // Compute component of the log marginal likelihood due to this step
         _log_marginal_likelihood += log_sum_weights - log(G::_nparticles);
+        
         if (step == 0) {
             _log_marginal_likelihood += _starting_log_likelihood;
         }
@@ -1724,11 +1789,14 @@ namespace proj {
 
         // Throw _nparticles darts
       for (unsigned i=start; i<end+1; i++) {
-            double u = rng.uniform();
-            auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
-            assert(it != probs.end());
-            unsigned which = (unsigned)std::distance(probs.begin(), it);
-            counts[which]++;
+//            double u = rng.uniform();
+          unsigned group_number = start / G::_nparticles;
+          double u = _group_rng[group_number]->uniform();
+//          cout << group_number << " : " << u << endl;
+          auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
+          assert(it != probs.end());
+          unsigned which = (unsigned)std::distance(probs.begin(), it);
+          counts[which]++;
         }
 
         // Copy particles
@@ -2810,6 +2878,15 @@ namespace proj {
                         p.setSeed(rng.randint(1,9999) + psuffix);
                         psuffix += 2;
                     }
+                
+                // set group rng
+                _group_rng.resize(G::_ngroups);
+                psuffix = 1;
+                for (auto &g:_group_rng) {
+                    g.reset(new Lot());
+                    g->setSeed(rng.randint(1,9999)+psuffix);
+                    psuffix += 2;
+                }
 
                     for (auto &p:my_vec) { // TODO: can parallelize this - is it worth it?
                         if (!G::_run_on_empty) {
@@ -2874,39 +2951,48 @@ namespace proj {
                         
                         if (filter) {
                             
+//                            if (g == 62) {
+//                                cout << "stop" << endl;
+//                            }
+                            
                             StopWatch sw;
                             
 //                            sw.start();
-                            for (unsigned i=0; i<G::_ngroups; i++) {
+//                            for (unsigned i=0; i<G::_ngroups; i++) {
                                 
-                                unsigned start = i * G::_nparticles;
-                                unsigned end = start + (G::_nparticles) - 1;
+//                                unsigned start = i * G::_nparticles;
+//                                unsigned end = start + (G::_nparticles) - 1;
                                 
 //                                double ess = filterParticles(g, my_vec, start, end); // filter only particles within a subgroup
                                 
-                                double ess = filterParticles(g, my_vec, particle_indices, start, end);
+//                                double ess = filterParticles(g, my_vec, particle_indices, start, end);
+                                
+                                filterParticlesThreading(my_vec, g, particle_indices);
                                 
                                 // TODO: can parallelize filtering now
                                 
-                                if (G::_verbose > 1) {
-                                    cout << "\t" << "ESS is : " << ess << endl;
-                                }
+//                                if (G::_verbose > 1) {
+//                                    cout << "\t" << "ESS is : " << ess << endl;
+//                                }
 //                            double total_seconds = sw.stop();
 //                            cout << "\nTotal time for filtering step " << g << " : " << total_seconds << endl;
 //                            cout << total_seconds << endl;
-                            }
+//                            }
                             // TODO: create new vector of particle assignments, then only shuffle and filter using this until copying is needed
 //                            saveAllSpeciesTrees(my_vec);
 //                            filterParticlesMixing(my_vec, g); // TODO: don't filter again at last step?
-                            filterParticlesMixing(particle_indices, my_vec);
+//                            filterParticlesMixing(particle_indices, my_vec);
                             
                             // shuffle new particle order
-                            unsigned seed = rng.getSeed();
-                            std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
-                            
 //                            unsigned seed = rng.getSeed();
-//                            std::shuffle(my_vec.begin(), my_vec.end(), std::default_random_engine(seed)); // shuffle particles using group seed // TODO: trying shuffling for now to ensure particles are redistributed among populations // TODO: try just shuffling?
-//                            saveAllSpeciesTrees(my_vec);
+//                            std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
+                            
+                            unsigned seed = rng.getSeed();
+                            std::shuffle(my_vec.begin(), my_vec.end(), std::default_random_engine(seed)); // shuffle particles using group seed // TODO: trying shuffling for now to ensure particles are redistributed among populations // TODO: try just shuffling?
+//                            cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
+                            if (g == 0) {
+                                saveAllSpeciesTrees(my_vec);
+                            }
                         }
                 } // g loop
                 
@@ -2917,7 +3003,7 @@ namespace proj {
                 }
                 if (G::_verbose > 0) {
                     cout << "\n";
-                    cout << "marginal likelihood after combined filtering: " << _log_marginal_likelihood << endl;
+//                    cout << "marginal likelihood after combined filtering: " << _log_marginal_likelihood << endl;
                     cout << "\n";
                 }
 
