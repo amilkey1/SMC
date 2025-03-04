@@ -2984,11 +2984,9 @@ namespace proj {
 //                            filterParticlesMixing(particle_indices, my_vec);
                             
                             // shuffle new particle order
-//                            unsigned seed = rng.getSeed();
-//                            std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
-                            
                             unsigned seed = rng.getSeed();
-                            std::shuffle(my_vec.begin(), my_vec.end(), std::default_random_engine(seed)); // shuffle particles using group seed // TODO: trying shuffling for now to ensure particles are redistributed among populations // TODO: try just shuffling?
+                            std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
+                            
 //                            cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
                             if (g == 0) {
                                 saveAllSpeciesTrees(my_vec);
