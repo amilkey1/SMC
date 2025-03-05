@@ -2648,21 +2648,12 @@ namespace proj {
 //                            filterParticlesMixing(particle_indices, my_vec); // for now, don't do multinomial resampling
                             
                             // shuffle new particle order
-                            unsigned seed = rng.getSeed();
-                            
-//                            if (g == 89) {
-//                                for (auto &p:my_vec) {
-//                                    p.showSpeciesParticle();
-//                                }
-//                            }
+//                            unsigned seed = rng.getSeed();
                             
                             // only shuffle particle indices, not particles
 //                            std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
                             
 //                            cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
-                            if (g == 0) {
-                                saveAllSpeciesTrees(my_vec);
-                            }
                         }
                 } // g loop
                 
@@ -2677,9 +2668,9 @@ namespace proj {
                     cout << "\n";
                 }
 
+                writePartialCountFile(my_vec);
 #if !defined (HIERARCHICAL_FILTERING)
                 writeParamsFileForBeastComparison(nsubsets, nspecies, ntaxa, my_vec);
-                writePartialCountFile(my_vec);
                 
                 saveAllSpeciesTrees(my_vec);
 #endif
