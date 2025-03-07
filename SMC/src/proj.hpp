@@ -98,6 +98,12 @@ namespace proj {
             void                        handleNTaxaPerSpecies();
             void                        checkOutgroupName();
             void                        debugSpeciesTree(vector<Particle> &particles);
+        
+#if defined (FASTER_SECOND_LEVEL)
+            void                        fasterSecondLevel(vector<Particle> &particles);
+            void                        buildSpeciesMap(bool taxa_from_data);
+#endif
+        
             double                      _small_enough;
             bool                        _first_line;
             unsigned                    _count; // counter for params output file
@@ -1118,6 +1124,11 @@ namespace proj {
         for (unsigned i=0; i<G::_nparticles; i++) {
             my_vec[i] = Particle();
         }
+        
+        
+#if defined (FASTER_SECOND_LEVEL)
+        buildSpeciesMap(/*taxa_from_data*/true);
+#endif
 
         initializeParticles(my_vec); // initialize in parallel with multithreading
         
@@ -1136,6 +1147,22 @@ namespace proj {
             p.processGeneNewicks(particle_newicks);
             count++;
         }
+        
+#if defined (FASTER_SECOND_LEVEL)
+        // set group rng
+        unsigned ngroups = round(G::_nparticles * G::_ngroups * G::_thin);
+        _group_rng.resize(ngroups);
+        unsigned a=0;
+        unsigned psuffix = 1;
+        for (auto &g:_group_rng) {
+            g.reset(new Lot());
+            g->setSeed(rng.randint(1,9999)+psuffix);
+            a++;
+            psuffix += 2;
+        }
+        
+        fasterSecondLevel(my_vec);
+#else
 
         cout << "\n";
         string filename1 = "species_trees.trees";
@@ -1438,6 +1465,7 @@ namespace proj {
             filesystem::remove(oldfname);
             std::rename(newfname, oldfname);
         }
+#endif
     }
 
     inline double Proj::getRunningSum(const vector<double> & log_weight_vec) const {
@@ -2395,12 +2423,14 @@ namespace proj {
         sim_vec[0].getMaxDeepCoalescences();
 
         cout << "\nBuilding species tree and associated gene trees....\n";
-        vector<string> taxon_names;
+//        vector<string> taxon_names;
+        G::_taxon_names.clear();
         for (auto &t:_taxon_map) {
-            taxon_names.push_back(t.first);
+//            taxon_names.push_back(t.first);
+            G::_taxon_names.push_back(t.first);
         }
 
-        _data->setTaxonNames(taxon_names);
+        _data->setTaxonNames(G::_taxon_names);
 
         // Simulate sequence data
         cout << "\nSimulating sequence data....\n";
@@ -2422,6 +2452,243 @@ namespace proj {
         writeDeepCoalescenceFile(sim_vec);
         writeThetaFile(sim_vec);
     }
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Proj::fasterSecondLevel(vector<Particle> &particles) {
+        if (G::_verbose > 1) {
+            cout << "beginning second level SMC " << endl;
+        }
+        
+        cout << "\n";
+        string filename1 = "species_trees.trees";
+        string filename2 = "unique_species_trees.trees";
+        string filename3 = "params-beast-comparison.log";
+        string altfname = "alt_species_trees.trees";
+
+        cout << "\n";
+
+        unsigned ngroups = round(G::_nparticles * G::_ngroups * G::_thin);
+        if (ngroups == 0) {
+            ngroups = 1;
+            cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
+        }
+
+//        string line;
+//        // For writing text file
+//        // Creating ofstream & ifstream class object
+//        ifstream in ("params-beast-comparison.log");
+//        ofstream f("params-beast-comparison-final.log");
+        
+        vector<unsigned> counts;
+        for (unsigned index=0; index<particles.size(); index++) {
+          counts.push_back(index);
+        }
+              
+        unsigned seed = rng.getSeed();
+        std::shuffle(counts.begin(), counts.end(), std::default_random_engine(seed));
+        
+        counts.erase(next(counts.begin(), 0), next(counts.begin(), (ngroups))); // choose what to delete - erase (thin) % of particle numbers
+        sort (counts.begin(), counts.end(), greater<int>()); // sort highest to lowest for deletion of particles later
+
+        // delete particles corresponding to those numbers
+        for (unsigned c=0; c<counts.size(); c++) {
+            particles.erase(particles.begin() + counts[c]);
+        }
+
+        assert(particles.size() == ngroups);
+
+        G::_nparticles = ngroups;
+        
+        unsigned nspecies = (unsigned) _species_names.size();
+
+        
+        for (unsigned g=0; g<ngroups; g++) {
+            
+            Particle p = particles[g];
+            
+            vector<Particle> second_level_particles;
+        
+        // initialize particles
+//        for (auto &p:particles) {
+            // reset forest species partitions
+            p.clearPartials(); // no more likelihood calculations
+            p.resetSpecies();
+            p.mapSpecies(_taxon_map, _species_names);
+//        }
+        
+//        for (auto &p:particles) {
+            p.saveCoalInfoInitial();
+//        }
+        
+            second_level_particles.resize(G::_particle_increase, p);
+            
+            for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
+                if (G::_verbose > 1) {
+                    cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
+                }
+                
+                // set particle random number seeds // TODO: double check random number seeds are working
+                unsigned group_number = particles[0].getGroupNumber();
+                unsigned psuffix = 1;
+                for (auto &p:second_level_particles) {
+                    p.setSeed(_group_rng[group_number]->randint(1,9999) + psuffix);
+                    psuffix += 2;
+                }
+                
+                for (auto &p:second_level_particles) { // TODO: need to do this for each particle saved from the first level
+                    p.proposeSpeciationEvent();
+                }
+                
+                filterSpeciesParticles(s, second_level_particles);
+            
+            }
+            
+            if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
+                unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
+                if (sample_size == 0) {
+                    cout << "\n";
+                    cout << "current settings would save 0 species trees; saving every species tree\n";
+                    cout << "\n";
+                    sample_size = G::_particle_increase;
+                }
+
+                unsigned group_number = second_level_particles[0].getGroupNumber();
+                unsigned seed = _group_rng[group_number]->getSeed();
+                std::shuffle(second_level_particles.begin(), second_level_particles.end(), std::default_random_engine(seed)); // shuffle particles using group seed
+                
+                // delete first (1-_thin) % of particles
+                second_level_particles.erase(next(second_level_particles.begin(), 0), next(second_level_particles.begin(), (G::_particle_increase-sample_size)));
+                 assert (second_level_particles.size() == sample_size);
+            }
+            
+            saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2);
+            saveSpeciesTreesAltHierarchical(second_level_particles);
+            unsigned nsubsets = _data->getNumSubsets();
+            unsigned ntaxa = _data->getNumTaxa();
+            writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, second_level_particles, filename3, g);
+        }
+
+        ofstream altfname_end;
+        altfname_end.open("alt_species_trees.trees", std::ios::app);
+        altfname_end << "end;" << endl;
+        altfname_end.close();
+        
+        ofstream strees;
+        strees.open("species_trees.trees", std::ios::app);
+        strees << "end;" << endl;
+        strees.close();
+        
+        ofstream u_strees;
+        u_strees.open("unique_species_trees.trees", std::ios::app);
+        u_strees << "end;" << endl;
+        u_strees.close();
+        
+    }
+
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Proj::buildSpeciesMap(bool taxa_from_data) {
+        vector<string> taxon_names;
+        for (auto &t:_taxon_map) {
+            taxon_names.push_back(t.first);
+        }
+        
+        G::_taxon_names = taxon_names;
+        
+        // Populates G::_species_names and G::_taxon_to_species
+        // For example, given these taxon names
+        //  t1^A, t2^A, t3^B, t4^B, t5^B, t6^C, t7^C, t8^D, t9^D, t10^D
+        // G::_species_names = ["A", "B", "C", "D"]
+        // G::_taxon_to_species["t1^A"]  = 0
+        // G::_taxon_to_species["t2^A"]  = 0
+        // G::_taxon_to_species["t3^B"]  = 1
+        // G::_taxon_to_species["t4^B"]  = 1
+        // G::_taxon_to_species["t5^B"]  = 1
+        // G::_taxon_to_species["t6^C"]  = 2
+        // G::_taxon_to_species["t7^C"]  = 2
+        // G::_taxon_to_species["t8^D"]  = 3
+        // G::_taxon_to_species["t9^D"]  = 3
+        // G::_taxon_to_species["t10^D"] = 3
+        // G::_taxon_to_species["A"]     = 0
+        // G::_taxon_to_species["B"]     = 1
+        // G::_taxon_to_species["C"]     = 2
+        // G::_taxon_to_species["D"]     = 3
+        unsigned nspecies = 0;
+        map<string, unsigned> species_name_to_index;
+        G::_taxon_to_species.clear();
+
+//        output("\nMapping taxon names to species index:\n", 2);
+        unsigned ntax = (unsigned)taxon_names.size();
+        assert(ntax > 0);
+        if (taxa_from_data) {
+            // Assume taxon names are already stored in _data object and no
+            // species names have yet been stored
+            _species_names.clear();
+            const Data::taxon_names_t & tnames = _data->getTaxonNames();
+            assert(tnames.size() > 0);
+            ntax = (unsigned)tnames.size();
+            for (auto & tname : tnames) {
+                string species_name = Node::taxonNameToSpeciesName(tname);
+//                output(format("  %s --> %s\n") % tname % species_name, 2);
+                unsigned species_index = ntax;
+                if (species_name_to_index.find(species_name) == species_name_to_index.end()) {
+                    // species_name not found
+                    species_index = nspecies;
+                    _species_names.push_back(species_name);
+                    species_name_to_index[species_name] = nspecies++;
+                } else {
+                    // species_name found
+                    species_index = species_name_to_index[species_name];
+                }
+                G::_taxon_to_species[tname] = species_index;
+            }
+        }
+        else {
+            // Assume G::_species_names and G::_taxon_names are already populated
+            // and _data is null because no data is needed for this analysis ("spec" mode)
+            
+            // First build species_name_to_index from G::_species_names
+            unsigned s = 0;
+            for (auto & species_name : _species_names) {
+                species_name_to_index[species_name] = s++;
+            }
+            
+            // Now build G::_taxon_to_species from G::_taxon_names and species_name_to_index
+            for (auto & tname : taxon_names) {
+                string species_name = Node::taxonNameToSpeciesName(tname);
+                unsigned species_index = 0;
+                if (species_name_to_index.count(species_name) == 0) {
+                    // species_name not found
+                    throw XProj(format("Expecting species name \"%s\" to be found in global species names vector but it was not") % species_name);
+                }
+                else {
+                    // species_name found
+                    species_index = species_name_to_index[species_name];
+                }
+//                output(format("  %s --> %s (%d)\n") % tname % species_name % species_index, 2);
+                G::_taxon_to_species[tname] = species_index;
+            }
+        }
+        
+//        output("\nMapping species names to species index:\n", 2);
+        for (auto & sname : _species_names) {
+            unsigned species_index = 0;
+            if (species_name_to_index.count(sname) == 0)
+                throw XProj(format("Proj::buildSpeciesMap failed because key \"%s\" does not exist in species_name_to_index map") % sname);
+            else {
+                species_index = species_name_to_index.at(sname);
+            }
+//            output(format("  %s --> %d\n") % sname % species_index, 2);
+            
+            // Note: despite appearances, this next line does not
+            // overwrite anything. We need to be able to map taxon
+            // names in species trees to a species index as well as
+            // taxon names in gene trees
+            G::_taxon_to_species[sname] = species_index;
+        }
+    }
+#endif
 
     inline void Proj::run() {
         if (G::_gene_newicks_specified) {
@@ -2506,8 +2773,12 @@ namespace proj {
                     my_vec[p] = Particle();
                 }
 
+#if defined (FASTER_SECOND_LEVEL)
+                buildSpeciesMap(/*taxa_from_data*/true);
+#endif
+                
                 initializeParticles(my_vec); // initialize in parallel with multithreading
-      
+                
                 unsigned list_size = (ntaxa-1)*nsubsets;
                 vector<unsigned> gene_order;
                 
@@ -2648,10 +2919,10 @@ namespace proj {
 //                            filterParticlesMixing(particle_indices, my_vec); // for now, don't do multinomial resampling
                             
                             // shuffle new particle order
-//                            unsigned seed = rng.getSeed();
+                            unsigned seed = rng.getSeed();
                             
                             // only shuffle particle indices, not particles
-//                            std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
+                            std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
                             
 //                            cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
                         }
@@ -2761,6 +3032,10 @@ namespace proj {
                     ngroups = 1;
                     cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
                 }
+                
+#if defined (FASTER_SECOND_LEVEL)
+                fasterSecondLevel(my_vec);
+#else
                 
                 vector<unsigned> counts;
                 for (unsigned index=0; index<my_vec.size(); index++) {
@@ -2999,7 +3274,7 @@ namespace proj {
                     std::rename(newfname, oldfname);
                 }
 #endif
-
+#endif
             }
 
         catch (XProj & x) {

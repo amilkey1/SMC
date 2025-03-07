@@ -66,6 +66,10 @@ unsigned    G::_ngroups = 1;
 bool        G::_upgma;
 vector<double> G::_base_frequencies;
 string      G::_string_base_frequencies;
+vector<string>           G::_taxon_names;
+#if defined (FASTER_SECOND_LEVEL)
+map<string, unsigned>    G::_taxon_to_species;
+#endif
 
 
 unsigned Forest::_nspecies = 4;

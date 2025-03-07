@@ -27,3 +27,5 @@
 //#define COAL_LIKE_TEST
 //
 // # define LIKELIHOOD_TEST // DO NOT USE
+
+#define FASTER_SECOND_LEVEL

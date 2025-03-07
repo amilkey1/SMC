@@ -7,6 +7,11 @@ extern void output(format & fmt, unsigned level);
 namespace proj {
 
     struct G {
+#if defined (FASTER_SECOND_LEVEL)
+        typedef unsigned long           species_t;
+        static map<string, unsigned>    _taxon_to_species;
+#endif
+        
         // Program settings used in processCommandLineOptions
         static bool                 _use_gpu;
         static bool                 _ambig_missing;
@@ -49,6 +54,9 @@ namespace proj {
         static double               _lambda;
         static unsigned             _ngroups;
         static bool                 _upgma;
+        
+        // other
+        static vector<string>           _taxon_names;
         
         // functions
         string inventName(unsigned k, bool lower_case);

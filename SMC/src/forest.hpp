@@ -41,6 +41,10 @@ class Forest {
                                     Forest();
                                     ~Forest();
         Forest(const Forest & other);
+    
+#if defined (FASTER_SECOND_LEVEL)
+        typedef tuple<double, unsigned, vector<G::species_t> >  coalinfo_t;
+#endif
 
         unsigned                    numLeaves() const;
         unsigned                    numInternals() const;
@@ -75,7 +79,7 @@ class Forest {
         vector<double>              reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
         int                         selectPair(vector<double> weight_vec, Lot::SharedPtr lot);
         void                        chooseSpeciesIncrement(Lot::SharedPtr lot);
-        void                        chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth);
+    pair<double,double>             chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth);
         void                        addSpeciesIncrement();
         void                        allowCoalescence(string species_name, double increment, Lot::SharedPtr lot);
         vector<pair<double, string>>      calcForestRate(Lot::SharedPtr lot);
@@ -114,6 +118,25 @@ class Forest {
         void                        buildRestOfTreeFaster();
         void                        buildStartingUPGMAMatrix();
         void                        buildStartingRow();
+    
+#if defined (FASTER_SECOND_LEVEL)
+        void                        saveCoalInfoInitial();
+        void                        saveCoalInfo(vector<Forest::coalinfo_t> & coalinfo_vect) const;
+        void                        saveCoalInfoSpeciesTree(vector<Forest::coalinfo_t> & coalinfo_vect, bool cap);
+        void                        addCoalInfoElem(const Node *, vector<coalinfo_t> & recipient);
+        void                        setSpeciesFromNodeName(Node * nd);
+        void                        speciationEvent(Lot::SharedPtr lot, G::species_t & left, G::species_t & right, G::species_t & anc);
+        void                        buildCoalInfoVect();
+        void                        fixupCoalInfo(vector<coalinfo_t> & coalinfo_vect, vector<coalinfo_t> & sppinfo_vect) const;
+        static bool                 subsumed(G::species_t test_species, G::species_t subtending_species);
+        void                        refreshAllPreorders() const;
+        void                        refreshPreorderNew(vector<Node*> & preorder) const;
+        Node *                      findNextPreorderNew(Node * nd) const;
+        pair<double,double>         chooseSpeciesIncrementOnlySecondLevel(Lot::SharedPtr lot, double max_depth);
+        vector<coalinfo_t>          _coalinfo;
+        mutable vector<Node::ptr_vect_t> _preorders;
+        mutable unsigned            _next_node_number;
+#endif
 
     
         map<string, double>         _theta_map;
@@ -239,6 +262,11 @@ class Forest {
         _starting_row.clear();
         _lineages_per_species.clear();
         _partials_calculated_count = 0;
+#if defined (FASTER_SECOND_LEVEL)
+        _coalinfo.clear();
+        _preorders.clear();
+        _next_node_number = 0;
+#endif
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -1191,6 +1219,11 @@ class Forest {
         _starting_row = other._starting_row;
         _species_names = other._species_names;
         _partials_calculated_count = other._partials_calculated_count;
+#if defined (FASTER_SECOND_LEVEL)
+        _coalinfo = other._coalinfo;
+        _preorders = other._preorders;
+        _next_node_number = other._next_node_number;
+#endif
 
         // copy tree itself
 
@@ -1248,6 +1281,10 @@ class Forest {
                 nd->_edge_length = othernd._edge_length;
                 nd->_position_in_lineages = othernd._position_in_lineages;
                 nd->_partial = othernd._partial;
+#if defined (FASTER_SECOND_LEVEL)
+                nd->_species = othernd._species;
+                nd->_height = othernd._height;
+#endif
             }
         }
 
@@ -1291,14 +1328,22 @@ class Forest {
             nd->_position_in_lineages=i;
             nd->_name=species_names[i];
             _lineages.push_back(nd);
+#if defined (FASTER_SECOND_LEVEL)
+        if (G::_taxon_to_species.count(nd->_name) == 0)
+            throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd->_name));
+        else {
+            Node::setSpeciesBit(nd->_species, G::_taxon_to_species.at(nd->_name), /*init_to_zero_first*/true);
+        }
+#endif
             }
         
         _nleaves=_nspecies;
         _ninternals=0;
     }
 
-    inline void Forest::chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth) {
-        assert (max_depth >= 0.0);
+    inline pair<double,double> Forest::chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth) {
+        double nlineages = (double) _lineages.size();
+        
         if (max_depth > 0.0) {
             double rate = (G::_lambda)*_lineages.size();
             
@@ -1306,7 +1351,6 @@ class Forest {
             double inner_term = 1-exp(-rate*max_depth);
             _last_edge_length = -log(1-u*inner_term)/rate;
             assert (_last_edge_length < max_depth);
-
             for (auto nd:_lineages) {
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
             }
@@ -1340,7 +1384,68 @@ class Forest {
         else {
             _species_build.back().second = _last_edge_length;
         }
+        
+        double constrained_factor = log(1 - exp(-1*nlineages*G::_lambda*max_depth));
+        return make_pair(_last_edge_length, constrained_factor);
+
     }
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline pair<double,double> Forest::chooseSpeciesIncrementOnlySecondLevel(Lot::SharedPtr lot, double max_depth) {
+        double nlineages = (double) _lineages.size();
+        
+        double species_tree_height = getLineageHeight(_lineages.back());
+        
+            max_depth = max_depth - species_tree_height;
+            
+            assert (max_depth >= 0.0);
+        
+        if (max_depth > 0.0) {
+            double rate = (G::_lambda)*_lineages.size();
+            
+            double u = lot->uniform();
+            double inner_term = 1-exp(-rate*max_depth);
+            _last_edge_length = -log(1-u*inner_term)/rate;
+            assert (_last_edge_length < max_depth);
+            for (auto nd:_lineages) {
+                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
+            }
+            
+            // lorad only works if all topologies the same - then don't include the prior on joins b/c it is fixed
+            double increment_prior = (log(rate)-_last_edge_length*rate);
+                        
+            _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior)); // do not include constrained factor in increment prior
+        }
+        else {
+            double rate = G::_lambda*_lineages.size();
+            
+            assert (lot != nullptr);
+            _last_edge_length = lot->gamma(1.0, 1.0/rate);
+
+            for (auto nd:_lineages) {
+                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
+            }
+            
+            double nChooseTwo = _lineages.size()*(_lineages.size() - 1);
+            double log_prob_join = log(2/nChooseTwo);
+            double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
+
+            _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior));
+
+        }
+        
+        if (_species_build.size() == 0) {
+            _species_build.push_back(make_pair(make_tuple("null", "null", "null"), _last_edge_length));
+        }
+        else {
+            _species_build.back().second = _last_edge_length;
+        }
+        
+        double constrained_factor = log(1 - exp(-1*nlineages*G::_lambda*max_depth));
+        return make_pair(_last_edge_length, constrained_factor);
+
+    }
+#endif
 
 
     inline void Forest::chooseSpeciesIncrement(Lot::SharedPtr lot) {
@@ -1368,6 +1473,7 @@ class Forest {
             assert (lot != nullptr);
             pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
             assert (t.first != t.second);
+            
             subtree1=_lineages[t.first];
             subtree2=_lineages[t.second];
             assert (t.first < _lineages.size());
@@ -1414,6 +1520,10 @@ class Forest {
         }
 #endif
         
+#if defined (FASTER_SECOND_LEVEL)
+        new_nd->_height = getLineageHeight(new_nd);
+#endif
+        
         calcTopologyPrior((int) _lineages.size()+1);
 
         _species_build.push_back(make_pair(make_tuple(subtree1->_name, subtree2->_name, new_nd->_name), 0.0));
@@ -1421,6 +1531,7 @@ class Forest {
     }
 
     inline void Forest::updateSpeciesPartition(tuple<string, string, string> species_info) {
+        // TODO: need to update _species in new node
         string spp1 = get<0>(species_info);
         string spp2 = get<1>(species_info);
         string new_spp = get<2>(species_info);
@@ -1449,6 +1560,7 @@ class Forest {
     }
 
     inline void Forest::setUpGeneForest(map<string, string> &taxon_map) {
+        
         _taxon_map = taxon_map;
         assert (_index >0);
         _species_partition.clear();
@@ -1458,16 +1570,64 @@ class Forest {
         for (auto &nd:_nodes) {
             count++;
             assert (!nd._left_child);
-//            if (!nd._left_child) {
             string species_name = taxon_map[nd._name];
             _species_partition[species_name].push_back(&nd);
             if (count == Forest::_ntaxa) {
                 break;
             }
+#if defined (FASTER_SECOND_LEVEL)
+        if (G::_taxon_to_species.count(nd._name) == 0)
+            throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd._name));
+        else {
+            Node::setSpeciesBit(nd._species, G::_taxon_to_species.at(nd._name), /*init_to_zero_first*/true);
+        }
+#endif
         }
         
         assert (_species_partition.size() == Forest::_nspecies);
     }
+
+#if defined (FASTER_SECOND_LEVEL)
+//    inline void Forest::speciationEvent(Lot::SharedPtr lot, G::species_t & left_spp, G::species_t & right_spp, G::species_t & anc_spp) {
+//            unsigned nlineages = (unsigned)_lineages.size();
+//
+//            // Choose two lineages to join
+//            assert(nlineages > 1);
+//            auto chosen_pair = lot->nchoose2(nlineages);
+//            unsigned left_pos = chosen_pair.first;
+//            unsigned right_pos = chosen_pair.second;
+//            Node * first_node  = _lineages[left_pos];
+//            Node * second_node = _lineages[right_pos];
+//
+//            // Get species for the two lineages to join
+//            left_spp = first_node->getSpecies();
+//            right_spp = second_node->getSpecies();
+//
+//            // Create ancestral node
+//            Node * anc_node = pullNode();
+//            joinLineagePair(anc_node, first_node, second_node);
+//            anc_node->setSpeciesToUnion(left_spp, right_spp);
+//
+//            // Get species for the new ancestral node
+//            anc_spp = anc_node->getSpecies();
+//
+//            // Update _lineages vector
+//            removeTwoAddOne(_lineages, first_node, second_node, anc_node);
+//            refreshAllPreorders();
+//        }
+
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+// This is an override of an abstract base class function
+inline void Forest::setSpeciesFromNodeName(Node * nd) {
+    if (G::_taxon_to_species.count(nd->_name) == 0)
+        throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd->_name));
+    else {
+        Node::setSpeciesBit(nd->_species, G::_taxon_to_species.at(nd->_name), /*init_to_zero_first*/true);
+    }
+}
+#endif
 
     inline double Forest::calcTopologyPrior(unsigned nlineages) {
         _log_joining_prob += -log(0.5*nlineages*(nlineages-1));
@@ -2408,6 +2568,10 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
                  }
              }
              calcPartialArray(new_nd);
+             
+#if defined (FASTER_SECOND_LEVEL)
+             new_nd->_species = 0;
+#endif
 
              subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
              subtree2->_partial=nullptr;
@@ -2984,7 +3148,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         unsigned count = -1;
         
         assert (_taxon_map.size() > 0);
-        setUpGeneForest(_taxon_map);
+        setUpGeneForest(_taxon_map); // TODO: don't have to redo this because it's the same at every step?
         
         for (unsigned gen=0; gen < species_build.size() - 1; gen++) { // don't go into last step because panmictic part will take care of that
             count = -1;
@@ -3192,6 +3356,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         unsigned count = -1;
         
         assert (_taxon_map.size() > 0);
+        
         setUpGeneForest(_taxon_map);
         
         for (unsigned gen=0; gen < species_build.size(); gen++) {
@@ -3429,6 +3594,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
     }
 
     inline void Forest::refreshPreorder() {
+        // TODO: I think this only works for complete trees - otherwise, need a separate preorder vector for each subtree
        // Create vector of node pointers in preorder sequence
         Node *nd = &_nodes.back();
        _preorder.clear();
@@ -4332,6 +4498,357 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             j++;
         }
     }
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Forest::addCoalInfoElem(const Node * nd, vector<coalinfo_t> & recipient) {
+        assert(_index >= 0);
+
+        // Assumes nd is an internal node
+        assert(nd->_left_child);
+        
+        recipient.push_back(
+            make_tuple(
+                nd->_height,
+                _index,
+                vector<G::species_t>({
+                    nd->_left_child->_species,
+                    nd->_left_child->_right_sib->_species,
+                })
+            )
+        );
+    }
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Forest::saveCoalInfo(vector<Forest::coalinfo_t> & coalinfo_vect) const {
+        // Appends to coalinfo_vect; clear before calling if desired
+        // GeneForest version ignores cap argument.
+        // Assumes heights and preorders are up-to-date; call
+        //   heightsInternalsPreorders() beforehand to ensure this
+        
+        // coalinfo_t is a tuple with these elements:
+        // - height of node
+        // - 1-offset gene index (0 means speciation)
+        // - vector of child species
+        
+        // Should only be called for complete gene trees
+        assert(_lineages.size() == 1);
+
+        // Copy tuples stored in _coalinfo to end of coalinfo_vect
+        coalinfo_vect.insert(coalinfo_vect.end(), _coalinfo.begin(), _coalinfo.end());
+    }
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Forest::buildCoalInfoVect() {
+        assert (_index == 0);
+        
+        refreshAllPreorders();
+        
+        _coalinfo.clear();
+        for (auto & preorder : _preorders) {
+            for (auto nd : boost::adaptors::reverse(preorder)) {
+                if (nd->_left_child) {
+                    // nd is an internal node
+                    assert(nd->_height != _infinity);
+                    assert(nd->_left_child->_right_sib);
+                    assert(nd->_left_child->_right_sib->_right_sib == nullptr);
+                    nd->_species = (nd->_left_child->_species | nd->_left_child->_right_sib->_species);
+                    addCoalInfoElem(nd, _coalinfo);
+                }
+                else {
+                    // nd is a leaf node
+                    unsigned spp_index = G::_taxon_to_species.at(nd->_name);
+                    nd->_species = (G::species_t)1 << spp_index;
+                }
+            }
+        }
+
+        // Assumes heights of all nodes are accurate
+        //
+//        _coalinfo.clear();
+//
+//        if (_preorder.size() == 0) {
+//            refreshPreorder(); // TODO: not sure what to do here
+//        }
+//        assert (_preorder.size() > 0);
+//        for (auto nd : boost::adaptors::reverse(_preorder)) {
+//            if (nd->_left_child) {
+//                // nd is an internal node
+//                assert(nd->_height != _infinity);
+//                assert(nd->_left_child->_right_sib);
+//                assert(nd->_left_child->_right_sib->_right_sib == nullptr);
+//                nd->_species = (nd->_left_child->_species | nd->_left_child->_right_sib->_species);
+//                addCoalInfoElem(nd, _coalinfo);
+//            }
+//            else {
+//                // nd is a leaf node
+//                unsigned spp_index = G::_taxon_to_species.at(nd->_name);
+//                nd->_species = (G::species_t)1 << spp_index;
+//            }
+//        }
+        }
+
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Forest::saveCoalInfoInitial() {
+        // coalinfo_t is a tuple with these elements:
+        // - height of node
+        // - 1-offset gene index (0 means speciation)
+        // - vector of child species
+        
+        // Should only be called for complete gene trees
+        assert (_lineages.size() == 1);
+        
+        _coalinfo.clear();
+        
+        refreshPreorder();
+        
+        // TODO: check node height - don't need to calculate, can just keep track as you go
+            for (auto nd : boost::adaptors::reverse(_preorder)) {
+                if (nd->_left_child) {
+                    // nd is an internal node
+//                    assert(nd->_height != _infinity);
+                    assert(nd->_left_child->_right_sib);
+                    assert(nd->_left_child->_right_sib->_right_sib == nullptr);
+                    nd->_species = (nd->_left_child->_species | nd->_left_child->_right_sib->_species);
+                    nd->_height = getLineageHeight(nd->_left_child); // node height is sum of child's branch lengths
+                    addCoalInfoElem(nd, _coalinfo);
+                }
+                else {
+                    // nd is a leaf node
+                    unsigned spp_index = G::_taxon_to_species.at(nd->_name);
+                    nd->_species = (G::species_t)1 << spp_index;
+                }
+            }
+        
+//        cout << "x";
+    }
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline bool Forest::subsumed(G::species_t test_species, G::species_t subtending_species) {
+        bool not_equal = (test_species != subtending_species);
+        bool is_subset = ((test_species & subtending_species) == test_species);
+        if (not_equal && is_subset)
+            return true;
+        else
+            return false;
+    }
+
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Forest::fixupCoalInfo(vector<coalinfo_t> & coalinfo_vect, vector<coalinfo_t> & sppinfo_vect) const {
+        // No fixing up to do if there are no species tree joins
+        if (sppinfo_vect.empty())
+            return;
+                    
+//        debugCheckCoalInfoSorted(coalinfo_vect);
+//        debugCheckCoalInfoSorted(sppinfo_vect);
+        
+        // Example:
+        //          -- before --           -- after ---
+        //  height   left  right  species    left   right
+        // -------  -----  -----  -------  -----  -----
+        // 0.01167      E      E              E       E
+        // 0.01389      B      B              B       B
+        // 0.02047      B      B              B       B
+        // 0.02079      D      D              D       D
+        // 0.02150      D      D              D       D
+        // 0.03438      C      C              C       C
+        // 0.08638  ------------       CD  ------------ <-- currently considering
+        // 0.11725  ------------      ACD  ------------
+        // 0.13886      C      A             CD       A
+        // 0.13942      D      A             CD       A
+        // 0.17349     AC     AD             AC      AD
+        // 0.39425    ACD      E            ACD       E
+        // 0.41254      B   ACDE              B    ACDE
+        //
+        //          -- before --           -- after ---
+        //  height   left  right  species    left   right
+        // -------  -----  -----  -------  -----  -----
+        // 0.01167      E      E              E       E
+        // 0.01389      B      B              B       B
+        // 0.02047      B      B              B       B
+        // 0.02079      D      D              D       D
+        // 0.02150      D      D              D       D
+        // 0.03438      C      C              C       C
+        // 0.08638  ------------       CD  ------------
+        // 0.11725  ------------      ACD  ------------ <-- currently considering
+        // 0.13886     CD      A            ACD     ACD
+        // 0.13942     CD      A            ACD     ACD
+        // 0.17349     AC     AD            ACD     ACD
+        // 0.39425    ACD      E            ACD       E
+        // 0.41254      B   ACDE              B    ACDE
+
+        unsigned jstart = 0;
+        for (auto & si : sppinfo_vect) {
+            // Get handles for current sppinfo_vect element
+            double                 h0 = get<0>(si);
+            vector<G::species_t> & v0 = get<2>(si);
+            
+            // Can't assume v0 has size 2 because this species tree join may be the fake
+            // join that combines all remaining species into an ancestral species
+            // for incomplete species forests
+            G::species_t           s0 = accumulate(v0.begin(), v0.end(), (G::species_t)0, [](const G::species_t & next, const G::species_t & cum){return (cum | next);});
+            
+            // Advance through coalinfo_vect to the first event that might be
+            // affected by the current species tree join
+            unsigned j = jstart;
+            assert(j < coalinfo_vect.size());
+            double h = get<0>(coalinfo_vect[j]);
+            while (h < h0) {
+                j++;
+                assert(j < coalinfo_vect.size());
+                h = get<0>(coalinfo_vect[j]);
+            }
+            
+            // Next time can start at this point in the coalinfo_vect
+            jstart = j;
+            
+            // Perform replacements in all subsequent gene tree coalinfo elements
+            map<G::species_t, G::species_t> replacements;
+            while (j < coalinfo_vect.size()) {
+                h = get<0>(coalinfo_vect[j]);
+                vector<G::species_t> & v = get<2>(coalinfo_vect[j]);
+                assert(v.size() == 2);
+                for (auto & kv : replacements) {
+                    if (subsumed(kv.first, v[0])) {
+                        v[0] |= kv.second;
+                    }
+                    if (subsumed(kv.first, v[1])) {
+                        v[1] |= kv.second;
+                    }
+                }
+                if (subsumed(v[0], s0)) {
+                    replacements[v[0]] = s0;
+                    v[0] = s0;
+                }
+                if (subsumed(v[1], s0)) {
+                    replacements[v[1]] = s0;
+                    v[1] = s0;
+                }
+                j++;
+            }
+        }
+    }
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Forest::saveCoalInfoSpeciesTree(vector<Forest::coalinfo_t> & coalinfo_vect, bool cap) {
+        // Appends to coalinfo_vect; clear coalinfo_vect before calling if desired
+        // Assumes heights and preorders are up-to-date; call
+        //   heightsInternalsPreorders() beforehand to ensure this
+        
+        double forest_height = getLineageHeight(_lineages.back());
+
+        // Dump _coalinfo into coalinfo_vect
+        if (!_coalinfo.empty()) {
+            coalinfo_vect.insert(coalinfo_vect.begin(), _coalinfo.begin(), _coalinfo.end());
+        }
+        
+        if (cap) {
+            // Create an entry pooling the remaining species
+            if (_lineages.size() > 1) {
+                vector<G::species_t> sppvect;
+                for (auto nd : _lineages) {
+                    sppvect.push_back(nd->_species);
+                }
+                coalinfo_vect.push_back(make_tuple(
+                    forest_height,
+                    0,
+                    sppvect)
+                );
+            }
+        }
+    }
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Forest::refreshAllPreorders() const {
+        // For each subtree stored in _lineages, create a vector of node pointers in preorder sequence
+        assert (_index == 0); // only need to call this for a species tree
+        _next_node_number = Forest::_nspecies;
+        _preorders.clear();
+        if (_lineages.size() == 0)
+            return;
+        
+        for (auto nd : _lineages) {
+            if (nd->_left_child) {
+                nd->_number = _next_node_number++;
+            }
+            
+            // lineage is a Node::ptr_vect_t (i.e. vector<Node *>)
+            // lineage[0] is the first node pointer in the preorder sequence for this lineage
+            // Add a new vector to _preorders containing, for now, just the root of the subtree
+            _preorders.push_back({nd});
+            
+            // Now add the nodes above the root in preorder sequence
+            Node::ptr_vect_t & preorder_vector = *_preorders.rbegin();
+            refreshPreorderNew(preorder_vector);
+        }
+    }
+
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Forest::refreshPreorderNew(vector<Node*> & preorder) const {
+        // Assumes preorder just contains the root node when this function is called
+        // Also assumes that _next_node_number was initialized prior to calling this function
+        assert(preorder.size() == 1);
+        
+        Node * nd = preorder[0];
+        while (true) {
+            nd = findNextPreorderNew(nd);
+            if (nd) {
+                preorder.push_back(nd);
+                if (nd->_left_child)
+                    nd->_number = _next_node_number++;
+            }
+            else
+                break;
+        }
+    }
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline Node * Forest::findNextPreorderNew(Node * nd) const {
+        assert(nd);
+        Node * next = 0;
+        if (!nd->_left_child && !nd->_right_sib) {
+            // nd has no children and no siblings, so next preorder is the right sibling of
+            // the first ancestral node that has a right sibling.
+
+            Node * anc = nd->_parent;
+            while (anc && !anc->_right_sib)
+                anc = anc->_parent;
+            if (anc) {
+                // We found an ancestor with a right sibling
+                next = anc->_right_sib;
+            }
+            else {
+                // nd is last preorder node in the tree
+                next = 0;
+            }
+        }
+        else if (nd->_right_sib && !nd->_left_child) {
+            // nd has no children (it is a tip), but does have a sibling on its right
+            next = nd->_right_sib;
+        }
+        else if (nd->_left_child && !nd->_right_sib) {
+            // nd has children (it is an internal node) but no siblings on its right
+            next = nd->_left_child;
+        }
+        else {
+            // nd has both children and siblings on its right
+            next = nd->_left_child;
+        }
+        return next;
+    }
+
+#endif
 
 }
 
