@@ -2506,7 +2506,7 @@ namespace proj {
             
             Particle p = particles[g];
             
-            vector<Particle> second_level_particles;
+            vector<Particle > second_level_particles;
         
         // initialize particles
 //        for (auto &p:particles) {
@@ -2519,7 +2519,8 @@ namespace proj {
 //        for (auto &p:particles) {
             p.saveCoalInfoInitial();
 //        }
-        
+            
+            p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
             second_level_particles.resize(G::_particle_increase, p);
             
             for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0

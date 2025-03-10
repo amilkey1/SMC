@@ -155,6 +155,7 @@ class Particle {
         double                                          findHeightNextCoalescentEvent(double hstart, vector<Forest::coalinfo_t> & coalinfo_vect);
         double                                          calcLogCoalescentLikelihood(vector<Forest::coalinfo_t> & coalinfo_vect, bool integrate_out_thetas, bool verbose);
         void                                            resetPrevLogCoalLike();
+        void                                            clearGeneForests();
 #endif
 
     private:
@@ -1244,7 +1245,11 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline double Particle::getCoalescentLikelihood(unsigned g) {
 #if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
+#if defined (FASTER_SECOND_LEVEL)
+        return _log_coal_like;
+#else
         return _log_coalescent_likelihood; // can't get coalescent likelihood separately for each gene tree
+#endif
 #else
         assert (g>0); // no coalescent likelihood for species tree
         return _forests[g]._log_coalescent_likelihood;
@@ -2090,6 +2095,15 @@ inline vector<double> Particle::getVectorPrior() {
 #if defined (FASTER_SECOND_LEVEL)
     inline void Particle::resetPrevLogCoalLike() {
         _prev_log_coal_like = _log_coal_like;
+    }
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Particle::clearGeneForests() {
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i].setTreeHeight();
+            _forests[i]._nodes.clear();
+        }
     }
 #endif
 

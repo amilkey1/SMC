@@ -133,9 +133,11 @@ class Forest {
         void                        refreshPreorderNew(vector<Node*> & preorder) const;
         Node *                      findNextPreorderNew(Node * nd) const;
         pair<double,double>         chooseSpeciesIncrementOnlySecondLevel(Lot::SharedPtr lot, double max_depth);
+        void                        setTreeHeight();
         vector<coalinfo_t>          _coalinfo;
         mutable vector<Node::ptr_vect_t> _preorders;
         mutable unsigned            _next_node_number;
+        double                      _forest_height;
 #endif
 
     
@@ -266,6 +268,7 @@ class Forest {
         _coalinfo.clear();
         _preorders.clear();
         _next_node_number = 0;
+        _forest_height = 0.0;
 #endif
     }
 
@@ -1223,86 +1226,89 @@ class Forest {
         _coalinfo = other._coalinfo;
         _preorders = other._preorders;
         _next_node_number = other._next_node_number;
+        _forest_height = other._forest_height;
 #endif
 
         // copy tree itself
 
-        _species_partition.clear();
-        for (auto spiter : other._species_partition) {
-            for (auto s : spiter.second) {
-                unsigned number = s->_number;
+        if (other._nodes.size() > 0) { // otherwise, there is no forest and nothing needs to be copied
+            _species_partition.clear();
+            for (auto spiter : other._species_partition) {
+                for (auto s : spiter.second) {
+                    unsigned number = s->_number;
+                    Node* nd = &*next(_nodes.begin(), number);
+                    _species_partition[spiter.first].push_back(nd);
+                }
+            }
+            
+            _starting_row.clear();
+            for (auto strow : other._starting_row) {
+                unsigned number = strow.first->_number;
                 Node* nd = &*next(_nodes.begin(), number);
-                _species_partition[spiter.first].push_back(nd);
+                _starting_row[nd] = strow.second;
             }
-        }
-        
-        _starting_row.clear();
-        for (auto strow : other._starting_row) {
-            unsigned number = strow.first->_number;
-            Node* nd = &*next(_nodes.begin(), number);
-            _starting_row[nd] = strow.second;
-        }
 
-        for (auto othernd : other._nodes) {
-            // get number of next node in preorder sequence (serves as index of node in _nodes vector)
-            int k = othernd._number;
+            for (auto othernd : other._nodes) {
+                // get number of next node in preorder sequence (serves as index of node in _nodes vector)
+                int k = othernd._number;
 
-            if (k>-1) {
+                if (k>-1) {
+                    Node* nd = &*next(_nodes.begin(), k);
+
+                // copy parent
+                    if (othernd._parent) {
+                        unsigned parent_number = othernd._parent->_number;
+                        Node* parent = &*next(_nodes.begin(), parent_number);
+                        nd->_parent = parent;
+                    }
+
+                // copy left child
+                    if (othernd._left_child) {
+                    unsigned left_child_number = othernd._left_child->_number;
+                        Node* left_child = &*next(_nodes.begin(), left_child_number);
+                        nd->_left_child = left_child;
+                }
+                    else {
+                        nd->_left_child = 0;
+                    }
+
+                // copy right sibling
+                if (othernd._right_sib) {
+                    unsigned right_sib_number = othernd._right_sib->_number;
+                    Node* right_sib = &*next(_nodes.begin(), right_sib_number);
+                    nd->_right_sib = right_sib;
+                }
+                else
+                    nd->_right_sib = 0;
+
+                    nd->_number = othernd._number;
+                    nd->_name = othernd._name;
+                    nd->_edge_length = othernd._edge_length;
+                    nd->_position_in_lineages = othernd._position_in_lineages;
+                    nd->_partial = othernd._partial;
+    #if defined (FASTER_SECOND_LEVEL)
+                    nd->_species = othernd._species;
+                    nd->_height = othernd._height;
+    #endif
+                }
+            }
+
+            unsigned j = 0;
+            for (auto othernd : other._lineages) {
+                unsigned k = othernd->_number;
                 Node* nd = &*next(_nodes.begin(), k);
-
-            // copy parent
-                if (othernd._parent) {
-                    unsigned parent_number = othernd._parent->_number;
-                    Node* parent = &*next(_nodes.begin(), parent_number);
-                    nd->_parent = parent;
+                _lineages[j] = nd;
+                j++;
+            }
+            
+            if (other._preorder.size() > 0) {
+                unsigned m = 0;
+                for (auto othernd : other._preorder) {
+                    unsigned n = othernd->_number;
+                    Node* nd = &*next(_nodes.begin(), n);
+                    _preorder[m] = nd;
+                    m++;
                 }
-
-            // copy left child
-                if (othernd._left_child) {
-                unsigned left_child_number = othernd._left_child->_number;
-                    Node* left_child = &*next(_nodes.begin(), left_child_number);
-                    nd->_left_child = left_child;
-            }
-                else {
-                    nd->_left_child = 0;
-                }
-
-            // copy right sibling
-            if (othernd._right_sib) {
-                unsigned right_sib_number = othernd._right_sib->_number;
-                Node* right_sib = &*next(_nodes.begin(), right_sib_number);
-                nd->_right_sib = right_sib;
-            }
-            else
-                nd->_right_sib = 0;
-
-                nd->_number = othernd._number;
-                nd->_name = othernd._name;
-                nd->_edge_length = othernd._edge_length;
-                nd->_position_in_lineages = othernd._position_in_lineages;
-                nd->_partial = othernd._partial;
-#if defined (FASTER_SECOND_LEVEL)
-                nd->_species = othernd._species;
-                nd->_height = othernd._height;
-#endif
-            }
-        }
-
-        unsigned j = 0;
-        for (auto othernd : other._lineages) {
-            unsigned k = othernd->_number;
-            Node* nd = &*next(_nodes.begin(), k);
-            _lineages[j] = nd;
-            j++;
-        }
-        
-        if (other._preorder.size() > 0) {
-            unsigned m = 0;
-            for (auto othernd : other._preorder) {
-                unsigned n = othernd->_number;
-                Node* nd = &*next(_nodes.begin(), n);
-                _preorder[m] = nd;
-                m++;
             }
         }
         
@@ -2694,6 +2700,25 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         }
     }
 
+#if defined (FASTER_SECOND_LEVEL)
+    inline double Forest::getTreeHeight() {
+        if (_index == 0 || _lineages.size() > 1) {
+            double sum_height = 0.0;
+
+            // calculate height of lineage
+            Node* base_node = _lineages[0];
+            sum_height += base_node->getEdgeLength();
+            for (Node* child=base_node->_left_child; child; child=child->_left_child) {
+                sum_height += child->getEdgeLength();
+            }
+            return sum_height;
+        }
+        else {
+            assert (_forest_height > 0.0);
+            return _forest_height;
+        }
+    }
+#else
     inline double Forest::getTreeHeight() {
         double sum_height = 0.0;
 
@@ -2705,6 +2730,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         }
         return sum_height;
     }
+#endif
 
     inline double Forest::getTreeLength() {
         // sum of all edge lengths in tree
@@ -4810,6 +4836,12 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             else
                 break;
         }
+    }
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Forest::setTreeHeight() {
+        _forest_height = getLineageHeight(_lineages.back());
     }
 #endif
 
