@@ -102,6 +102,8 @@ namespace proj {
 #if defined (FASTER_SECOND_LEVEL)
             void                        fasterSecondLevel(vector<Particle> &particles);
             void                        buildSpeciesMap(bool taxa_from_data);
+            void                        proposeSpeciesGroupsFaster(vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets);
+            void                proposeSpeciesGroupRangeFaster(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets);
 #endif
         
             double                      _small_enough;
@@ -1265,7 +1267,7 @@ namespace proj {
 
         vector<Particle> new_vec;
 
-        G::_nparticles = G::_particle_increase; // TODO: G::_nparticles is static? be careful
+        G::_nparticles = G::_particle_increase;
         unsigned index = 0;
         
         bool parallelize_by_group = false;
@@ -1973,6 +1975,80 @@ namespace proj {
 //        cout << "speciation rate = " << Forest::_lambda << endl;
     }
 
+    inline void Proj::proposeSpeciesGroupRangeFaster(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets) {
+        unsigned nspecies = (unsigned) _species_names.size();
+        
+        for (unsigned i=first; i<last; i++){
+            
+            Particle p = particles[i];
+            vector<Particle> second_level_particles;
+            
+            // initialize particles
+            p.clearPartials(); // no more likelihood calculations
+            p.resetSpecies();
+            p.mapSpecies(_taxon_map, _species_names);
+    
+            p.saveCoalInfoInitial();
+        
+            p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
+            second_level_particles.resize(G::_particle_increase, p);
+        
+            for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
+                if (G::_verbose > 1) {
+                    cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
+                }
+                
+                // set particle random number seeds // TODO: double check random number seeds are working
+                unsigned group_number = particles[0].getGroupNumber();
+                unsigned psuffix = 1;
+                for (auto &p:second_level_particles) {
+                    p.setSeed(_group_rng[group_number]->randint(1,9999) + psuffix);
+                    psuffix += 2;
+                }
+                
+                for (auto &p:second_level_particles) { // TODO: need to do this for each particle saved from the first level
+                    p.proposeSpeciationEvent();
+                }
+                
+                filterSpeciesParticles(s, second_level_particles);
+            }
+
+            
+            if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
+                unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
+                if (sample_size == 0) {
+                    cout << "\n";
+                    cout << "current settings would save 0 species trees; saving every species tree\n";
+                    cout << "\n";
+                    sample_size = G::_particle_increase;
+                }
+
+                unsigned group_number = second_level_particles[0].getGroupNumber();
+               
+                unsigned seed = _group_rng[group_number]->getSeed();
+                std::shuffle(second_level_particles.begin(), second_level_particles.end(), std::default_random_engine(seed)); // shuffle particles using group seed
+
+                // delete first (1-_thin) % of particles
+                second_level_particles.erase(next(second_level_particles.begin(), 0), next(second_level_particles.begin(), (G::_particle_increase-sample_size)));
+                assert (second_level_particles.size() == sample_size);
+            }
+
+            mtx.lock();
+            saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2);
+            saveSpeciesTreesAltHierarchical(second_level_particles);
+            _count++;
+            unsigned ntaxa = _data->getNumTaxa();
+            if (G::_gene_newicks_specified) {
+                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nsubsets, nspecies, ntaxa, second_level_particles, filename3, i);
+            }
+            else {
+                writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, second_level_particles, filename3, i);
+            }
+            mtx.unlock();
+        }
+
+    }
+
     inline void Proj::proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets, unsigned ntaxa) {
         unsigned nspecies = (unsigned) _species_names.size();
         
@@ -2046,6 +2122,39 @@ namespace proj {
             }
             mtx.unlock();
         }
+    }
+
+    inline void Proj::proposeSpeciesGroupsFaster(vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets) {
+        // ngroups = number of species SMCs to do (i.e. 100 particles for first round, thin = 1.0 means ngroups = 100 for this round)
+        assert (G::_nthreads > 1);
+        
+        // divide up groups as evenly as possible across threads
+        unsigned first = 0;
+        unsigned incr = ngroups/G::_nthreads + (ngroups % G::_nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of groups
+        unsigned last = incr;
+        
+        // need a vector of threads because we have to wait for each one to finish
+        vector<thread> threads;
+
+          while (true) {
+          // create a thread to handle particles first through last - 1
+            threads.push_back(thread(&Proj::proposeSpeciesGroupRangeFaster, this, first, last, std::ref(particles), ngroups, filename1, filename2, filename3, nsubsets));
+          // update first and last
+          first = last;
+          last += incr;
+          if (last > ngroups) {
+            last = ngroups;
+            }
+          if (first >= ngroups) {
+              break;
+          }
+        }
+
+        // the join function causes this loop to pause until the ith thread finishes
+        for (unsigned i = 0; i < threads.size(); i++) {
+          threads[i].join();
+        }
+
     }
 
     inline void Proj::proposeSpeciesGroups(vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets, unsigned ntaxa) {
@@ -2472,12 +2581,6 @@ namespace proj {
             ngroups = 1;
             cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
         }
-
-//        string line;
-//        // For writing text file
-//        // Creating ofstream & ifstream class object
-//        ifstream in ("params-beast-comparison.log");
-//        ofstream f("params-beast-comparison-final.log");
         
         vector<unsigned> counts;
         for (unsigned index=0; index<particles.size(); index++) {
@@ -2501,88 +2604,156 @@ namespace proj {
         
         unsigned nspecies = (unsigned) _species_names.size();
 
-        
-        for (unsigned g=0; g<ngroups; g++) {
+        if (G::_nthreads == 1) {
+            for (unsigned g=0; g<ngroups; g++) {
+                
+                Particle p = particles[g];
+                
+                vector<Particle > second_level_particles;
             
-            Particle p = particles[g];
+            // initialize particles
+                p.clearPartials(); // no more likelihood calculations
+                p.resetSpecies();
+                p.mapSpecies(_taxon_map, _species_names);
             
-            vector<Particle > second_level_particles;
-        
-        // initialize particles
-//        for (auto &p:particles) {
-            // reset forest species partitions
-            p.clearPartials(); // no more likelihood calculations
-            p.resetSpecies();
-            p.mapSpecies(_taxon_map, _species_names);
-//        }
-        
-//        for (auto &p:particles) {
-            p.saveCoalInfoInitial();
-//        }
-            
-            p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
-            second_level_particles.resize(G::_particle_increase, p);
-            
-            for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
-                if (G::_verbose > 1) {
-                    cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
+                p.saveCoalInfoInitial();
+                
+                p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
+                second_level_particles.resize(G::_particle_increase, p);
+                
+                for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
+                    if (G::_verbose > 1) {
+                        cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
+                    }
+                    
+                    // set particle random number seeds // TODO: double check random number seeds are working
+                    unsigned group_number = particles[0].getGroupNumber();
+                    unsigned psuffix = 1;
+                    for (auto &p:second_level_particles) {
+                        p.setSeed(_group_rng[group_number]->randint(1,9999) + psuffix);
+                        psuffix += 2;
+                    }
+                    
+                    for (auto &p:second_level_particles) { // TODO: need to do this for each particle saved from the first level
+                        p.proposeSpeciationEvent();
+                    }
+                    
+                    filterSpeciesParticles(s, second_level_particles);
+                
                 }
                 
-                // set particle random number seeds // TODO: double check random number seeds are working
-                unsigned group_number = particles[0].getGroupNumber();
-                unsigned psuffix = 1;
-                for (auto &p:second_level_particles) {
-                    p.setSeed(_group_rng[group_number]->randint(1,9999) + psuffix);
-                    psuffix += 2;
-                }
-                
-                for (auto &p:second_level_particles) { // TODO: need to do this for each particle saved from the first level
-                    p.proposeSpeciationEvent();
-                }
-                
-                filterSpeciesParticles(s, second_level_particles);
-            
-            }
-            
-            if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
-                unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
-                if (sample_size == 0) {
-                    cout << "\n";
-                    cout << "current settings would save 0 species trees; saving every species tree\n";
-                    cout << "\n";
-                    sample_size = G::_particle_increase;
-                }
+                if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
+                    unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
+                    if (sample_size == 0) {
+                        cout << "\n";
+                        cout << "current settings would save 0 species trees; saving every species tree\n";
+                        cout << "\n";
+                        sample_size = G::_particle_increase;
+                    }
 
-                unsigned group_number = second_level_particles[0].getGroupNumber();
-                unsigned seed = _group_rng[group_number]->getSeed();
-                std::shuffle(second_level_particles.begin(), second_level_particles.end(), std::default_random_engine(seed)); // shuffle particles using group seed
+                    unsigned group_number = second_level_particles[0].getGroupNumber();
+                    unsigned seed = _group_rng[group_number]->getSeed();
+                    std::shuffle(second_level_particles.begin(), second_level_particles.end(), std::default_random_engine(seed)); // shuffle particles using group seed
+                    
+                    // delete first (1-_thin) % of particles
+                    second_level_particles.erase(next(second_level_particles.begin(), 0), next(second_level_particles.begin(), (G::_particle_increase-sample_size)));
+                     assert (second_level_particles.size() == sample_size);
+                }
                 
-                // delete first (1-_thin) % of particles
-                second_level_particles.erase(next(second_level_particles.begin(), 0), next(second_level_particles.begin(), (G::_particle_increase-sample_size)));
-                 assert (second_level_particles.size() == sample_size);
+                saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2);
+                saveSpeciesTreesAltHierarchical(second_level_particles);
+                unsigned nsubsets = _data->getNumSubsets();
+                unsigned ntaxa = _data->getNumTaxa();
+                writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, second_level_particles, filename3, g);
             }
+
+            ofstream altfname_end;
+            altfname_end.open("alt_species_trees.trees", std::ios::app);
+            altfname_end << "end;" << endl;
+            altfname_end.close();
             
-            saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2);
-            saveSpeciesTreesAltHierarchical(second_level_particles);
-            unsigned nsubsets = _data->getNumSubsets();
-            unsigned ntaxa = _data->getNumTaxa();
-            writeParamsFileForBeastComparisonAfterSpeciesFiltering(nsubsets, nspecies, ntaxa, second_level_particles, filename3, g);
+            ofstream strees;
+            strees.open("species_trees.trees", std::ios::app);
+            strees << "end;" << endl;
+            strees.close();
+            
+            ofstream u_strees;
+            u_strees.open("unique_species_trees.trees", std::ios::app);
+            u_strees << "end;" << endl;
+            u_strees.close();
         }
+        else {
+            // TODO: filter second level
+            // don't bother with this if not multithreading
+                unsigned group_number = 0;
+                for (auto &p:particles) {
+                    p.setGroupNumber(group_number);
+                    group_number++;
+                }
+            
+            // set group rng
+            unsigned psuffix = 1;
+            _group_rng.resize(ngroups);
+            psuffix = 1;
+            for (auto &g:_group_rng) {
+                g.reset(new Lot());
+                g->setSeed(rng.randint(1,9999)+psuffix);
+                psuffix += 2;
+            }
+            
+            unsigned nsubsets = _data->getNumSubsets();
+                proposeSpeciesGroupsFaster(particles, ngroups, filename1, filename2, filename3, nsubsets);
+                
+                ofstream altfname;
+                altfname.open("alt_species_trees.trees", std::ios::app);
+                altfname << "end;" << endl;
+                altfname.close();
+                
+                ofstream strees;
+                strees.open("species_trees.trees", std::ios::app);
+                strees << "end;" << endl;
+                strees.close();
+                
+                ofstream u_strees;
+                u_strees.open("unique_species_trees.trees", std::ios::app);
+                u_strees << "end;" << endl;
+                u_strees.close();
 
-        ofstream altfname_end;
-        altfname_end.open("alt_species_trees.trees", std::ios::app);
-        altfname_end << "end;" << endl;
-        altfname_end.close();
-        
-        ofstream strees;
-        strees.open("species_trees.trees", std::ios::app);
-        strees << "end;" << endl;
-        strees.close();
-        
-        ofstream u_strees;
-        u_strees.open("unique_species_trees.trees", std::ios::app);
-        u_strees << "end;" << endl;
-        u_strees.close();
+                string line;
+                // For writing text file
+                // Creating ofstream & ifstream class object
+                ifstream in ("params-beast-comparison.log");
+                ofstream f("params-beast-comparison-final.log");
+
+                unsigned line_count = 0;
+
+                while (!in.eof()) {
+                    string text;
+
+                    getline(in, text);
+
+                    if (line_count == 0) {
+                        string add = "iter ";
+                        text = add + text;
+                    }
+                    else {
+                        if (text != "") {
+                            string add = to_string(line_count);
+                            text = add + text;
+                        }
+                    }
+                    if (text != "") {
+                        f << text << endl; // account for blank line at end of file
+                    }
+                    line_count++;
+                }
+
+                // remove existing params file and replace with copy
+                char oldfname[] = "params-beast-comparison.log";
+                char newfname[] = "params-beast-comparison-final.log";
+                filesystem::remove(oldfname);
+                std::rename(newfname, oldfname);
+        }
         
     }
 
