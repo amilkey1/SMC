@@ -17,8 +17,11 @@
 
 #include "lot.hpp"
 #include "g.hpp"
+#include "stopwatch.hpp"
 extern proj::Lot rng;
 std::mutex mtx;
+
+extern proj::StopWatch stopwatch;
 
 #include "partial_store.hpp"
 extern proj::PartialStore ps;
@@ -174,7 +177,9 @@ class Forest {
         unsigned                    _nincrements = 0;
         vector<Node*>               _preorder;
         double                      _small_enough;
+#if !defined (FASTER_SECOND_LEVEL)
         vector<pair<tuple<string,string,string>, double>>    _species_build;
+#endif
         map<string, string>         _taxon_map;
         map<string, unsigned>       _species_indices;
         double                      _log_weight;
@@ -193,7 +198,7 @@ class Forest {
         unsigned                    _partials_calculated_count;
     
         void                        showSpeciesJoined();
-        double                      calcTransitionProbability(Node* child, double s, double s_child);
+        double                      calcTransitionProbability(double s, double s_child, double edge_length);
         double                      calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length);
         double                      getTreeHeight();
         double                      getTreeLength();
@@ -253,7 +258,9 @@ class Forest {
         _theta_mean = 0.0;
         _ancestral_species_name = "";
         _ploidy = 2;
+#if !defined (FASTER_SECOND_LEVEL)
         _species_build.clear();
+#endif
         _taxon_map.clear();
         _species_indices.clear();
         _vector_prior.clear();
@@ -880,7 +887,7 @@ class Forest {
                 for (unsigned s = 0; s <_nstates; s++) {
                     double sum_over_child_states = 0.0;
                     for (unsigned s_child = 0; s_child < _nstates; s_child++) {
-                        double child_transition_prob = calcTransitionProbability(child, s, s_child);
+                        double child_transition_prob = calcTransitionProbability(s, s_child, child->_edge_length);
                         double child_partial = child_partial_array[p*_nstates + s_child];
                         sum_over_child_states += child_transition_prob * child_partial;
                     }   // child state loop
@@ -930,17 +937,35 @@ class Forest {
         return transition_prob;
     }
 
-    inline double Forest::calcTransitionProbability(Node* child, double s, double s_child) {
+    inline double Forest::calcTransitionProbability(double s, double s_child, double edge_length) {
+//        StopWatch sw;
+//        sw.start();
         double child_transition_prob = 0.0;
 
-        if (G::_model == "JC" ) {
-            double expterm = exp(-4.0*(child->_edge_length)*_relative_rate/3.0); // TODO: double check relative rate
-            double prsame = 0.25+0.75*expterm;
-            double prdif = 0.25 - 0.25*expterm;
+        if (G::_model.compare("JC") == 0) {
+//        if (G::_model == "JC" ) {
+//            double total_seconds = sw.stop();
+//            cout << "\nTotal time for transition prob step  : " << total_seconds << endl;
+//            cout << total_seconds << endl;
 
-            child_transition_prob = (s == s_child ? prsame : prdif);
-            assert (child_transition_prob > 0.0);
+            if (s == s_child) {
+                child_transition_prob = 0.25 + 0.75*exp(-4.0*_relative_rate*edge_length/3.0);
+            }
+            
+            else {
+                child_transition_prob = 0.25 - 0.25*exp(-4.0*_relative_rate*edge_length/3.0);
+            }
+//            double total_seconds = sw.stop();
+//            cout << "\nTotal time for transition prob step  : " << total_seconds << endl;
+//            cout << total_seconds << endl;
             return child_transition_prob;
+//            double expterm = exp(-4.0*edge_length*_relative_rate/3.0);
+//            double prsame = 0.25+0.75*expterm;
+//            double prdif = 0.25 - 0.25*expterm;
+//
+//            child_transition_prob = (s == s_child ? prsame : prdif);
+//            assert (child_transition_prob > 0.0);
+//            return child_transition_prob;
         }
 
         if (G::_model == "HKY") {
@@ -953,7 +978,7 @@ class Forest {
             double PI_J = 0.0;
 
             double phi = (pi_A+pi_G)*(pi_C+pi_T)+_kappa*(pi_A*pi_G+pi_C*pi_T);
-            double beta_t = 0.5*(child->_edge_length * _relative_rate )/phi; // TODO: double check relative rate
+            double beta_t = 0.5*(edge_length * _relative_rate )/phi;
 
             // transition prob depends only on ending state
             if (s_child == 0) {
@@ -1210,7 +1235,9 @@ class Forest {
         _theta_mean = other._theta_mean;
         _ancestral_species_name = other._ancestral_species_name;
         _ploidy = other._ploidy;
+#if !defined (FASTER_SECOND_LEVEL)
         _species_build = other._species_build;
+#endif
         _taxon_map = other._taxon_map;
         _species_indices = other._species_indices;
         _vector_prior = other._vector_prior;
@@ -1384,14 +1411,21 @@ class Forest {
 
         }
         
+#if !defined (FASTER_SECOND_LEVEL)
         if (_species_build.size() == 0) {
             _species_build.push_back(make_pair(make_tuple("null", "null", "null"), _last_edge_length));
         }
         else {
             _species_build.back().second = _last_edge_length;
         }
+#endif
         
         double constrained_factor = log(1 - exp(-1*nlineages*G::_lambda*max_depth));
+        
+#if defined (FASTER_SECOND_LEVEL)
+        _forest_height += _last_edge_length;
+#endif
+        
         return make_pair(_last_edge_length, constrained_factor);
 
     }
@@ -1400,9 +1434,7 @@ class Forest {
     inline pair<double,double> Forest::chooseSpeciesIncrementOnlySecondLevel(Lot::SharedPtr lot, double max_depth) {
         double nlineages = (double) _lineages.size();
         
-        double species_tree_height = getLineageHeight(_lineages.back());
-        
-            max_depth = max_depth - species_tree_height;
+            max_depth = max_depth - _forest_height;
             
             assert (max_depth >= 0.0);
         
@@ -1440,14 +1472,19 @@ class Forest {
 
         }
         
+#if !defined (FASTER_SECOND_LEVEL)
         if (_species_build.size() == 0) {
             _species_build.push_back(make_pair(make_tuple("null", "null", "null"), _last_edge_length));
         }
         else {
             _species_build.back().second = _last_edge_length;
         }
+#endif
         
         double constrained_factor = log(1 - exp(-1*nlineages*G::_lambda*max_depth));
+        
+        _forest_height += _last_edge_length;
+        
         return make_pair(_last_edge_length, constrained_factor);
 
     }
@@ -1463,6 +1500,10 @@ class Forest {
         for (auto nd:_lineages) {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
         }
+        
+#if defined (FASTER_SECOND_LEVEL)
+        _forest_height += _last_edge_length;
+#endif
     }
 
 
@@ -1532,7 +1573,9 @@ class Forest {
         
         calcTopologyPrior((int) _lineages.size()+1);
 
+#if !defined (FASTER_SECOND_LEVEL)
         _species_build.push_back(make_pair(make_tuple(subtree1->_name, subtree2->_name, new_nd->_name), 0.0));
+#endif
         return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
     }
 
@@ -2698,6 +2741,9 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         for (auto nd:_lineages) {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
         }
+#if defined (FASTER_SECOND_LEVEL)
+        _forest_height += _last_edge_length;
+#endif
     }
 
 #if defined (FASTER_SECOND_LEVEL)
@@ -2782,6 +2828,10 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             _last_edge_length = increment;
             _cum_height += increment;
         }
+        
+#if defined (FASTER_SECOND_LEVEL)
+        _forest_height += _last_edge_length;
+#endif
     }
 
     inline void Forest::resetThetaMap(Lot::SharedPtr lot) { // TODO: not sure if this works if not doing jones coalescent likelihood - double check
@@ -4558,7 +4608,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         // - vector of child species
         
         // Should only be called for complete gene trees
-        assert(_lineages.size() == 1);
+//        assert(_lineages.size() == 1);
 
         // Copy tuples stored in _coalinfo to end of coalinfo_vect
         coalinfo_vect.insert(coalinfo_vect.end(), _coalinfo.begin(), _coalinfo.end());
@@ -4768,7 +4818,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         // Assumes heights and preorders are up-to-date; call
         //   heightsInternalsPreorders() beforehand to ensure this
         
-        double forest_height = getLineageHeight(_lineages.back());
+//        double forest_height = getLineageHeight(_lineages.back());
 
         // Dump _coalinfo into coalinfo_vect
         if (!_coalinfo.empty()) {
@@ -4783,7 +4833,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
                     sppvect.push_back(nd->_species);
                 }
                 coalinfo_vect.push_back(make_tuple(
-                    forest_height,
+                    _forest_height,
                     0,
                     sppvect)
                 );
@@ -4881,6 +4931,5 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
     }
 
 #endif
-
 }
 

@@ -68,6 +68,7 @@ namespace proj {
             void                simulateData();
             void                writePaupFile(vector<Particle> particles, vector<string> taxpartition);
             void                initializeParticles(vector<Particle> &particles);
+            void                initializeParticle(Particle &particle);
             void                initializeParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
             void                handleGeneNewicks();
             void                handleSpeciesNewick(vector<Particle> particles);
@@ -102,8 +103,11 @@ namespace proj {
 #if defined (FASTER_SECOND_LEVEL)
             void                        fasterSecondLevel(vector<Particle> &particles);
             void                        buildSpeciesMap(bool taxa_from_data);
-            void                        proposeSpeciesGroupsFaster(vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets);
-            void                proposeSpeciesGroupRangeFaster(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets);
+            void                        proposeSpeciesGroupsFaster(vector<Particle> &particle, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets);
+            void                        proposeSpeciesGroupRangeFaster(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets);
+//            void                        proposeSpeciesGroupRangeFaster(unsigned first, unsigned last, Particle &particle, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets);
+            void                        proposeSpeciesParticlesFaster(vector<Particle> &particles);
+            void                        proposeSpeciesParticleRangeFaster(unsigned first, unsigned last, vector<Particle> &particles);
 #endif
         
             double                      _small_enough;
@@ -1975,23 +1979,29 @@ namespace proj {
 //        cout << "speciation rate = " << Forest::_lambda << endl;
     }
 
+#if defined (FASTER_SECOND_LEVEL)
     inline void Proj::proposeSpeciesGroupRangeFaster(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets) {
         unsigned nspecies = (unsigned) _species_names.size();
         
         for (unsigned i=first; i<last; i++){
-            
-            Particle p = particles[i];
             vector<Particle> second_level_particles;
-            
+            Particle p = particles[i];
+            p.saveCoalInfoInitial();
+
             // initialize particles
-            p.clearPartials(); // no more likelihood calculations
+            p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
             p.resetSpecies();
             p.mapSpecies(_taxon_map, _species_names);
-    
-            p.saveCoalInfoInitial();
-        
-            p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
+
+
             second_level_particles.resize(G::_particle_increase, p);
+            
+            
+            second_level_particles.resize(G::_particle_increase);
+            
+//            fill(second_level_particles.begin(), second_level_particles.end(), p);
+
+            assert(second_level_particles.size() == G::_particle_increase);
         
             for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
                 if (G::_verbose > 1) {
@@ -1999,16 +2009,17 @@ namespace proj {
                 }
                 
                 // set particle random number seeds // TODO: double check random number seeds are working
-                unsigned group_number = particles[0].getGroupNumber();
+                unsigned group_number = p.getGroupNumber();
                 unsigned psuffix = 1;
                 for (auto &p:second_level_particles) {
                     p.setSeed(_group_rng[group_number]->randint(1,9999) + psuffix);
                     psuffix += 2;
                 }
                 
-                for (auto &p:second_level_particles) { // TODO: need to do this for each particle saved from the first level
-                    p.proposeSpeciationEvent();
-                }
+//                for (auto &p:second_level_particles) { // TODO: need to do this for each particle saved from the first level
+//                    p.proposeSpeciationEvent();
+//                }
+                proposeSpeciesParticlesFaster(second_level_particles);
                 
                 filterSpeciesParticles(s, second_level_particles);
             }
@@ -2046,8 +2057,8 @@ namespace proj {
             }
             mtx.unlock();
         }
-
     }
+#endif
 
     inline void Proj::proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets, unsigned ntaxa) {
         unsigned nspecies = (unsigned) _species_names.size();
@@ -2060,8 +2071,6 @@ namespace proj {
             use_vec.resize(G::_particle_increase);
             
             fill(use_vec.begin(), use_vec.end(), p);
-
-            assert(use_vec.size() == G::_particle_increase);
 
             assert(use_vec.size() == G::_particle_increase);
 
@@ -2124,8 +2133,11 @@ namespace proj {
         }
     }
 
+#if defined (FASTER_SECOND_LEVEL)
     inline void Proj::proposeSpeciesGroupsFaster(vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets) {
         // ngroups = number of species SMCs to do (i.e. 100 particles for first round, thin = 1.0 means ngroups = 100 for this round)
+        cout << "starting proposals second level" << endl;
+
         assert (G::_nthreads > 1);
         
         // divide up groups as evenly as possible across threads
@@ -2154,11 +2166,12 @@ namespace proj {
         for (unsigned i = 0; i < threads.size(); i++) {
           threads[i].join();
         }
-
     }
+#endif
 
     inline void Proj::proposeSpeciesGroups(vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned nsubsets, unsigned ntaxa) {
         // ngroups = number of species SMCs to do (i.e. 100 particles for first round, thin = 1.0 means ngroups = 100 for this round)
+        cout << "starting proposals second level" << endl;
         assert (G::_nthreads > 1);
         
         // divide up groups as evenly as possible across threads
@@ -2226,6 +2239,45 @@ namespace proj {
         }
     }
 
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Proj::proposeSpeciesParticlesFaster(vector<Particle> &particles) {
+        assert(G::_nthreads > 0);
+        if (G::_nthreads == 1) {
+          for (auto & p : particles) {
+              p.proposeSpeciationEvent();
+          }
+        }
+        else {
+          // divide up the particles as evenly as possible across threads
+          unsigned first = 0;
+            unsigned incr = G::_nparticles/G::_nthreads + (G::_nparticles % G::_nthreads != 0 ? 1:0); // adding 1 to ensure we don't have 1 dangling particle for odd number of particles
+          unsigned last = incr;
+
+          // need a vector of threads because we have to wait for each one to finish
+          vector<thread> threads;
+
+            while (true) {
+            // create a thread to handle particles first through last - 1
+              threads.push_back(thread(&Proj::proposeSpeciesParticleRangeFaster, this, first, last, std::ref(particles)));
+            // update first and last
+            first = last;
+            last += incr;
+            if (last > G::_nparticles) {
+              last = G::_nparticles;
+              }
+            if (first>=G::_nparticles) {
+                break;
+            }
+          }
+
+          // the join function causes this loop to pause until the ith thread finishes
+          for (unsigned i = 0; i < threads.size(); i++) {
+            threads[i].join();
+          }
+        }
+    }
+#endif
+
     inline void Proj::initializeParticleRange(unsigned first, unsigned last, vector<Particle> &particles) {
         bool partials = false;
 
@@ -2236,6 +2288,24 @@ namespace proj {
             particles[i].setRelativeRatesByGene(G::_double_relative_rates);
         }
     }
+
+    inline void Proj::initializeParticle(Particle &particle) {
+        // set partials for first particle under save_memory setting for initial marginal likelihood calculation
+        assert (G::_nthreads > 0);
+        
+        bool partials = true;
+        if (G::_gene_newicks_specified) {
+            partials = false;
+            G::_save_memory = true;
+        }
+        
+        particle.setData(_data, _taxon_map, partials);
+        partials = false;
+        particle.mapSpecies(_taxon_map, _species_names);
+        
+        particle.setRelativeRatesByGene(G::_double_relative_rates);
+    }
+
 
     inline void Proj::initializeParticles(vector<Particle> &particles) {
         // set partials for first particle under save_memory setting for initial marginal likelihood calculation
@@ -2404,6 +2474,14 @@ namespace proj {
             particles[i].speciesOnlyProposal();
         }
     }
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Proj::proposeSpeciesParticleRangeFaster(unsigned first, unsigned last, vector<Particle> &particles) {
+        for (unsigned i=first; i<last; i++){
+            particles[i].proposeSpeciationEvent();
+        }
+    }
+#endif
 
     inline void Proj::debugSpeciesTree(vector<Particle> &particles) {
         cout << "debugging species tree" << endl;
@@ -2600,11 +2678,29 @@ namespace proj {
 
         assert(particles.size() == ngroups);
 
-        G::_nparticles = ngroups;
+//        G::_nparticles = ngroups;
+        G::_nparticles = G::_particle_increase;
         
         unsigned nspecies = (unsigned) _species_names.size();
+        
+        unsigned group_number = 0;
+        for (auto &p:particles) {
+            p.setGroupNumber(group_number);
+            group_number++;
+        }
+        
+        // set group rng
+        unsigned psuffix = 1;
+        _group_rng.resize(ngroups);
+        psuffix = 1;
+        for (auto &g:_group_rng) {
+            g.reset(new Lot());
+            g->setSeed(rng.randint(1,9999)+psuffix);
+            psuffix += 2;
+        }
 
         if (G::_nthreads == 1) {
+            
             for (unsigned g=0; g<ngroups; g++) {
                 
                 Particle p = particles[g];
@@ -2612,13 +2708,12 @@ namespace proj {
                 vector<Particle > second_level_particles;
             
             // initialize particles
-                p.clearPartials(); // no more likelihood calculations
+                p.saveCoalInfoInitial();
+                p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
                 p.resetSpecies();
                 p.mapSpecies(_taxon_map, _species_names);
             
-                p.saveCoalInfoInitial();
                 
-                p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
                 second_level_particles.resize(G::_particle_increase, p);
                 
                 for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
@@ -2626,9 +2721,9 @@ namespace proj {
                         cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
                     }
                     
-                    // set particle random number seeds // TODO: double check random number seeds are working
-                    unsigned group_number = particles[0].getGroupNumber();
-                    unsigned psuffix = 1;
+                    // set particle random number seeds
+                    psuffix = 1;
+                    unsigned group_number = particles[g].getGroupNumber();
                     for (auto &p:second_level_particles) {
                         p.setSeed(_group_rng[group_number]->randint(1,9999) + psuffix);
                         psuffix += 2;
@@ -2683,76 +2778,69 @@ namespace proj {
             u_strees.close();
         }
         else {
-            // TODO: filter second level
-            // don't bother with this if not multithreading
-                unsigned group_number = 0;
-                for (auto &p:particles) {
-                    p.setGroupNumber(group_number);
-                    group_number++;
-                }
-            
-            // set group rng
-            unsigned psuffix = 1;
-            _group_rng.resize(ngroups);
-            psuffix = 1;
-            for (auto &g:_group_rng) {
-                g.reset(new Lot());
-                g->setSeed(rng.randint(1,9999)+psuffix);
-                psuffix += 2;
-            }
-            
             unsigned nsubsets = _data->getNumSubsets();
-                proposeSpeciesGroupsFaster(particles, ngroups, filename1, filename2, filename3, nsubsets);
-                
-                ofstream altfname;
-                altfname.open("alt_species_trees.trees", std::ios::app);
-                altfname << "end;" << endl;
-                altfname.close();
-                
-                ofstream strees;
-                strees.open("species_trees.trees", std::ios::app);
-                strees << "end;" << endl;
-                strees.close();
-                
-                ofstream u_strees;
-                u_strees.open("unique_species_trees.trees", std::ios::app);
-                u_strees << "end;" << endl;
-                u_strees.close();
+            
+//            for (auto &p:particles) {
+//                // initialize particles
+//                p.resetSpecies();
+//                p.mapSpecies(_taxon_map, _species_names);
+//
+//                p.saveCoalInfoInitial();
+//
+//                p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
+//            }
+            
+            proposeSpeciesGroupsFaster(particles, ngroups, filename1, filename2, filename3, nsubsets);
+            
+            ofstream altfname;
+            altfname.open("alt_species_trees.trees", std::ios::app);
+            altfname << "end;" << endl;
+            altfname.close();
+            
+            ofstream strees;
+            strees.open("species_trees.trees", std::ios::app);
+            strees << "end;" << endl;
+            strees.close();
+            
+            ofstream u_strees;
+            u_strees.open("unique_species_trees.trees", std::ios::app);
+            u_strees << "end;" << endl;
+            u_strees.close();
 
-                string line;
-                // For writing text file
-                // Creating ofstream & ifstream class object
-                ifstream in ("params-beast-comparison.log");
-                ofstream f("params-beast-comparison-final.log");
+            string line;
+            // For writing text file
+            // Creating ofstream & ifstream class object
+            ifstream in ("params-beast-comparison.log");
+            ofstream f("params-beast-comparison-final.log");
 
-                unsigned line_count = 0;
+            unsigned line_count = 0;
 
-                while (!in.eof()) {
-                    string text;
+            while (!in.eof()) {
+                string text;
 
-                    getline(in, text);
+                getline(in, text);
 
-                    if (line_count == 0) {
-                        string add = "iter ";
+                if (line_count == 0) {
+                    string add = "iter ";
+                    text = add + text;
+                }
+                else {
+                    if (text != "") {
+                        string add = to_string(line_count);
                         text = add + text;
                     }
-                    else {
-                        if (text != "") {
-                            string add = to_string(line_count);
-                            text = add + text;
-                        }
-                    }
-                    if (text != "") {
-                        f << text << endl; // account for blank line at end of file
-                    }
-                    line_count++;
                 }
+                if (text != "") {
+                    f << text << endl; // account for blank line at end of file
+                }
+                line_count++;
+            }
 
-                // remove existing params file and replace with copy
-                char oldfname[] = "params-beast-comparison.log";
-                char newfname[] = "params-beast-comparison-final.log";
-                filesystem::remove(oldfname);
-                std::rename(newfname, oldfname);
+            // remove existing params file and replace with copy
+            char oldfname[] = "params-beast-comparison.log";
+            char newfname[] = "params-beast-comparison-final.log";
+            filesystem::remove(oldfname);
+            std::rename(newfname, oldfname);
         }
         
     }
@@ -2938,18 +3026,23 @@ namespace proj {
                 unsigned nsubsets = _data->getNumSubsets();
                 Particle::setNumSubsets(nsubsets);
                 
-                vector<Particle> my_vec;
-                my_vec.resize(G::_nparticles * G::_ngroups);
-                
-                for (unsigned p=0; p<my_vec.size(); p++) {
-                    my_vec[p] = Particle();
-                }
-
 #if defined (FASTER_SECOND_LEVEL)
                 buildSpeciesMap(/*taxa_from_data*/true);
 #endif
                 
-                initializeParticles(my_vec); // initialize in parallel with multithreading
+                Particle p;
+                initializeParticle(p); // initialize one particle and copy to all other particles
+                
+                vector<Particle> my_vec;
+                my_vec.resize(G::_nparticles * G::_ngroups, p);
+//                my_vec.resize(G::_nparticles * G::_ngroups);
+                
+//                for (unsigned p=0; p<my_vec.size(); p++) {
+//                    my_vec[p] = Particle();
+//                }
+                
+                // TODO: initialize one particle and copy it to all other particles?
+//                initializeParticles(my_vec); // initialize in parallel with multithreading
                 
                 unsigned list_size = (ntaxa-1)*nsubsets;
                 vector<unsigned> gene_order;
@@ -3208,6 +3301,7 @@ namespace proj {
 #if defined (FASTER_SECOND_LEVEL)
                 fasterSecondLevel(my_vec);
 #else
+//#endif
                 
                 vector<unsigned> counts;
                 for (unsigned index=0; index<my_vec.size(); index++) {
@@ -3228,6 +3322,18 @@ namespace proj {
                 assert(my_vec.size() == ngroups);
 
                 G::_nparticles = ngroups;
+                
+//#if defined (FASTER_SECOND_LEVEL)
+//                for (auto &p:my_vec)  {
+////                    Particle p = particles[i];
+//                    p.saveCoalInfoInitial();
+//
+//                    // initialize particles
+//                    p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
+//                    p.resetSpecies();
+//                    p.mapSpecies(_taxon_map, _species_names);
+//                }
+//#else
 
                 for (auto &p:my_vec) {
                     // reset forest species partitions
@@ -3235,6 +3341,7 @@ namespace proj {
                     p.resetSpecies();
                     p.mapSpecies(_taxon_map, _species_names);
                 }
+//#endif
 
                 vector<Particle> new_vec;
 
@@ -3266,7 +3373,11 @@ namespace proj {
                         p.setGroupNumber(group_number);
                         group_number++;
                     }
+//#if defined (FASTER_SECOND_LEVEL)
+//                    proposeSpeciesGroupsFaster(my_vec, ngroups, filename1, filename2, filename3, nsubsets);
+//#else
                     proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3, nsubsets, ntaxa);
+//#endif
                     
                     ofstream altfname;
                     altfname.open("alt_species_trees.trees", std::ios::app);
