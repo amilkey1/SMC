@@ -607,7 +607,7 @@ inline vector<double> Particle::getVectorPrior() {
 #if !defined (FASTER_SECOND_LEVEL)
     inline void Particle::speciesOnlyProposalIntegratingOutTheta() {
         if (_generation == 0) {
-            _species_branches = Forest::_nspecies;
+            _species_branches = G::_nspecies;
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i].refreshPreorder();
                 _forests[i].calcMinDepth();

@@ -1246,11 +1246,11 @@ namespace proj {
         
         bool parallelize_by_group = false;
         
-        if (G::_nthreads > 1) {
 #if defined PARALLELIZE_BY_GROUP
+        if (G::_nthreads > 1) {
             parallelize_by_group = true;
-#else
         }
+#endif
         
         // set group rng
         _group_rng.resize(ngroups);
@@ -1272,7 +1272,7 @@ namespace proj {
                 group_number++;
             }
             
-            proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3, ntaxa);
+            proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3);
             ofstream strees;
             strees.open("species_trees.trees", std::ios::app);
             strees << "end;" << endl;
@@ -1344,9 +1344,9 @@ namespace proj {
                 if (G::_verbose > 1) {
                     cout << "beginning species tree proposals for subset " << a+1 << endl;
                 }
-                for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
+                for (unsigned s=0; s<G::_nspecies-1; s++) {  // skip last round of filtering because weights are always 0
                     if (G::_verbose > 1) {
-                        cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
+                        cout << "starting species step " << s+1 << " of " << G::_nspecies-1 << endl;
                     }
 
                     // set particle random number seeds
@@ -1388,9 +1388,9 @@ namespace proj {
 
                 saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
                 saveSpeciesTreesAltHierarchical(use_vec);
-                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nspecies, ntaxa, use_vec, filename3, a);
+                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(use_vec, filename3, a);
                 if (a == 0) {
-                    writeLoradFileAfterSpeciesFiltering(nspecies, ntaxa, use_vec); // testing the marginal likelihood by writing to file for lorad for first species group only
+                    writeLoradFileAfterSpeciesFiltering(use_vec); // testing the marginal likelihood by writing to file for lorad for first species group only
                     cout << "species tree log marginal likelihood is: " << _log_species_tree_marginal_likelihood << endl;
                 }
             }
@@ -1441,7 +1441,6 @@ namespace proj {
             filesystem::remove(oldfname);
             std::rename(newfname, oldfname);
         }
-#endif
 #endif
     }
 
@@ -1986,10 +1985,10 @@ namespace proj {
                     psuffix += 2;
                 }
                 
-//                for (auto &p:second_level_particles) { // TODO: need to do this for each particle saved from the first level
-//                    p.proposeSpeciationEvent();
-//                }
-                proposeSpeciesParticlesFaster(second_level_particles);
+                for (auto &p:second_level_particles) {
+                    p.proposeSpeciationEvent();
+                }
+//                proposeSpeciesParticlesFaster(second_level_particles); // TODO: don't parallelize this step
                 
                 filterSpeciesParticles(s, second_level_particles);
             }
@@ -2055,7 +2054,10 @@ namespace proj {
                     psuffix += 2;
                 }
 
-                proposeSpeciesParticles(use_vec);
+//                proposeSpeciesParticles(use_vec);
+                for (auto & p : use_vec) {
+                    p.speciesOnlyProposal();
+                }
 
                 double ess = filterSpeciesParticles(s, use_vec);
                 if (G::_verbose > 1) {
@@ -2285,7 +2287,7 @@ namespace proj {
             particle.setFixTheta(true);
         }
         
-        if (!!G::_gene_newicks_specified) {
+        if (!G::_gene_newicks_specified) {
             unsigned list_size = (G::_ntaxa-1)*G::_nloci;
             vector<unsigned> gene_order;
             
@@ -3237,12 +3239,12 @@ namespace proj {
                 }
                       
                 unsigned seed = rng.getSeed();
-                std::shuffle(particles.begin(), particles.end(), std::default_random_engine(seed));
+                std::shuffle(my_vec.begin(), my_vec.end(), std::default_random_engine(seed));
 
-                unsigned number_of_particles_to_delete = particles.size() - G::_thin*particles.size();
+                unsigned number_of_particles_to_delete = my_vec.size() - G::_thin*my_vec.size();
                 
                 // erase number_of_particles_to_delete
-                particles.erase(particles.end() - number_of_particles_to_delete, particles.end());
+                my_vec.erase(my_vec.end() - number_of_particles_to_delete, my_vec.end());
 
                 assert(my_vec.size() == ngroups);
 
@@ -3301,7 +3303,7 @@ namespace proj {
 //#if defined (FASTER_SECOND_LEVEL)
 //                    proposeSpeciesGroupsFaster(my_vec, ngroups, filename1, filename2, filename3);
 //#else
-                    proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3, ntaxa);
+                    proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3);
 //#endif
                     
                     ofstream altfname;
@@ -3380,9 +3382,9 @@ namespace proj {
                         if (G::_verbose > 1) {
                             cout << "beginning species tree proposals for subset " << a+1 << endl;
                         }
-                        for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
+                        for (unsigned s=0; s<G::_nspecies-1; s++) {  // skip last round of filtering because weights are always 0
                             if (G::_verbose > 1) {
-                                cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
+                                cout << "starting species step " << s+1 << " of " << G::_nspecies-1 << endl;
                             }
                             
                             // set particle random number seeds
@@ -3425,7 +3427,7 @@ namespace proj {
                         saveSpeciesTreesAltHierarchical(use_vec);
                         writeParamsFileForBeastComparisonAfterSpeciesFiltering(use_vec, filename3, a);
                         if (a == 0) {
-                            writeLoradFileAfterSpeciesFiltering(nspecies, ntaxa, use_vec); // testing the marginal likelihood by writing to file for lorad for first species group only
+                            writeLoradFileAfterSpeciesFiltering(use_vec); // testing the marginal likelihood by writing to file for lorad for first species group only
                             cout << "species tree log marginal likelihood is: " << _log_species_tree_marginal_likelihood << endl;
                         }
                     }

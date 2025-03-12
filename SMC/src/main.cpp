@@ -105,8 +105,12 @@ GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
 int main(int argc, const char * argv[]) {
     Proj proj;
     try {
+        StopWatch sw;
+        sw.start();
         proj.processCommandLineOptions(argc, argv);
         proj.run();
+        double total_seconds = sw.stop();
+        cout << "total time: " << total_seconds << endl;
     }
     catch(std::exception & x) {
         std::cerr << "Exception: " << x.what() << std::endl;
