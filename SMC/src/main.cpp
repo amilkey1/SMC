@@ -63,25 +63,24 @@ bool        G::_save_gene_trees_separately = false;
 string      G::_newick_path = ".";
 double      G::_lambda = 10.0;
 unsigned    G::_ngroups = 1;
-bool        G::_upgma;
+bool        G::_upgma = true;
+double G::_infinity = numeric_limits<double>::infinity();
 vector<double> G::_base_frequencies;
 string      G::_string_base_frequencies;
 vector<string>           G::_taxon_names;
+unsigned    G::_nloci = 1;
+unsigned    G::_nspecies = 4;
+unsigned    G::_ntaxa = 12;
 #if defined (FASTER_SECOND_LEVEL)
 map<string, unsigned>    G::_taxon_to_species;
 #endif
 
-
-unsigned Forest::_nspecies = 4;
-unsigned Forest::_ntaxa = 12;
-unsigned G::_nsubsets = 1;
 const double Node::_smallest_edge_length=1.0e-12;
 double Forest::_kappa = 1.0;
 double Forest::_ploidy = 2.0;
 double Data::_occupancy = 1.0;
 double Forest::_edge_rate_variance = 0.0;
 double Forest::_asrv_shape = numeric_limits<double>::infinity();
-double Forest::_infinity = numeric_limits<double>::infinity();
 double Forest::_comphet = numeric_limits<double>::infinity();
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {

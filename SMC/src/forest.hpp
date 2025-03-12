@@ -53,8 +53,6 @@ class Forest {
         unsigned                    numInternals() const;
         unsigned                    numNodes() const;
         void                        showForest();
-        static void                 setNumSpecies(unsigned n);
-        static void                 setNumTaxa(unsigned n);
         double                      calcLogLikelihood();
         void                        createDefaultTree(Lot::SharedPtr lot);
         void operator=(const Forest & other);
@@ -158,8 +156,6 @@ class Forest {
         double                      _last_edge_length;
 
         Data::SharedPtr             _data;
-        static unsigned             _nspecies;
-        static unsigned             _ntaxa;
     
         unsigned                    _first_pattern = 0;
         unsigned                    _index;
@@ -221,7 +217,6 @@ class Forest {
         static double               _edge_rate_variance;
         static double               _asrv_shape;
         static double               _comphet;
-        static double               _infinity;
 };
 
 
@@ -248,7 +243,7 @@ class Forest {
         _log_coalescent_likelihood = 0.0;
         _log_coalescent_likelihood_increment = 0.0;
         _cum_height = 0.0;
-        _nleaves=_ntaxa;
+        _nleaves=G::_ntaxa;
         _ninternals=0;
         _depths.clear();
         _nincrements = 0;
@@ -288,7 +283,7 @@ class Forest {
         _index = index;
         assert (index > 0);         //don't set data for species tree, though it doesn't really matter for simulations
 //        const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
-        _ntaxa = ntaxa;
+        G::_ntaxa = ntaxa;
         _nleaves = ntaxa;
         
         _data = d;
@@ -297,12 +292,12 @@ class Forest {
 //        _first_pattern = gene_begin_end.first;
 //        _npatterns = _data->getNumPatternsInSubset(index-1);
         
-        _nodes.resize(_ntaxa);
+        _nodes.resize(G::_ntaxa);
         _lineages.reserve(_nodes.size());
         unsigned i= 0;
         
         //create taxa
-        for (unsigned i = 0; i < _ntaxa; i++) {
+        for (unsigned i = 0; i < G::_ntaxa; i++) {
             Node* nd = &*next(_nodes.begin(), i);
             nd->_right_sib=0;
             nd->_name=" ";
@@ -357,10 +352,10 @@ class Forest {
         unsigned i = 0;
         auto &data_matrix=_data->getDataMatrix();
         
-        _nodes.resize(_ntaxa);
+        _nodes.resize(G::_ntaxa);
         _lineages.reserve(_nodes.size());
         //create taxa
-        for (unsigned i = 0; i < _ntaxa; i++) {
+        for (unsigned i = 0; i < G::_ntaxa; i++) {
             Node* nd = &*next(_nodes.begin(), i);
             nd->_right_sib=0;
             nd->_name=" ";
@@ -817,14 +812,6 @@ class Forest {
                 }
             }
 
-    inline void Forest::setNumTaxa(unsigned n){
-        _ntaxa=n;
-    }
-
-    inline void Forest::setNumSpecies(unsigned n) {
-        _nspecies=n;
-    }
-
     inline pair<unsigned, unsigned> Forest::chooseTaxaToJoin(double s, Lot::SharedPtr lot){
         assert (s>1);
         double nsubtrees = s;
@@ -1179,11 +1166,11 @@ class Forest {
         clear();
         //create taxa
         assert (lot != nullptr);
-        double edge_length = lot->gamma(1.0, 1.0/_ntaxa);
+        double edge_length = lot->gamma(1.0, 1.0/G::_ntaxa);
         
         _lineages.reserve(_nodes.size());
         
-        for (unsigned i = 0; i < _ntaxa; i++) {
+        for (unsigned i = 0; i < G::_ntaxa; i++) {
             Node* nd = &*next(_nodes.begin(), i);
             nd->_right_sib=0;
             nd->_name="";
@@ -1194,7 +1181,7 @@ class Forest {
             nd->_edge_length = edge_length;
             nd->_position_in_lineages=i;
             }
-        _nleaves=_ntaxa;
+        _nleaves=G::_ntaxa;
         _ninternals=0;
         _last_edge_length = 0.0;
     }
@@ -1216,8 +1203,6 @@ class Forest {
         _first_pattern      = other._first_pattern;
         _gene_tree_log_likelihood = other._gene_tree_log_likelihood;
         _data               = other._data;
-        _nspecies           = other._nspecies;
-        _ntaxa              = other._ntaxa;
         _species_joined = other._species_joined;
         _log_joining_prob = other._log_joining_prob;
         _increments_and_priors = other._increments_and_priors;
@@ -1241,7 +1226,6 @@ class Forest {
         _taxon_map = other._taxon_map;
         _species_indices = other._species_indices;
         _vector_prior = other._vector_prior;
-        _infinity = other._infinity;
         _lineages_per_species = other._lineages_per_species;
         _upgma_additions = other._upgma_additions;
         _upgma_starting_edgelen = other._upgma_starting_edgelen;
@@ -1343,13 +1327,13 @@ class Forest {
 
     inline void Forest::setUpSpeciesForest(vector<string> &species_names) {
         _index = 0;
-        assert (_nspecies = (unsigned) species_names.size());
+        assert (G::_nspecies = (unsigned) species_names.size());
         
         //create species
-        _nodes.resize(_nspecies);
+        _nodes.resize(G::_nspecies);
         _lineages.reserve(_nodes.size());
         //create taxa
-        for (unsigned i = 0; i < _nspecies; i++) {
+        for (unsigned i = 0; i < G::_nspecies; i++) {
             Node* nd = &*next(_nodes.begin(), i);
             nd->_right_sib=0;
             nd->_name=" ";
@@ -1370,7 +1354,7 @@ class Forest {
 #endif
             }
         
-        _nleaves=_nspecies;
+        _nleaves=G::_nspecies;
         _ninternals=0;
     }
 
@@ -1621,7 +1605,7 @@ class Forest {
             assert (!nd._left_child);
             string species_name = taxon_map[nd._name];
             _species_partition[species_name].push_back(&nd);
-            if (count == Forest::_ntaxa) {
+            if (count == G::_ntaxa) {
                 break;
             }
 #if defined (FASTER_SECOND_LEVEL)
@@ -1633,7 +1617,7 @@ class Forest {
 #endif
         }
         
-        assert (_species_partition.size() == Forest::_nspecies);
+        assert (_species_partition.size() == G::_nspecies);
     }
 
 #if defined (FASTER_SECOND_LEVEL)
@@ -1906,9 +1890,9 @@ inline void Forest::setSpeciesFromNodeName(Node * nd) {
             // Create distance matrix dij and workspace dij2 used to build next dij
             // Both dij and dij2 are 1-dimensional vectors that store only the
             // lower diagonal of the distance matrix (excluding diagonal elements)
-            assert (_lineages.size() == _ntaxa);
-            unsigned n = _ntaxa;
-            vector<double> dij(n*(n-1)/2, _infinity);
+            assert (_lineages.size() == G::_ntaxa);
+            unsigned n = G::_ntaxa;
+            vector<double> dij(n*(n-1)/2, G::_infinity);
             vector<double> dij2;
             
             vector<tuple<unsigned, unsigned, unsigned, unsigned>> sites_tuples = _data->_partition->getSubsetRangeVect();
@@ -1944,7 +1928,7 @@ inline void Forest::setSpeciesFromNodeName(Node * nd) {
                     
                     double v = -0.75 * log(1 - 4.0/3.0 * p);
                     
-                    assert (v != _infinity);
+                    assert (v != G::_infinity);
                     
                     unsigned k = i*(i-1)/2 + j;
                     dij[k] = v;
@@ -1989,7 +1973,7 @@ inline void Forest::setSpeciesFromNodeName(Node * nd) {
             // Both dij and dij2 are 1-dimensional vectors that store only the
             // lower diagonal of the distance matrix (excluding diagonal elements)
             unsigned n = (unsigned)_lineages.size();
-            vector<double> dij(n*(n-1)/2, _infinity);
+            vector<double> dij(n*(n-1)/2, G::_infinity);
             vector<double> dij2;
 
             // Calculate distances between all pairs of lineages
@@ -2047,7 +2031,7 @@ inline void Forest::setSpeciesFromNodeName(Node * nd) {
     }
         
     inline void Forest::buildStartingRow() {
-        unsigned n = _ntaxa;
+        unsigned n = G::_ntaxa;
         map<Node *, unsigned> row;
         _upgma_starting_edgelen.clear();
         for (unsigned i = 0; i < n; i++) {
@@ -2103,7 +2087,7 @@ inline void Forest::setSpeciesFromNodeName(Node * nd) {
                     double a = dij[ik];
                     double b = dij[jk];
                     dij[ik] = 0.5*(a + b);
-                    dij[jk] = _infinity;
+                    dij[jk] = G::_infinity;
                 }
             }
         
@@ -2112,7 +2096,7 @@ inline void Forest::setSpeciesFromNodeName(Node * nd) {
             assert(n2 == n - 1);
             unsigned dim2 = n2*(n2-1)/2;
             dij2.resize(dim2);
-            dij2.assign(dim2, _infinity);
+            dij2.assign(dim2, G::_infinity);
         
             // Calculate distances between all pairs of lineages
             dij_row_col.clear();
@@ -2176,7 +2160,7 @@ inline void Forest::setSpeciesFromNodeName(Node * nd) {
         // Update all leading edge lengths
         double v = *it; // TODO: need to subtract existing node height?
         
-        assert (v != _infinity);
+        assert (v != G::_infinity);
         
         double edge_len_to_add = 0.5*v - upgma_height;
         if (edge_len_to_add <= 0.0) {
@@ -2238,7 +2222,7 @@ inline void Forest::setSpeciesFromNodeName(Node * nd) {
                 double a = dij[ik];
                 double b = dij[jk];
                 dij[ik] = 0.5*(a + b);
-                dij[jk] = _infinity;
+                dij[jk] = G::_infinity;
             }
         }
         
@@ -2253,7 +2237,7 @@ inline void Forest::setSpeciesFromNodeName(Node * nd) {
         assert(n2 == n - 1);
         unsigned dim2 = n2*(n2-1)/2;
         dij2.resize(dim2);
-        dij2.assign(dim2, _infinity);
+        dij2.assign(dim2, G::_infinity);
         
         // Calculate distances between all pairs of lineages
         dij_row_col.clear();
@@ -2398,7 +2382,7 @@ inline void Forest::setSpeciesFromNodeName(Node * nd) {
             for (unsigned j = 0; j < n; j++) {
                 if (j < i) {
                     double v = d[k++];
-                    if (v == Forest::_infinity)
+                    if (v == G::_infinity)
                         cout << "         inf";
                     else
                         cout << format("%12.5f") % v;
@@ -2849,7 +2833,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
 //        number = _nspecies - 2;
 //        _ancestral_species_name = boost::str(boost::format("node-%d")%number);
         
-        for (int i=0; i<_nspecies-1; i++) {
+        for (int i=0; i<G::_nspecies-1; i++) {
             string name = boost::str(boost::format("node-%d")%number);
             number++;
             species_names.push_back(name);
@@ -2857,7 +2841,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         
         _ancestral_species_name = species_names.back();
         
-        assert (species_names.size() == 2*_nspecies - 1);
+        assert (species_names.size() == 2*G::_nspecies - 1);
         
         // draw thetas for tips of species trees and ancestral population
         // for all other populations, theta = -1
@@ -2871,7 +2855,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         
         unsigned count = 0;
         for (auto &name:species_names) {
-            if (count < _nspecies || count == 2*_nspecies-2) {
+            if (count < G::_nspecies || count == 2*G::_nspecies-2) {
                 double new_theta = 0.0;
                 if (new_theta < _small_enough) {
                     new_theta = 1 / (lot->gamma(2.0, scale));
@@ -2941,7 +2925,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             _species_indices[s.first] = number - 1;
         }
         
-        for (int i=0; i<_nspecies-1; i++) {
+        for (int i=0; i<G::_nspecies-1; i++) {
             string name = boost::str(boost::format("node-%d")%number);
             number++;
             _species_indices[name] = number - 1;
@@ -2958,9 +2942,9 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             number++;
             _species_indices[s.first] = number - 1;
         }
-        assert (_species_names.size() == _nspecies);
+        assert (_species_names.size() == G::_nspecies);
         
-        for (int i=0; i<_nspecies-1; i++) {
+        for (int i=0; i<G::_nspecies-1; i++) {
             string name = boost::str(boost::format("node-%d")%number);
             number++;
             _species_names.push_back(name);
@@ -2985,9 +2969,9 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             number++;
             _species_indices[s.first] = number - 1;
         }
-        assert (_species_names.size() == _nspecies);
+        assert (_species_names.size() == G::_nspecies);
         
-        for (int i=0; i<_nspecies-1; i++) {
+        for (int i=0; i<G::_nspecies-1; i++) {
             string name = boost::str(boost::format("node-%d")%number);
             number++;
             _species_names.push_back(name);
@@ -3202,8 +3186,8 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         vector<double> gamma_b; // contains gamma_b by species
         vector<unsigned> q_b; // contains q_b by species
         
-        gamma_b.resize(_nspecies + species_build.size());
-        q_b.resize(_nspecies + species_build.size());
+        gamma_b.resize(G::_nspecies + species_build.size());
+        q_b.resize(G::_nspecies + species_build.size());
         
         _panmictic_coalescent_likelihood = 0.0;
         _log_coalescent_likelihood = 0.0;
@@ -3410,8 +3394,8 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
          vector<double> gamma_b; // contains gamma_b by species
         vector<unsigned> q_b; // contains q_b by species
         
-        gamma_b.resize(_nspecies + species_build.size());
-        q_b.resize(_nspecies + species_build.size());
+        gamma_b.resize(G::_nspecies + species_build.size());
+        q_b.resize(G::_nspecies + species_build.size());
         
         _panmictic_coalescent_likelihood = 0.0;
         _log_coalescent_likelihood = 0.0;
@@ -3787,7 +3771,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         // Draw equilibrium base frequencies from Dirichlet
         // having parameter G::_comphet
         vector<double> basefreq = {0.25, 0.25, 0.25, 0.25};
-        if (Forest::_comphet != Forest::_infinity) {
+        if (Forest::_comphet != G::_infinity) {
             // Draw 4 Gamma(G::_comphet, 1) variates
             double A = lot->gamma(Forest::_comphet, 1.0);
             double C = lot->gamma(Forest::_comphet, 1.0);
@@ -3839,7 +3823,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             for (unsigned i = 0; i < nsites; i++) {
                 // Choose relative rate for this site
                 double site_relrate = 1.0;
-                if (Forest::_asrv_shape != _infinity)
+                if (Forest::_asrv_shape != G::_infinity)
                     site_relrate = lot->gamma(Forest::_asrv_shape, 1.0/Forest::_asrv_shape);
                 unsigned from_state = sequences[parnum][i];
                 double cum_prob = 0.0;
@@ -3865,7 +3849,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
 //        for (unsigned t = 0; t < _ntaxa; t++) {
         unsigned t = 0;
         for (auto &nd:_nodes) {
-            if (t < _ntaxa) {
+            if (t < G::_ntaxa) {
                 // Allocate row t of _data's _data_matrix data member
                 dm[t].resize(starting_site + nsites);
 
@@ -4278,7 +4262,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
         unsigned count = 0;
         for (auto &nd:_nodes) {
             nd._edge_length = 0.0;
-            if (count < _nspecies) {
+            if (count < G::_nspecies) {
                 nd._name = "";
             }
             count++;
@@ -4626,7 +4610,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
             for (auto nd : boost::adaptors::reverse(preorder)) {
                 if (nd->_left_child) {
                     // nd is an internal node
-                    assert(nd->_height != _infinity);
+                    assert(nd->_height != G::_infinity);
                     assert(nd->_left_child->_right_sib);
                     assert(nd->_left_child->_right_sib->_right_sib == nullptr);
                     nd->_species = (nd->_left_child->_species | nd->_left_child->_right_sib->_species);
@@ -4846,7 +4830,7 @@ inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsign
     inline void Forest::refreshAllPreorders() const {
         // For each subtree stored in _lineages, create a vector of node pointers in preorder sequence
         assert (_index == 0); // only need to call this for a species tree
-        _next_node_number = Forest::_nspecies;
+        _next_node_number = G::_nspecies;
         _preorders.clear();
         if (_lineages.size() == 0)
             return;

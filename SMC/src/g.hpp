@@ -52,9 +52,12 @@ namespace proj {
         static bool                 _save_gene_trees_separately;
         static string               _newick_path;
         static double               _lambda;
-        static unsigned             _ngroups;
+        static unsigned             _ngroups; // number of subpopulations for mixing SMC
         static bool                 _upgma;
-        static unsigned             _nsubsets;
+        static unsigned             _nloci;
+        static unsigned             _nspecies;
+        static unsigned             _ntaxa;
+        static double               _infinity;
         
         // other
         static vector<string>           _taxon_names;
