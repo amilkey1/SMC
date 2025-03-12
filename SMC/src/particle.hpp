@@ -28,10 +28,9 @@ class Particle {
         void                                    showSpeciesParticle();
         void                                    proposal();
         void                                    setData(Data::SharedPtr d, map<string, string> &taxon_map, bool partials) {
-                                                    _nsubsets = d->getNumSubsets();
                                                     _data = d;
                                                     int index = 0;
-                                                    _forests.resize(_nsubsets+1);
+                                                    _forests.resize(G::_nsubsets+1);
                                                     for (auto &_forest:_forests) {
                                                         if (index > 0) {
                                                             _forest.setData(d, index, taxon_map, partials);
@@ -39,10 +38,9 @@ class Particle {
                                                         index++;
                                                     }
                                                 }
-        void                                    setSimData(Data::SharedPtr d, map<string, string> &taxon_map, unsigned nsubsets, unsigned ntaxa) {
-                                                    _nsubsets = nsubsets;
+        void                                    setSimData(Data::SharedPtr d, map<string, string> &taxon_map, unsigned ntaxa) {
                                                     int index = 0;
-                                                    _forests.resize(_nsubsets+1);
+                                                    _forests.resize(G::_nsubsets+1);
                                                     for (auto &_forest:_forests) {
                                                         if (index > 0) {
                                                             _forest.setSimData(d, index, taxon_map, ntaxa);
@@ -84,7 +82,6 @@ class Particle {
             return _log_weight>other->_log_weight;
         }
 
-        static void                                     setNumSubsets(unsigned n);
         void                                            setGroupNumber(unsigned n) {_group_number = n;} // group number for parallelization
         unsigned                                        getGroupNumber() {return _group_number;}// group number for parallelization
         vector<Forest> &                                getForests() {return _forests;}
@@ -166,7 +163,6 @@ class Particle {
         double                                  _log_coal_like;
         double                                  _prev_log_coal_like;
 #endif
-        static unsigned                         _nsubsets;
         vector<Forest>                          _forests;
         double                                  _log_weight;
         double                                  _log_species_weight;
@@ -234,7 +230,6 @@ class Particle {
         _log_likelihood = 0.0;
         _forests.clear();
         _data           = nullptr;
-        _nsubsets       = 0;
         _generation     = 0;
         _prev_forest_number = 0;
         _species_join_proposed = false;
@@ -472,7 +467,7 @@ inline vector<double> Particle::getVectorPrior() {
             }
         }
 //        else {
-        else if (_generation % _nsubsets == 0 && G::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+        else if (_generation % G::_nsubsets == 0 && G::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
             // don't rebuild the species tree at every step when simulating data
             trimSpeciesTree();
             if (_forests[0]._lineages.size() > 1) {
@@ -1195,10 +1190,6 @@ inline vector<double> Particle::getVectorPrior() {
             sum_height += child->getEdgeLength();
         }
         return sum_height;
-    }
-
-    inline void Particle::setNumSubsets(unsigned n) {
-        _nsubsets = n;
     }
 
     inline void Particle::mapSpecies(map<string, string> &taxon_map, vector<string> &species_names) {
@@ -2126,7 +2117,6 @@ inline vector<double> Particle::getVectorPrior() {
         _log_likelihood = other._log_likelihood;
         _forests         = other._forests;
         _data           = other._data;
-        _nsubsets       = other._nsubsets;
         _generation     = other._generation;
         _prev_forest_number = other._prev_forest_number;
         _species_join_proposed = other._species_join_proposed;

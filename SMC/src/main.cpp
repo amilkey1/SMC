@@ -74,7 +74,7 @@ map<string, unsigned>    G::_taxon_to_species;
 
 unsigned Forest::_nspecies = 4;
 unsigned Forest::_ntaxa = 12;
-unsigned Particle::_nsubsets = 1;
+unsigned G::_nsubsets = 1;
 const double Node::_smallest_edge_length=1.0e-12;
 double Forest::_kappa = 1.0;
 double Forest::_ploidy = 2.0;

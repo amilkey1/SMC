@@ -1121,8 +1121,7 @@ namespace proj {
 
 //          create vector of particles
 
-        unsigned nsubsets = _data->getNumSubsets();
-        Particle::setNumSubsets(nsubsets);
+        G::_nsubsets = _data->getNumSubsets();
         
         vector<Particle> my_vec;
         my_vec.resize(G::_nparticles);
@@ -1137,6 +1136,9 @@ namespace proj {
 #endif
 
         initializeParticles(my_vec); // initialize in parallel with multithreading
+        // TODO: modify this to match main function
+        
+       G::_nsubsets = _data->getNumSubsets();
         
         unsigned count = 0;
         for (auto &p:my_vec) {
@@ -1149,7 +1151,7 @@ namespace proj {
                 }
                 particle_newicks.push_back(newicks[i][count]);
             }
-            assert (particle_newicks.size() == nsubsets);
+            assert (particle_newicks.size() == G::_nsubsets);
             p.processGeneNewicks(particle_newicks);
             count++;
         }
@@ -2304,6 +2306,16 @@ namespace proj {
         particle.mapSpecies(_taxon_map, _species_names);
         
         particle.setRelativeRatesByGene(G::_double_relative_rates);
+        particle.calcGeneTreeLogLikelihoods();
+        
+        if (G::_upgma) {
+            particle.calcStartingUPGMAMatrix();
+            particle.calcStartingRowCount();
+        }
+        if (G::_fix_theta) { // TODO: unsure if this will be copied
+            particle.fixTheta();
+            particle.setFixTheta(true);
+        }
     }
 
 
@@ -2559,12 +2571,11 @@ namespace proj {
             checkOutgroupName();
         }
 
-        unsigned nsubsets = _data->getNumSubsets();
-        Particle::setNumSubsets(nsubsets);
+        G::_nsubsets = _data->getNumSubsets();
         
         assert (ntaxa > 0);
         
-        unsigned list_size = (ntaxa-1)*nsubsets;
+        unsigned list_size = (ntaxa-1)*G::_nsubsets;
         vector<unsigned> gene_order;
         
         unsigned count = 1;
@@ -2575,7 +2586,7 @@ namespace proj {
             }
             randomize.push_back(make_pair(rng.uniform(), count));
             count++;
-            if (count > nsubsets) {
+            if (count > G::_nsubsets) {
                 sort(randomize.begin(), randomize.end());
                 for (auto &r:randomize) {
                     gene_order.push_back(r.second);
@@ -2588,7 +2599,7 @@ namespace proj {
         
         sim_vec[0].setGeneOrder(gene_order);
 
-        sim_vec[0].setSimData(_data, _taxon_map, nsubsets, (unsigned) _taxon_map.size());
+        sim_vec[0].setSimData(_data, _taxon_map, (unsigned) _taxon_map.size());
 
         sim_vec[0].mapSpecies(_taxon_map, _species_names);
 
@@ -2600,7 +2611,7 @@ namespace proj {
         
         sim_vec[0].setRelativeRatesByGene(G::_double_relative_rates);
 
-        unsigned nsteps = (unsigned) (_taxon_map.size()-1)*nsubsets;
+        unsigned nsteps = (unsigned) (_taxon_map.size()-1)*G::_nsubsets;
 
         for (unsigned g=0; g<nsteps; g++){
             proposeParticles(sim_vec);
@@ -2632,7 +2643,7 @@ namespace proj {
         _data->compressPatterns();
         _data->writeDataToFile(G::_sim_file_name);
 
-        saveGeneTrees(nsubsets, sim_vec);
+        saveGeneTrees(G::_nsubsets, sim_vec);
         saveSpeciesTrees(sim_vec);
 
         writePaupFile(sim_vec, taxpartition);
@@ -3023,8 +3034,7 @@ namespace proj {
 
     //          create vector of particles
 
-                unsigned nsubsets = _data->getNumSubsets();
-                Particle::setNumSubsets(nsubsets);
+                G::_nsubsets = _data->getNumSubsets();
                 
 #if defined (FASTER_SECOND_LEVEL)
                 buildSpeciesMap(/*taxa_from_data*/true);
@@ -3033,18 +3043,7 @@ namespace proj {
                 Particle p;
                 initializeParticle(p); // initialize one particle and copy to all other particles
                 
-                vector<Particle> my_vec;
-                my_vec.resize(G::_nparticles * G::_ngroups, p);
-//                my_vec.resize(G::_nparticles * G::_ngroups);
-                
-//                for (unsigned p=0; p<my_vec.size(); p++) {
-//                    my_vec[p] = Particle();
-//                }
-                
-                // TODO: initialize one particle and copy it to all other particles?
-//                initializeParticles(my_vec); // initialize in parallel with multithreading
-                
-                unsigned list_size = (ntaxa-1)*nsubsets;
+                unsigned list_size = (ntaxa-1)*G::_nsubsets;
                 vector<unsigned> gene_order;
                 
                 unsigned count = 1;
@@ -3055,7 +3054,7 @@ namespace proj {
                     }
                     randomize.push_back(make_pair(rng.uniform(), count));
                     count++;
-                    if (count > nsubsets) {
+                    if (count > G::_nsubsets) {
                         sort(randomize.begin(), randomize.end());
                         for (auto &r:randomize) {
                             gene_order.push_back(r.second);
@@ -3066,21 +3065,7 @@ namespace proj {
                 
                 assert (gene_order.size() == list_size);
                 
-                unsigned particle_num = 0;
-                
-                for (auto &p:my_vec) {
-                    p.setGeneOrder(gene_order);
-                    if (G::_upgma) {
-                        if (particle_num == 0) {
-                            p.calcStartingUPGMAMatrix();
-                        }
-                        else {
-                            p.setStartingUPGMAMatrix(my_vec[0].getStartingUPGMAMatrix());
-                        }
-                        p.calcStartingRowCount();
-                        particle_num++;
-                    }
-                }
+                p.setGeneOrder(gene_order);
                 
 //                if (_species_newick_name != "null") {
 //                    handleSpeciesNewick(my_vec);
@@ -3088,12 +3073,11 @@ namespace proj {
                 
                 // reset marginal likelihood
                 _log_marginal_likelihood = 0.0;
-                vector<double> starting_log_likelihoods = my_vec[0].calcGeneTreeLogLikelihoods(); // can't start at 0 because not every gene gets changed
                 
                 _starting_log_likelihood = 0.0;
-                for (auto &l:starting_log_likelihoods) {
-                    _starting_log_likelihood += l;
-                }
+                
+                vector<Particle> my_vec;
+                my_vec.resize(G::_nparticles * G::_ngroups, p);
 
                 unsigned psuffix = 1;
                 for (auto &p:my_vec) {
@@ -3111,14 +3095,6 @@ namespace proj {
                 }
 
                     for (auto &p:my_vec) { // TODO: can parallelize this - is it worth it?
-                        if (!G::_run_on_empty) {
-                            p.setLogLikelihood(starting_log_likelihoods);
-                        }
-                        
-                        if (G::_fix_theta) {
-                            p.fixTheta();
-                            p.setFixTheta(true);
-                        }
                         
     #if defined (DRAW_NEW_THETA)
                         assert (!G::_fix_theta);
@@ -3140,7 +3116,7 @@ namespace proj {
                 
                 //run through each generation of particles
 
-                    unsigned nsteps = (ntaxa-1)*nsubsets;
+                    unsigned nsteps = (ntaxa-1)*G::_nsubsets;
                 
                     for (unsigned g=0; g<nsteps; g++){
                         if (G::_verbose > 0) {
@@ -3194,7 +3170,7 @@ namespace proj {
                 } // g loop
                 
                 if (G::_save_gene_trees) {
-                        for (int i=1; i<nsubsets+1; i++) {
+                        for (int i=1; i<G::_nsubsets+1; i++) {
                             saveGeneTrees(i, my_vec);
                         }
                 }

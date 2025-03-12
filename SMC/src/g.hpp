@@ -54,6 +54,7 @@ namespace proj {
         static double               _lambda;
         static unsigned             _ngroups;
         static bool                 _upgma;
+        static unsigned             _nsubsets;
         
         // other
         static vector<string>           _taxon_names;
