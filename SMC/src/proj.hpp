@@ -1073,7 +1073,6 @@ namespace proj {
             
             while (getline(infile, newick)) { // file newicks must start with the word "tree"
                 if (current_gene_newicks.size() < G::_nparticles) { // stop adding newicks once the number of particles has been reached // TODO: add option to randomize this?
-//                size_t found = newick.find("tree");
                 if (newick.find("tree") == 2) { // TODO: this only works if there are exactly 2 spaces before the newick - try starting at parenthesis
                         size_t pos = newick.find("("); //find location of parenthesis
                         newick.erase(0,pos); //delete everything prior to location found
@@ -1090,7 +1089,7 @@ namespace proj {
             newicks.push_back(current_gene_newicks);
         }
 
-        _data = Data::SharedPtr(new Data()); // TODO: don't need to set data b/c will not calculate a Felsenstein likelihood
+        _data = Data::SharedPtr(new Data()); // don't need to set data b/c will not calculate a Felsenstein likelihood
         _data->setPartition(_partition);
         _data->getDataFromFile(G::_data_file_name);
 
@@ -1107,28 +1106,24 @@ namespace proj {
         //set number of species to number in data file
         G::_ntaxa = _data->getNumTaxa();
         G::_nspecies = (unsigned) _species_names.size();
-        rng.setSeed(_random_seed);
-
-//          create vector of particles
-
         G::_nloci = _data->getNumSubsets();
-        
-        vector<Particle> my_vec;
-        my_vec.resize(G::_nparticles);
-
-        for (unsigned i=0; i<G::_nparticles; i++) {
-            my_vec[i] = Particle();
-        }
-        
+        rng.setSeed(_random_seed);
         
 #if defined (FASTER_SECOND_LEVEL)
         buildSpeciesMap(/*taxa_from_data*/true);
 #endif
 
-        initializeParticles(my_vec); // initialize in parallel with multithreading
-        // TODO: modify this to match main function
+        Particle p;
+        initializeParticle(p); // initialize one particle and copy to all other particles
         
-       G::_nloci = _data->getNumSubsets();
+        vector<Particle> my_vec;
+        my_vec.resize(G::_nparticles, p);
+
+        unsigned psuffix = 1;
+        for (auto &p:my_vec) {
+            p.setSeed(rng.randint(1,9999) + psuffix);
+            psuffix += 2;
+        }
         
         unsigned count = 0;
         for (auto &p:my_vec) {
@@ -1143,24 +1138,11 @@ namespace proj {
             }
             assert (particle_newicks.size() == G::_nloci);
             p.processGeneNewicks(particle_newicks);
+            p.resetSpecies();
+            p.mapSpecies(_taxon_map, _species_names);
+            // TODO: can do this with the original template particle?
             count++;
         }
-        
-#if defined (FASTER_SECOND_LEVEL)
-        // set group rng
-        unsigned ngroups = round(G::_nparticles * G::_ngroups * G::_thin);
-        _group_rng.resize(ngroups);
-        unsigned a=0;
-        unsigned psuffix = 1;
-        for (auto &g:_group_rng) {
-            g.reset(new Lot());
-            g->setSeed(rng.randint(1,9999)+psuffix);
-            a++;
-            psuffix += 2;
-        }
-        
-        fasterSecondLevel(my_vec);
-#else
 
         cout << "\n";
         string filename1 = "species_trees.trees";
@@ -1239,25 +1221,21 @@ namespace proj {
             }
         }
 
+        assert (G::_thin == 1.0);
         unsigned ngroups = round(G::_nparticles * G::_thin);
-        if (ngroups == 0) {
-            ngroups = 1;
-            cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
-        }
 
-        for (auto &p:my_vec) {
-            // reset forest species partitions
-            p.clearPartials(); // no more likelihood calculations
-            p.resetSpecies();
-            p.mapSpecies(_taxon_map, _species_names);
-        }
+//        for (auto &p:my_vec) {
+//            // reset forest species partitions
+//            p.clearPartials(); // no more likelihood calculations
+//            p.resetSpecies();
+//            p.mapSpecies(_taxon_map, _species_names);
+//        }
         
-        unsigned seed = rng.getSeed();
-        std::shuffle(my_vec.begin(), my_vec.end(), std::default_random_engine(seed)); // shuffle particles using group seed
-        
-        // delete first (1-_thin) % of particles
-        my_vec.erase(next(my_vec.begin(), 0), next(my_vec.begin(), (G::_nparticles-ngroups)));
         assert(my_vec.size() == ngroups);
+        
+#if defined (FASTER_SECOND_LEVEL)
+        fasterSecondLevel(my_vec);
+#else
 
         G::_nparticles = ngroups;
 
@@ -1271,13 +1249,13 @@ namespace proj {
         if (G::_nthreads > 1) {
 #if defined PARALLELIZE_BY_GROUP
             parallelize_by_group = true;
-#endif
+#else
         }
         
         // set group rng
         _group_rng.resize(ngroups);
         unsigned a=0;
-        unsigned psuffix = 1;
+        psuffix = 1;
         for (auto &g:_group_rng) {
             g.reset(new Lot());
             g->setSeed(rng.randint(1,9999)+psuffix);
@@ -1463,6 +1441,7 @@ namespace proj {
             filesystem::remove(oldfname);
             std::rename(newfname, oldfname);
         }
+#endif
 #endif
     }
 
@@ -2292,9 +2271,12 @@ namespace proj {
         particle.mapSpecies(_taxon_map, _species_names);
         
         particle.setRelativeRatesByGene(G::_double_relative_rates);
-        particle.calcGeneTreeLogLikelihoods();
         
-        if (G::_upgma) {
+        if (!G::_gene_newicks_specified) { // if starting from gene newicks, don't calculate any likelihoods
+            particle.calcGeneTreeLogLikelihoods();
+        }
+        
+        if (G::_upgma && !G::_gene_newicks_specified) {
             particle.calcStartingUPGMAMatrix();
             particle.calcStartingRowCount();
         }
@@ -2303,29 +2285,31 @@ namespace proj {
             particle.setFixTheta(true);
         }
         
-        unsigned list_size = (G::_ntaxa-1)*G::_nloci;
-        vector<unsigned> gene_order;
-        
-        unsigned count = 1;
-        vector<pair<double, unsigned>> randomize;
-        for (unsigned l=0; l<list_size; l++) {
-            if (count == 1) {
-                randomize.clear();
-            }
-            randomize.push_back(make_pair(rng.uniform(), count));
-            count++;
-            if (count > G::_nloci) {
-                sort(randomize.begin(), randomize.end());
-                for (auto &r:randomize) {
-                    gene_order.push_back(r.second);
+        if (!!G::_gene_newicks_specified) {
+            unsigned list_size = (G::_ntaxa-1)*G::_nloci;
+            vector<unsigned> gene_order;
+            
+            unsigned count = 1;
+            vector<pair<double, unsigned>> randomize;
+            for (unsigned l=0; l<list_size; l++) {
+                if (count == 1) {
+                    randomize.clear();
                 }
-                count = 1;
+                randomize.push_back(make_pair(rng.uniform(), count));
+                count++;
+                if (count > G::_nloci) {
+                    sort(randomize.begin(), randomize.end());
+                    for (auto &r:randomize) {
+                        gene_order.push_back(r.second);
+                    }
+                    count = 1;
+                }
             }
+            
+            assert (gene_order.size() == list_size);
+            
+            particle.setGeneOrder(gene_order);
         }
-        
-        assert (gene_order.size() == list_size);
-        
-        particle.setGeneOrder(gene_order);
     }
 
 
@@ -2958,6 +2942,10 @@ namespace proj {
                 throw XProj("cannot specify gene newicks and simulations");
             }
             try {
+                if (G::_thin < 1.0) {
+                    cout << "thin setting will be set to 1.0 for gene newick start " << endl;
+                    G::_thin = 1.0;
+                }
                 handleGeneNewicks();
             }
             catch (XProj & x) {

@@ -2,8 +2,6 @@
 #include <vector>
 
 #include "proj.hpp"
-//#include "g.hpp"
-//#include "particle.hpp"
 #include "conditionals.hpp"
 #include "stopwatch.hpp"
 

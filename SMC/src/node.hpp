@@ -47,9 +47,9 @@ namespace proj {
                     typedef std::vector<Node *>  PtrVector;
         
 #if defined (FASTER_SECOND_LEVEL)
-            static string       taxonNameToSpeciesName(string taxon_name);
-            static void         setSpeciesBits(G::species_t & to_species, const G::species_t & from_species, bool init_to_zero_first);
-            static void         setSpeciesBit(G::species_t & to_species, unsigned i, bool init_to_zero_first);
+            static string           taxonNameToSpeciesName(string taxon_name);
+            static void             setSpeciesBits(G::species_t & to_species, const G::species_t & from_species, bool init_to_zero_first);
+            static void             setSpeciesBit(G::species_t & to_species, unsigned i, bool init_to_zero_first);
             const G::species_t &    getSpecies() const {return _species;}
 #endif
         

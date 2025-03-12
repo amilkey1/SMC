@@ -93,14 +93,11 @@ class Particle {
         vector<pair<double, double>>                    getIncrementPriors(unsigned i);
         vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
         double                                          getCoalescentLikelihood(unsigned g);
-        bool                                            speciesJoinProposed() {return _species_join_proposed;}
         void                                            clear();
-        vector<double>                                  chooseIncrements(vector<double> event_choice_rates);
         void                                            speciesOnlyProposal();
 #if !defined (FASTER_SECOND_LEVEL)
         void                                            speciesOnlyProposalIntegratingOutTheta();
 #endif
-        void                                            calculateIncrementPriors(double increment, string species_name, unsigned forest_number, bool speciation, bool first_step);
         void                                            drawTheta();
         void                                            fixTheta();
         void                                            clearPartials();
@@ -132,7 +129,6 @@ class Particle {
         void                                            processGeneNewicks(vector<string> newicks);
         void                                            processSpeciesNewick(string newick_string);
         void                                            setNextSpeciesNumber() {_next_species_number = G::_nspecies;}
-        unsigned                                        showPrevForestNumber(){return _prev_forest_number;}
         string                                          getTranslateBlock();
         void                                            buildEntireSpeciesTree();
         void                                            rebuildSpeciesTree();
@@ -143,8 +139,6 @@ class Particle {
         void                                            calcStartingUPGMAMatrix();
         vector<vector<double>>                          getStartingUPGMAMatrix();
         void                                            setStartingUPGMAMatrix(vector<vector<double>> starting_upgma_matrices_by_gene);
-        vector<map<Node*,  unsigned>>                   getStartingRowCount();
-        void                                            setStartingRowCount(vector<map<Node*,  unsigned>> starting_row_count_by_gene);
         void                                            calcStartingRowCount();
         void                                            createSpeciesIndices();
         void                                            setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species);
@@ -169,8 +163,6 @@ class Particle {
         Data::SharedPtr                         _data;
         double                                  _log_likelihood;
         int                                     _generation = 0;
-        unsigned                                _prev_forest_number;
-        bool                                    _species_join_proposed;
         double                                  _log_coalescent_likelihood;
         mutable                                 Lot::SharedPtr _lot;
         unsigned                                _num_deep_coalescences;
@@ -186,7 +178,9 @@ class Particle {
         vector<unsigned>                        _gene_order;
         bool                                    _fix_theta;
         vector<double>                          _relative_rates_by_gene;
+#if !defined (FASTER_SECOND_LEVEL)
         unsigned                                _species_branches;
+#endif
         unsigned                                _group_number;
 };
 
@@ -231,8 +225,6 @@ class Particle {
         _forests.clear();
         _data           = nullptr;
         _generation     = 0;
-        _prev_forest_number = 0;
-        _species_join_proposed = false;
         _log_coalescent_likelihood = 0.0;
         _num_deep_coalescences = 0.0;
         _max_deep_coal = 0.0;
@@ -247,7 +239,9 @@ class Particle {
         _gene_order.clear();
         _fix_theta = false;
         _relative_rates_by_gene.clear();
+#if !defined (FASTER_SECOND_LEVEL)
         _species_branches = 0;
+#endif
         _group_number = 0;
     }
 
@@ -474,7 +468,6 @@ inline vector<double> Particle::getVectorPrior() {
             }
         }
         
-        _species_join_proposed = false;
         bool done = false;
                 
         while (!done) {
@@ -600,16 +593,6 @@ inline vector<double> Particle::getVectorPrior() {
         else {
             _log_weight = 0.0;
         }
-    }
-
-    vector<double> Particle::chooseIncrements(vector<double> event_choice_rates) {
-        vector<double> increments;
-        increments.resize(event_choice_rates.size());
-        
-        for (int p=0; p<event_choice_rates.size(); p++) {
-            increments[p] = -log(1.0 - _lot->uniform())/event_choice_rates[p];
-        }
-        return increments;
     }
 
 #if defined (FASTER_SECOND_LEVEL)
@@ -962,21 +945,6 @@ inline vector<double> Particle::getVectorPrior() {
         }
     }
 
-    inline vector<map<Node*,  unsigned>> Particle::getStartingRowCount() {
-        vector<map<Node*,  unsigned>> starting_row_count_by_gene;
-        for (unsigned i=1; i<_forests.size(); i++) {
-            starting_row_count_by_gene.push_back(_forests[i]._starting_row);
-        }
-        return starting_row_count_by_gene;
-    }
-
-
-    inline void Particle::setStartingRowCount(vector<map<Node*,  unsigned>> starting_row_count_by_gene) {
-        for (unsigned i=1; i<_forests.size(); i++) {
-            _forests[i]._starting_row = starting_row_count_by_gene[i-1];
-        }
-    }
-
     inline void Particle::calcStartingRowCount() {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].buildStartingRow();
@@ -1118,31 +1086,6 @@ inline vector<double> Particle::getVectorPrior() {
                 _forests[i]._species_indices = species_indices;
                 _forests[i]._theta_mean = theta_mean;
             }
-        }
-    }
-
-    inline void Particle::calculateIncrementPriors(double increment, string species_name, unsigned forest_number, bool speciation, bool first_step) {
-        // need to calculate coalescent likelihood before joining anything or updating species partition
-        for (int f=0; f<_forests.size(); f++) {
-            bool new_increment = false;
-            bool coalescence = false;
-            bool gene_tree = false;
-            
-            if (first_step) {
-                new_increment = true;
-            }
-//            if ((f == _prev_forest_number || _generation == 0) && !speciation) { // if previous join was a species join, new increment is false
-            if (f == _prev_forest_number) {
-                // add to existing increment + prior
-                new_increment = true;
-            }
-            if (f == forest_number) {
-                coalescence = true;
-            }
-            if (f > 0) {
-                gene_tree = true;
-            }
-            _forests[f].calcIncrementPrior(increment, species_name, new_increment, coalescence, gene_tree);
         }
     }
 
@@ -2115,8 +2058,6 @@ inline vector<double> Particle::getVectorPrior() {
         _forests         = other._forests;
         _data           = other._data;
         _generation     = other._generation;
-        _prev_forest_number = other._prev_forest_number;
-        _species_join_proposed = other._species_join_proposed;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _num_deep_coalescences = other._num_deep_coalescences;
         _max_deep_coal = other._max_deep_coal;
@@ -2131,7 +2072,9 @@ inline vector<double> Particle::getVectorPrior() {
         _gene_order = other._gene_order;
         _fix_theta = other._fix_theta;
         _relative_rates_by_gene = other._relative_rates_by_gene;
+#if !defined (FASTER_SECOND_LEVEL)
         _species_branches = other._species_branches;
+#endif
         _group_number = other._group_number;
 #if defined (FASTER_SECOND_LEVEL)
         _log_coal_like = other._log_coal_like;
