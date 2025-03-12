@@ -44,14 +44,14 @@ namespace proj {
             void                saveAllSpeciesTrees(vector<Particle> &v) const;
             void                saveSpeciesTreesAfterFirstRound(vector<Particle> &v) const;
             void                saveSpeciesTreesHierarchical(vector<Particle> &v, string filename1, string filename2) const;
-            void                saveGeneTrees(unsigned ngenes, vector<Particle> &v) const;
-            void                writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v) const;
-            void                writeLoradFileAfterSpeciesFiltering(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v) const;
+            void                saveGeneTrees(vector<Particle> &v) const;
+            void                writeLoradFile(vector<Particle> &v) const;
+            void                writeLoradFileAfterSpeciesFiltering(vector<Particle> &v) const;
             void                writeDeepCoalescenceFile(vector<Particle> &v);
             void                writeThetaFile(vector<Particle> &v);
-            void                writeParamsFileForBeastComparison (unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v) const;
-            void                writeParamsFileForBeastComparisonAfterSpeciesFiltering(unsigned nspecies, unsigned ntaxa, vector<Particle> &v, string filename, unsigned group_number);
-            void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned nspecies, unsigned ntaxa, vector<Particle> &v, string filename, unsigned group_number);
+            void                writeParamsFileForBeastComparison (vector<Particle> &v) const;
+            void                writeParamsFileForBeastComparisonAfterSpeciesFiltering(vector<Particle> &v, string filename, unsigned group_number);
+            void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(vector<Particle> &v, string filename, unsigned group_number);
             void                writePartialCountFile(vector<Particle> &particles);
             void                createSpeciesMap(Data::SharedPtr);
             void                simSpeciesMap();
@@ -59,8 +59,8 @@ namespace proj {
             void                showFinal(vector<Particle> my_vec);
             void                proposeSpeciesParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
             void                proposeSpeciesParticles(vector<Particle> &particles);
-            void                proposeSpeciesGroups(vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned ntaxa);
-            void                proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned ntaxa);
+            void                proposeSpeciesGroups(vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3);
+            void                proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3);
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
             void                proposeParticleGroupRange(unsigned first, unsigned last, vector<vector<Particle>> &particles);
             void                proposeParticles(vector<Particle> &particles);
@@ -154,7 +154,7 @@ namespace proj {
         partialf.close();
     }
 
-    inline void Proj::writeParamsFileForBeastComparison(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v) const {
+    inline void Proj::writeParamsFileForBeastComparison(vector<Particle> &v) const {
         // this function creates a params file that is comparable to output from starbeast3
         ofstream logf("params-beast-comparison.log");
         logf << "iter ";
@@ -166,7 +166,7 @@ namespace proj {
         logf << "\t" << "Tree.t:Species.height ";
         logf << "\t" << "Tree.t:Species.treeLength ";
 
-        for (int i=1; i<ngenes+1; i++) {
+        for (int i=1; i<G::_nloci+1; i++) {
             logf << "\t" << "Tree.t:gene" + to_string(i) + "height";
             logf << "\t" << "Tree.t:gene" + to_string(i) + "treeLength";
         }
@@ -174,16 +174,16 @@ namespace proj {
         logf << "\t" << "YuleModel.t:Species "; // this is the log probability of the species tree (multiply by log(3!) to get increment log prob)
         logf << "\t" << "popMean "; // this is psi in the InverseGamma(2,psi) distribution of popSize
 
-        for (int i=0; i<(nspecies*2-1); i++) {
+        for (int i=0; i<(G::_nspecies*2-1); i++) {
             logf << "\t" << "popSize." + to_string(i+1);
         }
 
         logf << "\t" << "speciationRate.t:Species ";
 
-        for (int i=1; i<ngenes+1; i++) {
+        for (int i=1; i<G::_nloci+1; i++) {
             logf << "\t" << "treeLikelihood:gene" + to_string(i);
         }
-        for (int i=1; i<ngenes+1; i++) {
+        for (int i=1; i<G::_nloci+1; i++) {
             logf << "\t" << "treePrior:gene" + to_string(i);
         }
         logf << endl;
@@ -203,7 +203,7 @@ namespace proj {
     #endif
 
                 double log_coalescent_likelihood = 0.0;
-                for (unsigned g=1; g<ngenes+1; g++) {
+                for (unsigned g=1; g<G::_nloci+1; g++) {
                     log_coalescent_likelihood += p.getCoalescentLikelihood(g);
                 }
 
@@ -244,7 +244,7 @@ namespace proj {
 
                 logf << "\t" << p.getPopMean() / 4.0; // beast uses Ne * u = theta / 4
 
-                for (int i=0; i<(nspecies*2-1); i++) {
+                for (int i=0; i<(G::_nspecies*2-1); i++) {
     #if defined (DRAW_NEW_THETA)
                     vector<double> theta_vec = p.getThetaVector();
                     logf << "\t" << theta_vec[i] / 4.0;
@@ -273,7 +273,7 @@ namespace proj {
         logf.close();
     }
 
-    inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFiltering(unsigned nspecies, unsigned ntaxa, vector<Particle> &v, string filename, unsigned group_number) {
+    inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFiltering(vector<Particle> &v, string filename, unsigned group_number) {
         // this function creates a params file that is comparable to output from starbeast3
         std::ofstream logf;
 
@@ -300,7 +300,7 @@ namespace proj {
             logf << "\t" << "YuleModel.t:Species "; // this is the log probability of the species tree (multiply by log(3!) to get increment log prob)
             logf << "\t" << "popMean "; // this is psi in the InverseGamma(2,psi) distribution of popSize
 
-            for (int i=0; i<(nspecies*2-1); i++) {
+            for (int i=0; i<(G::_nspecies*2-1); i++) {
                 logf << "\t" << "popSize." + to_string(i+1);
             }
 
@@ -373,7 +373,7 @@ namespace proj {
 
             logf << "\t" << p.getPopMean() / 4.0; // beast uses Ne * u = theta / 4
 
-            for (int i=0; i<(nspecies*2-1); i++) {
+            for (int i=0; i<(G::_nspecies*2-1); i++) {
 #if defined (DRAW_NEW_THETA)
                 if (!G::_gene_newicks_specified) {
                     vector<double> theta_vec = p.getThetaVector();
@@ -412,7 +412,7 @@ namespace proj {
         logf.close();
     }
 
-    inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(unsigned nspecies, unsigned ntaxa, vector<Particle> &v, string filename, unsigned group_number) {
+    inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(vector<Particle> &v, string filename, unsigned group_number) {
         // this function creates a params file that is comparable to output from starbeast3
         std::ofstream logf;
 
@@ -528,16 +528,16 @@ namespace proj {
         }
     }
 
-    inline void Proj::writeLoradFile(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v) const {
+    inline void Proj::writeLoradFile(vector<Particle> &v) const {
         ofstream logf("params.log");
         logf << "iteration ";
         logf << "\t" << "likelihood ";
-        for (int s=0; s<nspecies-1; s++) {
+        for (int s=0; s<G::_nspecies-1; s++) {
             logf << "\t" << "species_increment";
         }
         logf << "\t" << "species_tree_prior";
-        for (int g=1; g<ngenes+1; g++) {
-            for (int i=1; i<ntaxa; i++) {
+        for (int g=1; g<G::_nloci+1; g++) {
+            for (int i=1; i<G::_ntaxa; i++) {
                 logf << "\t" << "gene_increment";
             }
         }
@@ -553,7 +553,7 @@ namespace proj {
 
             double species_tree_prior = 0.0;
 
-            for (unsigned g=0; g<ngenes+1; g++) {
+            for (unsigned g=0; g<G::_nloci+1; g++) {
                 for (auto &b:p.getIncrementPriors(g)) {
                     logf << "\t" << b.first;
                     if (g == 0) { // species tree prior
@@ -570,7 +570,7 @@ namespace proj {
             }
 
             double log_coalescent_likelihood = 0.0;
-            for (unsigned g=1; g<ngenes+1; g++) {
+            for (unsigned g=1; g<G::_nloci+1; g++) {
                 log_coalescent_likelihood += p.getCoalescentLikelihood(g);
             }
             logf << "\t" << log_coalescent_likelihood;
@@ -581,10 +581,10 @@ namespace proj {
         logf.close();
     }
 
-    inline void Proj::writeLoradFileAfterSpeciesFiltering(unsigned ngenes, unsigned nspecies, unsigned ntaxa, vector<Particle> &v) const {
+    inline void Proj::writeLoradFileAfterSpeciesFiltering(vector<Particle> &v) const {
         ofstream logf("params.log");
         logf << "iteration ";
-        for (int s=0; s<nspecies-1; s++) {
+        for (int s=0; s<G::_nspecies-1; s++) {
             logf << "\t" << "species_increment";
         }
         logf << "\t" << "species_tree_prior";
@@ -759,9 +759,9 @@ namespace proj {
 
         }
 
-    inline void Proj::saveGeneTrees(unsigned ngenes, vector<Particle> &v) const {
+    inline void Proj::saveGeneTrees(vector<Particle> &v) const {
         if (G::_start_mode == "smc") {
-            for (unsigned i=1; i<ngenes; i++) {
+            for (unsigned i=1; i<G::_nloci; i++) {
                 string fname = "gene" + to_string(i) + ".trees";
                 ofstream treef(fname);
                 treef << "#nexus\n\n";
@@ -775,7 +775,7 @@ namespace proj {
         else {
             if (G::_save_gene_trees_separately) {
                 for (auto &p:v) {
-                    for (unsigned i=1; i<ngenes+1; i++) {
+                    for (unsigned i=1; i<G::_nloci+1; i++) {
                         string fname = "gene" + to_string(i) + ".trees";
                         ofstream treef(fname);
                         treef << "#nexus\n\n";
@@ -793,7 +793,7 @@ namespace proj {
                 treef << "#nexus\n\n";
                 treef << "begin trees;\n";
                 for (auto &p:v) {
-                        for (unsigned i=1; i<ngenes+1; i++) {
+                        for (unsigned i=1; i<G::_nloci+1; i++) {
                             treef << "tree gene" << i << " = [&R] " << p.saveGeneNewick(i)  << ";\n";
                     }
                     treef << endl;
@@ -1973,7 +1973,6 @@ namespace proj {
 
 #if defined (FASTER_SECOND_LEVEL)
     inline void Proj::proposeSpeciesGroupRangeFaster(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3) {
-        unsigned nspecies = (unsigned) _species_names.size();
         
         for (unsigned i=first; i<last; i++){
             vector<Particle> second_level_particles;
@@ -1995,9 +1994,9 @@ namespace proj {
 
             assert(second_level_particles.size() == G::_particle_increase);
         
-            for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
+            for (unsigned s=0; s<G::_nspecies-1; s++) {  // skip last round of filtering because weights are always 0
                 if (G::_verbose > 1) {
-                    cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
+                    cout << "starting species step " << s+1 << " of " << G::_nspecies-1 << endl;
                 }
                 
                 // set particle random number seeds // TODO: double check random number seeds are working
@@ -2040,20 +2039,18 @@ namespace proj {
             saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2);
             saveSpeciesTreesAltHierarchical(second_level_particles);
             _count++;
-            unsigned ntaxa = _data->getNumTaxa();
             if (G::_gene_newicks_specified) {
-                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nspecies, ntaxa, second_level_particles, filename3, i);
+                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(second_level_particles, filename3, i);
             }
             else {
-                writeParamsFileForBeastComparisonAfterSpeciesFiltering(nspecies, ntaxa, second_level_particles, filename3, i);
+                writeParamsFileForBeastComparisonAfterSpeciesFiltering(second_level_particles, filename3, i);
             }
             mtx.unlock();
         }
     }
 #endif
 
-    inline void Proj::proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned ntaxa) {
-        unsigned nspecies = (unsigned) _species_names.size();
+    inline void Proj::proposeSpeciesGroupRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3) {
         
         for (unsigned i=first; i<last; i++){
             
@@ -2069,7 +2066,7 @@ namespace proj {
             if (G::_verbose > 1) {
                 cout << "beginning species tree proposals for subset " << i+1 << endl;
             }
-            for (unsigned s = 0; s < nspecies-1; s++) {  // skip last round of filtering because weights are always 0
+            for (unsigned s = 0; s < G::_nspecies-1; s++) {  // skip last round of filtering because weights are always 0
                 
                 // set particle random number seeds
                 unsigned psuffix = 1;
@@ -2116,10 +2113,10 @@ namespace proj {
             saveSpeciesTreesAltHierarchical(use_vec);
             _count++;
             if (G::_gene_newicks_specified) {
-                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(nspecies, ntaxa, use_vec, filename3, i);
+                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(use_vec, filename3, i);
             }
             else {
-                writeParamsFileForBeastComparisonAfterSpeciesFiltering(nspecies, ntaxa, use_vec, filename3, i);
+                writeParamsFileForBeastComparisonAfterSpeciesFiltering(use_vec, filename3, i);
             }
             mtx.unlock();
         }
@@ -2161,7 +2158,7 @@ namespace proj {
     }
 #endif
 
-    inline void Proj::proposeSpeciesGroups(vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3, unsigned ntaxa) {
+    inline void Proj::proposeSpeciesGroups(vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3) {
         // ngroups = number of species SMCs to do (i.e. 100 particles for first round, thin = 1.0 means ngroups = 100 for this round)
         cout << "starting proposals second level" << endl;
         assert (G::_nthreads > 1);
@@ -2176,7 +2173,7 @@ namespace proj {
 
           while (true) {
           // create a thread to handle particles first through last - 1
-            threads.push_back(thread(&Proj::proposeSpeciesGroupRange, this, first, last, std::ref(particles), ngroups, filename1, filename2, filename3, ntaxa));
+            threads.push_back(thread(&Proj::proposeSpeciesGroupRange, this, first, last, std::ref(particles), ngroups, filename1, filename2, filename3));
           // update first and last
           first = last;
           last += incr;
@@ -2656,7 +2653,7 @@ namespace proj {
         _data->compressPatterns();
         _data->writeDataToFile(G::_sim_file_name);
 
-        saveGeneTrees(G::_nloci, sim_vec);
+        saveGeneTrees(sim_vec);
         saveSpeciesTrees(sim_vec);
 
         writePaupFile(sim_vec, taxpartition);
@@ -2684,7 +2681,6 @@ namespace proj {
             cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
         }
         
-        // TODO: trying - shuffling particle vec, then pop back number_to_delete
         unsigned seed = rng.getSeed();
         std::shuffle(particles.begin(), particles.end(), std::default_random_engine(seed));
 
@@ -2692,32 +2688,11 @@ namespace proj {
         
         // erase number_of_particles_to_delete
         particles.erase(particles.end() - number_of_particles_to_delete, particles.end());
-//        for (unsigned n=0; n < number_of_particles_to_delete; n++) {
-//            particles.pop_back();
-//        }
-        
-//        vector<unsigned> counts;
-//        for (unsigned index=0; index<particles.size(); index++) {
-//          counts.push_back(index);
-//        }
-              
-//        unsigned seed = rng.getSeed();
-//        std::shuffle(counts.begin(), counts.end(), std::default_random_engine(seed));
-//
-//        counts.erase(next(counts.begin(), 0), next(counts.begin(), (ngroups))); // choose what to delete - erase (thin) % of particle numbers
-//        sort (counts.begin(), counts.end(), greater<int>()); // sort highest to lowest for deletion of particles later
-//
-//        // delete particles corresponding to those numbers
-//        for (unsigned c=0; c<counts.size(); c++) {
-//            particles.erase(particles.begin() + counts[c]);
-//        }
 
         assert(particles.size() == ngroups);
 
         G::_nparticles = G::_particle_increase;
-        
-        unsigned nspecies = (unsigned) _species_names.size();
-        
+                
         unsigned group_number = 0;
         for (auto &p:particles) {
             p.setGroupNumber(group_number);
@@ -2735,25 +2710,21 @@ namespace proj {
         }
 
         if (G::_nthreads == 1) {
-            
-            for (unsigned g=0; g<ngroups; g++) {
-                
+            for (unsigned g=0; g<ngroups; g++) { // propose and filter for each particle saved from first round
                 Particle p = particles[g];
-                
                 vector<Particle > second_level_particles;
             
-            // initialize particles
+                // initialize particles
                 p.saveCoalInfoInitial();
                 p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
                 p.resetSpecies();
                 p.mapSpecies(_taxon_map, _species_names);
             
-                
                 second_level_particles.resize(G::_particle_increase, p);
                 
-                for (unsigned s=0; s<nspecies-1; s++) {  // skip last round of filtering because weights are always 0
+                for (unsigned s=0; s<G::_nspecies-1; s++) {  // skip last round of filtering because weights are always 0
                     if (G::_verbose > 1) {
-                        cout << "starting species step " << s+1 << " of " << nspecies-1 << endl;
+                        cout << "starting species step " << s+1 << " of " << G::_nspecies-1 << endl;
                     }
                     
                     // set particle random number seeds
@@ -2764,7 +2735,7 @@ namespace proj {
                         psuffix += 2;
                     }
                     
-                    for (auto &p:second_level_particles) { // TODO: need to do this for each particle saved from the first level
+                    for (auto &p:second_level_particles) {
                         p.proposeSpeciationEvent();
                     }
                     
@@ -2792,8 +2763,7 @@ namespace proj {
                 
                 saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2);
                 saveSpeciesTreesAltHierarchical(second_level_particles);
-                unsigned ntaxa = _data->getNumTaxa();
-                writeParamsFileForBeastComparisonAfterSpeciesFiltering(nspecies, ntaxa, second_level_particles, filename3, g);
+                writeParamsFileForBeastComparisonAfterSpeciesFiltering(second_level_particles, filename3, g);
             }
 
             ofstream altfname_end;
@@ -3166,9 +3136,7 @@ namespace proj {
                 } // g loop
                 
                 if (G::_save_gene_trees) {
-                    for (int i=1; i<G::_nloci+1; i++) {
-                        saveGeneTrees(i, my_vec);
-                    }
+                    saveGeneTrees(my_vec);
                 }
                 if (G::_verbose > 0) {
                     cout << "\n";
@@ -3178,7 +3146,7 @@ namespace proj {
 
                 writePartialCountFile(my_vec);
 #if !defined (HIERARCHICAL_FILTERING)
-                writeParamsFileForBeastComparison(nspecies, ntaxa, my_vec);
+                writeParamsFileForBeastComparison(my_vec);
                 
                 saveAllSpeciesTrees(my_vec);
 #endif
@@ -3281,15 +3249,12 @@ namespace proj {
                 }
                       
                 unsigned seed = rng.getSeed();
-                std::shuffle(counts.begin(), counts.end(), std::default_random_engine(seed));
-                
-                counts.erase(next(counts.begin(), 0), next(counts.begin(), (ngroups))); // choose what to delete - erase (thin) % of particle numbers
-                sort (counts.begin(), counts.end(), greater<int>()); // sort highest to lowest for deletion of particles later
+                std::shuffle(particles.begin(), particles.end(), std::default_random_engine(seed));
 
-                // delete particles corresponding to those numbers
-                for (unsigned c=0; c<counts.size(); c++) {
-                    my_vec.erase(my_vec.begin() + counts[c]);
-                }
+                unsigned number_of_particles_to_delete = particles.size() - G::_thin*particles.size();
+                
+                // erase number_of_particles_to_delete
+                particles.erase(particles.end() - number_of_particles_to_delete, particles.end());
 
                 assert(my_vec.size() == ngroups);
 
@@ -3470,7 +3435,7 @@ namespace proj {
                         
                         saveSpeciesTreesHierarchical(use_vec, filename1, filename2);
                         saveSpeciesTreesAltHierarchical(use_vec);
-                        writeParamsFileForBeastComparisonAfterSpeciesFiltering(nspecies, ntaxa, use_vec, filename3, a);
+                        writeParamsFileForBeastComparisonAfterSpeciesFiltering(use_vec, filename3, a);
                         if (a == 0) {
                             writeLoradFileAfterSpeciesFiltering(nspecies, ntaxa, use_vec); // testing the marginal likelihood by writing to file for lorad for first species group only
                             cout << "species tree log marginal likelihood is: " << _log_species_tree_marginal_likelihood << endl;
