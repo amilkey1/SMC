@@ -3365,7 +3365,7 @@ namespace proj {
                         vector<Particle> use_vec;
                         
                         Particle chosen_particle = my_vec[a];
-                        use_vec.resize(G::_particle_increase, a);
+                        use_vec.resize(G::_particle_increase, chosen_particle);
                                                                         
 //                        fill(use_vec.begin(), use_vec.end(), chosen_particle);
                         

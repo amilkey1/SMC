@@ -75,10 +75,10 @@ namespace proj {
             int                 _flags;
             PartialStore::partial_t _partial;
             int                 _position_in_lineages;
+            double              _height;
 #if defined (FASTER_SECOND_LEVEL)
         // Bitset of species (indices) compatible with this node
             G::species_t    _species;
-            double          _height;
 #endif
     };
     

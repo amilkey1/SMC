@@ -163,7 +163,6 @@ class Forest {
         double                          _log_coalescent_likelihood;
         double                          _panmictic_coalescent_likelihood;
         double                          _log_coalescent_likelihood_increment;
-        double                          _cum_height;
 #if !defined (FASTER_SECOND_LEVEL)
         vector<pair<double, pair<string, string>>>              _depths;
         vector<pair<tuple<string,string,string>, double>>    _species_build;
@@ -194,7 +193,6 @@ class Forest {
         double                          calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length);
 //        double                          getTreeHeight();
         double                          getTreeLength();
-        double                          getSpeciesTreeIncrement();
         double                          getLineageHeight(Node* nd);
         void                            addIncrement(double increment);
         void                            simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
@@ -238,7 +236,6 @@ class Forest {
         _done = false;
         _log_coalescent_likelihood = 0.0;
         _log_coalescent_likelihood_increment = 0.0;
-        _cum_height = 0.0;
         _nleaves=G::_ntaxa;
         _ninternals=0;
         _nincrements = 0;
@@ -297,6 +294,7 @@ class Forest {
             nd->_parent=0;
             nd->_number=i;
             nd->_edge_length=0.0;
+            nd->_height = 0.0;
             nd->_position_in_lineages=i;
             _lineages.push_back(nd);
         }
@@ -342,6 +340,7 @@ class Forest {
             nd->_parent=0;
             nd->_number=i;
             nd->_edge_length=0.0;
+            nd->_height = 0.0;
             nd->_position_in_lineages=i;
             _lineages.push_back(nd);
         }
@@ -1173,7 +1172,6 @@ class Forest {
         _done = other._done;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
-        _cum_height = other._cum_height;
         _relative_rate = other._relative_rate;
         _nincrements = other._nincrements;
         _preorder.resize(other._preorder.size());
@@ -1261,9 +1259,9 @@ class Forest {
                     nd->_edge_length = othernd._edge_length;
                     nd->_position_in_lineages = othernd._position_in_lineages;
                     nd->_partial = othernd._partial;
+                    nd->_height = othernd._height;
     #if defined (FASTER_SECOND_LEVEL)
                     nd->_species = othernd._species;
-                    nd->_height = othernd._height;
     #endif
                 }
             }
@@ -1306,6 +1304,7 @@ class Forest {
             nd->_parent=0;
             nd->_number=i;
             nd->_edge_length=0.0;
+            nd->_height = 0.0;
             nd->_position_in_lineages=i;
             nd->_name=species_names[i];
             _lineages.push_back(nd);
@@ -1457,7 +1456,6 @@ class Forest {
 
 
     inline tuple<string,string, string> Forest::speciesTreeProposal(Lot::SharedPtr lot) {
-        _cum_height = 0.0; // reset cum height for a new lineage
         // this function creates a new node and joins two species
         
         bool done = false;
@@ -1515,9 +1513,7 @@ class Forest {
         }
 #endif
         
-#if defined (FASTER_SECOND_LEVEL)
-        new_nd->_height = getLineageHeight(new_nd);
-#endif
+        new_nd->_height = _forest_height;
         
         calcTopologyPrior((int) _lineages.size()+1);
 
@@ -2057,18 +2053,16 @@ class Forest {
     // Also save starting edge lengths so they can be restored in destroyUPGMA()
         row.clear();
     _upgma_starting_edgelen.clear();
-    for (unsigned i = 0; i < n; i++) {
-        Node * nd = _lineages[i];
-        _upgma_starting_edgelen[nd] = nd->_edge_length;
-        row[nd] = i;
-    }
+        for (unsigned i = 0; i < n; i++) {
+            Node * nd = _lineages[i];
+            _upgma_starting_edgelen[nd] = nd->_edge_length;
+            row[nd] = i;
+        }
         
-//        double upgma_height = 0.0;
-    
-    // Build UPGMA tree on top of existing forest
-    assert(_upgma_additions.empty());
+        // Build UPGMA tree on top of existing forest
+        assert(_upgma_additions.empty());
         
-        double upgma_height = getLineageHeight(_lineages.back());
+        double upgma_height = _lineages.back()->_height;
                     
     unsigned nsteps = n - 1;
     while (nsteps > 0) {
@@ -2436,6 +2430,7 @@ class Forest {
          new_nd->_partial=ps.getPartial(_npatterns*4);
          assert(new_nd->_left_child->_right_sib);
          calcPartialArray(new_nd);
+        new_nd->_height = _forest_height;
 
          // don't update the species list
          updateNodeVector(_lineages, subtree1, subtree2, new_nd);
@@ -2524,6 +2519,7 @@ class Forest {
                  }
              }
              calcPartialArray(new_nd);
+             new_nd->_height = _forest_height;
              
 #if defined (FASTER_SECOND_LEVEL)
              new_nd->_species = 0;
@@ -2686,11 +2682,6 @@ class Forest {
         return sum_height;
     }
 
-    inline double Forest::getSpeciesTreeIncrement() {
-        assert (_index == 0);
-        return _cum_height;
-    }
-
     inline vector<pair<double, string>> Forest::calcForestRate(Lot::SharedPtr lot) {
         vector<pair<double, string>> rates;
         pair<double, string> rate_and_name;
@@ -2715,12 +2706,8 @@ class Forest {
     inline void Forest::addIncrement(double increment) {
         for (auto &nd:_lineages) {
             nd->_edge_length += increment;
-            _last_edge_length = increment;
         }
-        if (_index == 0) {
-            _last_edge_length = increment;
-            _cum_height += increment;
-        }
+        _last_edge_length = increment;
         
         _forest_height += _last_edge_length;
     }
@@ -3542,9 +3529,8 @@ class Forest {
                         done = true;
                     }
                     if (spp_left_child != spp_right_child) {
-                        double height = getLineageHeight(nd->_left_child);
+                        double height = nd->_height;
                         _depths.push_back(make_pair(height, make_pair(spp_left_child, spp_right_child)));
-    //                        _depths.push_back(height);
                     }
                     spp_left_child = "";
                     spp_right_child = "";
@@ -3552,7 +3538,6 @@ class Forest {
             }
         }
         assert (_depths.size() > 0);
-    //        return depths[0];
     }
 #endif
 
@@ -3580,14 +3565,14 @@ class Forest {
             Node * nd = *it;
             if (nd->_left_child) {
                 // if internal node, store cumulative height in _height
-                double height = getLineageHeight(nd->_left_child); //
+                double height = nd->_height; //
                 heights_and_nodes.push_back(make_pair(height, nd));
 //                nd->_height = nd->_left_child->_height + nd->_left_child->_edge_length;
 //                heights_and_nodes.push_back(make_pair(nd->_height, nd));
             }
             else {
                 // if leaf node, initialize _height to zero
-//                nd->_height = 0.0;
+                nd->_height = 0.0;
             }
         }
          
@@ -4139,10 +4124,8 @@ class Forest {
 
         _nodes.sort(
              [this](Node& lhs, Node& rhs) {
+//                 return lhs._left_child->_height < rhs._left_child->_height; } ); // TODO: is this just lhs->_height and rhs->_height?
                  return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
-
-//        _lineages.clear();
-//        _lineages.push_back(&_nodes.back());
 
         // reset node numbers and names that are not tips
         int j = 0;
@@ -4449,6 +4432,7 @@ class Forest {
         
         _nodes.sort(
              [this](Node& lhs, Node& rhs) {
+//                 return lhs._left_child->_height < rhs._left_child->_height; } );  // TODO: is this just lhs->_height and rhs->_height?
                  return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
         _lineages.clear();
         
@@ -4552,7 +4536,6 @@ class Forest {
                     assert(nd->_left_child->_right_sib);
                     assert(nd->_left_child->_right_sib->_right_sib == nullptr);
                     nd->_species = (nd->_left_child->_species | nd->_left_child->_right_sib->_species);
-                    nd->_height = getLineageHeight(nd->_left_child); // node height is sum of child's branch lengths
                     addCoalInfoElem(nd, _coalinfo);
                 }
                 else {
@@ -4561,9 +4544,7 @@ class Forest {
                     nd->_species = (G::species_t)1 << spp_index;
                 }
             }
-        
-//        cout << "x";
-    }
+        }
 #endif
 
 #if defined (FASTER_SECOND_LEVEL)
@@ -4681,8 +4662,6 @@ class Forest {
         // Assumes heights and preorders are up-to-date; call
         //   heightsInternalsPreorders() beforehand to ensure this
         
-//        double forest_height = getLineageHeight(_lineages.back());
-
         // Dump _coalinfo into coalinfo_vect
         if (!_coalinfo.empty()) {
             coalinfo_vect.insert(coalinfo_vect.begin(), _coalinfo.begin(), _coalinfo.end());
@@ -4754,7 +4733,7 @@ class Forest {
 
 #if defined (FASTER_SECOND_LEVEL)
     inline void Forest::setTreeHeight() {
-        _forest_height = getLineageHeight(_lineages.back());
+        _forest_height = _lineages.back()->_height;
     }
 #endif
 
