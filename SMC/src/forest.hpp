@@ -137,7 +137,6 @@ class Forest {
         vector<coalinfo_t>              _coalinfo;
         mutable vector<Node::ptr_vect_t> _preorders;
         mutable unsigned                _next_node_number;
-        double                          _forest_height;
 #endif
 
         map<string, double>             _theta_map;
@@ -188,11 +187,12 @@ class Forest {
         double                          _relative_rate;
         vector<pair<string, unsigned>>  _lineages_per_species;
         unsigned                        _partials_calculated_count;
+        double                          _forest_height;
     
         void                            showSpeciesJoined();
         double                          calcTransitionProbability(double s, double s_child, double edge_length);
         double                          calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length);
-        double                          getTreeHeight();
+//        double                          getTreeHeight();
         double                          getTreeLength();
         double                          getSpeciesTreeIncrement();
         double                          getLineageHeight(Node* nd);
@@ -262,11 +262,11 @@ class Forest {
         _starting_row.clear();
         _lineages_per_species.clear();
         _partials_calculated_count = 0;
+        _forest_height = 0.0;
 #if defined (FASTER_SECOND_LEVEL)
         _coalinfo.clear();
         _preorders.clear();
         _next_node_number = 0;
-        _forest_height = 0.0;
 #endif
     }
 
@@ -1197,11 +1197,11 @@ class Forest {
         _starting_row = other._starting_row;
         _species_names = other._species_names;
         _partials_calculated_count = other._partials_calculated_count;
+        _forest_height = other._forest_height;
 #if defined (FASTER_SECOND_LEVEL)
         _coalinfo = other._coalinfo;
         _preorders = other._preorders;
         _next_node_number = other._next_node_number;
-        _forest_height = other._forest_height;
 #endif
 
         // copy tree itself
@@ -1310,11 +1310,14 @@ class Forest {
             nd->_name=species_names[i];
             _lineages.push_back(nd);
 #if defined (FASTER_SECOND_LEVEL)
-        if (G::_taxon_to_species.count(nd->_name) == 0)
-            throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd->_name));
-        else {
-            Node::setSpeciesBit(nd->_species, G::_taxon_to_species.at(nd->_name), /*init_to_zero_first*/true);
-        }
+            if (G::_start_mode != "sim") {
+                if (G::_taxon_to_species.count(nd->_name) == 0) {
+                    throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd->_name));
+                }
+                else {
+                    Node::setSpeciesBit(nd->_species, G::_taxon_to_species.at(nd->_name), /*init_to_zero_first*/true);
+                }
+            }
 #endif
             }
         
@@ -1323,7 +1326,7 @@ class Forest {
     }
 
     inline pair<double,double> Forest::chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth) {
-        double nlineages = (double) _lineages.size();
+        unsigned nlineages = (unsigned) _lineages.size();
         
         if (max_depth > 0.0) {
             double rate = (G::_lambda)*_lineages.size();
@@ -1370,9 +1373,7 @@ class Forest {
         
         double constrained_factor = log(1 - exp(-1*nlineages*G::_lambda*max_depth));
         
-#if defined (FASTER_SECOND_LEVEL)
         _forest_height += _last_edge_length;
-#endif
         
         return make_pair(_last_edge_length, constrained_factor);
 
@@ -1464,7 +1465,6 @@ class Forest {
         Node* subtree2 = nullptr;
         
         while (!done) {
-        
             assert (lot != nullptr);
             pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
             assert (t.first != t.second);
@@ -1571,11 +1571,14 @@ class Forest {
                 break;
             }
 #if defined (FASTER_SECOND_LEVEL)
-        if (G::_taxon_to_species.count(nd._name) == 0)
-            throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd._name));
-        else {
-            Node::setSpeciesBit(nd._species, G::_taxon_to_species.at(nd._name), /*init_to_zero_first*/true);
-        }
+            if (G::_start_mode != "sim") {
+                if (G::_taxon_to_species.count(nd._name) == 0) {
+                    throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd._name));
+                }
+                else {
+                    Node::setSpeciesBit(nd._species, G::_taxon_to_species.at(nd._name), /*init_to_zero_first*/true);
+                }
+            }
 #endif
         }
         
@@ -2445,9 +2448,7 @@ class Forest {
 
          Node *subtree1 = nullptr;
          Node *subtree2 = nullptr;
-         list<Node*> nodes;
-
-        nodes = _species_partition[species_name];
+         list<Node*> nodes = _species_partition[species_name];
         
         assert (nodes.size() > 0);
 
@@ -2531,10 +2532,10 @@ class Forest {
              subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
              subtree2->_partial=nullptr;
          }
-
-             //update species list
-             updateNodeList(nodes, subtree1, subtree2, new_nd);
-             updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+        
+        //update species list
+         updateNodeList(nodes, subtree1, subtree2, new_nd);
+         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
 
         _species_partition[species_name] = nodes;
 
@@ -2642,37 +2643,37 @@ class Forest {
         node_list.push_back(addnode);
     }
 
-#if defined (FASTER_SECOND_LEVEL)
-    inline double Forest::getTreeHeight() {
-        if (_index == 0 || _lineages.size() > 1) {
-            double sum_height = 0.0;
-
-            // calculate height of lineage
-            Node* base_node = _lineages[0];
-            sum_height += base_node->getEdgeLength();
-            for (Node* child=base_node->_left_child; child; child=child->_left_child) {
-                sum_height += child->getEdgeLength();
-            }
-            return sum_height;
-        }
-        else {
-            assert (_forest_height > 0.0);
-            return _forest_height;
-        }
-    }
-#else
-    inline double Forest::getTreeHeight() {
-        double sum_height = 0.0;
-
-        // calculate height of lineage
-        Node* base_node = _lineages[0];
-        sum_height += base_node->getEdgeLength();
-        for (Node* child=base_node->_left_child; child; child=child->_left_child) {
-            sum_height += child->getEdgeLength();
-        }
-        return sum_height;
-    }
-#endif
+//#if defined (FASTER_SECOND_LEVEL)
+//    inline double Forest::getTreeHeight() {
+//        if (_index == 0 || _lineages.size() > 1) {
+//            double sum_height = 0.0;
+//
+//            // calculate height of lineage
+//            Node* base_node = _lineages[0];
+//            sum_height += base_node->getEdgeLength();
+//            for (Node* child=base_node->_left_child; child; child=child->_left_child) {
+//                sum_height += child->getEdgeLength();
+//            }
+//            return sum_height;
+//        }
+//        else {
+//            assert (_forest_height > 0.0);
+//            return _forest_height;
+//        }
+//    }
+//#else
+//    inline double Forest::getTreeHeight() {
+//        double sum_height = 0.0;
+//
+//        // calculate height of lineage
+//        Node* base_node = _lineages[0];
+//        sum_height += base_node->getEdgeLength();
+//        for (Node* child=base_node->_left_child; child; child=child->_left_child) {
+//            sum_height += child->getEdgeLength();
+//        }
+//        return sum_height;
+//    }
+//#endif
 
     inline double Forest::getTreeLength() {
         // sum of all edge lengths in tree
@@ -2714,15 +2715,14 @@ class Forest {
     inline void Forest::addIncrement(double increment) {
         for (auto &nd:_lineages) {
             nd->_edge_length += increment;
+            _last_edge_length = increment;
         }
         if (_index == 0) {
             _last_edge_length = increment;
             _cum_height += increment;
         }
         
-#if defined (FASTER_SECOND_LEVEL)
         _forest_height += _last_edge_length;
-#endif
     }
 
     inline void Forest::resetThetaMap(Lot::SharedPtr lot) { // TODO: not sure if this works if not doing jones coalescent likelihood - double check

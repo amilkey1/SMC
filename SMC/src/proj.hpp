@@ -853,7 +853,7 @@ namespace proj {
         ("save_gene_trees_separately", boost::program_options::value(&G::_save_gene_trees_separately)->default_value(false), "for simulations, save gene trees in separate files")
         ("newick_path", boost::program_options::value(&G::_newick_path)->default_value("."), "path to gene newicks are if starting from gene newicks and only performing SMC on second round")
         ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(5), "number of populations")
-        ("upgma", boost::program_options::value(&G::_upgma)->default_value(false), "set to true to use UPGMA completion")
+        ("upgma", boost::program_options::value(&G::_upgma)->default_value(true), "set to false to not use UPGMA completion")
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -1648,17 +1648,17 @@ namespace proj {
 
     inline double Proj::filterParticles(unsigned step, vector<Particle> & particles, vector<unsigned> &particle_indices, unsigned start, unsigned end) {
         // Copy log weights for all bundles to prob vector
-
+        
         vector<double> probs(G::_nparticles, 0.0);
 
-      unsigned count_index = 0;
-      for (unsigned p=start; p<end+1; p++) {
-          unsigned particle_number = particle_indices[p];
-          probs[count_index] = particles[particle_number].getLogWeight();
-          count_index++;
+        unsigned count_index = 0;
+        for (unsigned p=start; p<end+1; p++) {
+            unsigned particle_number = particle_indices[p];
+            probs[count_index] = particles[particle_number].getLogWeight();
+            count_index++;
         }
 
-      assert (probs.size() == G::_nparticles);
+        assert (probs.size() == G::_nparticles);
         // Normalize log_weights to create discrete probability distribution
         double log_sum_weights = getRunningSum(probs);
 
@@ -1685,10 +1685,8 @@ namespace proj {
 
         // Throw _nparticles darts
       for (unsigned i=start; i<end+1; i++) {
-//            double u = rng.uniform();
           unsigned group_number = start / G::_nparticles;
           double u = _group_rng[group_number]->uniform();
-//          cout << group_number << " : " << u << endl;
           auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
           assert(it != probs.end());
           unsigned which = (unsigned)std::distance(probs.begin(), it);
@@ -1697,7 +1695,7 @@ namespace proj {
 
         // Copy particles
 
-      bool copying_needed = true;
+        bool copying_needed = true;
 
         // Locate first donor
         unsigned donor = 0;
@@ -1709,7 +1707,7 @@ namespace proj {
             }
         }
 
-      if (copying_needed) {
+        if (copying_needed) {
             // Locate first recipient
             unsigned recipient = 0;
             while (counts[recipient] != 0) {
@@ -1909,8 +1907,8 @@ namespace proj {
 
     inline void Proj::createSpeciesMap(Data::SharedPtr d) {
         // this only works if names are in taxon^species format (no _)
-        const vector<string> &names = d->getTaxonNames();
-        for (auto &name:names) {
+        G::_taxon_names = d->getTaxonNames();
+        for (auto &name:G::_taxon_names) {
             regex re(".+\\^(.+)");
             smatch match_obj;
             bool matched=regex_match(name, match_obj, re); //search name for regular expression, store result in match_obj
@@ -2532,6 +2530,9 @@ namespace proj {
                 ntaxa += t;
             }
         }
+        
+        G::_ntaxa = ntaxa;
+        G::_nspecies = (unsigned) G::_ntaxaperspecies.size();
 
         vector<Particle> sim_vec(1);
         sim_vec[0] = Particle();
@@ -2836,13 +2837,6 @@ namespace proj {
 
 #if defined (FASTER_SECOND_LEVEL)
     inline void Proj::buildSpeciesMap(bool taxa_from_data) {
-        vector<string> taxon_names;
-        for (auto &t:_taxon_map) {
-            taxon_names.push_back(t.first);
-        }
-        
-        G::_taxon_names = taxon_names;
-        
         // Populates G::_species_names and G::_taxon_to_species
         // For example, given these taxon names
         //  t1^A, t2^A, t3^B, t4^B, t5^B, t6^C, t7^C, t8^D, t9^D, t10^D
@@ -2866,16 +2860,14 @@ namespace proj {
         G::_taxon_to_species.clear();
 
 //        output("\nMapping taxon names to species index:\n", 2);
-        unsigned ntax = (unsigned)taxon_names.size();
+        unsigned ntax = (unsigned)G::_taxon_names.size();
         assert(ntax > 0);
         if (taxa_from_data) {
             // Assume taxon names are already stored in _data object and no
             // species names have yet been stored
             _species_names.clear();
-            const Data::taxon_names_t & tnames = _data->getTaxonNames();
-            assert(tnames.size() > 0);
-            ntax = (unsigned)tnames.size();
-            for (auto & tname : tnames) {
+            assert(G::_taxon_names.size() > 0);
+            for (auto & tname : G::_taxon_names) {
                 string species_name = Node::taxonNameToSpeciesName(tname);
 //                output(format("  %s --> %s\n") % tname % species_name, 2);
                 unsigned species_index = ntax;
@@ -2902,7 +2894,7 @@ namespace proj {
             }
             
             // Now build G::_taxon_to_species from G::_taxon_names and species_name_to_index
-            for (auto & tname : taxon_names) {
+            for (auto & tname : G::_taxon_names) {
                 string species_name = Node::taxonNameToSpeciesName(tname);
                 unsigned species_index = 0;
                 if (species_name_to_index.count(species_name) == 0) {
@@ -3006,15 +2998,14 @@ namespace proj {
                     checkOutgroupName();
                 }
 
-                //set number of species to number in data file
+                // set some globla variables
                 G::_ntaxa = _data->getNumTaxa();
                 G::_nspecies = (unsigned) _species_names.size();
-                rng.setSeed(_random_seed);
-
-    //          create vector of particles
-
                 G::_nloci = _data->getNumSubsets();
                 
+                // set random number seed
+                rng.setSeed(_random_seed);
+
 #if defined (FASTER_SECOND_LEVEL)
                 buildSpeciesMap(/*taxa_from_data*/true);
 #endif
@@ -3052,25 +3043,19 @@ namespace proj {
                     psuffix += 2;
                 }
 
-                for (auto &p:my_vec) { // TODO: can parallelize this - is it worth it?
-                    
 #if defined (DRAW_NEW_THETA)
-                    assert (!G::_fix_theta);
+                assert (!G::_fix_theta);
+                for (auto &p:my_vec) {
                     p.drawTheta();
-#endif
                 }
-                
-//                if (G::_save_memory) { // don't clear any partials because they will just have to be reset again for first likelihood
-//                    my_vec[0].clearPartials(); // all other particles should have no partials
-//                }
+#endif
                 
                 // particle_indices holds the subgroup each particle is in
-                vector<unsigned> particle_indices;
                 unsigned total_n_particles = G::_nparticles * G::_ngroups;
-                
-                for (unsigned i=0; i<total_n_particles; i++) {
-                    particle_indices.push_back(i);
-                }
+                vector<unsigned> particle_indices(total_n_particles);
+
+                // fill particle_indices with values starting from 0
+                iota(particle_indices.begin(), particle_indices.end(), 0);
                 
                 //run through each generation of particles
 

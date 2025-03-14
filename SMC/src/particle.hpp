@@ -177,7 +177,6 @@ class Particle {
         vector<double>                          _starting_log_likelihoods;
         vector<unsigned>                        _gene_order;
         bool                                    _fix_theta;
-        vector<double>                          _relative_rates_by_gene;
 #if !defined (FASTER_SECOND_LEVEL)
         unsigned                                _species_branches;
 #endif
@@ -238,7 +237,6 @@ class Particle {
         _next_species_number_by_gene.clear();
         _gene_order.clear();
         _fix_theta = false;
-        _relative_rates_by_gene.clear();
 #if !defined (FASTER_SECOND_LEVEL)
         _species_branches = 0;
 #endif
@@ -329,7 +327,7 @@ class Particle {
     }
 
     inline double Particle::getSpeciesTreeHeight() {
-        return _forests[0].getTreeHeight();
+        return _forests[0]._forest_height;
     }
 
     inline double Particle::getSpeciesTreeLength() {
@@ -339,7 +337,7 @@ class Particle {
     inline vector<double> Particle::getGeneTreeHeights() {
         vector<double> gene_tree_heights;
         for (int i=1; i<_forests.size(); i++) {
-            gene_tree_heights.push_back(_forests[i].getTreeHeight());
+            gene_tree_heights.push_back(_forests[i]._forest_height);
         }
         return gene_tree_heights;
     }
@@ -447,7 +445,6 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline void Particle::proposal() {
         double inv_gamma_modifier = 0.0;
-//        double log_weight_modifier = 0.0;
         
         unsigned next_gene = _gene_order[_generation];
         bool calc_weight = false;
@@ -645,7 +642,7 @@ inline vector<double> Particle::getVectorPrior() {
                 }
                 if (_forests[0]._lineages.size() > 1) {
                     max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
-                    max_depth -= _forests[0].getTreeHeight();
+                    max_depth -= _forests[0]._forest_height;
                     // choose a species tree increment
                 }
                 
@@ -774,8 +771,6 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
         
 #endif
-//        _forests[0].showForest();
-//        _forests[1].showForest();
             _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
 #if !defined (UNCONSTRAINED_PROPOSAL)
             double test = 1/_log_species_weight;
@@ -852,7 +847,7 @@ inline vector<double> Particle::getVectorPrior() {
                 }
                 if (_forests[0]._lineages.size() > 1) {
                     max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
-                    max_depth -= _forests[0].getTreeHeight();
+                    max_depth -= _forests[0]._forest_height;
                     // choose a species tree increment
                 }
                 
@@ -927,7 +922,7 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline void Particle::calcStartingUPGMAMatrix() {
         for (unsigned i=1; i<_forests.size(); i++) {
-            _forests[i].buildStartingUPGMAMatrix(); // TODO: can do this once and copy to all particles
+            _forests[i].buildStartingUPGMAMatrix();
         }
     }
 
@@ -1081,7 +1076,7 @@ inline vector<double> Particle::getVectorPrior() {
         map<string, double> theta_map = _forests[1]._theta_map;
         map<string, unsigned> species_indices = _forests[1]._species_indices;
         if (_forests.size() > 2) {
-            for (int i=2; i<_forests.size(); i++) {
+            for (unsigned i=2; i<_forests.size(); i++) {
                 _forests[i]._theta_map = theta_map;
                 _forests[i]._species_indices = species_indices;
                 _forests[i]._theta_mean = theta_mean;
@@ -1136,7 +1131,7 @@ inline vector<double> Particle::getVectorPrior() {
         //species tree
         _forests[0].setUpSpeciesForest(species_names);
 
-        if (_forests[1]._lineages.size() > 0) {
+        if (_forests[1]._lineages.size() > 0) { // don't redo this for faster second level when nodes have been cleared from gene trees
             //gene trees
             for (unsigned i=1; i<_forests.size(); i++) {
                 _forests[i].setUpGeneForest(taxon_map);
@@ -1296,7 +1291,7 @@ inline vector<double> Particle::getVectorPrior() {
         vector<double> gene_tree_heights;
         for (unsigned i=1; i<_forests.size(); i++) {
             if (_forests[i]._species_partition.size() > 1) {
-                gene_tree_heights.push_back(_forests[i].getTreeHeight());
+                gene_tree_heights.push_back(_forests[i]._forest_height);
             }
             else {
                 trim = false;
@@ -1311,7 +1306,7 @@ inline vector<double> Particle::getVectorPrior() {
             unsigned count = (unsigned) _t.size();
             
             while (!done) {
-                double species_tree_height = _forests[0].getTreeHeight();
+                double species_tree_height = _forests[0]._forest_height;
                 double amount_to_trim = 0.0;
                 
                 Node* nd = _forests[0]._lineages.back();
@@ -1349,7 +1344,7 @@ inline vector<double> Particle::getVectorPrior() {
                     for (auto &nd:_forests[0]._lineages) {
                         nd->_edge_length -= amount_to_trim;
                     }
-
+                    _forests[0]._forest_height -= amount_to_trim;
                 }
                 else {
                     amount_to_trim = species_tree_height - max_gene_tree_height;
@@ -1357,6 +1352,8 @@ inline vector<double> Particle::getVectorPrior() {
                     for (auto &nd:_forests[0]._lineages) {
                         nd->_edge_length -= amount_to_trim;
                     }
+                    _forests[0]._forest_height -= amount_to_trim;
+                    
                     _t[count-2].second -= amount_to_trim;
                     
                     for (auto &g:_t_by_gene) {
@@ -1524,8 +1521,6 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::setRelativeRatesByGene(vector<double> rel_rates) {
-        _relative_rates_by_gene = rel_rates;
-        
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i]._relative_rate = rel_rates[i-1];
         }
@@ -2070,7 +2065,6 @@ inline vector<double> Particle::getVectorPrior() {
         _next_species_number_by_gene = other._next_species_number_by_gene;
         _gene_order = other._gene_order;
         _fix_theta = other._fix_theta;
-        _relative_rates_by_gene = other._relative_rates_by_gene;
 #if !defined (FASTER_SECOND_LEVEL)
         _species_branches = other._species_branches;
 #endif
