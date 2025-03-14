@@ -123,7 +123,7 @@ class Forest {
     
 #if defined (FASTER_SECOND_LEVEL)
         void                            saveCoalInfoInitial();
-        void                            saveCoalInfo(vector<Forest::coalinfo_t> & coalinfo_vect) const;
+        void                            saveCoalInfoGeneForest(vector<Forest::coalinfo_t> & coalinfo_vect) const;
         void                            saveCoalInfoSpeciesTree(vector<Forest::coalinfo_t> & coalinfo_vect, bool cap);
         void                            addCoalInfoElem(const Node *, vector<coalinfo_t> & recipient);
         void                            buildCoalInfoVect();
@@ -2245,6 +2245,10 @@ class Forest {
         for (unsigned i = 0; i < n; i++) {
             Node * nd = _lineages[i];
             _starting_row[nd] = i; // TODO: can save this earlier to not remake it
+        }
+        
+        if (_lineages.size() == 1) {
+            _lineages.back()->_partial = nullptr; // last step, only node with partials should be the new node, and partials are no longer needed if likelihood has been calculated
         }
     }
         
@@ -4479,7 +4483,7 @@ class Forest {
 #endif
 
 #if defined (FASTER_SECOND_LEVEL)
-    inline void Forest::saveCoalInfo(vector<Forest::coalinfo_t> & coalinfo_vect) const {
+    inline void Forest::saveCoalInfoGeneForest(vector<Forest::coalinfo_t> & coalinfo_vect) const {
         // Appends to coalinfo_vect; clear before calling if desired
         // GeneForest version ignores cap argument.
         // Assumes heights and preorders are up-to-date; call
@@ -4502,7 +4506,7 @@ class Forest {
     inline void Forest::buildCoalInfoVect() {
         assert (_index == 0);
         
-        refreshAllPreorders();
+        refreshAllPreorders(); // TODO: don't always need to refresh preorders?
         
         _coalinfo.clear();
         for (auto & preorder : _preorders) {
@@ -4522,31 +4526,7 @@ class Forest {
                 }
             }
         }
-
-        // Assumes heights of all nodes are accurate
-        //
-//        _coalinfo.clear();
-//
-//        if (_preorder.size() == 0) {
-//            refreshPreorder(); // TODO: not sure what to do here
-//        }
-//        assert (_preorder.size() > 0);
-//        for (auto nd : boost::adaptors::reverse(_preorder)) {
-//            if (nd->_left_child) {
-//                // nd is an internal node
-//                assert(nd->_height != _infinity);
-//                assert(nd->_left_child->_right_sib);
-//                assert(nd->_left_child->_right_sib->_right_sib == nullptr);
-//                nd->_species = (nd->_left_child->_species | nd->_left_child->_right_sib->_species);
-//                addCoalInfoElem(nd, _coalinfo);
-//            }
-//            else {
-//                // nd is a leaf node
-//                unsigned spp_index = G::_taxon_to_species.at(nd->_name);
-//                nd->_species = (G::species_t)1 << spp_index;
-//            }
-//        }
-        }
+    }
 
 #endif
 

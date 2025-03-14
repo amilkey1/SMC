@@ -1566,7 +1566,7 @@ inline vector<double> Particle::getVectorPrior() {
         // Stores tuple (height, 0, vector of species) for each join in the current species forest.
         // Do not cap with ancestral species at this point.
         vector<Forest::coalinfo_t> sppinfo_vect;
-        _forests[0].saveCoalInfoSpeciesTree(sppinfo_vect, false); // TODO: unsure about false?
+        _forests[0].saveCoalInfoSpeciesTree(sppinfo_vect, false); // don't save ancestral pop
 
         // Sort sppinfo_vect from smallest height to largest height
         sort(sppinfo_vect.begin(), sppinfo_vect.end());
@@ -1582,7 +1582,7 @@ inline vector<double> Particle::getVectorPrior() {
         // limits for species tree increments
         
         for (unsigned f=1; f<_forests.size(); f++) {
-            _forests[f].saveCoalInfo(coalinfo_vect);
+            _forests[f].saveCoalInfoGeneForest(coalinfo_vect);
         }
         
         // Sort coalinfo_vect from smallest to largest height
@@ -1626,7 +1626,7 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
                 
             // Adjust elements of coalinfo_vect affected by species tree joins
-            _forests[0].fixupCoalInfo(coalinfo_vect, sppinfo_vect); // TODO: this is not working - but maybe it's the species tree vect that's wrong?
+            _forests[0].fixupCoalInfo(coalinfo_vect, sppinfo_vect);
 
 #if defined(DEBUG_COALLIKE)
             // Show coalinfo_vect before fixing up
@@ -1640,18 +1640,15 @@ inline vector<double> Particle::getVectorPrior() {
         }
         
         // Draw a speciation increment dt.
-//        double forest_height = _forests[0].getLineageHeight(_forests[0]._lineages[0]);
         double forest_height = _forests[0]._forest_height;
         //speclog_element._height = forest_height;
         double h = findHeightNextCoalescentEvent(forest_height, coalinfo_vect);
         assert(h <= max_height);
         
-//        pair<double,double> tmp = chooseTruncatedSpeciesForestIncrement(h);
         pair<double,double> tmp = _forests[0].chooseSpeciesIncrementOnlySecondLevel(_lot, h);
         
         double log_weight_factor = tmp.second;
         assert (log_weight_factor == log_weight_factor); // check for NaN
-        //double increment = tmp.first;
         
         num_species_tree_lineages = (unsigned) _forests[0]._lineages.size();
         if (num_species_tree_lineages == 2) {
@@ -1818,8 +1815,7 @@ inline vector<double> Particle::getVectorPrior() {
         typedef map<G::species_t, double> dmap;
         
         // n_jb[g][b] holds starting (leaf-end) number of lineages for locus g, branch b
-        unsigned nloci = (unsigned) _forests.size() - 1;
-        vector<dmap> n_jb(nloci);
+        vector<dmap> n_jb(G::_nloci);
         
         // log_r_b[b] holds sum of log(r_b) for branch b
         dmap log_r_b;
@@ -1847,15 +1843,15 @@ inline vector<double> Particle::getVectorPrior() {
         
         // Initialize n_jb for other loci by copying n_jb for locus 0
         // Assumes the same number of individuals have been sampled from each species for all loci
-        for (unsigned g = 1; g < nloci; g++) {
+        for (unsigned g = 1; g < G::_nloci; g++) {
             n_jb[g] = n_jb[0];
         }
         
         // prev_height[g][b] holds previous height for locus g and branch b
-        vector<map<G::species_t, double> > prev_height(nloci);
+        vector<map<G::species_t, double> > prev_height(G::_nloci);
         
         // Ploidy for each locus (currently all loci assumed to be diploid)
-        vector<double> p_j(nloci, 2.0);
+        vector<double> p_j(G::_nloci, 2.0);
         
         // Vector branches stores branches (including ancestral ones)
         vector<G::species_t> branches;
@@ -1907,7 +1903,7 @@ inline vector<double> Particle::getVectorPrior() {
                     branches.push_back(banc);
                 }
                     
-                for (unsigned g = 0; g < nloci; g++) {
+                for (unsigned g = 0; g < G::_nloci; g++) {
                     // Account for non-coalescence since the last coalescent
                     unsigned nsum = 0;
                     for (auto b : b_vect) {
@@ -2043,10 +2039,13 @@ inline vector<double> Particle::getVectorPrior() {
 #if defined (FASTER_SECOND_LEVEL)
     inline void Particle::clearGeneForests() {
         for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i].saveCoalInfoInitial();
             _forests[i].setTreeHeight();
             _forests[i]._data = nullptr;
             _forests[i]._nodes.clear();
             _forests[i]._lineages.clear();
+            _forests[i]._preorder.clear();
+            _forests[i]._vector_prior.clear();
         }
     }
 #endif

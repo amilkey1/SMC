@@ -1955,20 +1955,13 @@ namespace proj {
         for (unsigned i=first; i<last; i++){
             vector<Particle> second_level_particles;
             Particle p = particles[i];
-            p.saveCoalInfoInitial();
 
             // initialize particles
             p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
             p.resetSpecies();
             p.mapSpecies(_taxon_map, _species_names);
 
-
             second_level_particles.resize(G::_particle_increase, p);
-            
-            
-            second_level_particles.resize(G::_particle_increase);
-            
-//            fill(second_level_particles.begin(), second_level_particles.end(), p);
 
             assert(second_level_particles.size() == G::_particle_increase);
         
@@ -1988,7 +1981,6 @@ namespace proj {
                 for (auto &p:second_level_particles) {
                     p.proposeSpeciationEvent();
                 }
-//                proposeSpeciesParticlesFaster(second_level_particles); // TODO: don't parallelize this step
                 
                 filterSpeciesParticles(s, second_level_particles);
             }
@@ -2035,9 +2027,9 @@ namespace proj {
             vector<Particle> use_vec;
             Particle p = particles[i];
             
-            use_vec.resize(G::_particle_increase);
+            use_vec.resize(G::_particle_increase, p);
             
-            fill(use_vec.begin(), use_vec.end(), p);
+//            fill(use_vec.begin(), use_vec.end(), p);
 
             assert(use_vec.size() == G::_particle_increase);
 
@@ -2649,6 +2641,8 @@ namespace proj {
 
 #if defined (FASTER_SECOND_LEVEL)
     inline void Proj::fasterSecondLevel(vector<Particle> &particles) {
+        StopWatch sw;
+        sw.start();
         if (G::_verbose > 1) {
             cout << "beginning second level SMC " << endl;
         }
@@ -2672,8 +2666,13 @@ namespace proj {
 
         unsigned number_of_particles_to_delete = particles.size() - G::_thin*particles.size();
         
+        StopWatch sw2;
+        sw2.start();
         // erase number_of_particles_to_delete
         particles.erase(particles.end() - number_of_particles_to_delete, particles.end());
+        
+        double total_seconds = sw2.stop();
+        cout << "total time thinning second level: " << total_seconds << endl;
 
         assert(particles.size() == ngroups);
 
@@ -2695,13 +2694,17 @@ namespace proj {
             psuffix += 2;
         }
 
+        double total_seconds2 = sw.stop();
+        cout << "total time initializing second level: " << total_seconds2 << endl;
+        
         if (G::_nthreads == 1) {
+            sw.start();
             for (unsigned g=0; g<ngroups; g++) { // propose and filter for each particle saved from first round
+
                 Particle p = particles[g];
                 vector<Particle > second_level_particles;
             
                 // initialize particles
-                p.saveCoalInfoInitial();
                 p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
                 p.resetSpecies();
                 p.mapSpecies(_taxon_map, _species_names);
@@ -2728,6 +2731,8 @@ namespace proj {
                     filterSpeciesParticles(s, second_level_particles);
                 
                 }
+//                double total_seconds = sw.stop();
+//                cout << "total time for one species tree SMC: " << total_seconds << endl;
                 
                 if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
                     unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
@@ -2766,17 +2771,11 @@ namespace proj {
             u_strees.open("unique_species_trees.trees", std::ios::app);
             u_strees << "end;" << endl;
             u_strees.close();
+            
+            double total_seconds = sw.stop();
+            cout << "total time for second level: " << total_seconds << endl;
         }
         else {
-//            for (auto &p:particles) {
-//                // initialize particles
-//                p.resetSpecies();
-//                p.mapSpecies(_taxon_map, _species_names);
-//
-//                p.saveCoalInfoInitial();
-//
-//                p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
-//            }
             
             proposeSpeciesGroupsFaster(particles, ngroups, filename1, filename2, filename3);
             
@@ -3020,6 +3019,9 @@ namespace proj {
                 buildSpeciesMap(/*taxa_from_data*/true);
 #endif
                 
+                StopWatch sw;
+                sw.start();
+                
                 Particle p;
                 initializeParticle(p); // initialize one particle and copy to all other particles
                 
@@ -3073,7 +3075,11 @@ namespace proj {
                 //run through each generation of particles
 
                 unsigned nsteps = (G::_ntaxa-1)*G::_nloci;
+                
+                double total_seconds = sw.stop();
+                cout << "total time initializing first level: " << total_seconds << endl;
             
+                sw.start();
                 for (unsigned g=0; g<nsteps; g++){
                     if (G::_verbose > 0) {
                         cout << "starting step " << g << " of " << nsteps-1 << endl;
@@ -3089,13 +3095,7 @@ namespace proj {
                     }
 
                     //taxon joining and reweighting step
-                    
-//                  StopWatch sw;
-//                  sw.start();
                     proposeParticles(my_vec);
-//                  double total_seconds = sw.stop();
-//                  cout << "\nTotal time for proposal step " << g << " : " << total_seconds << endl;
-//                  cout << total_seconds << endl;
 
                     bool filter = true;
 
@@ -3104,14 +3104,9 @@ namespace proj {
                     }
                     
                     if (filter) {
-                        StopWatch sw;
-//                      sw.start();
                             
                         // parallelize filtering by subgroup
-                            filterParticlesThreading(my_vec, g, particle_indices);
-//                      double total_seconds = sw.stop();
-//                      cout << "\nTotal time for filtering step " << g << " : " << total_seconds << endl;
-//                      cout << total_seconds << endl;
+                        filterParticlesThreading(my_vec, g, particle_indices);
                         
 //                      filterParticlesMixing(particle_indices, my_vec); // for now, don't do multinomial resampling
                         
@@ -3125,6 +3120,10 @@ namespace proj {
                     }
                 } // g loop
                 
+                total_seconds = sw.stop();
+                cout << "\nTotal time for first  round: " << total_seconds << endl;
+                cout << total_seconds << endl;
+                
                 if (G::_save_gene_trees) {
                     saveGeneTrees(my_vec);
                 }
@@ -3134,7 +3133,12 @@ namespace proj {
                     cout << "\n";
                 }
 
+                sw.start();
                 writePartialCountFile(my_vec);
+                total_seconds = sw.stop();
+                cout << "\nTotal time for writing partial file: " << total_seconds << endl;
+                cout << total_seconds << endl;
+                
 #if !defined (HIERARCHICAL_FILTERING)
                 writeParamsFileForBeastComparison(my_vec);
                 
@@ -3142,8 +3146,13 @@ namespace proj {
 #endif
 
 #if defined (HIERARCHICAL_FILTERING)
+                sw.start();
                 saveSpeciesTreesAfterFirstRound(my_vec);
+                total_seconds = sw.stop();
+                cout << "\nTotal time for saving species trees after first round: " << total_seconds << endl;
+                cout << total_seconds << endl;
                 
+                sw.start();
                 cout << "\n";
                 string filename1 = "species_trees.trees";
                 string filename2 = "unique_species_trees.trees";
@@ -3227,6 +3236,9 @@ namespace proj {
                     ngroups = 1;
                     cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
                 }
+                total_seconds = sw.stop();
+                cout << "\nTotal time setting files for second round: " << total_seconds << endl;
+                cout << total_seconds << endl;
                 
 #if defined (FASTER_SECOND_LEVEL)
                 fasterSecondLevel(my_vec);
@@ -3252,9 +3264,7 @@ namespace proj {
                 
 //#if defined (FASTER_SECOND_LEVEL)
 //                for (auto &p:my_vec)  {
-////                    Particle p = particles[i];
-//                    p.saveCoalInfoInitial();
-//
+////                    Particle p = particles[i];//
 //                    // initialize particles
 //                    p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
 //                    p.resetSpecies();
@@ -3369,11 +3379,10 @@ namespace proj {
                         
                         vector<Particle> use_vec;
                         
-                        use_vec.resize(G::_particle_increase);
-                        
                         Particle chosen_particle = my_vec[a];
-                                                
-                        fill(use_vec.begin(), use_vec.end(), chosen_particle);
+                        use_vec.resize(G::_particle_increase, a);
+                                                                        
+//                        fill(use_vec.begin(), use_vec.end(), chosen_particle);
                         
                         assert(use_vec.size() == G::_particle_increase);
 
