@@ -149,6 +149,7 @@ class Particle {
         double                                          calcLogCoalescentLikelihood(vector<Forest::coalinfo_t> & coalinfo_vect, bool integrate_out_thetas, bool verbose);
         void                                            resetPrevLogCoalLike();
         void                                            clearGeneForests();
+        void                                            setNodeHeights();
 #endif
 
     private:
@@ -541,7 +542,6 @@ inline vector<double> Particle::getVectorPrior() {
             }
         }
             
-
          if (_forests[1]._theta_mean == 0.0) {
              assert (G::_theta > 0.0);
              for (int i=1; i<_forests.size(); i++) {
@@ -1483,12 +1483,14 @@ inline vector<double> Particle::getVectorPrior() {
                 }
             }
             
+#if defined (DRAW_NEW_THETA)
             // update theta map
             for (auto t:theta_map) {
                 if (t.second == -1.0)  {
                     _forests[1].updateThetaMap(_lot, t.first);
                 }
             }
+#endif
             
             if (_forests.size() > 2) {
                 for (unsigned i=2; i<_forests.size(); i++) {
@@ -2022,6 +2024,14 @@ inline vector<double> Particle::getVectorPrior() {
 
         _log_coal_like = log_likelihood;
         return log_likelihood;
+    }
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Particle::setNodeHeights() {
+        for (unsigned f=1; f<_forests.size(); f++) {
+            _forests[f].setNodeHeights();
+        }
     }
 #endif
 

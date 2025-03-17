@@ -1140,6 +1140,7 @@ namespace proj {
             p.processGeneNewicks(particle_newicks);
             p.resetSpecies();
             p.mapSpecies(_taxon_map, _species_names);
+            p.setNodeHeights();
             // TODO: can do this with the original template particle?
             count++;
         }
@@ -1223,13 +1224,6 @@ namespace proj {
 
         assert (G::_thin == 1.0);
         unsigned ngroups = round(G::_nparticles * G::_thin);
-
-//        for (auto &p:my_vec) {
-//            // reset forest species partitions
-//            p.clearPartials(); // no more likelihood calculations
-//            p.resetSpecies();
-//            p.mapSpecies(_taxon_map, _species_names);
-//        }
         
         assert(my_vec.size() == ngroups);
         
@@ -2938,6 +2932,10 @@ namespace proj {
                 if (G::_thin < 1.0) {
                     cout << "thin setting will be set to 1.0 for gene newick start " << endl;
                     G::_thin = 1.0;
+                }
+                if (G::_ngroups > 1) {
+                    cout << "ngroups will be set to 1.0 for gene newick start " << endl;
+                    G::_ngroups = 1.0;
                 }
                 handleGeneNewicks();
             }

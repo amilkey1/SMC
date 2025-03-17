@@ -134,6 +134,7 @@ class Forest {
         Node *                          findNextPreorderNew(Node * nd) const;
         pair<double,double>             chooseSpeciesIncrementOnlySecondLevel(Lot::SharedPtr lot, double max_depth);
         void                            setTreeHeight();
+        void                            setNodeHeights();
         vector<coalinfo_t>              _coalinfo;
         mutable vector<Node::ptr_vect_t> _preorders;
         mutable unsigned                _next_node_number;
@@ -4734,6 +4735,20 @@ class Forest {
 #if defined (FASTER_SECOND_LEVEL)
     inline void Forest::setTreeHeight() {
         _forest_height = _lineages.back()->_height;
+    }
+#endif
+
+#if defined (FASTER_SECOND_LEVEL)
+    inline void Forest::setNodeHeights() {
+        assert (_preorder.size() > 0);
+        for (auto &nd:_nodes) {
+            if (!nd._left_child) {
+                nd._height = 0.0;
+            }
+            else {
+                nd._height = getLineageHeight(nd._left_child);
+            }
+        }
     }
 #endif
 
