@@ -18,6 +18,13 @@
 #include <mutex>
 #include <random>
 
+extern int my_rank;
+#if defined(USING_MPI)
+extern int ntasks;
+#endif
+
+extern void output(string msg);
+
 using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
@@ -113,6 +120,15 @@ namespace proj {
             unsigned                    _count; // counter for params output file
             double                      _starting_log_likelihood;
             vector<Lot::SharedPtr>      _group_rng;
+        
+#if defined(USING_MPI)
+            void mpiSetSchedule();
+            vector<unsigned>            _mpi_first_particle;
+            vector<unsigned>            _mpi_last_particle;
+            vector<string>              _starting_gene_newicks;
+            vector<string>              _starting_species_newicks;
+            void                        growGeneTrees(Particle &particles, unsigned particle_number, unsigned gene_number, unsigned step);
+#endif
 
     };
 
@@ -249,7 +265,7 @@ namespace proj {
                     vector<double> theta_vec = p.getThetaVector();
                     logf << "\t" << theta_vec[i] / 4.0;
     #else
-                    logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
+                    logf << "\t" << G::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
     #endif
                 }
 
@@ -380,7 +396,7 @@ namespace proj {
                     logf << "\t" << theta_vec[i] / 4.0;
                 }
 #else
-                logf << "\t" << Forest::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
+                logf << "\t" << G::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
 #endif
             }
 
@@ -1557,7 +1573,6 @@ namespace proj {
                   assert(recipient < total_n_particles);
 
                   // Copy donor to recipient
-//                  particle_indices[recipient] = particle_indices[donor];
                   particles[recipient] = particles[donor];
 
                   counts[donor]--;
@@ -1935,7 +1950,7 @@ namespace proj {
 #if defined (DRAW_NEW_THETA)
         cout << "different theta for each population in each particle " << endl;
 #else
-        cout << "theta = " << Forest::_theta << endl;
+        cout << "theta = " << G::_theta << endl;
 #endif
 
 //        cout << "speciation rate = " << Forest::_lambda << endl;
@@ -2636,8 +2651,8 @@ namespace proj {
 
 #if defined (FASTER_SECOND_LEVEL)
     inline void Proj::fasterSecondLevel(vector<Particle> &particles) {
-        StopWatch sw;
-        sw.start();
+//        StopWatch sw;
+//        sw.start();
         if (G::_verbose > 1) {
             cout << "beginning second level SMC " << endl;
         }
@@ -2661,13 +2676,13 @@ namespace proj {
 
         unsigned number_of_particles_to_delete = particles.size() - G::_thin*particles.size();
         
-        StopWatch sw2;
-        sw2.start();
+//        StopWatch sw2;
+//        sw2.start();
         // erase number_of_particles_to_delete
         particles.erase(particles.end() - number_of_particles_to_delete, particles.end());
         
-        double total_seconds = sw2.stop();
-        cout << "total time thinning second level: " << total_seconds << endl;
+//        double total_seconds = sw2.stop();
+//        cout << "total time thinning second level: " << total_seconds << endl;
 
         assert(particles.size() == ngroups);
 
@@ -2689,11 +2704,11 @@ namespace proj {
             psuffix += 2;
         }
 
-        double total_seconds2 = sw.stop();
-        cout << "total time initializing second level: " << total_seconds2 << endl;
+//        double total_seconds2 = sw.stop();
+//        cout << "total time initializing second level: " << total_seconds2 << endl;
         
         if (G::_nthreads == 1) {
-            sw.start();
+//            sw.start();
             for (unsigned g=0; g<ngroups; g++) { // propose and filter for each particle saved from first round
 
                 Particle p = particles[g];
@@ -2767,8 +2782,8 @@ namespace proj {
             u_strees << "end;" << endl;
             u_strees.close();
             
-            double total_seconds = sw.stop();
-            cout << "total time for second level: " << total_seconds << endl;
+//            double total_seconds = sw.stop();
+//            cout << "total time for second level: " << total_seconds << endl;
         }
         else {
             
@@ -2923,7 +2938,103 @@ namespace proj {
     }
 #endif
 
+#if defined(USING_MPI)
+    inline void Proj::mpiSetSchedule() {
+       // Determine which particles will be handled by this processor: e.g.
+       // 20 = number of particles
+       //  3 = number of processors
+       //  6 = 20 / 3
+       //  2 = 20 % 3
+       //  rank 0 gets 6, rank 1 gets 7, rank 2 gets 7
+        unsigned total_n_particles = G::_nparticles * G::_ngroups;
+       vector<unsigned> particles_per_task(ntasks, total_n_particles  / ntasks);
+
+       unsigned particle_remainder = total_n_particles % ntasks;
+
+       // Each rank > 0 gets an extra job if there is any remainder
+       for (unsigned rank = 1; rank < ntasks; ++rank) {
+           if (particle_remainder > 0) {
+               particles_per_task[rank] += 1;
+               --particle_remainder;
+           }
+       }
+
+       _mpi_first_particle.resize(ntasks);
+       _mpi_last_particle.resize(ntasks);
+       unsigned particle_cum = 0;
+       output("\nParticle schedule:\n");
+       output(str(format("%12s %25s %25s\n") % "rank" % "first particle" % "last particle"));
+       for (unsigned rank = 0; rank < ntasks; ++rank) {
+           _mpi_first_particle[rank] = particle_cum;
+           _mpi_last_particle[rank]  = particle_cum + particles_per_task[rank];
+           particle_cum += particles_per_task[rank];
+           
+           output(str(format("%12d %25d %25d\n") % rank % (_mpi_first_particle[rank] + 1) % _mpi_last_particle[rank]));
+       }
+    }
+#endif
+
+#if defined(USING_MPI)
+    inline void Proj::growGeneTrees(Particle &particle, unsigned particle_number, unsigned gene_number, unsigned step) {
+        cout << "GROWING GENE TREES MPI for step " << step << endl;
+        //taxon joining and reweighting step
+        if (step > 0) {
+            cout << "about to initialize gene forest with newick " << _starting_gene_newicks[particle_number] << endl;
+            particle.initGeneForest(_starting_gene_newicks[particle_number]);
+            if (step % G::_nloci == 0) { // otherwise, species tree remains the same and does not need to be reset
+                cout << "about to initialize species forest with newick" << _starting_species_newicks[particle_number] << endl;
+                particle.initSpeciesForest(_starting_species_newicks[particle_number]);
+            }
+        }
+        particle.proposal();
+        
+//        particle.showParticle();
+
+        if (my_rank == 0) {
+//            particle.showParticle();
+//            cout << "saving gene newick " << endl;
+            string gene_newick = particle.saveChangedForest();
+            cout << "SAVED GENE NEWICK: " << gene_newick << endl;
+//            cout << "SAVING SPECIES TREE " << endl;
+            string species_newick = particle.saveForestNewick();
+            cout << "SAVED SPECIES NEWICK: " << species_newick << endl;
+//            particle.showParticle();
+            // Copy selected gene tree to _starting_gene_newicks
+            _starting_gene_newicks[particle_number] = gene_newick;
+            _starting_species_newicks[particle_number] = species_newick;
+        }
+        
+        else {
+            string gene_newick = to_string(gene_number) + "|" + particle.saveChangedForest(); // genes start at 0
+            string species_newick = to_string(-1) + "|" + particle.saveForestNewick(); // -1 indicates species tree
+            
+            
+            // send the newick string to the coordinator
+            int msglen_gene = 1 + gene_newick.size();
+            int msglen_species = 1 + species_newick.size();
+            int msglen = msglen_gene + msglen_species;
+            
+            gene_newick.resize(msglen_gene);      // Adds \0 character to the end
+            species_newick.resize(msglen_species);  // Adds \0 character to the end
+            string newick = gene_newick + species_newick;
+            
+            MPI_Send(&newick[0],        // void* data
+                     msglen,           // int count
+                     MPI_CHAR,               // MPI_Datatype datatype,
+                     0,                      // int destination,
+                     (int) particle_number,            // int tag,
+                     MPI_COMM_WORLD);        // MPI_Comm communicator)
+        }
+    }
+#endif
+
     inline void Proj::run() {
+#if defined(USING_MPI)
+        output("Starting MPI parallel version...\n");
+        output(str(format("No. processors: %d\n") % ntasks));
+#else
+        output("Starting serial version...\n");
+#endif
         if (G::_gene_newicks_specified) {
             if (G::_start_mode == "sim") {
                 throw XProj("cannot specify gene newicks and simulations");
@@ -2967,7 +3078,7 @@ namespace proj {
 #if defined (DRAW_NEW_THETA)
                 cout << "drawing new theta for each particle " << endl;
 #else
-                cout << "Theta: " << Forest::_theta << endl;
+                cout << "Theta: " << G::_theta << endl;
 #endif
                 cout << "Number of threads: " << G::_nthreads << endl;
             }
@@ -3008,8 +3119,8 @@ namespace proj {
                 buildSpeciesMap(/*taxa_from_data*/true);
 #endif
                 
-                StopWatch sw;
-                sw.start();
+//                StopWatch sw;
+//                sw.start();
                 
                 Particle p;
                 initializeParticle(p); // initialize one particle and copy to all other particles
@@ -3055,15 +3166,166 @@ namespace proj {
                 // fill particle_indices with values starting from 0
                 iota(particle_indices.begin(), particle_indices.end(), 0);
                 
+#if defined (USING_MPI)
+                mpiSetSchedule(); // TODO: need to set this earlier - make sure it works
+                _starting_gene_newicks.resize(total_n_particles);
+                _starting_species_newicks.resize(total_n_particles);
+#endif
+                
                 //run through each generation of particles
 
                 unsigned nsteps = (G::_ntaxa-1)*G::_nloci;
                 
-                double total_seconds = sw.stop();
-                cout << "total time initializing first level: " << total_seconds << endl;
-            
-                sw.start();
+//                double total_seconds = sw.stop();
+//                cout << "total time initializing first level: " << total_seconds << endl;
+                
+                
+#if defined (USING_MPI)
                 for (unsigned g=0; g<nsteps; g++){
+                    unsigned gene_number = my_vec[0].getNextGene();
+                    
+                    unsigned psuffix = 1;
+                    if (g > 0) {
+                        // set particle random number seeds
+                        for (auto &p:my_vec) {
+                            p.setSeed(rng.randint(1,9999) + psuffix);
+                            psuffix += 2;
+                        }
+                    }
+                    
+                    for (unsigned s = _mpi_first_particle[my_rank]; s < _mpi_last_particle[my_rank]; ++s) {
+                        growGeneTrees(my_vec[s], s, gene_number, g);
+                    }
+                    
+                    //            bool filter = true;
+                    //
+                    //            if (G::_run_on_empty) {
+                    //                filter = false;
+                    //            }
+                    //
+                    //            if (filter) {
+                    //
+                    //                // parallelize filtering by subgroup
+                    //                filterParticlesThreading(my_vec, g, particle_indices);
+                    //
+                    //                // shuffle new particle order
+                    //                unsigned seed = rng.getSeed();
+                    //
+                    //                // only shuffle particle indices, not particles
+                    //                std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
+                    //            }
+//                }
+                
+                if (my_rank == 0) {
+                    // Make a list of particles that we haven't heard from yet
+                    list<unsigned> outstanding;
+                    for (unsigned rank = 1; rank < ntasks; ++rank) {
+                        for (unsigned p = _mpi_first_particle[rank]; p < _mpi_last_particle[rank]; p++) {
+                            outstanding.push_back(p);
+                        }
+                    }
+                    
+                    // Receive newicks from particles being handled by other processors
+                    // until outstanding is empty
+                    while (!outstanding.empty()) {
+                        // Probe to get message status
+                        int message_length = 0;
+                        MPI_Status status;
+                        MPI_Probe(MPI_ANY_SOURCE,   // Source rank or MPI_ANY_SOURCE
+                            MPI_ANY_TAG,            // Message tag
+                            MPI_COMM_WORLD,         // Communicator
+                            &status                 // Status object
+                        );
+                    
+                        // Get length of message
+                        MPI_Get_count(&status, MPI_CHAR, &message_length);
+
+                        // Get particle number
+                        unsigned particle = (unsigned)status.MPI_TAG;
+
+                        // Get the message itself
+                        string newick;
+                        newick.resize(message_length);
+                        MPI_Recv(&newick[0],    // Initial address of receive buffer
+                            message_length,     // Maximum number of elements to receive
+                            MPI_CHAR,           // Datatype of each receive buffer entry
+                            status.MPI_SOURCE,     // Rank of source
+                            status.MPI_TAG,        // Message tag
+                            MPI_COMM_WORLD,     // Communicator
+                            MPI_STATUS_IGNORE   // Status object
+                        );
+                        
+                        // Store the newick and remove particle from outstanding
+                        newick.resize(message_length - 1);  // remove '\0' at end
+                        
+                        vector<string> parts;
+                        split(parts, newick, is_any_of("|"));
+                        string chosen_gene_newick = parts[1];
+                        
+                        _starting_gene_newicks[particle-1] = chosen_gene_newick;
+                        
+                        string chosen_species_newick = parts[2];
+                        _starting_species_newicks[particle-1] = chosen_species_newick;
+                        
+                        auto it = find(outstanding.begin(), outstanding.end(), particle);
+                        assert(it != outstanding.end());
+                        outstanding.erase(it);
+                    }
+                }
+            }
+            
+        // Ensure no one starts on species tree until coordinator is ready
+        MPI_Barrier(MPI_COMM_WORLD);
+
+#else
+            
+//                sw.start();
+                for (unsigned g=0; g<nsteps; g++){
+                    if (g == 0) {
+                            // reset gene order
+                        unsigned list_size = G::_nloci;
+                        vector<vector<unsigned>> new_gene_order;
+                        new_gene_order.resize(G::_ngroups);
+                        for (auto n:new_gene_order) {
+                            n.resize(G::_nloci);
+                        }
+
+                        for (unsigned n=0; n<G::_ngroups; n++) {
+//                                for (unsigned l=0; l<G::_nloci; l++) {
+                                unsigned count = 1;
+                                vector<pair<double, unsigned>> randomize;
+                                for (unsigned l=0; l<list_size; l++) {
+                                    if (count == 1) {
+                                        randomize.clear();
+                                    }
+                                    randomize.push_back(make_pair(rng.uniform(), count));
+                                    count++;
+                                    if (count > G::_nloci) {
+                                        sort(randomize.begin(), randomize.end());
+                                        for (auto &r:randomize) {
+                                            new_gene_order[n].push_back(r.second);
+                                        }
+                                        count = 1;
+                                    }
+                                }
+//                                }
+                        }
+                        // shuffle new particle order
+                        unsigned seed = rng.getSeed();
+
+                        // only shuffle particle indices, not particles // TODO: THIS IS NOT WORKING
+//                        std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
+                        unsigned ngroup = 0;
+                        unsigned group_count = 0;
+                        for (unsigned p=0; p<G::_nparticles*G::_ngroups; p++) {
+//                            cout << "particle " << p << " and group " << ngroup << endl;
+                            my_vec[p].resetGeneOrder(g, new_gene_order[ngroup]);
+                            if ((group_count+1)%G::_nparticles == 0) {
+                                ngroup++;
+                            }
+                            group_count++;
+                        }
+                    }
                     if (G::_verbose > 0) {
                         cout << "starting step " << g << " of " << nsteps-1 << endl;
                     }
@@ -3093,19 +3355,61 @@ namespace proj {
                         
 //                      filterParticlesMixing(particle_indices, my_vec); // for now, don't do multinomial resampling
                         
-                        // shuffle new particle order
-                        unsigned seed = rng.getSeed();
-                        
-                        // only shuffle particle indices, not particles
-                        std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
+                        // TODO: testing - only shuffle groups after all particles have coalesced each locus once, then reset gene order
+                        if ((g+1)%G::_nloci == 0 && g != nsteps-1) {
+                                // reset gene order
+                            unsigned list_size = G::_nloci;
+                            vector<vector<unsigned>> new_gene_order;
+                            new_gene_order.resize(G::_ngroups);
+                            for (auto n:new_gene_order) {
+                                n.resize(G::_nloci);
+                            }
+
+                            for (unsigned n=0; n<G::_ngroups; n++) {
+//                                for (unsigned l=0; l<G::_nloci; l++) {
+                                    unsigned count = 1;
+                                    vector<pair<double, unsigned>> randomize;
+                                    for (unsigned l=0; l<list_size; l++) {
+                                        if (count == 1) {
+                                            randomize.clear();
+                                        }
+                                        randomize.push_back(make_pair(rng.uniform(), count));
+                                        count++;
+                                        if (count > G::_nloci) {
+                                            sort(randomize.begin(), randomize.end());
+                                            for (auto &r:randomize) {
+                                                new_gene_order[n].push_back(r.second);
+                                            }
+                                            count = 1;
+                                        }
+                                    }
+//                                }
+                            }
+                            // shuffle new particle order
+                            unsigned seed = rng.getSeed();
+                            
+                            // only shuffle particle indices, not particles // TODO: THIS IS NOT WORKING
+                            std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
+                            unsigned ngroup = 0;
+                            unsigned group_count = 0;
+                            for (unsigned p=0; p<G::_nparticles*G::_ngroups; p++) {
+                                unsigned particle_number = particle_indices[p];
+                                my_vec[particle_number].resetGeneOrder(g, new_gene_order[ngroup]);
+                                if ((group_count+1)%G::_nparticles == 0) {
+                                    ngroup++;
+                                }
+                                group_count++;
+                            }
+                        }
                         
 //                      cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
                     }
                 } // g loop
                 
-                total_seconds = sw.stop();
-                cout << "\nTotal time for first  round: " << total_seconds << endl;
-                cout << total_seconds << endl;
+//                total_seconds = sw.stop();
+//                cout << "\nTotal time for first  round: " << total_seconds << endl;
+//                cout << total_seconds << endl;
+#endif
                 
                 if (G::_save_gene_trees) {
                     saveGeneTrees(my_vec);
@@ -3116,11 +3420,11 @@ namespace proj {
                     cout << "\n";
                 }
 
-                sw.start();
+//                sw.start();
                 writePartialCountFile(my_vec);
-                total_seconds = sw.stop();
-                cout << "\nTotal time for writing partial file: " << total_seconds << endl;
-                cout << total_seconds << endl;
+//                total_seconds = sw.stop();
+//                cout << "\nTotal time for writing partial file: " << total_seconds << endl;
+//                cout << total_seconds << endl;
                 
 #if !defined (HIERARCHICAL_FILTERING)
                 writeParamsFileForBeastComparison(my_vec);
@@ -3129,13 +3433,13 @@ namespace proj {
 #endif
 
 #if defined (HIERARCHICAL_FILTERING)
-                sw.start();
+//                sw.start();
                 saveSpeciesTreesAfterFirstRound(my_vec);
-                total_seconds = sw.stop();
-                cout << "\nTotal time for saving species trees after first round: " << total_seconds << endl;
-                cout << total_seconds << endl;
+//                total_seconds = sw.stop();
+//                cout << "\nTotal time for saving species trees after first round: " << total_seconds << endl;
+//                cout << total_seconds << endl;
                 
-                sw.start();
+//                sw.start();
                 cout << "\n";
                 string filename1 = "species_trees.trees";
                 string filename2 = "unique_species_trees.trees";
@@ -3219,14 +3523,13 @@ namespace proj {
                     ngroups = 1;
                     cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
                 }
-                total_seconds = sw.stop();
-                cout << "\nTotal time setting files for second round: " << total_seconds << endl;
-                cout << total_seconds << endl;
+//                total_seconds = sw.stop();
+//                cout << "\nTotal time setting files for second round: " << total_seconds << endl;
+//                cout << total_seconds << endl;
                 
 #if defined (FASTER_SECOND_LEVEL)
                 fasterSecondLevel(my_vec);
 #else
-//#endif
                 
                 vector<unsigned> counts;
                 for (unsigned index=0; index<my_vec.size(); index++) {
@@ -3244,16 +3547,6 @@ namespace proj {
                 assert(my_vec.size() == ngroups);
 
                 G::_nparticles = ngroups;
-                
-//#if defined (FASTER_SECOND_LEVEL)
-//                for (auto &p:my_vec)  {
-////                    Particle p = particles[i];//
-//                    // initialize particles
-//                    p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
-//                    p.resetSpecies();
-//                    p.mapSpecies(_taxon_map, _species_names);
-//                }
-//#else
 
                 for (auto &p:my_vec) {
                     // reset forest species partitions
@@ -3261,7 +3554,6 @@ namespace proj {
                     p.resetSpecies();
                     p.mapSpecies(_taxon_map, _species_names);
                 }
-//#endif
 
                 vector<Particle> new_vec;
 
@@ -3293,11 +3585,7 @@ namespace proj {
                         p.setGroupNumber(group_number);
                         group_number++;
                     }
-//#if defined (FASTER_SECOND_LEVEL)
-//                    proposeSpeciesGroupsFaster(my_vec, ngroups, filename1, filename2, filename3);
-//#else
                     proposeSpeciesGroups(my_vec, ngroups, filename1, filename2, filename3);
-//#endif
                     
                     ofstream altfname;
                     altfname.open("alt_species_trees.trees", std::ios::app);
@@ -3364,9 +3652,7 @@ namespace proj {
                         
                         Particle chosen_particle = my_vec[a];
                         use_vec.resize(G::_particle_increase, chosen_particle);
-                                                                        
-//                        fill(use_vec.begin(), use_vec.end(), chosen_particle);
-                        
+                                                                                                
                         assert(use_vec.size() == G::_particle_increase);
 
                         index += G::_particle_increase;

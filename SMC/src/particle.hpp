@@ -73,6 +73,12 @@ class Particle {
             
         string                                  saveGeneNewick(unsigned i) {
             return _forests[i].makeNewick(8, true);}
+        string                                  saveChangedForest() {return _forests[_gene_order[_generation-1]].makePartialNewick(8, true);}
+#if defined (USING_MPI)
+        unsigned                                getNextGene(){return _gene_order[_generation];}
+        void                                    initSpeciesForest(string newick);
+        void                                    initGeneForest(string newick);
+#endif
     
         bool operator<(const Particle::SharedPtr & other) const {
             return _log_weight<other->_log_weight;
@@ -133,6 +139,7 @@ class Particle {
         void                                            buildEntireSpeciesTree();
         void                                            rebuildSpeciesTree();
         void                                            setGeneOrder(vector<unsigned> gene_order) {_gene_order = gene_order;}
+        void                                            resetGeneOrder(unsigned step, vector<unsigned> gene_order);
         void                                            trimSpeciesTree();
         void                                            setFixTheta(bool fix) {_fix_theta = fix;}
         void                                            setRelativeRatesByGene(vector<double> rel_rates);
@@ -445,6 +452,7 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::proposal() {
+//        cout << "proposal gen " << _generation << endl;
         double inv_gamma_modifier = 0.0;
         
         unsigned next_gene = _gene_order[_generation];
@@ -460,7 +468,9 @@ inline vector<double> Particle::getVectorPrior() {
         }
         else if (_generation % G::_nloci == 0 && G::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
             // don't rebuild the species tree at every step when simulating data
+//            cout << "trimming species tree " << endl;
             trimSpeciesTree();
+//            cout << "rebuilding species tree " << endl;
             if (_forests[0]._lineages.size() > 1) {
                 rebuildSpeciesTree();
             }
@@ -501,7 +511,7 @@ inline vector<double> Particle::getVectorPrior() {
                 unsigned index = selectEventLinearScale(event_choice_rates);
                 string species_name = rates_by_species[index].second;
                 _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
-                           
+                
                 if (G::_start_mode == "smc") {
                     if (G::_upgma) {
                         if (!G::_run_on_empty) {
@@ -590,6 +600,14 @@ inline vector<double> Particle::getVectorPrior() {
         else {
             _log_weight = 0.0;
         }
+        
+//        for (auto &nd:_forests[0]._nodes) {
+//            cout << nd._name << endl;
+//        }
+        string species_newick = _forests[0].makeNewick(8, true);
+//        cout << "species newick at end of particle proposal " << species_newick << endl;
+//        cout << "species tree description is " << endl;
+//        _forests[0].showForest();
     }
 
 #if defined (FASTER_SECOND_LEVEL)
@@ -1048,7 +1066,7 @@ inline vector<double> Particle::getVectorPrior() {
 #if defined (DRAW_NEW_THETA)
         return _forests[1]._theta_mean;
 #else
-        return Forest::_theta;
+        return G::_theta;
 #endif
     }
 
@@ -1242,6 +1260,18 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::processGeneNewicks(vector<string> newicks) {
+//        _forests[1].clear();
+//        string spp_newick = "(((A:0.07947872,C:0.07947872):0.03811037,D:0.11758908):0.09019614,(B:0.19883376,E:0.19883376):0.00895147)";
+//        _forests[0].clear();
+//        _forests[0].buildFromNewickMPI(spp_newick, true, false);
+//        _forests[0].showForest();
+//        string test1 = _forests[0].makePartialNewick(8, true);
+//        cout << test1 << endl;
+        string newick = "(a^A:0.00003891,b^A:0.00003891,c^B:0.00003891,d^B:0.00003891,e^C:0.00003891,f^C:0.00003891,g^D:0.00003891,h^D:0.00003891(i^E:0.00003891,j^E:0.00003891)";
+        _forests[1].buildFromNewickMPI(newick, true, true); // TODO: BE CAREFUL, TESTING
+        _forests[1].showForest(); // TODO: need to set lienages correclty and remove extra nodes
+        string test = _forests[1].makePartialNewick(8, true);
+        cout << test << endl;
         for (int i=1; i<_forests.size(); i++) {
 //            _forests[i]._nodes.clear();
             _forests[i].buildFromNewick(newicks[i-1], true, false); // newicks starts at 0
@@ -1284,9 +1314,11 @@ inline vector<double> Particle::getVectorPrior() {
     inline void Particle::trimSpeciesTree() {
         map<string, double> theta_map = _forests[1]._theta_map;
         vector<string> species_names = _forests[1]._species_names;
-        
-        unsigned spp_count = (unsigned) species_names.size();
-        
+
+//        unsigned spp_count = (unsigned) species_names.size();
+        unsigned spp_count = G::_nspecies*2 - 1;
+//        unsigned spp_count = (unsigned) G::_species_names.size();
+
         bool trim = true;
         vector<double> gene_tree_heights;
         for (unsigned i=1; i<_forests.size(); i++) {
@@ -1298,24 +1330,27 @@ inline vector<double> Particle::getVectorPrior() {
                 break;
             }
         }
-        
+
         if (trim) {
             double max_gene_tree_height = *max_element(gene_tree_heights.begin(), gene_tree_heights.end());
-            
+//            cout << "max gene tree height is " << max_gene_tree_height << endl;
+
             bool done = false;
             unsigned count = (unsigned) _t.size();
-            
+
             while (!done) {
+//                _forests[0].showForest();
                 double species_tree_height = _forests[0]._forest_height;
                 double amount_to_trim = 0.0;
-                
+
                 Node* nd = _forests[0]._lineages.back();
                 if (_forests[0]._lineages.size() < G::_nspecies) {
+//                    cout << "starting next round" << endl;
                     Node* subtree1 = nd->_left_child;
                     Node* subtree2 = nd->_left_child->_right_sib;
-                    
+
                     _forests[0].revertNodeVector(_forests[0]._lineages, subtree1, subtree2, nd);
-                    
+
                     // reset siblings and parents of original nodes back to 0
                     subtree1->resetNode(); //subtree1
                     subtree2->resetNode(); //subtree2
@@ -1323,23 +1358,54 @@ inline vector<double> Particle::getVectorPrior() {
                     // clear new node from _nodes
                     //clear new node that was just created
                     nd->clear(); //new_nd
-                    
+
                     _forests[0]._nodes.pop_back();
-                    
+
                     amount_to_trim = _t[count - 2].second;
-                    
+
+//                    cout << "amount to trim = " << amount_to_trim << endl;
+//                    assert (amount_to_trim > 0.0);
+
+//                    cout << _t[0].second << endl;
+//                    cout << _t[1].second << endl;
+//                    cout << _t[2].second << endl;
+//                    cout << _t[3].second << endl;
+//                    cout << _t[4].second << endl;
+
                     _t.pop_back();
                     
                     for (auto &g:_t_by_gene) {
                         g.pop_back();
                     }
+
+//                    for (auto &g:_t_by_gene) {
+//                        for (auto &s:g) {
+//                            cout << s.second << endl;
+//                        }
+//                    }
+
                     _forests[0]._ninternals--;
-                    
+
+#if defined (DRAW_NEW_THETA)
                     theta_map[species_names[spp_count-1]] = -1.0;
-                    
+#endif
+
+//                    cout << "test3" << endl;
+
                     spp_count--;
+//                    cout << "amount to trim = " << amount_to_trim << endl;
+
                 }
-                
+
+//                cout << "amount to trim = " << amount_to_trim << endl;
+
+                assert (amount_to_trim > 0.0);
+//                cout << "species tree height is " << species_tree_height << endl;
+//                cout << "max gene tree height is " << max_gene_tree_height << endl;
+//                cout << "amount to trim is" << amount_to_trim << endl;
+
+//                cout << "species tree height - amount to trim = " << species_tree_height - amount_to_trim << endl;
+
                 if (species_tree_height - amount_to_trim > max_gene_tree_height) {
                     for (auto &nd:_forests[0]._lineages) {
                         nd->_edge_length -= amount_to_trim;
@@ -1348,14 +1414,15 @@ inline vector<double> Particle::getVectorPrior() {
                 }
                 else {
                     amount_to_trim = species_tree_height - max_gene_tree_height;
+//                    cout << "amount to trim = " << amount_to_trim << endl;
                     assert (amount_to_trim > 0.0);
                     for (auto &nd:_forests[0]._lineages) {
                         nd->_edge_length -= amount_to_trim;
                     }
                     _forests[0]._forest_height -= amount_to_trim;
-                    
+
                     _t[count-2].second -= amount_to_trim;
-                    
+
                     for (auto &g:_t_by_gene) {
                         g[count-2].second -= amount_to_trim;
                     }
@@ -1363,12 +1430,104 @@ inline vector<double> Particle::getVectorPrior() {
                 }
                 count--;
             }
-
         }
+
+#if defined (DRAW_NEW_THETA)
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i]._theta_map = theta_map;
         }
+#endif
     }
+
+//    inline void Particle::trimSpeciesTree() {
+//        map<string, double> theta_map = _forests[1]._theta_map;
+//        vector<string> species_names = _forests[1]._species_names;
+//
+//        unsigned spp_count = (unsigned) species_names.size();
+//
+//        bool trim = true;
+//        vector<double> gene_tree_heights;
+//        for (unsigned i=1; i<_forests.size(); i++) {
+//            if (_forests[i]._species_partition.size() > 1) {
+//                gene_tree_heights.push_back(_forests[i]._forest_height);
+//            }
+//            else {
+//                trim = false;
+//                break;
+//            }
+//        }
+//
+//        if (trim) {
+//            double max_gene_tree_height = *max_element(gene_tree_heights.begin(), gene_tree_heights.end());
+//
+//            bool done = false;
+//            unsigned count = (unsigned) _t.size();
+//
+//            while (!done) {
+//                double species_tree_height = _forests[0]._forest_height;
+//                double amount_to_trim = 0.0;
+//
+//                Node* nd = _forests[0]._lineages.back();
+//                if (_forests[0]._lineages.size() < G::_nspecies) {
+//                    Node* subtree1 = nd->_left_child;
+//                    Node* subtree2 = nd->_left_child->_right_sib;
+//
+//                    _forests[0].revertNodeVector(_forests[0]._lineages, subtree1, subtree2, nd);
+//
+//                    // reset siblings and parents of original nodes back to 0
+//                    subtree1->resetNode(); //subtree1
+//                    subtree2->resetNode(); //subtree2
+//
+//                    // clear new node from _nodes
+//                    //clear new node that was just created
+//                    nd->clear(); //new_nd
+//
+//                    _forests[0]._nodes.pop_back();
+//
+//                    amount_to_trim = _t[count - 2].second;
+//
+//                    _t.pop_back();
+//
+//                    for (auto &g:_t_by_gene) {
+//                        g.pop_back();
+//                    }
+//                    _forests[0]._ninternals--;
+//
+//    //                theta_map[G::_species_names[spp_count-1]] = -1.0;
+//
+//                    spp_count--;
+//                }
+//
+//                if (species_tree_height - amount_to_trim > max_gene_tree_height) {
+//                    for (auto &nd:_forests[0]._lineages) {
+//                        nd->_edge_length -= amount_to_trim;
+//                    }
+//                    _forests[0]._forest_height -= amount_to_trim;
+//                }
+//                else {
+//                    amount_to_trim = species_tree_height - max_gene_tree_height;
+//                    assert (amount_to_trim > 0.0);
+//                    for (auto &nd:_forests[0]._lineages) {
+//                        nd->_edge_length -= amount_to_trim;
+//                    }
+//                    _forests[0]._forest_height -= amount_to_trim;
+//
+//                    _t[count-2].second -= amount_to_trim;
+//
+//                    for (auto &g:_t_by_gene) {
+//                        g[count-2].second -= amount_to_trim;
+//                    }
+//                    done = true;
+//                }
+//                count--;
+//            }
+//
+//        }
+//    //    for (unsigned i=1; i<_forests.size(); i++) {
+//    //        _forests[i]._theta_map = theta_map;
+//    //    }
+//    }
+
 
 
     inline void Particle::createSpeciesIndices() {
@@ -2054,6 +2213,56 @@ inline vector<double> Particle::getVectorPrior() {
         }
     }
 #endif
+
+#if defined (USING_MPI)
+    inline void Particle::initSpeciesForest(string newick) {
+        // TODO: need to rebuild _t and _t_by_gene first?
+//        cout << "INITIALIZING SPECIES NEWICK generation " << _generation << "   " << newick << endl;
+        _forests[0].clear();
+        _forests[0].buildFromNewickMPI(newick, true, false);
+//        cout << "after initializing species forest, lineages are: " << endl;
+//        cout << "\t";
+//        for (auto &nd:_forests[0]._lineages) {
+//            cout << nd->_name << " position " << nd->_position_in_lineages << endl;
+//        }
+//        _forests[0].showForest();
+    }
+#endif
+
+#if defined (USING_MPI)
+    inline void Particle::initGeneForest(string newick) {
+        unsigned gene_number = _gene_order[_generation-1]; // generation has already been updated for the next step
+        _forests[gene_number].clear();
+//        cout << "BUILDING NEWICK  " << newick << endl;
+//        cout << "gene number is " << gene_number << endl;
+        _forests[gene_number].buildFromNewickMPI(newick, true, true);
+        
+//        for (auto &nd:_forests[gene_number]._nodes) {
+//            cout << nd._position_in_lineages << endl;
+//        }
+//        cout << "FOREST BUILT IS ";
+//        _forests[gene_number].showForest();
+    }
+#endif
+
+    inline void Particle::resetGeneOrder(unsigned step, vector<unsigned> gene_order) {
+        unsigned count=0;
+//        for (unsigned s=G::_nloci*step; s<G::_nloci*step+G::_nloci; s++) {
+        if (step == 0) { // step 0 is different because this happens before any proposals have occurred
+            for (unsigned s=step; s<G::_nloci+1; s++) {
+                _gene_order[s] = gene_order[count];
+                count++;
+            }
+        }
+        else {
+            for (unsigned s=step+1; s<step+G::_nloci+1; s++) {
+    //                for (unsigned l=0; l<G::_nloci; l++) {
+                _gene_order[s] = gene_order[count];
+                count++;
+            }
+        }
+//        }
+    }
 
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;

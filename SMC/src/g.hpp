@@ -61,6 +61,7 @@ namespace proj {
         
         // other
         static vector<string>           _taxon_names;
+//        static vector<string>                  _species_names;
         
         // functions
         string inventName(unsigned k, bool lower_case);

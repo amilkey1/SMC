@@ -19,6 +19,22 @@ proj::PartialStore ps;
 using namespace proj;
 using namespace std;
 
+int my_rank = 0;
+#if defined(USING_MPI)
+//int my_rank = 0;
+int ntasks = 0;
+
+void output(string msg) {
+    if (my_rank == 0) {
+        cout << msg;
+    }
+}
+#else
+void output(string msg) {
+    cout << msg;
+}
+#endif
+
 #include "forest.hpp"
 #include "data.hpp"
 #include "particle.hpp"
@@ -81,6 +97,8 @@ double Forest::_edge_rate_variance = 0.0;
 double Forest::_asrv_shape = numeric_limits<double>::infinity();
 double Forest::_comphet = numeric_limits<double>::infinity();
 
+//vector<string> G::_species_names;
+
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT
     {"standard",             "KNKNTTTTRSRSIIMIQHQHPPPPRRRRLLLLEDEDAAAAGGGGVVVV*Y*YSSSS*CWCLFLF"},
@@ -103,6 +121,13 @@ GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
 };
 
 int main(int argc, const char * argv[]) {
+#if defined(USING_MPI)
+    MPI_Init(NULL, NULL);
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
+//    std::cerr << my_rank << "    " << ntasks << endl;
+#endif
+    
     Proj proj;
     try {
         StopWatch sw;
@@ -119,6 +144,10 @@ int main(int argc, const char * argv[]) {
     catch(...) {
         std::cerr << "Exception of unknown type!\n";
     }
+    
+#if defined(USING_MPI)
+    MPI_Finalize();
+#endif
     return 0;
 }
 
