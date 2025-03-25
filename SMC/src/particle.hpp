@@ -456,6 +456,7 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline void Particle::proposal() {
 //        cout << "proposal gen " << _generation << endl;
+//        checkPartition();
         double inv_gamma_modifier = 0.0;
         
         unsigned next_gene = _gene_order[_generation];
@@ -498,6 +499,7 @@ inline vector<double> Particle::getVectorPrior() {
         bool done = false;
                 
         while (!done) {
+//            checkPartition();
             vector<pair<double, string>> rates_by_species = _forests[next_gene].calcForestRate(_lot);
             double total_rate = 0.0;
             double gene_increment = -1.0;
@@ -628,6 +630,7 @@ inline vector<double> Particle::getVectorPrior() {
 //        cout << "species newick at end of particle proposal " << species_newick << endl;
 //        cout << "species tree description is " << endl;
 //        _forests[0].showForest();
+//        checkPartition();
     }
 
 #if defined (FASTER_SECOND_LEVEL)
@@ -2277,13 +2280,16 @@ inline vector<double> Particle::getVectorPrior() {
         unsigned count=0;
 //        for (unsigned s=G::_nloci*step; s<G::_nloci*step+G::_nloci; s++) {
         if (step == 0) { // step 0 is different because this happens before any proposals have occurred
-            for (unsigned s=step; s<G::_nloci+1; s++) {
+//            for (unsigned s=step; s<G::_nloci+1; s++) {
+            for (unsigned s=step; s<G::_nloci; s++) {
+
                 _gene_order[s] = gene_order[count];
                 count++;
             }
         }
         else {
             for (unsigned s=step+1; s<step+G::_nloci+1; s++) {
+//            for (unsigned s=step+1; s<step+G::_nloci; s++) {
     //                for (unsigned l=0; l<G::_nloci; l++) {
                 _gene_order[s] = gene_order[count];
                 count++;
@@ -2293,7 +2299,7 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::checkPartition() {
-        for (auto &s:_forests[5]._species_partition) {
+        for (auto &s:_forests[1]._species_partition) {
             cout << "x";
         }
     }
