@@ -5411,7 +5411,7 @@ class Forest {
             
             // if there are 2 lineages left and neither has edge length 0, the tree is complete - add another node
             if (_lineages.size() == 2) {
-                if (_lineages[0]->_edge_length > Forest::_small_enough && _lineages[1]->_edge_length > Forest::_small_enough) {
+                if ((_lineages[0]->_edge_length > Forest::_small_enough && _lineages[1]->_edge_length > Forest::_small_enough) || (G::_species_newick_name != "null")) {
                     Node* subtree1 = _lineages[0];
                     Node* subtree2 = _lineages[1];
                     

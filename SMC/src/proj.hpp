@@ -2428,9 +2428,15 @@ namespace proj {
 
     inline void Proj::proposeParticles(vector<Particle> &particles) {
         assert(G::_nthreads > 0);
+//        unsigned count = 0;
         if (G::_nthreads == 1) {
           for (auto & p : particles) {
+//              cout << "particle " << count << endl;
+//              if (count == 2472) {
+//                  cout << "stop";
+//              }
               p.proposal();
+//              count++;
           }
         }
         else {
@@ -3188,8 +3194,13 @@ namespace proj {
                 
                 if (G::_species_newick_name != "null") {
                     string species_newick = handleSpeciesNewick();
+                    unsigned count = 0;
                     for (auto &p:my_vec) {
+//                        if (count == 2472) {
+//                            cout << "stop";
+//                        }
                         p.processSpeciesNewick(species_newick);
+                        count++;
                     }
                 }
                 
