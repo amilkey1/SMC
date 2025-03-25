@@ -74,11 +74,14 @@ class Particle {
         string                                  saveGeneNewick(unsigned i) {
             return _forests[i].makeNewick(8, true);}
         string                                  saveChangedForest() {return _forests[_gene_order[_generation-1]].makePartialNewick(8, true);}
-#if defined (USING_MPI)
+//#if defined (USING_MPI)
         unsigned                                getNextGene(){return _gene_order[_generation];}
         void                                    initSpeciesForest(string newick);
         void                                    initGeneForest(string newick);
-#endif
+        void                                    checkPartition();
+        void                                    initGeneForestSpeciesPartition(string species_partition);
+        string                                  saveForestSpeciesPartition();
+//#endif
     
         bool operator<(const Particle::SharedPtr & other) const {
             return _log_weight<other->_log_weight;
@@ -156,9 +159,9 @@ class Particle {
         double                                          calcLogCoalescentLikelihood(vector<Forest::coalinfo_t> & coalinfo_vect, bool integrate_out_thetas, bool verbose);
         void                                            resetPrevLogCoalLike();
         void                                            clearGeneForests();
-        void                                            setNodeHeights();
 #endif
-
+        void                                            setNodeHeights();
+    
     private:
 
 #if defined (FASTER_SECOND_LEVEL)
@@ -179,7 +182,7 @@ class Particle {
         unsigned                                _psuffix;
         unsigned                                _next_species_number;
         vector<unsigned>                        _next_species_number_by_gene;
-        vector<tuple<string, string, string>>   _species_order;
+//        vector<tuple<string, string, string>>   _species_order;
         vector<pair<tuple<string, string, string>, double>> _t;
         vector<vector<pair<tuple<string, string, string>, double>>> _t_by_gene;
         vector<double>                          _starting_log_likelihoods;
@@ -239,7 +242,7 @@ class Particle {
         _t.clear();
         _psuffix = 0;
         _next_species_number = G::_nspecies;
-        _species_order.clear();
+//        _species_order.clear();
         _starting_log_likelihoods.clear();
         _t_by_gene.clear();
         _next_species_number_by_gene.clear();
@@ -456,23 +459,39 @@ inline vector<double> Particle::getVectorPrior() {
         double inv_gamma_modifier = 0.0;
         
         unsigned next_gene = _gene_order[_generation];
+//        _forests[next_gene].showForest();
         bool calc_weight = false;
         
-        if (_generation == 0) {
-            buildEntireSpeciesTree();
-            // make a separate species tree information vector for each gene
-            for (unsigned i=1; i<_forests.size(); i++) {
-                _t_by_gene.push_back(_t);
-                _next_species_number_by_gene.push_back(0);
+        if (G::_species_newick_name == "null") { // if specifying species newick, keep the species tree the same for all particles and never reset it in first level
+            if (_generation == 0) {
+                buildEntireSpeciesTree();
+                // make a separate species tree information vector for each gene
+                for (unsigned i=1; i<_forests.size(); i++) {
+                    _t_by_gene.push_back(_t);
+                    _next_species_number_by_gene.push_back(0);
+                }
             }
+#if !defined (USING_MPI) // TODO: for now, don't rebuild tree for MPI
+            else if (_generation % G::_nloci == 0 && G::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+                // don't rebuild the species tree at every step when simulating data
+    //            cout << "trimming species tree " << endl;
+                bool test = false;
+                if (!test) { // TODO: BE CAREFUL
+                    trimSpeciesTree();
+    //            cout << "rebuilding species tree " << endl;
+                if (_forests[0]._lineages.size() > 1) {
+                    rebuildSpeciesTree();
+                }
+                }
+            }
+#endif
         }
-        else if (_generation % G::_nloci == 0 && G::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
-            // don't rebuild the species tree at every step when simulating data
-//            cout << "trimming species tree " << endl;
-            trimSpeciesTree();
-//            cout << "rebuilding species tree " << endl;
-            if (_forests[0]._lineages.size() > 1) {
-                rebuildSpeciesTree();
+        else {
+            if (_generation == 0) {
+                for (unsigned i=1; i<_forests.size(); i++) {
+                    _t_by_gene.push_back(_t);
+                    _next_species_number_by_gene.push_back(0);
+                }
             }
         }
         
@@ -510,6 +529,7 @@ inline vector<double> Particle::getVectorPrior() {
                 
                 unsigned index = selectEventLinearScale(event_choice_rates);
                 string species_name = rates_by_species[index].second;
+//                _forests[next_gene].showForest();
                 _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
                 
                 if (G::_start_mode == "smc") {
@@ -1228,9 +1248,14 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline void Particle::processSpeciesNewick(string newick_string) {
         assert (newick_string != "");
-        _species_order = _forests[0].buildFromNewickTopology(newick_string);
-        _forests[0]._lineages.clear();
-        _species_order.erase(_species_order.begin()); // don't need "null", "null", "null"
+       _t =  _forests[0].buildFromNewickMPI(newick_string, true, false, _lot);
+//        _t = _forests[0].resetT();
+        // TODO: need to set _t and _t_by_gene too
+//        vector<tuple<string, string, string>> species_order = _forests[0].buildFromNewickTopology(newick_string);
+//        _forests[0].resetLineages();
+//        cout << "test";
+//        _forests[0]._lineages.clear();
+//        _species_order.erase(_species_order.begin()); // don't need "null", "null", "null"
     }
 
     inline string Particle::getTranslateBlock() {
@@ -1267,8 +1292,8 @@ inline vector<double> Particle::getVectorPrior() {
 //        _forests[0].showForest();
 //        string test1 = _forests[0].makePartialNewick(8, true);
 //        cout << test1 << endl;
-        string newick = "(a^A:0.00003891,b^A:0.00003891,c^B:0.00003891,d^B:0.00003891,e^C:0.00003891,f^C:0.00003891,g^D:0.00003891,h^D:0.00003891(i^E:0.00003891,j^E:0.00003891)";
-        _forests[1].buildFromNewickMPI(newick, true, true); // TODO: BE CAREFUL, TESTING
+        string newick = " (c^B:0.003683424303221,d^B:0.003683424303221,e^C:0.003683424303221,f^C:0.003683424303221,g^D:0.003683424303221,h^D:0.003683424303221,i^E:0.003683424303221,j^E:0.003683424303221,(a^A:0.002613430000000,b^A:0.002613430000000):0.001069994304221)";
+        _forests[1].buildFromNewickMPI(newick, true, true, _lot); // TODO: BE CAREFUL, TESTING
         _forests[1].showForest(); // TODO: need to set lienages correclty and remove extra nodes
         string test = _forests[1].makePartialNewick(8, true);
         cout << test << endl;
@@ -2186,13 +2211,11 @@ inline vector<double> Particle::getVectorPrior() {
     }
 #endif
 
-#if defined (FASTER_SECOND_LEVEL)
     inline void Particle::setNodeHeights() {
         for (unsigned f=1; f<_forests.size(); f++) {
             _forests[f].setNodeHeights();
         }
     }
-#endif
 
 #if defined (FASTER_SECOND_LEVEL)
     inline void Particle::resetPrevLogCoalLike() {
@@ -2214,12 +2237,12 @@ inline vector<double> Particle::getVectorPrior() {
     }
 #endif
 
-#if defined (USING_MPI)
+//#if defined (USING_MPI)
     inline void Particle::initSpeciesForest(string newick) {
         // TODO: need to rebuild _t and _t_by_gene first?
 //        cout << "INITIALIZING SPECIES NEWICK generation " << _generation << "   " << newick << endl;
-        _forests[0].clear();
-        _forests[0].buildFromNewickMPI(newick, true, false);
+//        _forests[0].clear();
+        _forests[0].buildFromNewickMPI(newick, true, false, _lot);
 //        cout << "after initializing species forest, lineages are: " << endl;
 //        cout << "\t";
 //        for (auto &nd:_forests[0]._lineages) {
@@ -2227,23 +2250,28 @@ inline vector<double> Particle::getVectorPrior() {
 //        }
 //        _forests[0].showForest();
     }
-#endif
+//#endif
 
-#if defined (USING_MPI)
+//#if defined (USING_MPI)
     inline void Particle::initGeneForest(string newick) {
-        unsigned gene_number = _gene_order[_generation-1]; // generation has already been updated for the next step
-        _forests[gene_number].clear();
+        unsigned gene_number = _gene_order[_generation-1]; // updating for the previous step
+//        _forests[gene_number].clear();
 //        cout << "BUILDING NEWICK  " << newick << endl;
 //        cout << "gene number is " << gene_number << endl;
-        _forests[gene_number].buildFromNewickMPI(newick, true, true);
+        _forests[gene_number].buildFromNewickMPI(newick, true, true, _lot);
+        // TODO: why is this necessary?
+//        _forests[gene_number]._npatterns = _data->getNumPatternsInSubset(gene_number-1);
         
 //        for (auto &nd:_forests[gene_number]._nodes) {
 //            cout << nd._position_in_lineages << endl;
 //        }
 //        cout << "FOREST BUILT IS ";
 //        _forests[gene_number].showForest();
+        for (auto &s:_forests[gene_number]._species_partition) {
+            cout << "x";
+        }
     }
-#endif
+//#endif
 
     inline void Particle::resetGeneOrder(unsigned step, vector<unsigned> gene_order) {
         unsigned count=0;
@@ -2264,6 +2292,31 @@ inline vector<double> Particle::getVectorPrior() {
 //        }
     }
 
+    inline void Particle::checkPartition() {
+        for (auto &s:_forests[5]._species_partition) {
+            cout << "x";
+        }
+    }
+
+    inline void Particle::initGeneForestSpeciesPartition(string species_partition) {
+        unsigned gene_number = _gene_order[_generation-1];
+        _forests[gene_number].resetSpeciesPartition(species_partition); // TODO: fill this in
+    }
+
+    inline string Particle::saveForestSpeciesPartition() { // TODO: can't save by number because the order of nodes might change
+        unsigned gene_number = _gene_order[_generation-1];
+        map<string, vector<string>> partition = _forests[gene_number].saveSpeciesPartition();
+        string partition_for_message = "";
+        for (auto &m:partition) {
+            cout << "x";
+            partition_for_message += " spp " + m.first + "";
+            for (auto &nd:m.second) {
+                partition_for_message += " nd " + nd;
+            }
+        }
+        return partition_for_message;
+    }
+
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
         _log_species_weight = other._log_species_weight;
@@ -2278,7 +2331,7 @@ inline vector<double> Particle::getVectorPrior() {
         _t = other._t;
         _psuffix = other._psuffix;
         _next_species_number = other._next_species_number;
-        _species_order = other._species_order;
+//        _species_order = other._species_order;
         _starting_log_likelihoods = other._starting_log_likelihoods;
         _t_by_gene = other._t_by_gene;
         _next_species_number_by_gene = other._next_species_number_by_gene;

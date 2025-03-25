@@ -78,7 +78,7 @@ namespace proj {
             void                initializeParticle(Particle &particle);
             void                initializeParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
             void                handleGeneNewicks();
-            void                handleSpeciesNewick(vector<Particle> particles);
+            string              handleSpeciesNewick();
             double              filterParticles(unsigned step, vector<Particle> & particles, vector<unsigned> &particle_indices, unsigned start, unsigned end);
             void                filterParticlesThreading(vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices);
             void                filterParticlesRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices);
@@ -121,14 +121,16 @@ namespace proj {
             double                      _starting_log_likelihood;
             vector<Lot::SharedPtr>      _group_rng;
         
-#if defined(USING_MPI)
+//#if defined(USING_MPI)
             void mpiSetSchedule();
             vector<unsigned>            _mpi_first_particle;
             vector<unsigned>            _mpi_last_particle;
             vector<string>              _starting_gene_newicks;
             vector<string>              _starting_species_newicks;
+//            vector<map<string, vector<string>>> _starting_species_partitions;
+            vector<string>              _starting_species_partitions;
             void                        growGeneTrees(Particle &particles, unsigned particle_number, unsigned gene_number, unsigned step);
-#endif
+//#endif
 
     };
 
@@ -777,7 +779,7 @@ namespace proj {
 
     inline void Proj::saveGeneTrees(vector<Particle> &v) const {
         if (G::_start_mode == "smc") {
-            for (unsigned i=1; i<G::_nloci; i++) {
+            for (unsigned i=1; i<G::_nloci+1; i++) {
                 string fname = "gene" + to_string(i) + ".trees";
                 ofstream treef(fname);
                 treef << "#nexus\n\n";
@@ -1045,31 +1047,29 @@ namespace proj {
         }
     }
 
-    inline void Proj::handleSpeciesNewick(vector<Particle> particles) {
-            ifstream infile(G::_species_newick_name);
-            string newick_string;
-            string newick;
+    inline string Proj::handleSpeciesNewick() {
+        ifstream infile(G::_species_newick_name);
+        string newick_string;
+        string newick;
         int size_before = (int) newick.size();
-            while (getline(infile, newick)) { // file newicks must start with the word "tree" two spaces from the left margin
+        while (getline(infile, newick)) { // file newicks must start with the word "tree" two spaces from the left margin
             if (newick.find("tree") == 2) { // TODO: this only works if there are exactly 2 spaces before the newick - try starting at parenthesis
-                    size_t pos = newick.find("("); //find location of parenthesis
-                    newick.erase(0,pos); //delete everything prior to location found
+                size_t pos = newick.find("("); //find location of parenthesis
+                newick.erase(0,pos); //delete everything prior to location found
                 newick_string = newick;
                 }
             }
-            while (getline(infile, newick)) {
-                newick_string = newick;
-                break;
-            }
-            int size_after = (int) newick.size();
+            int size_after = (int) newick_string.size();
             if (size_before == size_after) {
-                throw XProj("cannot find gene newick file");
+                throw XProj("cannot find species newick file");
             }
+        
+        return newick_string;
             
-            for (auto &p:particles) {
-                p.processSpeciesNewick(newick_string);
-                p.mapSpecies(_taxon_map, _species_names);
-            }
+//            for (auto &p:particles) {
+//                p.processSpeciesNewick(newick_string);
+//                p.mapSpecies(_taxon_map, _species_names);
+//            }
     }
 
     inline void Proj::handleGeneNewicks() {
@@ -2277,6 +2277,11 @@ namespace proj {
             particle.calcGeneTreeLogLikelihoods();
         }
         
+//        if (G::_species_newick_name != "null") {
+//            string species_newick = handleSpeciesNewick();
+//            particle.processSpeciesNewick(species_newick);
+//        }
+        
         if (G::_upgma && !G::_gene_newicks_specified) {
             particle.calcStartingUPGMAMatrix();
             particle.calcStartingRowCount();
@@ -2974,49 +2979,88 @@ namespace proj {
     }
 #endif
 
-#if defined(USING_MPI)
+//#if defined(USING_MPI)
     inline void Proj::growGeneTrees(Particle &particle, unsigned particle_number, unsigned gene_number, unsigned step) {
         cout << "GROWING GENE TREES MPI for step " << step << endl;
         //taxon joining and reweighting step
-        if (step > 0) {
-            cout << "about to initialize gene forest with newick " << _starting_gene_newicks[particle_number] << endl;
-            particle.initGeneForest(_starting_gene_newicks[particle_number]);
+        if (step > 0) { // initialize forest for the gene that was just modified so everything is up to date
+            particle.initGeneForest(_starting_gene_newicks[particle_number]); // TODO: need to also update update species partition, t, t by gene
+            particle.initGeneForestSpeciesPartition(_starting_species_partitions[particle_number]);
             if (step % G::_nloci == 0) { // otherwise, species tree remains the same and does not need to be reset
-                cout << "about to initialize species forest with newick" << _starting_species_newicks[particle_number] << endl;
                 particle.initSpeciesForest(_starting_species_newicks[particle_number]);
             }
         }
+        if (step == 3) {
+            cout << "ON STEP 3 " << endl;
+            particle.showParticle();
+        }
         particle.proposal();
         
-//        particle.showParticle();
-
+#if !defined (USING_MPI)
+        if (step == 0) {
+            _starting_gene_newicks.resize(G::_nparticles);
+            _starting_species_newicks.resize(G::_nparticles);
+            _starting_species_partitions.resize(G::_nparticles);
+        }
+#endif
+        assert(_starting_gene_newicks.size() == G::_nparticles);
+        assert (_starting_species_newicks.size() == G::_nparticles);
+        assert (_starting_species_partitions.size() == G::_nparticles);
+        
+#if !defined (USING_MPI)
         if (my_rank == 0) {
-//            particle.showParticle();
-//            cout << "saving gene newick " << endl;
             string gene_newick = particle.saveChangedForest();
-            cout << "SAVED GENE NEWICK: " << gene_newick << endl;
-//            cout << "SAVING SPECIES TREE " << endl;
             string species_newick = particle.saveForestNewick();
-            cout << "SAVED SPECIES NEWICK: " << species_newick << endl;
-//            particle.showParticle();
+            string species_partition = particle.saveForestSpeciesPartition();
             // Copy selected gene tree to _starting_gene_newicks
             _starting_gene_newicks[particle_number] = gene_newick;
             _starting_species_newicks[particle_number] = species_newick;
+            _starting_species_partitions[particle_number] = species_partition;
+            
+//            string partition_for_message = "|";
+//            for (auto &m:partition) {
+//                partition_for_message.push_back("spp " + m);
+//                for (auto &nd:m) {
+//                    partition_for_message.push_back("nd " + nd);
+//                }
+//            }
+        }
+#endif
+
+#if defined(USING_MPI)
+        if (my_rank == 0) {
+            string gene_newick = particle.saveChangedForest();
+            string species_newick = particle.saveForestNewick();
+            map<string, vector<string>> species_partition = particle.saveForestSpeciesPartition();
+            // Copy selected gene tree, species tree, and species partition to _starting_gene_newicks
+            _starting_gene_newicks[particle_number] = gene_newick;
+            _starting_species_newicks[particle_number] = species_newick;
+            _starting_species_partitions[particle_number] = species_partition;
         }
         
         else {
             string gene_newick = to_string(gene_number) + "|" + particle.saveChangedForest(); // genes start at 0
             string species_newick = to_string(-1) + "|" + particle.saveForestNewick(); // -1 indicates species tree
-            
+//            map<string, vector<string>> partition = particle.saveForestSpeciesPartition();
+            string partition_for_message = "|" + particle.saveForestSpeciesPartition();
+//            string partition_for_message = "|";
+//            for (auto &m:partition) {
+//                partition_for_message.push_back("spp " + m);
+//                for (auto &nd:m) {
+//                    partition_for_message.push_back("nd " + nd);
+//                }
+//            }
             
             // send the newick string to the coordinator
             int msglen_gene = 1 + gene_newick.size();
             int msglen_species = 1 + species_newick.size();
-            int msglen = msglen_gene + msglen_species;
+            int msglen_partition = 1 + partition_for_message.size();
+            int msglen = msglen_gene + msglen_species + msglen_partition;
             
             gene_newick.resize(msglen_gene);      // Adds \0 character to the end
             species_newick.resize(msglen_species);  // Adds \0 character to the end
-            string newick = gene_newick + species_newick;
+            msglen_partition.resize(msglen_partition); // Adds \0 character to the end
+            string newick = gene_newick + species_newick + msglen_partition;
             
             MPI_Send(&newick[0],        // void* data
                      msglen,           // int count
@@ -3025,13 +3069,15 @@ namespace proj {
                      (int) particle_number,            // int tag,
                      MPI_COMM_WORLD);        // MPI_Comm communicator)
         }
-    }
 #endif
+    }
+//#endif
 
     inline void Proj::run() {
 #if defined(USING_MPI)
         output("Starting MPI parallel version...\n");
         output(str(format("No. processors: %d\n") % ntasks));
+        G::_save_memory = true; // set save memory because partials will need to be recalculated
 #else
         output("Starting serial version...\n");
 #endif
@@ -3125,9 +3171,6 @@ namespace proj {
                 Particle p;
                 initializeParticle(p); // initialize one particle and copy to all other particles
                 
-//                if (_species_newick_name != "null") {
-//                    handleSpeciesNewick(my_vec);
-//                }
                 
                 // reset marginal likelihood
                 _log_marginal_likelihood = 0.0;
@@ -3143,6 +3186,13 @@ namespace proj {
                     psuffix += 2;
                 }
                 
+                if (G::_species_newick_name != "null") {
+                    string species_newick = handleSpeciesNewick();
+                    for (auto &p:my_vec) {
+                        p.processSpeciesNewick(species_newick);
+                    }
+                }
+                
                 // set group rng
                 _group_rng.resize(G::_ngroups);
                 psuffix = 1;
@@ -3151,6 +3201,10 @@ namespace proj {
                     g->setSeed(rng.randint(1,9999)+psuffix);
                     psuffix += 2;
                 }
+                
+//                if (G::_species_newick_name != "null") {
+//                    handleSpeciesNewick(my_vec);
+//                }
 
 #if defined (DRAW_NEW_THETA)
                 assert (!G::_fix_theta);
@@ -3170,6 +3224,7 @@ namespace proj {
                 mpiSetSchedule(); // TODO: need to set this earlier - make sure it works
                 _starting_gene_newicks.resize(total_n_particles);
                 _starting_species_newicks.resize(total_n_particles);
+                _starting_species_partitions.resize(total_n_particles);
 #endif
                 
                 //run through each generation of particles
@@ -3267,6 +3322,9 @@ namespace proj {
                         string chosen_species_newick = parts[2];
                         _starting_species_newicks[particle-1] = chosen_species_newick;
                         
+                        string chosen_species_partition = parts[3]; // TODO: can you pass around a map like this?
+                        _starting_species_partitions[particle-1] = chosen_species_partition;
+                        
                         auto it = find(outstanding.begin(), outstanding.end(), particle);
                         assert(it != outstanding.end());
                         outstanding.erase(it);
@@ -3279,6 +3337,8 @@ namespace proj {
 
 #else
             
+                bool test = false;
+                if (!test) {
 //                sw.start();
                 for (unsigned g=0; g<nsteps; g++){
                     if (g == 0) {
@@ -3409,6 +3469,26 @@ namespace proj {
 //                total_seconds = sw.stop();
 //                cout << "\nTotal time for first  round: " << total_seconds << endl;
 //                cout << total_seconds << endl;
+                }
+                else {
+                    for (unsigned g=0; g<nsteps; g++){
+                        unsigned gene_number = my_vec[0].getNextGene();
+                        
+                        unsigned psuffix = 1;
+                        if (g > 0) {
+                            // set particle random number seeds
+                            for (auto &p:my_vec) {
+                                p.setSeed(rng.randint(1,9999) + psuffix);
+                                psuffix += 2;
+                            }
+                        }
+                        
+                        for (unsigned s = 0; s < G::_nparticles*G::_ngroups; ++s) {
+                            my_vec[s].checkPartition();
+                            growGeneTrees(my_vec[s], s, gene_number, g);
+                        }
+                    }
+                }
 #endif
                 
                 if (G::_save_gene_trees) {

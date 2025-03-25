@@ -106,7 +106,7 @@ class Forest {
         void                            resetThetaMap(Lot::SharedPtr lot);
         void                            drawNewTheta(string new_species, Lot::SharedPtr lot);
         void                            buildFromNewick(const string newick, bool rooted, bool allow_polytomies);
-        void                            buildFromNewickMPI(const string newick, bool rooted, bool allow_polytomies);
+    vector<pair<tuple<string, string, string>, double>> buildFromNewickMPI(const string newick, bool rooted, bool allow_polytomies, Lot::SharedPtr lot);
         void                            extractNodeNumberFromName(Node * nd, std::set<unsigned> & used);
         void                            stripOutNexusComments(std::string & newick);
         unsigned                        countNewickLeaves(const std::string newick);
@@ -123,7 +123,8 @@ class Forest {
         void                            buildRestOfTreeFaster();
         void                            buildStartingUPGMAMatrix();
         void                            buildStartingRow();
-        void                            resetLineages();
+        vector<pair<tuple<string, string, string>, double>>                            resetLineages(Lot::SharedPtr lot);
+        vector<pair<tuple<string, string, string>, double>> resetT();
     
 #if defined (FASTER_SECOND_LEVEL)
         void                            saveCoalInfoInitial();
@@ -138,12 +139,17 @@ class Forest {
         Node *                          findNextPreorderNew(Node * nd) const;
         pair<double,double>             chooseSpeciesIncrementOnlySecondLevel(Lot::SharedPtr lot, double max_depth);
         void                            setTreeHeight();
-        void                            setNodeHeights();
+
+        
         vector<coalinfo_t>              _coalinfo;
         mutable vector<Node::ptr_vect_t> _preorders;
         mutable unsigned                _next_node_number;
 #endif
 
+    void                            setNodeHeights();
+    void                            resetSpeciesPartition(string species_partition);
+    map<string, vector<string>>     saveSpeciesPartition();
+    
         map<string, double>             _theta_map;
         std::vector<Node *>             _lineages;
         std::list<Node>                 _nodes;
@@ -328,7 +334,7 @@ class Forest {
         Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index-1);
         _first_pattern = gene_begin_end.first;
         _npatterns = _data->getNumPatternsInSubset(index-1);
-
+        
         const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
         unsigned i = 0;
         auto &data_matrix=_data->getDataMatrix();
@@ -2450,11 +2456,19 @@ class Forest {
      }
 
     inline void Forest::allowCoalescence(string species_name, double increment, Lot::SharedPtr lot) {
+//        for (auto &nd:_nodes) {
+//            cout << "node " << nd._name << "edge length is " << nd._edge_length << endl;
+//        }
+//        cout << "save memory is " << G::_save_memory << endl;
          double prev_log_likelihood = _gene_tree_log_likelihood;
 
          Node *subtree1 = nullptr;
          Node *subtree2 = nullptr;
-         list<Node*> nodes = _species_partition[species_name];
+         list<Node*> nodes = _species_partition[species_name]; // TODO: need to also update species partition?
+//        cout << "in species partition" << endl;
+//        for (auto &nd:nodes) {
+//            cout << "node " << nd->_name << " edge length is " << nd->_edge_length << endl;
+//        }
         
         assert (nodes.size() > 0);
 
@@ -2508,16 +2522,30 @@ class Forest {
          new_nd->_edge_length=0.0;
          _ninternals++;
          new_nd->_right_sib=0;
+        new_nd->_name = to_string(new_nd->_number);
 
          new_nd->_left_child=subtree1;
          subtree1->_right_sib=subtree2;
 
          subtree1->_parent=new_nd;
          subtree2->_parent=new_nd;
+        
+//        for (auto &nd:_nodes) {
+//            cout << "node " << nd._name << "edge length is " << nd._edge_length << endl;
+//        }
+        
+//        cout << "subtree 1 " << subtree1->_name << "edge len " << subtree1->_edge_length << endl;
+//        cout << "subtree 2 edge len " << subtree2->_name << subtree2->_edge_length << endl;
 
          if (!G::_run_on_empty) {
+//             cout << "CALCULATING PARTIALS "<< endl;
              //always calculating partials now
              assert (new_nd->_partial == nullptr);
+//             cout << "NPATTERNS IS " << _npatterns << endl;
+//             cout << "NLEAVES IS " << _nleaves << endl;
+//             cout << "KAPPA IS " << _kappa << endl;
+//             cout << "TAXON MAP SIZE IS" << _taxon_map.size() << endl;
+//             cout << "DATA PATTERN COUNTS IS " << _data->_pattern_counts[0] << endl;
              new_nd->_partial=ps.getPartial(_npatterns*4);
              assert(new_nd->_left_child->_right_sib);
 
@@ -2585,17 +2613,41 @@ class Forest {
     }
 
     inline void Forest::updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode) {
+//        showForest();
         // Delete delnode1 from node_vector
         auto it1 = find(node_vector.begin(), node_vector.end(), delnode1);
-        if (it1 == node_vector.end()) {
-            cout << "node to delete 1 has position " << delnode1->_position_in_lineages << " and name " << delnode1->_name << endl;
-            cout << "node to delete 2 has position " << delnode2->_position_in_lineages << " and name " << delnode2->_name << endl;
-            cout << "node to add has position " << addnode->_position_in_lineages << " and name " << addnode->_name << endl;
-            cout << "lineages is: ";
-            for (auto &nd:_lineages) {
-                cout << nd->_name << " position " << nd->_position_in_lineages << endl;
-            }
-        }
+//        if (it1 == node_vector.end()) {
+//            cout << "node to delete 1 has position " << delnode1->_position_in_lineages << " and name " << delnode1->_name << endl;
+//            cout << delnode1->_name << " position " << delnode1->_position_in_lineages << endl;
+//            cout << "\tedge len " << delnode1->_edge_length << endl;
+//            if (delnode1->_parent) {
+//                cout << "\tparent " << delnode1->_parent << endl;
+//            }
+//            cout << "node to delete 2 has position " << delnode2->_position_in_lineages << " and name " << delnode2->_name << endl;
+//            cout << delnode2->_name << " position " << delnode2->_position_in_lineages << endl;
+//            cout << "\tedge len " << delnode2->_edge_length << endl;
+//            if (delnode2->_parent) {
+//                cout << "\tparent " << delnode2->_parent << endl;
+//            }
+//            cout << "node to add has position " << addnode->_position_in_lineages << " and name " << addnode->_name << endl;
+//            cout << "lineages is: ";
+//            for (auto &nd:_lineages) {
+//                cout << nd->_name << " position " << nd->_position_in_lineages << endl;
+//                cout << "\tedge len " << nd->_edge_length << endl;
+//                if (nd->_parent) {
+//                    cout << "\tparent " << nd->_parent << endl;
+//                }
+//            }
+//
+//            cout << "nodes is: ";
+//            for (auto &nd:_nodes) {
+//                cout << nd._name << " position " << nd._position_in_lineages << endl;
+//                cout << "\tedge len " << nd._edge_length << endl;
+//                if (nd._parent) {
+//                    cout << "\tparent " << nd._parent << endl;
+//                }
+//            }
+//        }
         assert(it1 != node_vector.end());
         node_vector.erase(it1);
 
@@ -4857,7 +4909,10 @@ class Forest {
             throw XProj(boost::str(boost::format("node name (%s) not interpretable as a positive integer") % nd->_name));
     }
 
-    inline void Forest::buildFromNewickMPI(const std::string newick, bool rooted, bool allow_polytomies) {
+    inline vector<pair<tuple<string, string, string>, double>> Forest::buildFromNewickMPI(const std::string newick, bool rooted, bool allow_polytomies, Lot::SharedPtr lot) {
+        vector<pair<tuple<string, string, string>, double>> new_t;
+        // TODO: this doesn't seem to work if the tree is complete? leaves out the last node?
+        _nodes.clear();
 //        cout << "in function buildfromnewickmpi" << endl;
 //        cout << "building newick " << newick << endl;
         std::set<unsigned> used; // used to ensure that no two leaf nodes have the same number
@@ -5178,11 +5233,14 @@ class Forest {
             _nodes.sort(
                  [this](Node& lhs, Node& rhs) {
                      return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
-            
-            // reset node numbers
+                        
+            // reset node numbers and names
             int j = 0;
             for (auto &nd:_nodes) {
                 nd._number = j;
+                if (nd._number > G::_ntaxa-1) {
+                    nd._name = to_string(j);
+                }
                 j++;
             }
             
@@ -5203,7 +5261,7 @@ class Forest {
                 }
             }
             
-            resetLineages();
+           new_t = resetLineages(lot);
             
             if (_lineages.size() == 1) {
                 _nodes.back()._edge_length = 0.0;
@@ -5245,11 +5303,20 @@ class Forest {
             clear();
             throw x;
         }
+        return new_t;
     }
 
-    inline void Forest::resetLineages() {
-//        cout << "IN RESET LINEAGES FUNCTION " << endl;
-    // this function rebuilds the _lineages vector, setting _position_in_lineages
+//    inline vector<pair<tuple<string, string, string>, double>> Forest::resetT() {
+//        for (auto &nd:_nodes) {
+//            
+//        }
+//    }
+
+    inline vector<pair<tuple<string, string, string>, double>> Forest::resetLineages(Lot::SharedPtr lot) {
+        // this function rebuilds the _lineages vector, setting _position_in_lineages
+        // this function also rebuilds _t for use in reading in a species newick
+        vector<pair<tuple<string, string, string>, double>> new_t;
+        
         _ninternals = 0;
         _lineages.clear();
         unsigned i=0;
@@ -5264,24 +5331,118 @@ class Forest {
             }
         }
         
-//        cout << "nodes looks like: " << endl;
-//        cout << "\t";
-//        for (auto &nd:_nodes) {
-//            cout << nd._name << " position " << nd._position_in_lineages << endl;
-//        }
+        bool draw_edge_lens_from_prior = false;
+        if (G::_species_newick_name != "null") {
+            draw_edge_lens_from_prior = true;
+        }
+        
+        if (!draw_edge_lens_from_prior) {
+            tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+            double edge_len = _lineages.front()->_edge_length;
+            new_t.push_back(make_pair(species_joined, edge_len));
 
-//        cout << "IN RESET LINEAGES FUNCTION " << endl;
-//        for (auto &nd:_nodes) {
-//            cout << nd._name << endl;
-//            cout << nd._position_in_lineages << endl;
-//        }
-//        cout << "UPDATING VECTOR" << endl;
-        for (auto &nd : _nodes) {
-            if (nd._left_child) {
-                assert (nd._left_child->_right_sib);
-                updateNodeVector(_lineages, nd._left_child, nd._left_child->_right_sib, &nd);
+            
+            for (auto &nd : _nodes) {
+                if (nd._left_child) {
+                    assert (nd._left_child->_right_sib);
+                    updateNodeVector(_lineages, nd._left_child, nd._left_child->_right_sib, &nd);
+                    tuple<string, string, string> species_joined = make_tuple(nd._left_child->_name, nd._left_child->_right_sib->_name, nd._name);
+                    double edge_len = nd._edge_length;
+                    new_t.push_back(make_pair(species_joined, edge_len));
+                }
+            }
+            
+            // if there are 2 lineages left and neither has edge length 0, the tree is complete - add another node
+            if (_lineages.size() == 2) {
+                if (_lineages[0]->_edge_length > Forest::_small_enough && _lineages[1]->_edge_length > Forest::_small_enough) {
+                    Node* subtree1 = _lineages[0];
+                    Node* subtree2 = _lineages[1];
+                    
+                    Node nd;
+                    _nodes.push_back(nd);
+                    Node* new_nd = &_nodes.back();
+                    new_nd->_parent=0;
+                    new_nd->_number=_nleaves+_ninternals;
+                    new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
+                    new_nd->_edge_length=0.0;
+                    _ninternals++;
+                    new_nd->_right_sib=0;
+
+                    new_nd->_left_child=subtree1;
+                    subtree1->_right_sib=subtree2;
+
+                    subtree1->_parent=new_nd;
+                    subtree2->_parent=new_nd;
+                    
+                    updateNodeVector (_lineages, subtree1, subtree2, new_nd);
+                    assert (_lineages.size() == 1);
+                    
+                    tuple<string, string, string> species_joined = make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
+                    double edge_len = new_nd->_edge_length;
+                    new_t.push_back(make_pair(species_joined, edge_len));
+                }
             }
         }
+        else {
+            _forest_height = 0.0;
+            tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
+            for (auto &nd:_lineages) {
+                nd->_edge_length = 0.0;
+            }
+            chooseSpeciesIncrementOnly(lot, 0.0);
+//            double edge_len = _lineages.front()->_edge_length
+            new_t.push_back(make_pair(species_joined, _last_edge_length));
+
+            
+            for (auto &nd : _nodes) {
+                if (nd._left_child) {
+                    assert (nd._left_child->_right_sib);
+                    
+                    updateNodeVector(_lineages, nd._left_child, nd._left_child->_right_sib, &nd);
+                    nd._edge_length = 0.0;
+                    chooseSpeciesIncrementOnly(lot, 0.0);
+                    
+                    tuple<string, string, string> species_joined = make_tuple(nd._left_child->_name, nd._left_child->_right_sib->_name, nd._name);
+                    double edge_len = nd._edge_length;
+                    assert (edge_len == _last_edge_length);
+                    new_t.push_back(make_pair(species_joined, _last_edge_length));
+                }
+            }
+            
+            // if there are 2 lineages left and neither has edge length 0, the tree is complete - add another node
+            if (_lineages.size() == 2) {
+                if (_lineages[0]->_edge_length > Forest::_small_enough && _lineages[1]->_edge_length > Forest::_small_enough) {
+                    Node* subtree1 = _lineages[0];
+                    Node* subtree2 = _lineages[1];
+                    
+                    Node nd;
+                    _nodes.push_back(nd);
+                    Node* new_nd = &_nodes.back();
+                    new_nd->_parent=0;
+                    new_nd->_number=_nleaves+_ninternals;
+                    new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
+                    new_nd->_edge_length=0.0;
+                    _ninternals++;
+                    new_nd->_right_sib=0;
+
+                    new_nd->_left_child=subtree1;
+                    subtree1->_right_sib=subtree2;
+
+                    subtree1->_parent=new_nd;
+                    subtree2->_parent=new_nd;
+                    
+                    updateNodeVector (_lineages, subtree1, subtree2, new_nd);
+                    
+                    assert (_lineages.size() == 1);
+                    
+                    tuple<string, string, string> species_joined = make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
+                    double edge_len = new_nd->_edge_length;
+                    assert (edge_len == 0.0);
+                    new_t.push_back(make_pair(species_joined, 0.0));
+                }
+            }
+        }
+        return new_t;
     }
 
 #if defined (FASTER_SECOND_LEVEL)
@@ -5575,7 +5736,6 @@ class Forest {
     }
 #endif
 
-#if defined (FASTER_SECOND_LEVEL)
     inline void Forest::setNodeHeights() {
         assert (_preorder.size() > 0);
         for (auto &nd:_nodes) {
@@ -5587,7 +5747,38 @@ class Forest {
             }
         }
     }
-#endif
+
+    inline void Forest::resetSpeciesPartition(string species_partition_string) {
+        _species_partition.clear();
+        cout << species_partition_string << endl;
+        for (auto s:species_partition_string) {
+            cout << s << endl;
+        }
+        
+//        for (auto &m:species_partition) {
+//            _species_partition[m.first];
+//            for (auto &s:m.second) {
+//                for (auto &nd:_nodes) {
+//                    if (nd._name == s) {
+//                        _species_partition[m.first].push_back(&nd);
+//                        break;
+//                    }
+//                }
+//            }
+//        }
+    }
+
+    inline map<string, vector<string>> Forest::saveSpeciesPartition() {
+        map<string, vector<string>> species_partition_strings;
+        for (auto &s:_species_partition) {
+            species_partition_strings[s.first];
+            for (auto &nd:s.second) {
+//                species_partition_strings[s.first].push_back(to_string(nd->_number));
+                species_partition_strings[s.first].push_back(nd->_name);
+            }
+        }
+        return species_partition_strings;
+    }
 
 #if defined (FASTER_SECOND_LEVEL)
     inline Node * Forest::findNextPreorderNew(Node * nd) const {
