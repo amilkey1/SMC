@@ -1295,11 +1295,11 @@ inline vector<double> Particle::getVectorPrior() {
 //        _forests[0].showForest();
 //        string test1 = _forests[0].makePartialNewick(8, true);
 //        cout << test1 << endl;
-        string newick = " (c^B:0.003683424303221,d^B:0.003683424303221,e^C:0.003683424303221,f^C:0.003683424303221,g^D:0.003683424303221,h^D:0.003683424303221,i^E:0.003683424303221,j^E:0.003683424303221,(a^A:0.002613430000000,b^A:0.002613430000000):0.001069994304221)";
-        _forests[1].buildFromNewickMPI(newick, true, true, _lot); // TODO: BE CAREFUL, TESTING
-        _forests[1].showForest(); // TODO: need to set lienages correclty and remove extra nodes
-        string test = _forests[1].makePartialNewick(8, true);
-        cout << test << endl;
+//        string newick = " (c^B:0.003683424303221,d^B:0.003683424303221,e^C:0.003683424303221,f^C:0.003683424303221,g^D:0.003683424303221,h^D:0.003683424303221,i^E:0.003683424303221,j^E:0.003683424303221,(a^A:0.002613430000000,b^A:0.002613430000000):0.001069994304221)";
+//        _forests[1].buildFromNewickMPI(newick, true, true, _lot); // TODO: BE CAREFUL, TESTING
+//        _forests[1].showForest(); // TODO: need to set lienages correclty and remove extra nodes
+//        string test = _forests[1].makePartialNewick(8, true);
+//        cout << test << endl;
         for (int i=1; i<_forests.size(); i++) {
 //            _forests[i]._nodes.clear();
             _forests[i].buildFromNewick(newicks[i-1], true, false); // newicks starts at 0
