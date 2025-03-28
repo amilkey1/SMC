@@ -10,6 +10,7 @@ using namespace boost;
 
 #include "lot.hpp"
 #include "conditionals.hpp"
+#include "stopwatch.hpp"
 
 extern proj::Lot rng;
 std::mutex mutx;
@@ -82,6 +83,7 @@ class Particle {
         void                                    initGeneForestSpeciesPartition(string species_partition);
         string                                  saveForestSpeciesPartition();
 //#endif
+        void                                    setGeneUPGMAMatrices();
     
         bool operator<(const Particle::SharedPtr & other) const {
             return _log_weight<other->_log_weight;
@@ -537,7 +539,10 @@ inline vector<double> Particle::getVectorPrior() {
                 if (G::_start_mode == "smc") {
                     if (G::_upgma) {
                         if (!G::_run_on_empty) {
-                            _forests[next_gene].buildRestOfTreeFaster();
+                            // TODO: old way
+//                            _forests[next_gene].buildRestOfTreeFaster();
+                            // TODO: new way
+//                            _forests[next_gene].constructUPGMA();
                         }
                     }
                 }
@@ -644,6 +649,9 @@ inline vector<double> Particle::getVectorPrior() {
 
 #if !defined (FASTER_SECOND_LEVEL)
     inline void Particle::speciesOnlyProposalIntegratingOutTheta() {
+        StopWatch sw;
+//        sw.start();
+        
         if (_generation == 0) {
             _species_branches = G::_nspecies;
             for (int i=1; i<_forests.size(); i++) {
@@ -716,6 +724,7 @@ inline vector<double> Particle::getVectorPrior() {
             vector<unsigned> q_jb;
             
             double neg_inf = -1*numeric_limits<double>::infinity();
+            
             for (int i = 1; i<_forests.size(); i++) {
                 if (_log_coalescent_likelihood != neg_inf) {
                     pair<vector<double>, vector<unsigned>> params;
@@ -725,6 +734,8 @@ inline vector<double> Particle::getVectorPrior() {
 //                    calcInitialCoalescentLikelihood();
                     params = _forests[i].calcInitialCoalescentLikelihoodIntegratingOutTheta();
 #else
+                    sw.start();
+                    
                     if (_forests[0]._lineages.size() > 1) {
                         params = _forests[i].calcCoalescentLikelihoodIntegratingOutTheta(_forests[0]._species_build);
                     }
@@ -755,8 +766,11 @@ inline vector<double> Particle::getVectorPrior() {
                         }
                     }
                 }
+                double total_seconds = sw.stop();
+                G::_total_seconds_in_coal_likelihood += total_seconds;
             }
-                    
+                   
+            sw.start();
             if (_forests[0]._lineages.size() > 2) {
                 for (unsigned p=0; p<gamma_jb.size(); p++) {
                     double log_rb = q_jb[p] * log((4 / _forests[1]._ploidy));
@@ -790,6 +804,8 @@ inline vector<double> Particle::getVectorPrior() {
                     }
                 }
             }
+            double total_seconds = sw.stop();
+            G::_total_seconds_in_coal_likelihood += total_seconds;
         }
 
 #if defined (COAL_LIKE_TEST)
@@ -823,6 +839,8 @@ inline vector<double> Particle::getVectorPrior() {
             assert (_log_species_weight == 0.0);
         }
         _generation++;
+//        double total_seconds = sw.stop();
+//        G::_total_seconds_in_coal_likelihood += total_seconds;
     }
 #endif
 
@@ -1740,6 +1758,8 @@ inline vector<double> Particle::getVectorPrior() {
 
 #if defined (FASTER_SECOND_LEVEL)
     inline unsigned Particle::proposeSpeciationEvent() {
+        StopWatch sw;
+//        sw.start();
         // This function is only used for proposing speciation events when there are
         // complete gene trees available. It thus draws increments from a truncated
         // exponential distribution where the trunction point is the next height at
@@ -1905,7 +1925,10 @@ inline vector<double> Particle::getVectorPrior() {
 #if defined(DEBUG_COALLIKE)
         calcLogCoalescentLikelihood(coalinfo_vect, /*integrate_out_thetas*/true, /*verbose*/true);
 #else
+        sw.start();
         calcLogCoalescentLikelihood(coalinfo_vect, /*integrate_out_thetas*/true, /*verbose*/false);
+        double total_seconds = sw.stop();
+        G::_total_seconds_in_coal_likelihood += total_seconds;
 #endif
         _log_species_weight = _log_coal_like - _prev_log_coal_like + log_weight_factor;
 
@@ -1917,8 +1940,8 @@ inline vector<double> Particle::getVectorPrior() {
         // G::_speclog[step].push_back(speclog_element);
 
         _generation++;
+        
         return num_species_tree_lineages;
-
     }
 #endif
 
@@ -2068,11 +2091,11 @@ inline vector<double> Particle::getVectorPrior() {
             unsigned             locus_plus_one   = get<1>(cinfo);
             int                  locus   = locus_plus_one - 1;
             
-            ostringstream oss;
+//            ostringstream oss;
             vector<G::species_t> & b_vect = get<2>(cinfo);
-            copy(b_vect.begin(), b_vect.end(), ostream_iterator<G::species_t>(oss, " "));
-            string spp_joined = oss.str();
-            boost::algorithm::trim_right(spp_joined);
+//            copy(b_vect.begin(), b_vect.end(), ostream_iterator<G::species_t>(oss, " "));
+//            string spp_joined = oss.str();
+//            boost::algorithm::trim_right(spp_joined);
             
             G::species_t banc = 0;
             for (auto b : b_vect)
@@ -2321,6 +2344,12 @@ inline vector<double> Particle::getVectorPrior() {
             }
         }
         return partition_for_message;
+    }
+
+    inline void Particle::setGeneUPGMAMatrices() {
+        for (unsigned i=1; i<_forests.size(); i++) {
+            _forests[i].setGeneUPGMAMatrices();
+        }
     }
 
     inline void Particle::operator=(const Particle & other) {

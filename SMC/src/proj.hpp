@@ -87,6 +87,8 @@ namespace proj {
             double              filterSpeciesParticles(unsigned step, vector<Particle> & particles);
             double              computeEffectiveSampleSize(const vector<double> & probs) const;
             void                saveSpeciesTreesAltHierarchical(vector<Particle> &v) const;
+            bool                isUnambiguous(Data::state_t s0) const;
+            void                calcPairwiseDistanceMatrix();
 
 
         private:
@@ -2316,6 +2318,10 @@ namespace proj {
             
             particle.setGeneOrder(gene_order);
         }
+        
+        if (G::_upgma) {
+            particle.setGeneUPGMAMatrices();
+        }
     }
 
 
@@ -3079,6 +3085,125 @@ namespace proj {
     }
 //#endif
 
+    inline void Proj::calcPairwiseDistanceMatrix() {
+        // Get number of data subsets
+//        unsigned nsubsets = _data->getNumSubsets();
+        
+        // nsubsets should equal the number of loci
+//        assert(nsubsets == G::_nloci);
+                
+        // Allocate a distance matrix for each locus
+        G::_dmatrix.resize(G::_nloci);
+        
+        // Get number of taxa (i.e. number of leaves in a trivial gene forest
+        unsigned n = G::_ntaxa;
+        unsigned n_choose_2 = n*(n-1)/2;
+        
+        // Populate a vector of species to identify rows and columns of _dmatrix
+        assert(n == G::_taxon_names.size());
+        G::_dmatrix_rows.resize(n);
+        for (unsigned i = 0; i < n; i++) {
+            G::_dmatrix_rows[i].resize(G::_ntaxa);
+            G::_dmatrix_rows[i].setBitAt(i);
+        }
+        
+        // Get references to data matrix and counts
+        const Data::pattern_counts_t & counts = _data->getPatternCounts();
+        const Data::data_matrix_t & data_matrix = _data->getDataMatrix();
+        
+        // Loop through all data subsets (i.e. loci)
+        for (unsigned subset = 0; subset < G::_nloci; subset++) {
+            // Create working space to keep track of
+            // pairwise differences and similarities
+            vector<unsigned> diffs(n_choose_2, 0);
+            vector<unsigned> sames(n_choose_2, 0);
+            
+            // Loop through all patterns in subset
+            unsigned npatterns = _data->getNumPatternsInSubset(subset);
+            Data::begin_end_pair_t pattern_range = _data->getSubsetBeginEnd(subset);
+            unsigned first_pattern = pattern_range.first;
+            for (unsigned p = 0; p < npatterns; p++) {
+                unsigned pp = first_pattern + p;
+                unsigned count = counts[pp];
+
+                // Loop through all elements of _dmatrix and update diffs and totals
+                for (unsigned i = 1; i < n; i++) {
+                    Data::state_t di = data_matrix[i][pp];
+                    //TODO: excluding patterns that show ambiguity
+                    bool ok_i = isUnambiguous(di);
+                    for (unsigned j = 0; j < i; j++) {
+                        unsigned k = i*(i-1)/2 + j;
+                        Data::state_t dj = data_matrix[j][pp];
+                        bool ok_j = isUnambiguous(dj);
+                        if (ok_i && ok_j) {
+                            if (di == dj)
+                                sames[k] += (double)count;
+                            else
+                                diffs[k] += (double)count;
+                        }
+                    }   // j loop
+                }   // i loop
+            }   // p loop
+            
+            // Compute JC distances and store in _dmatrix[subset]
+            //TODO: assuming JC for the UPGMA part
+            G::_dmatrix[subset].resize(n_choose_2);
+            for (unsigned k = 0; k < n_choose_2; k++) {
+                unsigned nsites = sames[k] + diffs[k];
+                assert(nsites > 0);
+                double pdist = 1.0*diffs[k]/nsites;
+                if (pdist >= 0.75)
+                    pdist = 0.74986667; // value used by PAUP*
+                    
+                double jcdist = -0.75*log(1 - 4.0*pdist/3.0);
+                
+                if (jcdist <= 0.0)
+                    jcdist = 0.0;
+                    
+                G::_dmatrix[subset][k] = jcdist;
+            }
+            
+            //G::debugShowDistanceMatrix(G::_dmatrix_rows, G::_dmatrix[subset], subset);
+            
+        }   // subset loop
+    }
+
+    inline bool Proj::isUnambiguous(Data::state_t s0) const {
+        // Case 1: s0 is ambiguous (AG)
+        //    s0     s   s & s0   s & s0 == s0
+        //  0101  0001     0001          false
+        //  0101  0010     0000          false
+        //  0101  0100     0100          false
+        //  0101  1000     0000          false
+        //
+        // Case 2: s0 is unambiguous (T)
+        //    s0     s   s & s0   s & s0 == s0
+        //  1000  0001     0000          false
+        //  1000  0010     0000          false
+        //  1000  0100     0000          false
+        //  1000  1000     1000          true
+        //
+        // Case 3: s0 is unambiguous (A)
+        //    s0     s   s & s0   s & s0 == s0
+        //  0001  0001     0001          true
+        //  0001  0010     0000          false
+        //  0001  0100     0000          false
+        //  0001  1000     0000          false
+        //
+        // Bottom line, if s & s0 is ever equal to s0, then
+        // state s0 is unambiguous
+        bool is_unambiguous = false;
+        unsigned nstates = 4; // TODO: setting for now
+        for (unsigned i = 0; i < nstates; i++) {
+            Data::state_t s = (Data::state_t)1 << i;
+            if ( (s & s0) == s0) {
+                is_unambiguous = true;
+                break;
+            }
+        }
+        return is_unambiguous;
+    }
+
     inline void Proj::run() {
 #if defined(USING_MPI)
         output("Starting MPI parallel version...\n");
@@ -3173,10 +3298,12 @@ namespace proj {
                 
 //                StopWatch sw;
 //                sw.start();
+                calcPairwiseDistanceMatrix();
+
                 
                 Particle p;
                 initializeParticle(p); // initialize one particle and copy to all other particles
-                
+                                
                 
                 // reset marginal likelihood
                 _log_marginal_likelihood = 0.0;

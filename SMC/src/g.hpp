@@ -1,4 +1,5 @@
 #pragma once
+#include "split.hpp"
 
 extern void output(string msg, unsigned level);
 extern void output(format & fmt, unsigned level);
@@ -58,10 +59,16 @@ namespace proj {
         static unsigned             _nspecies;
         static unsigned             _ntaxa;
         static double               _infinity;
+        static double               _total_seconds_in_coal_likelihood;
+        static double               _test;
+        static unsigned             _partial_arrays;
         
         // other
         static vector<string>           _taxon_names;
 //        static vector<string>                  _species_names;
+        
+        static vector<vector<double> > _dmatrix;
+        static vector<Split>           _dmatrix_rows;
         
         // functions
         string inventName(unsigned k, bool lower_case);
@@ -98,6 +105,7 @@ namespace proj {
         string species_name(letters.rbegin(), letters.rend());
         return species_name;
     }
+
 
 }
 

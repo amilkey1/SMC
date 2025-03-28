@@ -18,6 +18,7 @@ namespace proj {
             Split &                                             operator=(const Split & other);
             bool                                                operator==(const Split & other) const;
             bool                                                operator<(const Split & other) const;
+            Split &                                             operator+=(const Split & other);
 
             void                                                clear();
             void                                                resize(unsigned nleaves);
@@ -52,6 +53,12 @@ namespace proj {
             typedef std::shared_ptr< Split >                    SharedPtr;
     };
 
+    Split operator+(const Split & a, const Split & b) {
+        Split c(a);
+        c += b;
+        return c;
+    }
+
     inline Split::Split() {
         _mask = 0L;
         _nleaves = 0;
@@ -78,9 +85,17 @@ namespace proj {
         }
     }
 
+    inline Split & Split::operator+=(const Split & other) {
+        addSplit(other);
+        return *this;
+    }
+
     inline Split & Split::operator=(const Split & other) {
         _nleaves = other._nleaves;
         _bits = other._bits;
+        _mask = other._mask;
+        _bits_per_unit = other._bits_per_unit;
+        
         return *this;
     }
 
