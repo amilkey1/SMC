@@ -87,7 +87,11 @@ class Forest {
         vector<pair<double, string>>    calcForestRate(Lot::SharedPtr lot);
         void                            updateSpeciesPartition(tuple<string, string, string> species_info);
         double                          calcTopologyPrior(unsigned nlineages);
+    
+#if defined (UNUSED_FUNCTIONS)
         void                            calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree);
+#endif
+    
         void                            clearPartials();
         void                            setRelativeRate(double rel_rate) {_relative_rate = rel_rate;}
         unsigned                        getDeepCoal(tuple <string, string, string> species_joined);
@@ -122,12 +126,14 @@ class Forest {
         pair<Node*, Node*>              getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
         void                            debugShowDistanceMatrix(const vector<double> & d) const;
     
-        void                            buildRestOfTreeFaster();
         void                            constructUPGMA();
         void                            destroyUPGMA();
         void                            mergeDMatrixPair(vector<Split> & dmatrows, vector<double> & dmatrix, Split & s1, Split & s2);
         void                            buildStartingUPGMAMatrix();
+#if defined (OLD_UPGMA)
         void                            buildStartingRow();
+        void                            buildRestOfTreeFaster();
+#endif
         vector<pair<tuple<string, string, string>, double>>                            resetLineages(Lot::SharedPtr lot);
         vector<pair<tuple<string, string, string>, double>> resetT();
     
@@ -151,9 +157,9 @@ class Forest {
         mutable unsigned                _next_node_number;
 #endif
 
-    void                            setNodeHeights();
-    void                            resetSpeciesPartition(string species_partition);
-    map<string, vector<string>>     saveSpeciesPartition();
+        void                            setNodeHeights();
+        void                            resetSpeciesPartition(string species_partition);
+        map<string, vector<string>>     saveSpeciesPartition();
         void                            setGeneUPGMAMatrices();
     
         map<string, double>             _theta_map;
@@ -164,7 +170,6 @@ class Forest {
         unsigned                        _nleaves;
         unsigned                        _ninternals;
         unsigned                        _npatterns;
-        unsigned                        _nstates;
         double                          _last_edge_length;
 
         Data::SharedPtr                 _data;
@@ -173,20 +178,23 @@ class Forest {
         unsigned                        _index;
         map<string, list<Node*> >       _species_partition;
         double                          _gene_tree_log_likelihood;
-        pair<Node*, Node*>              _species_joined;
         double                          _log_joining_prob;
         vector<pair<double, double>>    _increments_and_priors;
         bool                            _done;
+    
+#if defined (DEBUG_MODE)
+        pair<Node*, Node*>                  _species_joined;
+#endif
+    
+#if !defined (FASTER_SECOND_LEVEL)
+        vector<pair<double, pair<string, string>>>          _depths;
+        vector<pair<tuple<string,string,string>, double>>   _species_build;
+        unsigned                                            _nincrements = 0;
         double                          _log_coalescent_likelihood;
         double                          _panmictic_coalescent_likelihood;
         double                          _log_coalescent_likelihood_increment;
-#if !defined (FASTER_SECOND_LEVEL)
-        vector<pair<double, pair<string, string>>>              _depths;
-        vector<pair<tuple<string,string,string>, double>>    _species_build;
 #endif
-        unsigned                        _nincrements = 0;
         vector<Node*>                   _preorder;
-        double                          _small_enough;
         map<string, string>             _taxon_map;
         map<string, unsigned>           _species_indices;
         double                          _log_weight;
@@ -195,6 +203,9 @@ class Forest {
         double                          _theta_mean;
         vector<pair<Node*, Node*>>      _node_choices;
         vector<double>                  _log_likelihood_choices;
+#if defined (OLD_UPGMA)
+        map<Node*,  unsigned>           _starting_row;
+#endif
         stack<Node *>                   _upgma_additions;
         map<Node *, double>             _upgma_starting_edgelen;
         
@@ -204,26 +215,28 @@ class Forest {
     
         vector<string>                  _species_names;
         vector<double>                  _starting_dij;
-        map<Node*,  unsigned>           _starting_row;
         double                          _relative_rate;
         vector<pair<string, unsigned>>  _lineages_per_species;
         unsigned                        _partials_calculated_count;
         double                          _forest_height;
     
+#if defined (DEBUG_MODE)
         void                            showSpeciesJoined();
-//        double                          calcTransitionProbability(double s, double s_child, double edge_length);
+#endif
         double                          calcTransitionProbabilityJC(double s, double s_child, double edge_length);
         double                          calcTransitionProbabilityHKY(double s, double s_child, double edge_length);
         double                          calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length);
-//        double                          getTreeHeight();
         double                          getTreeLength();
         double                          getLineageHeight(Node* nd);
         void                            addIncrement(double increment);
         void                            simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
+    
+#if !defined (FASTER_SECOND_LEVEL)
         double                          calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
         pair<vector<double>, vector<unsigned>>  calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build);
         pair<vector<double>, vector<unsigned>>  calcInitialCoalescentLikelihoodIntegratingOutTheta();
         pair<vector<double>, vector<unsigned>>  calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build);
+#endif
         
         unsigned                        multinomialDraw(Lot::SharedPtr lot, const vector<double> & probs);
 
@@ -231,7 +244,6 @@ class Forest {
 
         typedef std::shared_ptr<Forest> SharedPtr;
         static double                   _kappa;
-        static double                   _ploidy;
         static double                   _edge_rate_variance;
         static double                   _asrv_shape;
         static double                   _comphet;
@@ -251,36 +263,35 @@ class Forest {
         _nodes.clear();
         _lineages.clear();
         _npatterns = 0;
-        _nstates = 4;
         _last_edge_length = 0.0;
         _lineages.clear();
         _log_weight = 0.0;
         _gene_tree_log_likelihood = 0.0;
         _log_joining_prob = 0.0;
-        _done = false;
-        _log_coalescent_likelihood = 0.0;
-        _log_coalescent_likelihood_increment = 0.0;
         _nleaves=G::_ntaxa;
         _ninternals=0;
-        _nincrements = 0;
         _preorder.clear();
-        _panmictic_coalescent_likelihood = 0.0;
-        _small_enough = 0.0000001;
         _theta_mean = 0.0;
         _ancestral_species_name = "";
-        _ploidy = 2;
 #if !defined (FASTER_SECOND_LEVEL)
         _species_build.clear();
         _depths.clear();
+        _panmictic_coalescent_likelihood = 0.0;
+        _log_coalescent_likelihood = 0.0;
+        _log_coalescent_likelihood_increment = 0.0;
 #endif
         _taxon_map.clear();
         _species_indices.clear();
         _vector_prior.clear();
+#if defined (OLD_UPGMA)
+        _starting_row.clear();
+        _nincrements = 0;
+#endif
         _upgma_additions = stack<Node*>();
         _upgma_starting_edgelen.clear();
+
         _species_names.clear();
         _starting_dij.clear();
-        _starting_row.clear();
         _lineages_per_species.clear();
         _partials_calculated_count = 0;
         _forest_height = 0.0;
@@ -288,6 +299,10 @@ class Forest {
         _coalinfo.clear();
         _preorders.clear();
         _next_node_number = 0;
+#endif
+        
+#if defined (UNUSED_FUNCTIONS)
+        _done = false;
 #endif
     }
 
@@ -392,11 +407,11 @@ class Forest {
                     nd->_partial=ps.getPartial(_npatterns*4);
                     for (unsigned p=0; p<_npatterns; p++) {
                         unsigned pp = _first_pattern+p;
-                        for (unsigned s=0; s<_nstates; s++) {
+                        for (unsigned s=0; s<G::_nstates; s++) {
                             Data::state_t state = (Data::state_t)1 << s;
                             Data::state_t d = data_matrix[nd->_number][pp];
                             double result = state & d;
-                            (*nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                            (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
                         }
                     }
                 }
@@ -863,11 +878,11 @@ class Forest {
                 new_nd->_partial=ps.getPartial(_npatterns*4);
                 for (unsigned p=0; p<_npatterns; p++) {
                     unsigned pp = _first_pattern+p;
-                    for (unsigned s=0; s<_nstates; s++) {
+                    for (unsigned s=0; s<G::_nstates; s++) {
                         Data::state_t state = (Data::state_t)1 << s;
                         Data::state_t d = data_matrix[new_nd->_number][pp];
                         double result = state & d;
-                        (*new_nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*new_nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
                     }
                 }
             }
@@ -884,17 +899,17 @@ class Forest {
             auto & child_partial_array = *(child->_partial);
 
             for (unsigned p = 0; p < _npatterns; p++) {
-                for (unsigned s = 0; s <_nstates; s++) {
+                for (unsigned s = 0; s <G::_nstates; s++) {
                     double sum_over_child_states = 0.0;
-                    for (unsigned s_child = 0; s_child < _nstates; s_child++) {
+                    for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
                         double child_transition_prob = calcTransitionProbabilityJC(s, s_child, child->_edge_length);
-                        double child_partial = child_partial_array[p*_nstates + s_child];
+                        double child_partial = child_partial_array[p*G::_nstates + s_child];
                         sum_over_child_states += child_transition_prob * child_partial;
                     }   // child state loop
                     if (child == new_nd->_left_child)
-                        parent_partial_array[p*_nstates+s] = sum_over_child_states;
+                        parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
                     else
-                        parent_partial_array[p*_nstates+s] *= sum_over_child_states;
+                        parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
                 }   // parent state loop
             }   // pattern loop
         }   // child loop
@@ -913,11 +928,11 @@ class Forest {
                 new_nd->_partial=ps.getPartial(_npatterns*4);
                 for (unsigned p=0; p<_npatterns; p++) {
                     unsigned pp = _first_pattern+p;
-                    for (unsigned s=0; s<_nstates; s++) {
+                    for (unsigned s=0; s<G::_nstates; s++) {
                         Data::state_t state = (Data::state_t)1 << s;
                         Data::state_t d = data_matrix[new_nd->_number][pp];
                         double result = state & d;
-                        (*new_nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*new_nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
                     }
                 }
             }
@@ -934,17 +949,17 @@ class Forest {
             auto & child_partial_array = *(child->_partial);
 
             for (unsigned p = 0; p < _npatterns; p++) {
-                for (unsigned s = 0; s <_nstates; s++) {
+                for (unsigned s = 0; s <G::_nstates; s++) {
                     double sum_over_child_states = 0.0;
-                    for (unsigned s_child = 0; s_child < _nstates; s_child++) {
+                    for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
                         double child_transition_prob = calcTransitionProbabilityHKY(s, s_child, child->_edge_length);
-                        double child_partial = child_partial_array[p*_nstates + s_child];
+                        double child_partial = child_partial_array[p*G::_nstates + s_child];
                         sum_over_child_states += child_transition_prob * child_partial;
                     }   // child state loop
                     if (child == new_nd->_left_child)
-                        parent_partial_array[p*_nstates+s] = sum_over_child_states;
+                        parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
                     else
-                        parent_partial_array[p*_nstates+s] *= sum_over_child_states;
+                        parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
                 }   // parent state loop
             }   // pattern loop
         }   // child loop
@@ -952,7 +967,7 @@ class Forest {
 
     inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length) {
         assert(pi.size() == 4);
-        assert(fabs(accumulate(pi.begin(), pi.end(), 0.0) - 1.0) < Forest::_small_enough);
+        assert(fabs(accumulate(pi.begin(), pi.end(), 0.0) - 1.0) < G::_small_enough);
         assert(_relative_rate > 0.0);
         double transition_prob = 0.0;
         
@@ -1079,8 +1094,8 @@ class Forest {
             double log_like = 0.0;
             for (unsigned p=0; p<_npatterns; p++) {
                 double site_like = 0.0;
-                for (unsigned s=0; s<_nstates; s++) {
-                    double partial = (*nd->_partial)[p*_nstates+s];
+                for (unsigned s=0; s<G::_nstates; s++) {
+                    double partial = (*nd->_partial)[p*G::_nstates+s];
                     site_like += 0.25*partial;
                 }
                 assert(site_like>0);
@@ -1243,7 +1258,6 @@ class Forest {
     }
 
     inline void Forest::operator=(const Forest & other) {
-        _nstates = other._nstates;
         _npatterns = other._npatterns;
         _edge_rate_variance = other._edge_rate_variance;
         _asrv_shape = other._asrv_shape;
@@ -1259,36 +1273,35 @@ class Forest {
         _first_pattern      = other._first_pattern;
         _gene_tree_log_likelihood = other._gene_tree_log_likelihood;
         _data               = other._data;
-        _species_joined = other._species_joined;
         _log_joining_prob = other._log_joining_prob;
         _increments_and_priors = other._increments_and_priors;
-        _done = other._done;
-        _log_coalescent_likelihood = other._log_coalescent_likelihood;
-        _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
         _relative_rate = other._relative_rate;
-        _nincrements = other._nincrements;
         _preorder.resize(other._preorder.size());
-        _panmictic_coalescent_likelihood = other._panmictic_coalescent_likelihood;
         _theta_map = other._theta_map;
-        _small_enough = other._small_enough;
         _theta_mean = other._theta_mean;
         _ancestral_species_name = other._ancestral_species_name;
-        _ploidy = other._ploidy;
 #if !defined (FASTER_SECOND_LEVEL)
         _species_build = other._species_build;
         _depths = other._depths;
+        _panmictic_coalescent_likelihood = other._panmictic_coalescent_likelihood;
+        _log_coalescent_likelihood = other._log_coalescent_likelihood;
+        _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
 #endif
         _taxon_map = other._taxon_map;
         _species_indices = other._species_indices;
         _vector_prior = other._vector_prior;
         _lineages_per_species = other._lineages_per_species;
+#if defined (OLD_UPGMA)
+        _starting_row = other._starting_row;
+        _nincrements = other._nincrements;
+#endif
         _upgma_additions = other._upgma_additions;
         _upgma_starting_edgelen = other._upgma_starting_edgelen;
+
         _dmatrix = other._dmatrix;
         _dmatrix_rows = other._dmatrix_rows;
         
         _starting_dij = other._starting_dij;
-        _starting_row = other._starting_row;
         _species_names = other._species_names;
         _partials_calculated_count = other._partials_calculated_count;
         _forest_height = other._forest_height;
@@ -1296,6 +1309,14 @@ class Forest {
         _coalinfo = other._coalinfo;
         _preorders = other._preorders;
         _next_node_number = other._next_node_number;
+#endif
+        
+#if defined (DEBUG_MODE)
+        _species_joined = other._species_joined;
+#endif
+        
+#if defined (UNUSED_FUNCTIONS)
+        _done = other._done;
 #endif
 
         // copy tree itself
@@ -1310,12 +1331,14 @@ class Forest {
                 }
             }
             
+#if defined (OLD_UPGMA)
             _starting_row.clear();
             for (auto strow : other._starting_row) {
                 unsigned number = strow.first->_number;
                 Node* nd = &*next(_nodes.begin(), number);
                 _starting_row[nd] = strow.second;
             }
+#endif
 
             for (auto othernd : other._nodes) {
                 // get number of next node in preorder sequence (serves as index of node in _nodes vector)
@@ -1638,6 +1661,7 @@ class Forest {
         }
     }
 
+#if defined (DEBUG_MODE)
     inline void Forest::showSpeciesJoined() {
         assert (_index==0);
         if (_species_joined.first != NULL) {
@@ -1647,6 +1671,7 @@ class Forest {
             cout << "no species joined" << endl;
         }
     }
+#endif
 
     inline void Forest::setUpGeneForest(map<string, string> &taxon_map) {
         _taxon_map = taxon_map;
@@ -1689,6 +1714,7 @@ class Forest {
         }
     }
 
+#if defined (UNUSED_FUNCTIONS)
     inline void Forest::calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree) {
 #if defined (DRAW_NEW_THETA)
         double log_increment_prior = 0.0;
@@ -1855,7 +1881,9 @@ class Forest {
         }
 #endif
     }
+#endif
 
+#if defined (OLD_UPGMA)
     struct negLogLikeDist {
         negLogLikeDist(unsigned npatterns, unsigned first, const Data::pattern_counts_t & counts, const vector<double> & same, const vector<double> & diff, double v0)
             : _npatterns(npatterns), _first(first), _counts(counts), _same(same), _diff(diff), _v0(v0) {}
@@ -1882,7 +1910,9 @@ class Forest {
             const vector<double> & _diff;
             double _v0;
     };
+#endif
         
+#if defined (OLD_UPGMA)
     inline void Forest::buildStartingUPGMAMatrix() {
         bool use_minimizer = true;
         
@@ -2002,12 +2032,12 @@ class Forest {
                     same_state.assign(npatterns, 0.0);
                     diff_state.assign(npatterns, 0.0);
                     for (unsigned p = 0; p < npatterns; p++) {
-                        for (unsigned lstate = 0; lstate < _nstates; lstate++) {
+                        for (unsigned lstate = 0; lstate < G::_nstates; lstate++) {
                             auto & l_partial_array = *(lnode->_partial);
-                            double lpartial = l_partial_array[p*_nstates + lstate];
-                            for (unsigned rstate = 0; rstate < _nstates; rstate++) {
+                            double lpartial = l_partial_array[p*G::_nstates + lstate];
+                            for (unsigned rstate = 0; rstate < G::_nstates; rstate++) {
                                 auto & r_partial_array = *(rnode->_partial);
-                                double rpartial = r_partial_array[p*_nstates + rstate];
+                                double rpartial = r_partial_array[p*G::_nstates + rstate];
                                 if (lstate == rstate)
                                     same_state[p] += lpartial*rpartial;
                                 else
@@ -2044,7 +2074,9 @@ class Forest {
         }
         
     }
+#endif
         
+#if defined (OLD_UPGMA)
     inline void Forest::buildStartingRow() {
         unsigned n = G::_ntaxa;
         map<Node *, unsigned> row;
@@ -2056,6 +2088,7 @@ class Forest {
         }
         _starting_row = row;
     }
+#endif
 
     inline void Forest::destroyUPGMA() {
         if (G::_save_memory) {
@@ -2422,305 +2455,303 @@ class Forest {
         dmatrows = drows2;
     }
     
-inline void Forest::buildRestOfTreeFaster() {
-//    StopWatch sw;
-    
-    if (_data->_original_data_matrix.size() > 0) {
-        _data->_original_data_matrix.clear(); // if not using minimizer, can't clear this until all genes have gone through once
-    }
-
-//            debugShowDistanceMatrix(_starting_dij);
-    
-    double prev_log_likelihood = _gene_tree_log_likelihood;
-    
-    vector<double> dij = _starting_dij;
-//    for (auto &d:_starting_dij) {
-//        cout << d << endl;
-//    }
-    vector<double> dij2;
-    
-//            debugShowDistanceMatrix(dij);
-    
-    // Create a map relating position in dij vector to row,col in distance matrix
-    map<unsigned, pair<unsigned, unsigned>> dij_row_col;
-    
-//            // Create distance matrix dij and workspace dij2 used to build next dij
-//            // Both dij and dij2 are 1-dimensional vectors that store only the
-//            // lower diagonal of the distance matrix (excluding diagonal elements)
-    
-    unsigned temp1 = _lineages.back()->_left_child->_right_sib->_position_in_lineages;
-    unsigned temp2 = _lineages.back()->_left_child->_position_in_lineages;
-    unsigned i_to_delete = temp1;
-    unsigned j_to_delete = temp2; // i is larger number
-
-    if (temp2 > temp1) {
-        i_to_delete = temp2;
-        j_to_delete = temp1;
-    }
-
-    
-    Node* parent = _lineages.back();
-    
-    unsigned n = (unsigned) _lineages.size() + 1;
-    
-    _starting_row[parent] = i_to_delete;
-    
-        for (unsigned k = 0; k < n; k++) {
-            if (k != i_to_delete && k != j_to_delete) {
-                unsigned ik = (i_to_delete > k) ? (i_to_delete*(i_to_delete-1)/2 + k) : (k*(k-1)/2 + i_to_delete);
-                unsigned jk = (j_to_delete > k) ? (j_to_delete*(j_to_delete-1)/2 + k) : (k*(k-1)/2 + j_to_delete);
-                double a = dij[ik];
-                double b = dij[jk];
-                dij[ik] = 0.5*(a + b);
-                dij[jk] = G::_infinity;
-            }
+#if defined (OLD_UPGMA)
+    inline void Forest::buildRestOfTreeFaster() {
+        
+        if (_data->_original_data_matrix.size() > 0) {
+            _data->_original_data_matrix.clear(); // if not using minimizer, can't clear this until all genes have gone through once
         }
-    
-        // Build new distance matrix
-         unsigned n2 = (unsigned)_lineages.size();
-        assert(n2 == n - 1);
-        unsigned dim2 = n2*(n2-1)/2;
-        dij2.resize(dim2);
-        dij2.assign(dim2, G::_infinity);
-    
-        // Calculate distances between all pairs of lineages
-        dij_row_col.clear();
-        for (unsigned i2 = 1; i2 < n2; i2++) {
-            for (unsigned j2 = 0; j2 < i2; j2++) {
-                Node * lnode2 = _lineages[i2];
-                Node * rnode2 = _lineages[j2];
-                assert(_starting_row.find(lnode2) != _starting_row.end());
-                assert(_starting_row.find(rnode2) != _starting_row.end());
-                unsigned i = _starting_row[lnode2];
-                unsigned j = _starting_row[rnode2];
-                unsigned k2 = i2*(i2-1)/2 + j2;
-                unsigned k = i*(i-1)/2 + j;
-                if (j > i) {
-                    k = j*(j-1)/2 + i;
+
+    //            debugShowDistanceMatrix(_starting_dij);
+        
+        double prev_log_likelihood = _gene_tree_log_likelihood;
+        
+        vector<double> dij = _starting_dij;
+        vector<double> dij2;
+        
+    //            debugShowDistanceMatrix(dij);
+        
+        // Create a map relating position in dij vector to row,col in distance matrix
+        map<unsigned, pair<unsigned, unsigned>> dij_row_col;
+        
+                // Create distance matrix dij and workspace dij2 used to build next dij
+                // Both dij and dij2 are 1-dimensional vectors that store only the
+                // lower diagonal of the distance matrix (excluding diagonal elements)
+        
+        unsigned temp1 = _lineages.back()->_left_child->_right_sib->_position_in_lineages;
+        unsigned temp2 = _lineages.back()->_left_child->_position_in_lineages;
+        unsigned i_to_delete = temp1;
+        unsigned j_to_delete = temp2; // i is larger number
+
+        if (temp2 > temp1) {
+            i_to_delete = temp2;
+            j_to_delete = temp1;
+        }
+
+        
+        Node* parent = _lineages.back();
+        
+        unsigned n = (unsigned) _lineages.size() + 1;
+        
+        _starting_row[parent] = i_to_delete;
+        
+            for (unsigned k = 0; k < n; k++) {
+                if (k != i_to_delete && k != j_to_delete) {
+                    unsigned ik = (i_to_delete > k) ? (i_to_delete*(i_to_delete-1)/2 + k) : (k*(k-1)/2 + i_to_delete);
+                    unsigned jk = (j_to_delete > k) ? (j_to_delete*(j_to_delete-1)/2 + k) : (k*(k-1)/2 + j_to_delete);
+                    double a = dij[ik];
+                    double b = dij[jk];
+                    dij[ik] = 0.5*(a + b);
+                    dij[jk] = G::_infinity;
                 }
-                dij2[k2] = dij[k];
-                dij_row_col[k2] = make_pair(i2,j2);
-                
-                assert (dij[k] == dij[k]);
             }
-        }
-    
-    map<Node*, unsigned> row;
-        dij = dij2;
-        n = n2;
-        for (unsigned i = 0; i < n; i++) {
-            Node * nd = _lineages[i];
-            row[nd] = i;
-        }
-
-            // save starting distance matrix to reuse in next step
-    _starting_dij = dij;
-    
-    // Create a map relating nodes in _lineages to rows of dij
-    // Also save starting edge lengths so they can be restored in destroyUPGMA()
-        row.clear();
-    _upgma_starting_edgelen.clear();
-        for (unsigned i = 0; i < n; i++) {
-            Node * nd = _lineages[i];
-            _upgma_starting_edgelen[nd] = nd->_edge_length;
-            row[nd] = i;
-        }
         
-        // Build UPGMA tree on top of existing forest
-        assert(_upgma_additions.empty());
+            // Build new distance matrix
+             unsigned n2 = (unsigned)_lineages.size();
+            assert(n2 == n - 1);
+            unsigned dim2 = n2*(n2-1)/2;
+            dij2.resize(dim2);
+            dij2.assign(dim2, G::_infinity);
         
-        double upgma_height = _lineages.back()->_height;
+            // Calculate distances between all pairs of lineages
+            dij_row_col.clear();
+            for (unsigned i2 = 1; i2 < n2; i2++) {
+                for (unsigned j2 = 0; j2 < i2; j2++) {
+                    Node * lnode2 = _lineages[i2];
+                    Node * rnode2 = _lineages[j2];
+                    assert(_starting_row.find(lnode2) != _starting_row.end());
+                    assert(_starting_row.find(rnode2) != _starting_row.end());
+                    unsigned i = _starting_row[lnode2];
+                    unsigned j = _starting_row[rnode2];
+                    unsigned k2 = i2*(i2-1)/2 + j2;
+                    unsigned k = i*(i-1)/2 + j;
+                    if (j > i) {
+                        k = j*(j-1)/2 + i;
+                    }
+                    dij2[k2] = dij[k];
+                    dij_row_col[k2] = make_pair(i2,j2);
                     
-    unsigned nsteps = n - 1;
-//    for (auto &d:dij) {
-//        cout << d << endl;
-//    }
-    while (nsteps > 0) {
-        // Find smallest entry in d
-        auto it = min_element(dij.begin(), dij.end());
-        unsigned offset = (unsigned)std::distance(dij.begin(), it);
-        auto p = dij_row_col.at(offset);
-        unsigned i = p.first;
-        unsigned j = p.second;
-        
-        // Update all leading edge lengths
-        double v = *it; // TODO: need to subtract existing node height?
-        
-        assert (v != G::_infinity);
-        
-        double edge_len_to_add = 0.5*v - upgma_height;
-        if (edge_len_to_add <= 0.0) {
-            edge_len_to_add = _small_enough; // TODO: to avoid likelihood issues, set v to very small if 0
-            v = _small_enough;
-        }
-        
-        assert (edge_len_to_add > 0.0);
-        assert (v == v); // check v is not NaN
-        for (auto nd : _lineages) {
-    //                nd->_edge_length += (0.5*v - upgma_height);
-            nd->_edge_length += edge_len_to_add;
-        }
-        
-        upgma_height += edge_len_to_add;
-        
-        //debugShowLineages();
-        
-        // Join lineages i and j
-        Node nd;
-        _nodes.push_back(nd);
-        Node* new_nd = &_nodes.back();
-
-        Node * subtree1 = _lineages[i];
-        Node * subtree2 = _lineages[j];
-        
-        new_nd->_parent=0;
-        new_nd->_number=_nleaves+_ninternals;
-        new_nd->_right_sib=0;
-
-        new_nd->_left_child=subtree1;
-        subtree1->_right_sib=subtree2;
-
-        subtree1->_parent=new_nd;
-        subtree2->_parent=new_nd;
-        
-        _ninternals++;
-        
-        // Nodes added to _upgma_additions will be removed in destroyUPGMA()
-        _upgma_additions.push(new_nd);
-        
-        // Remove lnode and rnode from _lineages and add anc at the end
-        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-        row[new_nd] = i;
-                    
-        //debugShowLineages();
-        // output(format("\nJoining lineages %d and %d\n") % i % j, 0);
-
-        assert (new_nd->_partial == nullptr);
-        new_nd->_partial=ps.getPartial(_npatterns*4);
-        assert(new_nd->_left_child->_right_sib);
-//        sw.start();
-        calcPartialArrayJC(new_nd); // TODO: for now, always complete UPGMA with JC
-//        double test = sw.stop();
-//        G::_test += test;
-                    
-        // Update distance matrix
-        for (unsigned k = 0; k < n; k++) {
-            if (k != i && k != j) {
-                unsigned ik = (i > k) ? (i*(i-1)/2 + k) : (k*(k-1)/2 + i);
-                unsigned jk = (j > k) ? (j*(j-1)/2 + k) : (k*(k-1)/2 + j);
-                double a = dij[ik];
-                double b = dij[jk];
-                dij[ik] = 0.5*(a + b);
-                dij[jk] = G::_infinity;
-            }
-        }
-        
-        // Sanity check
-        for (auto nd : _lineages) {
-            assert(!nd->_right_sib);
-            assert(!nd->_parent);
-        }
-        
-        // Build new distance matrix
-        unsigned n2 = (unsigned)_lineages.size();
-        assert(n2 == n - 1);
-        unsigned dim2 = n2*(n2-1)/2;
-        dij2.resize(dim2);
-        dij2.assign(dim2, G::_infinity);
-        
-        // Calculate distances between all pairs of lineages
-        dij_row_col.clear();
-        for (unsigned i2 = 1; i2 < n2; i2++) {
-            for (unsigned j2 = 0; j2 < i2; j2++) {
-                Node * lnode2 = _lineages[i2];
-                Node * rnode2 = _lineages[j2];
-                unsigned i = row[lnode2];
-                unsigned j = row[rnode2];
-                unsigned k2 = i2*(i2-1)/2 + j2;
-                unsigned k = i*(i-1)/2 + j;
-                if (j > i) {
-                    k = j*(j-1)/2 + i;
+                    assert (dij[k] == dij[k]);
                 }
-                dij2[k2] = dij[k];
-                dij_row_col[k2] = make_pair(i2,j2);
             }
-        }
+        
+        map<Node*, unsigned> row;
+            dij = dij2;
+            n = n2;
+            for (unsigned i = 0; i < n; i++) {
+                Node * nd = _lineages[i];
+                row[nd] = i;
+            }
+
+                // save starting distance matrix to reuse in next step
+        _starting_dij = dij;
+        
+        // Create a map relating nodes in _lineages to rows of dij
+        // Also save starting edge lengths so they can be restored in destroyUPGMA()
+            row.clear();
+        _upgma_starting_edgelen.clear();
+            for (unsigned i = 0; i < n; i++) {
+                Node * nd = _lineages[i];
+                _upgma_starting_edgelen[nd] = nd->_edge_length;
+                row[nd] = i;
+            }
             
-        // Set up for next iteration
-        dij = dij2;
-        n = n2;
-        for (unsigned i = 0; i < n; i++) {
-            Node * nd = _lineages[i];
-            row[nd] = i;
+            // Build UPGMA tree on top of existing forest
+            assert(_upgma_additions.empty());
+            
+            double upgma_height = _lineages.back()->_height;
+                        
+        unsigned nsteps = n - 1;
+    //    for (auto &d:dij) {
+    //        cout << d << endl;
+    //    }
+        while (nsteps > 0) {
+            // Find smallest entry in d
+            auto it = min_element(dij.begin(), dij.end());
+            unsigned offset = (unsigned)std::distance(dij.begin(), it);
+            auto p = dij_row_col.at(offset);
+            unsigned i = p.first;
+            unsigned j = p.second;
+            
+            // Update all leading edge lengths
+            double v = *it; // TODO: need to subtract existing node height?
+            
+            assert (v != G::_infinity);
+            
+            double edge_len_to_add = 0.5*v - upgma_height;
+            if (edge_len_to_add <= 0.0) {
+                edge_len_to_add = _small_enough; // TODO: to avoid likelihood issues, set v to very small if 0
+                v = _small_enough;
+            }
+            
+            assert (edge_len_to_add > 0.0);
+            assert (v == v); // check v is not NaN
+            for (auto nd : _lineages) {
+        //                nd->_edge_length += (0.5*v - upgma_height);
+                nd->_edge_length += edge_len_to_add;
+            }
+            
+            upgma_height += edge_len_to_add;
+            
+            //debugShowLineages();
+            
+            // Join lineages i and j
+            Node nd;
+            _nodes.push_back(nd);
+            Node* new_nd = &_nodes.back();
+
+            Node * subtree1 = _lineages[i];
+            Node * subtree2 = _lineages[j];
+            
+            new_nd->_parent=0;
+            new_nd->_number=_nleaves+_ninternals;
+            new_nd->_right_sib=0;
+
+            new_nd->_left_child=subtree1;
+            subtree1->_right_sib=subtree2;
+
+            subtree1->_parent=new_nd;
+            subtree2->_parent=new_nd;
+            
+            _ninternals++;
+            
+            // Nodes added to _upgma_additions will be removed in destroyUPGMA()
+            _upgma_additions.push(new_nd);
+            
+            // Remove lnode and rnode from _lineages and add anc at the end
+            updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+            row[new_nd] = i;
+                        
+            //debugShowLineages();
+            // output(format("\nJoining lineages %d and %d\n") % i % j, 0);
+
+            assert (new_nd->_partial == nullptr);
+            new_nd->_partial=ps.getPartial(_npatterns*4);
+            assert(new_nd->_left_child->_right_sib);
+    //        sw.start();
+            calcPartialArrayJC(new_nd); // TODO: for now, always complete UPGMA with JC
+    //        double test = sw.stop();
+    //        G::_test += test;
+                        
+            // Update distance matrix
+            for (unsigned k = 0; k < n; k++) {
+                if (k != i && k != j) {
+                    unsigned ik = (i > k) ? (i*(i-1)/2 + k) : (k*(k-1)/2 + i);
+                    unsigned jk = (j > k) ? (j*(j-1)/2 + k) : (k*(k-1)/2 + j);
+                    double a = dij[ik];
+                    double b = dij[jk];
+                    dij[ik] = 0.5*(a + b);
+                    dij[jk] = G::_infinity;
+                }
+            }
+            
+            // Sanity check
+            for (auto nd : _lineages) {
+                assert(!nd->_right_sib);
+                assert(!nd->_parent);
+            }
+            
+            // Build new distance matrix
+            unsigned n2 = (unsigned)_lineages.size();
+            assert(n2 == n - 1);
+            unsigned dim2 = n2*(n2-1)/2;
+            dij2.resize(dim2);
+            dij2.assign(dim2, G::_infinity);
+            
+            // Calculate distances between all pairs of lineages
+            dij_row_col.clear();
+            for (unsigned i2 = 1; i2 < n2; i2++) {
+                for (unsigned j2 = 0; j2 < i2; j2++) {
+                    Node * lnode2 = _lineages[i2];
+                    Node * rnode2 = _lineages[j2];
+                    unsigned i = row[lnode2];
+                    unsigned j = row[rnode2];
+                    unsigned k2 = i2*(i2-1)/2 + j2;
+                    unsigned k = i*(i-1)/2 + j;
+                    if (j > i) {
+                        k = j*(j-1)/2 + i;
+                    }
+                    dij2[k2] = dij[k];
+                    dij_row_col[k2] = make_pair(i2,j2);
+                }
+            }
+                
+            // Set up for next iteration
+            dij = dij2;
+            n = n2;
+            for (unsigned i = 0; i < n; i++) {
+                Node * nd = _lineages[i];
+                row[nd] = i;
+            }
+            
+            --nsteps;
         }
-        
-        --nsteps;
-    }
 
-    // debugging output
-    // output(format("\nGene forest for locus \"%s\" after UPGMA:\n%s\n") % gene_name % makeNewick(9, /*use_names*/true, /*coalunits*/false), 0);
-    // output(format("  Height after UPGMA = %g\n") % _forest_height, 0);
-        
-    _gene_tree_log_likelihood = calcLogLikelihood();
-    _log_weight = _gene_tree_log_likelihood - prev_log_likelihood; // previous likelihood is the entire tree
-        
-//                showForest();
-        
-    if (G::_save_memory) {
-        for (auto &nd:_nodes) {
-            nd._partial=nullptr;
-        }
-    }
-
-    // destroy upgma
-    while (!_upgma_additions.empty()) {
-        Node * parent = _upgma_additions.top();
-        Node* child1 = parent->_left_child;
-        Node* child2 = parent->_left_child->_right_sib;
-        
-        assert(child1);
-        assert(child2);
-        
-        revertNodeVector(_lineages, child1, child2, parent);
-
-        //reset siblings and parents of original nodes back to 0
-        child1->resetNode(); //subtree1
-        child2->resetNode(); //subtree2
-        
+        // debugging output
+        // output(format("\nGene forest for locus \"%s\" after UPGMA:\n%s\n") % gene_name % makeNewick(9, /*use_names*/true, /*coalunits*/false), 0);
+        // output(format("  Height after UPGMA = %g\n") % _forest_height, 0);
+            
+        _gene_tree_log_likelihood = calcLogLikelihood();
+        _log_weight = _gene_tree_log_likelihood - prev_log_likelihood; // previous likelihood is the entire tree
+            
+    //                showForest();
+            
         if (G::_save_memory) {
-            child1->_partial = nullptr;
-            child2->_partial = nullptr;
+            for (auto &nd:_nodes) {
+                nd._partial=nullptr;
+            }
         }
 
-        // clear new node from _nodes
-        //clear new node that was just created
-        parent->clear(); //new_nd
+        // destroy upgma
+        while (!_upgma_additions.empty()) {
+            Node * parent = _upgma_additions.top();
+            Node* child1 = parent->_left_child;
+            Node* child2 = parent->_left_child->_right_sib;
+            
+            assert(child1);
+            assert(child2);
+            
+            revertNodeVector(_lineages, child1, child2, parent);
 
-        _upgma_additions.pop();
-        _nodes.pop_back(); // remove unused node from node list
-        
-        _ninternals--;
-    }
+            //reset siblings and parents of original nodes back to 0
+            child1->resetNode(); //subtree1
+            child2->resetNode(); //subtree2
+            
+            if (G::_save_memory) {
+                child1->_partial = nullptr;
+                child2->_partial = nullptr;
+            }
 
-    // Restore starting edge lengths
-    for (auto nd : _lineages) {
-        nd->_edge_length = _upgma_starting_edgelen.at(nd);
-    }
+            // clear new node from _nodes
+            //clear new node that was just created
+            parent->clear(); //new_nd
 
-    _upgma_starting_edgelen.clear();
-        
-        n = (unsigned) _lineages.size();
-        
-        _starting_row.clear();
-        for (unsigned i = 0; i < n; i++) {
-            Node * nd = _lineages[i];
-            _starting_row[nd] = i; // TODO: can save this earlier to not remake it
+            _upgma_additions.pop();
+            _nodes.pop_back(); // remove unused node from node list
+            
+            _ninternals--;
         }
-        
-        if (_lineages.size() == 1) {
-            _lineages.back()->_partial = nullptr; // last step, only node with partials should be the new node, and partials are no longer needed if likelihood has been calculated
+
+        // Restore starting edge lengths
+        for (auto nd : _lineages) {
+            nd->_edge_length = _upgma_starting_edgelen.at(nd);
         }
-    }
+
+        _upgma_starting_edgelen.clear();
+            
+            n = (unsigned) _lineages.size();
+            
+            _starting_row.clear();
+            for (unsigned i = 0; i < n; i++) {
+                Node * nd = _lineages[i];
+                _starting_row[nd] = i; // TODO: can save this earlier to not remake it
+            }
+            
+            if (_lineages.size() == 1) {
+                _lineages.back()->_partial = nullptr; // last step, only node with partials should be the new node, and partials are no longer needed if likelihood has been calculated
+            }
+        }
+#endif
         
     inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
         // d is a 1-dimensional vector that stores the lower triangle of a square matrix
@@ -3210,38 +3241,6 @@ inline void Forest::buildRestOfTreeFaster() {
         node_list.push_back(addnode);
     }
 
-    //#if defined (FASTER_SECOND_LEVEL)
-    //    inline double Forest::getTreeHeight() {
-    //        if (_index == 0 || _lineages.size() > 1) {
-    //            double sum_height = 0.0;
-    //
-    //            // calculate height of lineage
-    //            Node* base_node = _lineages[0];
-    //            sum_height += base_node->getEdgeLength();
-    //            for (Node* child=base_node->_left_child; child; child=child->_left_child) {
-    //                sum_height += child->getEdgeLength();
-    //            }
-    //            return sum_height;
-    //        }
-    //        else {
-    //            assert (_forest_height > 0.0);
-    //            return _forest_height;
-    //        }
-    //    }
-    //#else
-    //    inline double Forest::getTreeHeight() {
-    //        double sum_height = 0.0;
-    //
-    //        // calculate height of lineage
-    //        Node* base_node = _lineages[0];
-    //        sum_height += base_node->getEdgeLength();
-    //        for (Node* child=base_node->_left_child; child; child=child->_left_child) {
-    //            sum_height += child->getEdgeLength();
-    //        }
-    //        return sum_height;
-    //    }
-    //#endif
-
     inline double Forest::getTreeLength() {
         // sum of all edge lengths in tree
         double sum_height = 0.0;
@@ -3317,7 +3316,7 @@ inline void Forest::buildRestOfTreeFaster() {
         for (auto &name:species_names) {
             if (count < G::_nspecies || count == 2*G::_nspecies-2) {
                 double new_theta = 0.0;
-                if (new_theta < _small_enough) {
+                if (new_theta < G::_small_enough) {
                     new_theta = 1 / (lot->gamma(2.0, scale));
                     assert (new_theta > 0.0);
                     _theta_map[name] = new_theta;
@@ -3340,7 +3339,7 @@ inline void Forest::buildRestOfTreeFaster() {
         // draw a new theta for the newest species population
         double scale = 1 / _theta_mean;
         double new_theta = 0.0;
-        if (new_theta < _small_enough) {
+        if (new_theta < G::_small_enough) {
             new_theta = 1 / lot->gamma(2.0, scale);
             _theta_map[new_species] = new_theta;
         }
@@ -3357,7 +3356,7 @@ inline void Forest::buildRestOfTreeFaster() {
         double scale = (2.0 - 1.0) / _theta_mean;
         assert (scale > 0.0);
         double new_theta = 0.0;
-        if (new_theta < _small_enough) {
+        if (new_theta < G::_small_enough) {
     //            new_theta = 1 / (lot->gamma(2.01, scale));
             new_theta = 1 / (lot->gamma(2.0, scale));
             assert (new_theta > 0.0);
@@ -3452,7 +3451,7 @@ inline void Forest::buildRestOfTreeFaster() {
         assert (scale > 0.0);
         for (auto &name:_species_names) {
             double new_theta = 0.0;
-            if (new_theta < _small_enough) {
+            if (new_theta < G::_small_enough) {
                 new_theta = 1 / (lot->gamma(2.0, scale));
                 assert (new_theta > 0.0);
                 _theta_map[name] = new_theta;
@@ -3467,6 +3466,7 @@ inline void Forest::buildRestOfTreeFaster() {
         }
     }
 
+#if !defined (FASTER_SECOND_LEVEL)
     inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {
         _panmictic_coalescent_likelihood = 0.0;
 
@@ -3636,7 +3636,9 @@ inline void Forest::buildRestOfTreeFaster() {
         _log_coalescent_likelihood += log_coalescent_likelihood;
         return log_coalescent_likelihood;
     }
+#endif
 
+#if !defined (FASTER_SECOND_LEVEL)
     inline pair<vector<double>, vector<unsigned>> Forest::calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build) {
         vector<double> gamma_b; // contains gamma_b by species
         vector<unsigned> q_b; // contains q_b by species
@@ -3721,7 +3723,7 @@ inline void Forest::buildRestOfTreeFaster() {
                                     assert (gamma_b.size() > 0);
                                     
                                     q_b[count] += 1;
-                                    gamma_b[count] += 4* increment * nlineages *(nlineages-1) / (2*_ploidy);
+                                    gamma_b[count] += 4* increment * nlineages *(nlineages-1) / (2*G::_ploidy);
                                     for (auto &s:_species_partition) {
                                         if (s.first == species) {
                                             bool found = (find(s.second.begin(), s.second.end(), search_nd->_right_sib) != s.second.end());
@@ -3745,7 +3747,7 @@ inline void Forest::buildRestOfTreeFaster() {
                                     assert (increment > 0.0);
                                     
                                     assert (gamma_b.size() > 0);
-                                    gamma_b[count] += 4*increment * nlineages *(nlineages-1) / (2*_ploidy);
+                                    gamma_b[count] += 4*increment * nlineages *(nlineages-1) / (2*G::_ploidy);
                                 }
                             }
                         }
@@ -3777,7 +3779,7 @@ inline void Forest::buildRestOfTreeFaster() {
                         // calculate prob of coalescence
                         double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
                         q_b.back() += 1;
-                        gamma_b.back() += 4*increment * panmictic_nlineages *(panmictic_nlineages-1) / (2*_ploidy);
+                        gamma_b.back() += 4*increment * panmictic_nlineages *(panmictic_nlineages-1) / (2*G::_ploidy);
 
                         cum_time += increment;
                         panmictic_nlineages--;
@@ -3785,13 +3787,14 @@ inline void Forest::buildRestOfTreeFaster() {
                     assert (panmictic_nlineages == 1);
                 }
             }
-            
             assert (gamma_b.size() == q_b.size());
         }
         
         return make_pair(gamma_b, q_b);
     }
+#endif
 
+#if !defined (FASTER_SECOND_LEVEL)
     inline pair<vector<double>, vector<unsigned>> Forest::calcInitialCoalescentLikelihoodIntegratingOutTheta() {
         vector<double> gamma_b; // contains gamma_b by species
         vector<unsigned> q_b; // contains q_b by species
@@ -3832,7 +3835,7 @@ inline void Forest::buildRestOfTreeFaster() {
             // calculate prob of coalescence
             double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
             q_b.back() += 1;
-            gamma_b.back() += 4*increment * panmictic_nlineages *(panmictic_nlineages-1) / (2*_ploidy);
+            gamma_b.back() += 4*increment * panmictic_nlineages *(panmictic_nlineages-1) / (2*G::_ploidy);
 
             cum_time += increment;
             panmictic_nlineages--;
@@ -3844,7 +3847,9 @@ inline void Forest::buildRestOfTreeFaster() {
         
         return make_pair(gamma_b, q_b);
     }
+#endif
 
+#if !defined (FASTER_SECOND_LEVEL)
     inline pair<vector<double>, vector<unsigned>> Forest::calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build) { // TODO: issues when newicks read in have very small branch lengths
          vector<double> gamma_b; // contains gamma_b by species
         vector<unsigned> q_b; // contains q_b by species
@@ -3932,7 +3937,7 @@ inline void Forest::buildRestOfTreeFaster() {
                                     assert (gamma_b.size() > 0);
                                     
                                     q_b[count] += 1;
-                                    gamma_b[count] += 4* increment * nlineages *(nlineages-1) / (2*_ploidy);
+                                    gamma_b[count] += 4* increment * nlineages *(nlineages-1) / (2*G::_ploidy);
                                     for (auto &s:_species_partition) {
                                         if (s.first == species) {
                                             bool found = (find(s.second.begin(), s.second.end(), search_nd->_right_sib) != s.second.end());
@@ -3956,7 +3961,7 @@ inline void Forest::buildRestOfTreeFaster() {
                                     assert (increment > 0.0);
                                     
                                     assert (gamma_b.size() > 0);
-                                    gamma_b[count] += 4*increment * nlineages *(nlineages-1) / (2*_ploidy);
+                                    gamma_b[count] += 4*increment * nlineages *(nlineages-1) / (2*G::_ploidy);
                                 }
                             }
                         }
@@ -3988,7 +3993,7 @@ inline void Forest::buildRestOfTreeFaster() {
                         // calculate prob of coalescence
                         double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
                         q_b.back() += 1;
-                        gamma_b.back() += 4*increment * panmictic_nlineages *(panmictic_nlineages-1) / (2*_ploidy);
+                        gamma_b.back() += 4*increment * panmictic_nlineages *(panmictic_nlineages-1) / (2*G::_ploidy);
 
                         cum_time += increment;
                         panmictic_nlineages--;
@@ -4003,6 +4008,7 @@ inline void Forest::buildRestOfTreeFaster() {
         _species_partition.clear(); // avoid having to copy extra nodes by clearing this since it will be reset
         return make_pair(gamma_b, q_b);
     }
+#endif
 
     #if !defined (FASTER_SECOND_LEVEL)
     inline void Forest::resetDepthVector(tuple<string, string, string> species_joined) {
@@ -5804,12 +5810,6 @@ inline void Forest::buildRestOfTreeFaster() {
         return new_t;
     }
 
-    //    inline vector<pair<tuple<string, string, string>, double>> Forest::resetT() {
-    //        for (auto &nd:_nodes) {
-    //
-    //        }
-    //    }
-
     inline vector<pair<tuple<string, string, string>, double>> Forest::resetLineages(Lot::SharedPtr lot) {
         // this function rebuilds the _lineages vector, setting _position_in_lineages
         // this function also rebuilds _t for use in reading in a species newick
@@ -5852,7 +5852,7 @@ inline void Forest::buildRestOfTreeFaster() {
             
             // if there are 2 lineages left and neither has edge length 0, the tree is complete - add another node
             if (_lineages.size() == 2) {
-                if (_lineages[0]->_edge_length > Forest::_small_enough && _lineages[1]->_edge_length > Forest::_small_enough) {
+                if (_lineages[0]->_edge_length > G::_small_enough && _lineages[1]->_edge_length > G::_small_enough) {
                     Node* subtree1 = _lineages[0];
                     Node* subtree2 = _lineages[1];
                     
@@ -5909,7 +5909,7 @@ inline void Forest::buildRestOfTreeFaster() {
             
             // if there are 2 lineages left and neither has edge length 0, the tree is complete - add another node
             if (_lineages.size() == 2) {
-                if ((_lineages[0]->_edge_length > Forest::_small_enough && _lineages[1]->_edge_length > Forest::_small_enough) || (G::_species_newick_name != "null")) {
+                if ((_lineages[0]->_edge_length > G::_small_enough && _lineages[1]->_edge_length > G::_small_enough) || (G::_species_newick_name != "null")) {
                     Node* subtree1 = _lineages[0];
                     Node* subtree2 = _lineages[1];
                     

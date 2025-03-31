@@ -96,8 +96,11 @@ class Particle {
         void                                            setGroupNumber(unsigned n) {_group_number = n;} // group number for parallelization
         unsigned                                        getGroupNumber() {return _group_number;}// group number for parallelization
         vector<Forest> &                                getForests() {return _forests;}
-        void                                            showSpeciesIncrement();
+#if defined (DEBUG_MODE)
         void                                            showSpeciesJoined();
+        void                                            showSpeciesIncrement();
+        pair<string, string>                            getSpeciesJoined(){return make_pair(_forests[0]._species_joined.first->_name, _forests[0]._species_joined.second->_name);}
+#endif
         void                                            showSpeciesTree();
         int                                             selectEventLinearScale(vector<double> weight_vec);
         double                                          getTopologyPrior(unsigned i);
@@ -134,7 +137,6 @@ class Particle {
         void                                            setNewTheta(bool fix_theta);
         vector<double>                                  getThetaVector();
         double                                          getPopMean();
-        pair<string, string>                            getSpeciesJoined(){return make_pair(_forests[0]._species_joined.first->_name, _forests[0]._species_joined.second->_name);}
         void                                            setPsuffix(unsigned psuffix) {_psuffix = psuffix;}
         double                                          calcInitialCoalescentLikelihood();
         void                                            processGeneNewicks(vector<string> newicks);
@@ -148,10 +150,12 @@ class Particle {
         void                                            trimSpeciesTree();
         void                                            setFixTheta(bool fix) {_fix_theta = fix;}
         void                                            setRelativeRatesByGene(vector<double> rel_rates);
+#if defined (OLD_UPGMA)
+        void                                            calcStartingRowCount();
         void                                            calcStartingUPGMAMatrix();
         vector<vector<double>>                          getStartingUPGMAMatrix();
         void                                            setStartingUPGMAMatrix(vector<vector<double>> starting_upgma_matrices_by_gene);
-        void                                            calcStartingRowCount();
+#endif
         void                                            createSpeciesIndices();
         void                                            setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species);
 #if defined (FASTER_SECOND_LEVEL)
@@ -277,7 +281,6 @@ class Particle {
             cout << "  _forest._nleaves:          " << _forest._nleaves            << "\n";
             cout << "  _forest._ninternals:       " << _forest._ninternals         << "\n";
             cout << "  _forest._npatterns:        " << _forest._npatterns          << "\n";
-            cout << "  _forest._nstates:          " << _forest._nstates            << "\n";
             cout << "  _forest._last_edge_length: " << _forest._last_edge_length   << "\n";
             cout << "  newick description:        " << _forest.makeNewick(5,false) << "\n";
         }
@@ -536,6 +539,7 @@ inline vector<double> Particle::getVectorPrior() {
 //                _forests[next_gene].showForest();
                 _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
                 
+#if defined (OLD_UPGMA)
                 if (G::_start_mode == "smc") {
                     if (G::_upgma) {
                         if (!G::_run_on_empty) {
@@ -546,6 +550,7 @@ inline vector<double> Particle::getVectorPrior() {
                         }
                     }
                 }
+#endif
                     
                 if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
                     _t_by_gene[next_gene-1][next_species_index].second -= gene_increment; // update species tree increments
@@ -979,12 +984,15 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
     }
 
+#if defined (OLD_UPGMA)
     inline void Particle::calcStartingUPGMAMatrix() {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].buildStartingUPGMAMatrix();
         }
     }
+#endif
 
+#if defined (OLD_UPGMA)
     inline vector<vector<double>> Particle::getStartingUPGMAMatrix() {
         vector<vector<double>> starting_upgma_matrices_by_gene;
         for (unsigned i=1; i<_forests.size(); i++) {
@@ -992,19 +1000,25 @@ inline vector<double> Particle::getVectorPrior() {
         }
         return starting_upgma_matrices_by_gene;
     }
+#endif
 
+#if defined (OLD_UPGMA)
     inline void Particle::setStartingUPGMAMatrix(vector<vector<double>> starting_upgma_matrices_by_gene) {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i]._starting_dij = starting_upgma_matrices_by_gene[i-1];
         }
     }
+#endif
 
+#if defined (OLD_UPGMA)
     inline void Particle::calcStartingRowCount() {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].buildStartingRow();
         }
     }
+#endif
 
+#if !defined (FASTER_SECOND_LEVEL)
     inline double Particle::calcInitialCoalescentLikelihood() {
 #if defined GRAHAM_JONES_COALESCENT_LIKELIHOOD
         unsigned nbranches = G::_nspecies*2 - 1;
@@ -1053,6 +1067,7 @@ inline vector<double> Particle::getVectorPrior() {
         return 0;
 #endif
     }
+#endif
 
     inline void Particle::setNewTheta(bool fix_theta) {
         if (fix_theta) { // fix theta for all populations
@@ -1198,13 +1213,17 @@ inline vector<double> Particle::getVectorPrior() {
         }
     }
 
+#if defined (DEBUG_MODE)
     inline void Particle::showSpeciesIncrement(){
         cout << "species tree increment: " << "     " << _forests[0]._last_edge_length << endl;
     }
+#endif
 
+#if defined (DEBUG_MODE)
     inline void Particle::showSpeciesJoined(){
         _forests[0].showSpeciesJoined();
     }
+#endif
         
     inline int Particle::selectEventLinearScale(vector<double> weight_vec) {
         // choose a random number [0,1]

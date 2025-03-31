@@ -31,3 +31,7 @@
 #define FASTER_SECOND_LEVEL
 
 //#define DEBUG_COALLIKE
+
+//#define OLD_UPGMA
+
+//#define UNUSED_FUNCTIONS

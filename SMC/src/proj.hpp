@@ -106,7 +106,10 @@ namespace proj {
             void                        handleRelativeRates();
             void                        handleNTaxaPerSpecies();
             void                        checkOutgroupName();
+        
+#if defined (DEBUG_MODE)
             void                        debugSpeciesTree(vector<Particle> &particles);
+#endif
         
 #if defined (FASTER_SECOND_LEVEL)
             void                        fasterSecondLevel(vector<Particle> &particles);
@@ -2294,10 +2297,13 @@ namespace proj {
 //            particle.processSpeciesNewick(species_newick);
 //        }
         
+#if defined (OLD_UPGMA)
         if (G::_upgma && !G::_gene_newicks_specified) {
             particle.calcStartingUPGMAMatrix();
             particle.calcStartingRowCount();
         }
+#endif
+        
         if (G::_fix_theta) {
             particle.fixTheta();
             particle.setFixTheta(true);
@@ -2517,6 +2523,7 @@ namespace proj {
     }
 #endif
 
+#if defined (DEBUG_MODE)
     inline void Proj::debugSpeciesTree(vector<Particle> &particles) {
         cout << "debugging species tree" << endl;
         for (auto &p:particles) {
@@ -2526,6 +2533,7 @@ namespace proj {
             cout << " _______ " << endl;
         }
     }
+#endif
 
     inline void Proj::writePaupFile(vector<Particle> particles, vector<string> taxpartition) {
         // Output a PAUP* command file for estimating the species tree using

@@ -67,6 +67,9 @@ namespace proj {
         static double               _total_seconds_in_coal_likelihood;
         static double               _test;
         static unsigned             _partial_arrays;
+        static unsigned             _nstates;
+        static double               _ploidy;
+        static double               _small_enough;
         
         // other
         static vector<string>           _taxon_names;

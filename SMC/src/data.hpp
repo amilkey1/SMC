@@ -93,9 +93,9 @@ namespace proj {
             taxon_names_t                               _taxon_names;
             data_matrix_t                               _data_matrix;
             subset_end_t                                _subset_end;
-//# if defined (FASTER_UPMGA_TREE)
+# if defined (OLD_UPGMA)
             data_matrix_t                               _original_data_matrix;
-//#endif
+#endif
     };
 
 //#include "forest.hpp"
@@ -160,7 +160,9 @@ namespace proj {
         _taxon_names.clear();
         _data_matrix.clear();
         _subset_end.clear();
+#if defined (OLD_UPGMA)
         _original_data_matrix.clear();
+#endif
     }
 
     inline unsigned Data::getNumPatterns() const {
@@ -202,7 +204,9 @@ namespace proj {
     }
     
     inline unsigned Data::buildSubsetSpecificMaps(unsigned ntaxa, unsigned seqlen, unsigned nsubsets) {
+#if defined (OLD_UPGMA)
         _original_data_matrix = _data_matrix;
+#endif
         
         pattern_vect_t pattern(ntaxa);
 

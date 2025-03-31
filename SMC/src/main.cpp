@@ -88,6 +88,9 @@ unsigned    G::_ntaxa = 12;
 #if defined (FASTER_SECOND_LEVEL)
 map<string, unsigned>    G::_taxon_to_species;
 #endif
+unsigned    G::_nstates = 4;
+double      G::_ploidy = 2.0;
+double      G::_small_enough = 0.0000001;
 
 vector<vector<double> > G::_dmatrix;
 vector<Split>           G::_dmatrix_rows;
@@ -96,7 +99,6 @@ G::ModelType G::_model_type;
 
 const double Node::_smallest_edge_length=1.0e-12;
 double Forest::_kappa = 1.0;
-double Forest::_ploidy = 2.0;
 double Data::_occupancy = 1.0;
 double Forest::_edge_rate_variance = 0.0;
 double Forest::_asrv_shape = numeric_limits<double>::infinity();
