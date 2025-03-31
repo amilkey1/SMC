@@ -971,6 +971,16 @@ namespace proj {
                 cout << boost::format("\nTheta mean of %d will be fixed for all particles; population sizes will all be drawn from the same theta\n") % G::_theta;
             }
         }
+        
+        if (G::_model == "JC") {
+            G::_model_type = G::ModelType::MODEL_TYPE_JC;
+        }
+        else if (G::_model == "HKY") {
+           G:: _model_type = G::ModelType::MODEL_TYPE_HKY;
+        }
+        else {
+            throw XProj("must specify either JC or HKY for model type");
+        }
     }
 
     inline void Proj::checkOutgroupName() {

@@ -92,6 +92,8 @@ map<string, unsigned>    G::_taxon_to_species;
 vector<vector<double> > G::_dmatrix;
 vector<Split>           G::_dmatrix_rows;
 
+G::ModelType G::_model_type;
+
 const double Node::_smallest_edge_length=1.0e-12;
 double Forest::_kappa = 1.0;
 double Forest::_ploidy = 2.0;

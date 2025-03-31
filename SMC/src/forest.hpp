@@ -69,11 +69,9 @@ class Forest {
         string                          makeAltNewick(unsigned precision, bool use_names);
         string                          makePartialNewick(unsigned precision, bool use_names);
         pair<unsigned, unsigned>        chooseTaxaToJoin(double s, Lot::SharedPtr lot);
-//        void                            calcPartialArray(Node* new_nd);
         void                            calcPartialArrayJC(Node* new_nd);
         void                            calcPartialArrayHKY(Node* new_nd);
 
-//        double                          calcPartialArrayUPGMA(Node* new_nd);
         void                            setUpGeneForest(map<string, string> &taxon_map);
         void                            setUpSpeciesForest(vector<string> &species_names);
         tuple<string,string, string>    speciesTreeProposal(Lot::SharedPtr lot);
@@ -391,15 +389,14 @@ class Forest {
                 nd->_name = name;
 
                 if (!G::_save_memory || (G::_save_memory && partials)) { // if save memory setting, don't set tip partials yet
-                    nd->_partial=ps.getPartial(_index-1, _npatterns*4);
+                    nd->_partial=ps.getPartial(_npatterns*4);
                     for (unsigned p=0; p<_npatterns; p++) {
                         unsigned pp = _first_pattern+p;
                         for (unsigned s=0; s<_nstates; s++) {
                             Data::state_t state = (Data::state_t)1 << s;
                             Data::state_t d = data_matrix[nd->_number][pp];
                             double result = state & d;
-                            (nd->_partial->_v)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
-//                            (*nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                            (*nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
                         }
                     }
                 }
@@ -855,312 +852,103 @@ class Forest {
     }
 
     inline void Forest::calcPartialArrayJC(Node * new_nd) {
-        assert(_index >= 0);
-        
+        _partials_calculated_count++;
+
+        assert (_index > 0);
+    
         if (!new_nd->_left_child) {
             auto &data_matrix=_data->getDataMatrix();
             assert (G::_save_memory || G::_start_mode == "sim");
             if (!new_nd->_left_child) {
-                new_nd->_partial=ps.getPartial(_index-1, _npatterns*4);
+                new_nd->_partial=ps.getPartial(_npatterns*4);
                 for (unsigned p=0; p<_npatterns; p++) {
                     unsigned pp = _first_pattern+p;
                     for (unsigned s=0; s<_nstates; s++) {
                         Data::state_t state = (Data::state_t)1 << s;
                         Data::state_t d = data_matrix[new_nd->_number][pp];
                         double result = state & d;
-                        (new_nd->_partial->_v)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*new_nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
                     }
                 }
             }
         }
+    
+        auto & parent_partial_array = *(new_nd->_partial);
+        for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
 
-        // Computes the partial array for new_nd and returns the difference in
-        // log likelihood due to the addition of new_nd
-        //char base[] = {'A','C','G','T'};
-        
-        // Get pattern counts
-        auto counts = _data->getPatternCounts();
-                
-        // Ensure tree is dichotomous
-        assert(new_nd->_left_child);
-        assert(new_nd->_left_child->_right_sib);
-        assert(!new_nd->_left_child->_right_sib->_right_sib);
-        assert(new_nd->_left_child->_partial);
-        assert(new_nd->_left_child->_right_sib->_partial);
-        
-//        auto & parent_partial_array = *(new_nd->_partial);
-        auto & parent_partial_array = new_nd->_partial->_v;
-
-//        cout << "entering loop " << endl;
-//        unsigned loop_count = 0;
-        for (Node * child = new_nd->_left_child; child; child = child->_right_sib) {
-//            loop_count++;
             if (child->_partial == nullptr) {
-                child->_partial = ps.getPartial(_index-1, _npatterns*4);
+                child->_partial = ps.getPartial(_npatterns*4);
                 calcPartialArrayJC(child);
             }
-            
-            assert(child->_partial);
-//            auto & child_partial_array = *(child->_partial);
-            auto & child_partial_array = child->_partial->_v;
+            assert (child->_partial != nullptr);
+            auto & child_partial_array = *(child->_partial);
 
             for (unsigned p = 0; p < _npatterns; p++) {
-                //unsigned pp = first_pattern + p;
-
-                for (unsigned s = 0; s < _nstates; s++) {
+                for (unsigned s = 0; s <_nstates; s++) {
                     double sum_over_child_states = 0.0;
                     for (unsigned s_child = 0; s_child < _nstates; s_child++) {
-//                        StopWatch sw;
-//                        sw.start();
                         double child_transition_prob = calcTransitionProbabilityJC(s, s_child, child->_edge_length);
-//                        double test = sw.stop();
-//                        G::_test += test;
                         double child_partial = child_partial_array[p*_nstates + s_child];
-                                                
                         sum_over_child_states += child_transition_prob * child_partial;
                     }   // child state loop
-                    
                     if (child == new_nd->_left_child)
-                        parent_partial_array[p*Forest::_nstates + s] = sum_over_child_states;
-                    else {
-                        parent_partial_array[p*_nstates + s] *= sum_over_child_states;
-                    }
+                        parent_partial_array[p*_nstates+s] = sum_over_child_states;
+                    else
+                        parent_partial_array[p*_nstates+s] *= sum_over_child_states;
                 }   // parent state loop
             }   // pattern loop
         }   // child loop
-//        cout << "loop count = " << loop_count << endl;
-
     }
 
 
     inline void Forest::calcPartialArrayHKY(Node * new_nd) {
-        assert(_index >= 0);
-                
+        _partials_calculated_count++;
+
+        assert (_index > 0);
+
         if (!new_nd->_left_child) {
             auto &data_matrix=_data->getDataMatrix();
             assert (G::_save_memory || G::_start_mode == "sim");
             if (!new_nd->_left_child) {
-                new_nd->_partial=ps.getPartial(_index-1, _npatterns*4);
+                new_nd->_partial=ps.getPartial(_npatterns*4);
                 for (unsigned p=0; p<_npatterns; p++) {
                     unsigned pp = _first_pattern+p;
                     for (unsigned s=0; s<_nstates; s++) {
                         Data::state_t state = (Data::state_t)1 << s;
                         Data::state_t d = data_matrix[new_nd->_number][pp];
                         double result = state & d;
-                        (new_nd->_partial->_v)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*new_nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
                     }
                 }
             }
         }
 
-        // Computes the partial array for new_nd and returns the difference in
-        // log likelihood due to the addition of new_nd
-        //char base[] = {'A','C','G','T'};
-        
-        // Get pattern counts
-        auto counts = _data->getPatternCounts();
-                
-        // Ensure tree is dichotomous
-        assert(new_nd->_left_child);
-        assert(new_nd->_left_child->_right_sib);
-        assert(!new_nd->_left_child->_right_sib->_right_sib);
-        assert(new_nd->_left_child->_partial);
-        assert(new_nd->_left_child->_right_sib->_partial);
-        
-    //        auto & parent_partial_array = *(new_nd->_partial);
-        auto & parent_partial_array = new_nd->_partial->_v;
+        auto & parent_partial_array = *(new_nd->_partial);
+        for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
 
-    //        cout << "entering loop " << endl;
-    //        unsigned loop_count = 0;
-        for (Node * child = new_nd->_left_child; child; child = child->_right_sib) {
-    //            loop_count++;
             if (child->_partial == nullptr) {
-                child->_partial = ps.getPartial(_index-1, _npatterns*4);
+                child->_partial = ps.getPartial(_npatterns*4);
                 calcPartialArrayHKY(child);
             }
-            
-            assert(child->_partial);
-    //            auto & child_partial_array = *(child->_partial);
-            auto & child_partial_array = child->_partial->_v;
+            assert (child->_partial != nullptr);
+            auto & child_partial_array = *(child->_partial);
 
             for (unsigned p = 0; p < _npatterns; p++) {
-                //unsigned pp = first_pattern + p;
-
-                for (unsigned s = 0; s < _nstates; s++) {
+                for (unsigned s = 0; s <_nstates; s++) {
                     double sum_over_child_states = 0.0;
                     for (unsigned s_child = 0; s_child < _nstates; s_child++) {
-    //                        StopWatch sw;
-    //                        sw.start();
                         double child_transition_prob = calcTransitionProbabilityHKY(s, s_child, child->_edge_length);
-    //                        double test = sw.stop();
-    //                        G::_test += test;
                         double child_partial = child_partial_array[p*_nstates + s_child];
-                                                
                         sum_over_child_states += child_transition_prob * child_partial;
                     }   // child state loop
-                    
                     if (child == new_nd->_left_child)
-                        parent_partial_array[p*Forest::_nstates + s] = sum_over_child_states;
-                    else {
-                        parent_partial_array[p*_nstates + s] *= sum_over_child_states;
-                    }
+                        parent_partial_array[p*_nstates+s] = sum_over_child_states;
+                    else
+                        parent_partial_array[p*_nstates+s] *= sum_over_child_states;
                 }   // parent state loop
             }   // pattern loop
         }   // child loop
-    //        cout << "loop count = " << loop_count << endl;
-
     }
-
-
-//    inline double Forest::calcPartialArrayUPGMA(Node * new_nd) {
-//        assert(_index >= 0);
-//
-//        if (!new_nd->_left_child) {
-//            auto &data_matrix=_data->getDataMatrix();
-//            assert (G::_save_memory || G::_start_mode == "sim");
-//            if (!new_nd->_left_child) {
-//                new_nd->_partial=ps.getPartial(_npatterns*4);
-//                for (unsigned p=0; p<_npatterns; p++) {
-//                    unsigned pp = _first_pattern+p;
-//                    for (unsigned s=0; s<_nstates; s++) {
-//                        Data::state_t state = (Data::state_t)1 << s;
-//                        Data::state_t d = data_matrix[new_nd->_number][pp];
-//                        double result = state & d;
-//                        (*new_nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
-//                    }
-//                }
-//            }
-//        }
-//
-//        // Computes the partial array for new_nd and returns the difference in
-//        // log likelihood due to the addition of new_nd
-//        //char base[] = {'A','C','G','T'};
-//
-//        // Get pattern counts
-//        auto counts = _data->getPatternCounts();
-//
-//        // Get the first and last pattern index for this gene's data
-//        Data::begin_end_pair_t be = _data->getSubsetBeginEnd(_index-1);
-//        unsigned first_pattern = be.first;
-//
-//        // Ensure tree is dichotomous
-//        assert(new_nd->_left_child);
-//        assert(new_nd->_left_child->_right_sib);
-//        assert(!new_nd->_left_child->_right_sib->_right_sib);
-//        assert(new_nd->_left_child->_partial);
-//        assert(new_nd->_left_child->_right_sib->_partial);
-//
-//        auto & parent_partial_array = *(new_nd->_partial);
-//        unsigned npatterns = _data->getNumPatternsInSubset(_index-1);
-//        for (Node * child = new_nd->_left_child; child; child = child->_right_sib) {
-//            if (child->_partial == nullptr) {
-//                child->_partial = ps.getPartial(_npatterns*4);
-//                calcPartialArray(child);
-//            }
-//
-//            assert(child->_partial);
-//            auto & child_partial_array = *(child->_partial);
-//
-//            for (unsigned p = 0; p < _npatterns; p++) {
-//                //unsigned pp = first_pattern + p;
-//
-//                for (unsigned s = 0; s < _nstates; s++) {
-//                    double sum_over_child_states = 0.0;
-//                    for (unsigned s_child = 0; s_child < _nstates; s_child++) {
-//                        double child_transition_prob = calcTransitionProbability(s, s_child, child->_edge_length);
-//                        double child_partial = child_partial_array[p*_nstates + s_child];
-//
-//                        sum_over_child_states += child_transition_prob * child_partial;
-//                    }   // child state loop
-//
-//                    if (child == new_nd->_left_child)
-//                        parent_partial_array[p*Forest::_nstates + s] = sum_over_child_states;
-//                    else {
-//                        parent_partial_array[p*_nstates + s] *= sum_over_child_states;
-//                    }
-//                }   // parent state loop
-//            }   // pattern loop
-//        }   // child loop
-//
-//        // Compute the ratio of after to before likelihoods
-//        //TODO: make more efficient
-//        double prev_loglike = 0.0;
-//        double curr_loglike = 0.0;
-//        auto & newnd_partial_array = *new_nd->_partial;
-//        auto & lchild_partial_array = *new_nd->_left_child->_partial;
-//        auto & rchild_partial_array = *new_nd->_left_child->_right_sib->_partial;
-//        for (unsigned p = 0; p < npatterns; p++) {
-//            unsigned pp = first_pattern + p;
-//            //unsigned count = counts[pp];
-//            double left_sitelike = 0.0;
-//            double right_sitelike = 0.0;
-//            double newnd_sitelike = 0.0;
-//            for (unsigned s = 0; s < _nstates; s++) {
-//                left_sitelike += 0.25*lchild_partial_array[p*_nstates + s];
-//                right_sitelike += 0.25*rchild_partial_array[p*_nstates + s];
-//                newnd_sitelike += 0.25*newnd_partial_array[p*_nstates + s];
-//            }
-//            prev_loglike += log(left_sitelike)*counts[pp];
-//            prev_loglike += log(right_sitelike)*counts[pp];
-//            curr_loglike += log(newnd_sitelike)*counts[pp];
-//        }
-//
-//        return curr_loglike - prev_loglike;
-//    }
-                                                        
-//    inline void Forest::calcPartialArray(Node* new_nd) {
-////        StopWatch sw;
-////        sw.start();
-//
-//        _partials_calculated_count++;
-//
-//        assert (_index > 0);
-//
-//        if (!new_nd->_left_child) {
-//            auto &data_matrix=_data->getDataMatrix();
-//            assert (G::_save_memory || G::_start_mode == "sim");
-//            if (!new_nd->_left_child) {
-//                new_nd->_partial=ps.getPartial(_npatterns*4);
-//                for (unsigned p=0; p<_npatterns; p++) {
-//                    unsigned pp = _first_pattern+p;
-//                    for (unsigned s=0; s<_nstates; s++) {
-//                        Data::state_t state = (Data::state_t)1 << s;
-//                        Data::state_t d = data_matrix[new_nd->_number][pp];
-//                        double result = state & d;
-//                        (*new_nd->_partial)[p*_nstates+s]= (result == 0.0 ? 0.0:1.0);
-//                    }
-//                }
-//            }
-//        }
-//
-//        auto & parent_partial_array = *(new_nd->_partial);
-//        for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
-//
-//            if (child->_partial == nullptr) {
-//                child->_partial = ps.getPartial(_npatterns*4);
-//                calcPartialArray(child);
-//            }
-//            assert (child->_partial != nullptr);
-//            auto & child_partial_array = *(child->_partial);
-//
-//            for (unsigned p = 0; p < _npatterns; p++) {
-//                for (unsigned s = 0; s <_nstates; s++) {
-//                    double sum_over_child_states = 0.0;
-//                    for (unsigned s_child = 0; s_child < _nstates; s_child++) {
-//                        double child_transition_prob = calcTransitionProbability(s, s_child, child->_edge_length);
-//                        double child_partial = child_partial_array[p*_nstates + s_child];
-//                        sum_over_child_states += child_transition_prob * child_partial;
-//                    }   // child state loop
-//                    if (child == new_nd->_left_child)
-//                        parent_partial_array[p*_nstates+s] = sum_over_child_states;
-//                    else
-//                        parent_partial_array[p*_nstates+s] *= sum_over_child_states;
-//                }   // parent state loop
-//            }   // pattern loop
-//        }   // child loop
-////        double test = sw.stop();
-////        cout << test << endl;
-//    }
 
     inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length) {
         assert(pi.size() == 4);
@@ -1198,95 +986,6 @@ class Forest {
         }
         return transition_prob;
     }
-
-//    inline double Forest::calcTransitionProbability(double s, double s_child, double edge_length) {
-////        StopWatch sw;
-////        sw.start();
-//        double child_transition_prob = 0.0;
-//
-//        if (G::_model.compare("JC") == 0) {
-////        if (G::_model == "JC" ) {
-////            double total_seconds = sw.stop();
-////            cout << "\nTotal time for transition prob step  : " << total_seconds << endl;
-////            cout << total_seconds << endl;
-//
-//            if (s == s_child) {
-//                child_transition_prob = 0.25 + 0.75*exp(-4.0*_relative_rate*edge_length/3.0);
-//            }
-//
-//            else {
-//                child_transition_prob = 0.25 - 0.25*exp(-4.0*_relative_rate*edge_length/3.0);
-//            }
-////            double total_seconds = sw.stop();
-////            cout << "\nTotal time for transition prob step  : " << total_seconds << endl;
-////            cout << total_seconds << endl;
-//            return child_transition_prob;
-//        }
-//
-//        if (G::_model == "HKY") {
-//            double pi_A = G::_base_frequencies[0];
-//            double pi_C = G::_base_frequencies[1];
-//            double pi_G = G::_base_frequencies[2];
-//            double pi_T = G::_base_frequencies[3];
-//
-//            double pi_j = 0.0;
-//            double PI_J = 0.0;
-//
-//            double phi = (pi_A+pi_G)*(pi_C+pi_T)+_kappa*(pi_A*pi_G+pi_C*pi_T);
-//            double beta_t = 0.5*(edge_length * _relative_rate )/phi;
-//
-//            // transition prob depends only on ending state
-//            if (s_child == 0) {
-//                // purine
-//                pi_j = pi_A;
-//                PI_J = pi_A + pi_G;
-//            }
-//            else if (s_child == 1) {
-//                // pyrimidine
-//                pi_j = pi_C;
-//                PI_J = pi_C + pi_T;
-//            }
-//            else if (s_child == 2) {
-//                // purine
-//                pi_j = pi_G;
-//                PI_J = pi_A + pi_G;
-//            }
-//            else if (s_child == 3) {
-//                // pyrimidine
-//                pi_j = pi_T;
-//                PI_J = pi_C + pi_T;
-//            }
-//
-//            while (true) {
-//                if (s == s_child) {
-//                    // no transition or transversion
-//                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
-//                    double second_term = (PI_J-pi_j)/PI_J*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
-//                    child_transition_prob = pi_j*first_term+second_term;
-//                    break;
-//                }
-//
-//                else if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
-//                    // transition
-//                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
-//                    double second_term = (1/PI_J)*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
-//                    child_transition_prob = pi_j*(first_term-second_term);
-//                    break;
-//                }
-//
-//                else {
-//                    // transversion
-//                    child_transition_prob = pi_j*(1-exp(-beta_t));
-//                    break;
-//                }
-//            }
-//            assert (child_transition_prob > 0.0);
-//            return child_transition_prob;
-//        }
-//        else {
-//            throw XProj("must specify JC or HKY model");
-//        }
-//    }
 
     inline double Forest::calcTransitionProbabilityJC(double s, double s_child, double edge_length) {
         double child_transition_prob = 0.0;
@@ -1381,8 +1080,7 @@ class Forest {
             for (unsigned p=0; p<_npatterns; p++) {
                 double site_like = 0.0;
                 for (unsigned s=0; s<_nstates; s++) {
-                    double partial = (nd->_partial->_v)[p*_nstates+s];
-//                    double partial = (*nd->_partial)[p*_nstates+s];
+                    double partial = (*nd->_partial)[p*_nstates+s];
                     site_like += 0.25*partial;
                 }
                 assert(site_like>0);
@@ -2305,12 +2003,10 @@ class Forest {
                     diff_state.assign(npatterns, 0.0);
                     for (unsigned p = 0; p < npatterns; p++) {
                         for (unsigned lstate = 0; lstate < _nstates; lstate++) {
-//                            auto & l_partial_array = *(lnode->_partial);
-                            auto & l_partial_array = lnode->_partial->_v;
+                            auto & l_partial_array = *(lnode->_partial);
                             double lpartial = l_partial_array[p*_nstates + lstate];
                             for (unsigned rstate = 0; rstate < _nstates; rstate++) {
-//                                auto & r_partial_array = *(rnode->_partial);
-                                auto & r_partial_array = rnode->_partial->_v;
+                                auto & r_partial_array = *(rnode->_partial);
                                 double rpartial = r_partial_array[p*_nstates + rstate];
                                 if (lstate == rstate)
                                     same_state[p] += lpartial*rpartial;
@@ -2527,7 +2223,7 @@ class Forest {
             row_of_node[new_nd] = i;
 
             assert (new_nd->_partial == nullptr);
-            new_nd->_partial=ps.getPartial(_index-1, _npatterns*4);
+            new_nd->_partial=ps.getPartial(_npatterns*4);
             assert(new_nd->_left_child->_right_sib);
             
 //            StopWatch sw;
@@ -2900,7 +2596,7 @@ inline void Forest::buildRestOfTreeFaster() {
         // output(format("\nJoining lineages %d and %d\n") % i % j, 0);
 
         assert (new_nd->_partial == nullptr);
-        new_nd->_partial=ps.getPartial(_index-1, _npatterns*4);
+        new_nd->_partial=ps.getPartial(_npatterns*4);
         assert(new_nd->_left_child->_right_sib);
 //        sw.start();
         calcPartialArrayJC(new_nd); // TODO: for now, always complete UPGMA with JC
@@ -3204,12 +2900,12 @@ inline void Forest::buildRestOfTreeFaster() {
 
          //always calculating partials now
          assert (new_nd->_partial == nullptr);
-         new_nd->_partial=ps.getPartial(_index-1, _npatterns*4);
+         new_nd->_partial=ps.getPartial(_npatterns*4);
          assert(new_nd->_left_child->_right_sib);
-        if (G::_model == "JC") {
+        if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
             calcPartialArrayJC(new_nd);
         }
-        else if (G::_model == "HKY") {
+        else if (G::_model_type == G::ModelType::MODEL_TYPE_HKY) {
             calcPartialArrayHKY(new_nd);
         }
         else {
@@ -3249,11 +2945,11 @@ inline void Forest::buildRestOfTreeFaster() {
              if (G::_save_memory) {
                  for (auto &nd:_lineages) {
                      if (nd->_partial == nullptr) {
-                         nd->_partial = ps.getPartial(_index-1, _npatterns*4);
-                         if (G::_model == "JC") {
+                         nd->_partial = ps.getPartial(_npatterns*4);
+                         if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
                              calcPartialArrayJC(nd);
                          }
-                         else if (G::_model == "HKY") {
+                         else if (G::_model_type == G::ModelType::MODEL_TYPE_HKY) {
                              calcPartialArrayHKY(nd);
                          }
                          else {
@@ -3309,17 +3005,17 @@ inline void Forest::buildRestOfTreeFaster() {
          if (!G::_run_on_empty) {
              //always calculating partials now
              assert (new_nd->_partial == nullptr);
-             new_nd->_partial=ps.getPartial(_index-1, _npatterns*4);
+             new_nd->_partial=ps.getPartial(_npatterns*4);
              assert(new_nd->_left_child->_right_sib);
 
              if (G::_save_memory) {
                  for (auto &nd:_lineages) {
                      if (nd->_partial == nullptr) {
-                         nd->_partial = ps.getPartial(_index-1, _npatterns*4);
-                         if (G::_model == "JC") {
+                         nd->_partial = ps.getPartial(_npatterns*4);
+                         if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
                              calcPartialArrayJC(nd);
                          }
-                         else if (G::_model == "HKY") {
+                         else if (G::_model_type == G::ModelType::MODEL_TYPE_HKY) {
                              calcPartialArrayHKY(nd);
                          }
                          else {
@@ -3328,10 +3024,11 @@ inline void Forest::buildRestOfTreeFaster() {
                      }
                  }
              }
-             if (G::_model == "JC") {
+             
+             if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
                  calcPartialArrayJC(new_nd);
              }
-             else if (G::_model == "HKY") {
+             else if (G::_model_type == G::ModelType::MODEL_TYPE_HKY) {
                  calcPartialArrayHKY(new_nd);
              }
              else {
