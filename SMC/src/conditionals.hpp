@@ -24,7 +24,7 @@
 
 #define WEIGHT_MODIFIER // includes weight correction for differing theta prior mean and proposal mean
 
-//#define COAL_LIKE_TEST
+//#define COAL_LIKE_TEST // DO NOT USE
 //
 // # define LIKELIHOOD_TEST // DO NOT USE
 

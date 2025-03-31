@@ -3225,8 +3225,7 @@ namespace proj {
         // Bottom line, if s & s0 is ever equal to s0, then
         // state s0 is unambiguous
         bool is_unambiguous = false;
-        unsigned nstates = 4; // TODO: setting for now
-        for (unsigned i = 0; i < nstates; i++) {
+        for (unsigned i = 0; i < G::_nstates; i++) {
             Data::state_t s = (Data::state_t)1 << i;
             if ( (s & s0) == s0) {
                 is_unambiguous = true;
@@ -3318,7 +3317,7 @@ namespace proj {
                     checkOutgroupName();
                 }
 
-                // set some globla variables
+                // set some global variables
                 G::_ntaxa = _data->getNumTaxa();
                 G::_nspecies = (unsigned) _species_names.size();
                 G::_nloci = _data->getNumSubsets();
@@ -3333,7 +3332,6 @@ namespace proj {
 //                StopWatch sw;
 //                sw.start();
                 calcPairwiseDistanceMatrix();
-
                 
                 Particle p;
                 initializeParticle(p); // initialize one particle and copy to all other particles
@@ -3669,13 +3667,8 @@ namespace proj {
 #endif
 
 #if defined (HIERARCHICAL_FILTERING)
-//                sw.start();
                 saveSpeciesTreesAfterFirstRound(my_vec);
-//                total_seconds = sw.stop();
-//                cout << "\nTotal time for saving species trees after first round: " << total_seconds << endl;
-//                cout << total_seconds << endl;
                 
-//                sw.start();
                 cout << "\n";
                 string filename1 = "species_trees.trees";
                 string filename2 = "unique_species_trees.trees";

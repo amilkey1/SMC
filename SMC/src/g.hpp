@@ -9,12 +9,12 @@ namespace proj {
 
     struct G {
         enum class ModelType {
-          MODEL_TYPE_JC,
-          MODEL_TYPE_HKY
+            MODEL_TYPE_JC,
+            MODEL_TYPE_HKY
         };
         
         enum class StartModeType {
-          START_MODE_SIM,
+            START_MODE_SIM,
             START_MODE_SMC
         };
         

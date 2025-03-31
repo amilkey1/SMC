@@ -897,12 +897,20 @@ class Forest {
             }
             assert (child->_partial != nullptr);
             auto & child_partial_array = *(child->_partial);
+            
+            // calculate both transition probabilities before loop, then choose 1 based on s == s_child
+            double transition_prob_same = calcTransitionProbabilityJC(1, 1, child->_edge_length);
+            double transition_prob_dif = calcTransitionProbabilityJC(1, 2, child->_edge_length);
 
             for (unsigned p = 0; p < _npatterns; p++) {
                 for (unsigned s = 0; s <G::_nstates; s++) {
                     double sum_over_child_states = 0.0;
                     for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
-                        double child_transition_prob = calcTransitionProbabilityJC(s, s_child, child->_edge_length);
+                        double child_transition_prob = transition_prob_same;
+                        if (s_child != s) {
+                            child_transition_prob = transition_prob_dif;
+                        }
+//                        double child_transition_prob = calcTransitionProbabilityJC(s, s_child, child->_edge_length);
                         double child_partial = child_partial_array[p*G::_nstates + s_child];
                         sum_over_child_states += child_transition_prob * child_partial;
                     }   // child state loop
@@ -1264,7 +1272,6 @@ class Forest {
         _asrv_shape = other._asrv_shape;
         _comphet = other._comphet;
 //        _nodes.clear(); // don't need to clear _nodes because they will get overwritten
-        // TODO: need to clear parents if starting second level trivial forest
         _nodes.resize(other._nodes.size());
         _lineages.resize(other._lineages.size());
         _nleaves            = other._nleaves;
