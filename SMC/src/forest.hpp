@@ -165,7 +165,6 @@ class Forest {
         map<string, double>             _theta_map;
         std::vector<Node *>             _lineages;
         std::list<Node>                 _nodes;
-        std::vector<Node*>              _new_nodes;
 
         unsigned                        _nleaves;
         unsigned                        _ninternals;
@@ -1265,9 +1264,9 @@ class Forest {
         _asrv_shape = other._asrv_shape;
         _comphet = other._comphet;
 //        _nodes.clear(); // don't need to clear _nodes because they will get overwritten
+        // TODO: need to clear parents if starting second level trivial forest
         _nodes.resize(other._nodes.size());
         _lineages.resize(other._lineages.size());
-        _new_nodes.resize(other._new_nodes.size());
         _nleaves            = other._nleaves;
         _ninternals         = other._ninternals;
         _last_edge_length   = other._last_edge_length;
@@ -1355,6 +1354,9 @@ class Forest {
                         Node* parent = &*next(_nodes.begin(), parent_number);
                         nd->_parent = parent;
                     }
+                    else {
+                        nd->_parent = 0;
+                    }
 
                 // copy left child
                     if (othernd._left_child) {
@@ -1372,8 +1374,9 @@ class Forest {
                     Node* right_sib = &*next(_nodes.begin(), right_sib_number);
                     nd->_right_sib = right_sib;
                 }
-                else
+                else {
                     nd->_right_sib = 0;
+                }
 
                     nd->_number = othernd._number;
                     nd->_name = othernd._name;
