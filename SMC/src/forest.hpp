@@ -873,7 +873,8 @@ class Forest {
     
         if (!new_nd->_left_child) {
             auto &data_matrix=_data->getDataMatrix();
-            assert (G::_save_memory || G::_start_mode_type == G::StartModeType::START_MODE_SIM);
+            assert (G::_save_memory || G::_start_mode == "sim");
+//            assert (G::_save_memory || G::_start_mode_type == G::StartModeType::START_MODE_SIM);
             if (!new_nd->_left_child) {
                 new_nd->_partial=ps.getPartial(_npatterns*4);
                 for (unsigned p=0; p<_npatterns; p++) {
@@ -923,7 +924,8 @@ class Forest {
 
         if (!new_nd->_left_child) {
             auto &data_matrix=_data->getDataMatrix();
-            assert (G::_save_memory || G::_start_mode_type == G::StartModeType::START_MODE_SIM);
+            assert (G::_save_memory || G::_start_mode == "sim");
+//            assert (G::_save_memory || G::_start_mode_type == G::StartModeType::START_MODE_SIM);
             if (!new_nd->_left_child) {
                 new_nd->_partial=ps.getPartial(_npatterns*4);
                 for (unsigned p=0; p<_npatterns; p++) {
@@ -1262,7 +1264,7 @@ class Forest {
         _edge_rate_variance = other._edge_rate_variance;
         _asrv_shape = other._asrv_shape;
         _comphet = other._comphet;
-        _nodes.clear();
+//        _nodes.clear(); // don't need to clear _nodes because they will get overwritten
         _nodes.resize(other._nodes.size());
         _lineages.resize(other._lineages.size());
         _new_nodes.resize(other._new_nodes.size());
@@ -1429,8 +1431,8 @@ class Forest {
             nd->_name=species_names[i];
             _lineages.push_back(nd);
 #if defined (FASTER_SECOND_LEVEL)
-//            if (G::_start_mode != "sim") {
-            if (G::_start_mode_type != G::StartModeType::START_MODE_SIM) {
+            if (G::_start_mode != "sim") {
+//            if (G::_start_mode_type != G::StartModeType::START_MODE_SIM) {
                 if (G::_taxon_to_species.count(nd->_name) == 0) {
                     throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd->_name));
                 }
@@ -1690,8 +1692,8 @@ class Forest {
                 break;
             }
 #if defined (FASTER_SECOND_LEVEL)
-//            if (G::_start_mode != "sim") {
-            if (G::_start_mode_type != G::StartModeType::START_MODE_SIM) {
+            if (G::_start_mode != "sim") {
+//            if (G::_start_mode_type != G::StartModeType::START_MODE_SIM) {
                 if (G::_taxon_to_species.count(nd._name) == 0) {
                     throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd._name));
                 }

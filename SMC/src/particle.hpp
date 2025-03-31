@@ -59,7 +59,6 @@ class Particle {
 #if defined (DEBUG_MODE)
         double                                  getSpeciesIncrement () {return _forests[0]._last_edge_length;}
 #endif
-    
         double                                  getSpeciesLogWeight() const {return _log_species_weight;}
         unsigned                                getPartialCount();
         void                                    setLogWeight(double w){_log_weight = w;}
@@ -550,7 +549,7 @@ inline vector<double> Particle::getVectorPrior() {
                     if (G::_upgma) {
                         if (!G::_run_on_empty) {
                             // TODO: old way
-//                            _forests[next_gene].buildRestOfTreeFaster();
+                            _forests[next_gene].buildRestOfTreeFaster();
                             // TODO: new way
 //                            _forests[next_gene].constructUPGMA();
                         }
@@ -2293,10 +2292,10 @@ inline vector<double> Particle::getVectorPrior() {
 //        _log_coal_like = other._log_coal_like; // do not need to save this
 //        _prev_log_coal_like = other._prev_log_coal_like; // do not need to save this
         
-        if (G::_start_mode_type == G::StartModeType::START_MODE_SIM) {
+//        if (G::_start_mode_type == G::StartModeType::START_MODE_SIM) { // TODO: checking start mode seems slower than just copying?
             _num_deep_coalescences = other._num_deep_coalescences;
             _max_deep_coal = other._max_deep_coal;
-        }
+//        }
 
 #if !defined (FASTER_SECOND_LEVEL)
         _species_branches = other._species_branches;
