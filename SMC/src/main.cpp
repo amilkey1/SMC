@@ -96,6 +96,7 @@ vector<vector<double> > G::_dmatrix;
 vector<Split>           G::_dmatrix_rows;
 
 G::ModelType G::_model_type;
+G::StartModeType G::_start_mode_type;
 
 const double Node::_smallest_edge_length=1.0e-12;
 double Forest::_kappa = 1.0;
@@ -104,8 +105,6 @@ double Forest::_edge_rate_variance = 0.0;
 double Forest::_asrv_shape = numeric_limits<double>::infinity();
 double Forest::_comphet = numeric_limits<double>::infinity();
 
-double G::_total_seconds_in_coal_likelihood = 0.0;
-double G::_test = 0.0;
 unsigned G::_partial_arrays = 0.0;
 
 //vector<string> G::_species_names;
@@ -147,7 +146,6 @@ int main(int argc, const char * argv[]) {
         proj.run();
         double total_seconds = sw.stop();
         cout << "total time: " << total_seconds << endl;
-        cout << "total test time: " << G::_test << endl;
         cout << "total partials in UPGMA: " << G::_partial_arrays << endl;
     }
     catch(std::exception & x) {

@@ -106,7 +106,6 @@ class Forest {
         void                            refreshPreorder();
         void                            createThetaMap(Lot::SharedPtr lot);
         void                            createThetaMapFixedTheta(Lot::SharedPtr lot);
-        void                            createSpeciesIndices();
         void                            updateThetaMap(Lot::SharedPtr lot, string new_species_name);
         void                            updateThetaMapFixedTheta(Lot::SharedPtr lot, string new_species_name);
         void                            resetThetaMap(Lot::SharedPtr lot);
@@ -133,6 +132,7 @@ class Forest {
 #if defined (OLD_UPGMA)
         void                            buildStartingRow();
         void                            buildRestOfTreeFaster();
+        void                            createSpeciesIndices();
 #endif
         vector<pair<tuple<string, string, string>, double>>                            resetLineages(Lot::SharedPtr lot);
         vector<pair<tuple<string, string, string>, double>> resetT();
@@ -196,7 +196,6 @@ class Forest {
 #endif
         vector<Node*>                   _preorder;
         map<string, string>             _taxon_map;
-        map<string, unsigned>           _species_indices;
         double                          _log_weight;
         string                          _ancestral_species_name;
         vector<double>                  _vector_prior;
@@ -205,6 +204,7 @@ class Forest {
         vector<double>                  _log_likelihood_choices;
 #if defined (OLD_UPGMA)
         map<Node*,  unsigned>           _starting_row;
+        map<string, unsigned>           _species_indices;
 #endif
         stack<Node *>                   _upgma_additions;
         map<Node *, double>             _upgma_starting_edgelen;
@@ -281,11 +281,11 @@ class Forest {
         _log_coalescent_likelihood_increment = 0.0;
 #endif
         _taxon_map.clear();
-        _species_indices.clear();
         _vector_prior.clear();
 #if defined (OLD_UPGMA)
         _starting_row.clear();
         _nincrements = 0;
+        _species_indices.clear();
 #endif
         _upgma_additions = stack<Node*>();
         _upgma_starting_edgelen.clear();
@@ -873,7 +873,7 @@ class Forest {
     
         if (!new_nd->_left_child) {
             auto &data_matrix=_data->getDataMatrix();
-            assert (G::_save_memory || G::_start_mode == "sim");
+            assert (G::_save_memory || G::_start_mode_type == G::StartModeType::START_MODE_SIM);
             if (!new_nd->_left_child) {
                 new_nd->_partial=ps.getPartial(_npatterns*4);
                 for (unsigned p=0; p<_npatterns; p++) {
@@ -923,7 +923,7 @@ class Forest {
 
         if (!new_nd->_left_child) {
             auto &data_matrix=_data->getDataMatrix();
-            assert (G::_save_memory || G::_start_mode == "sim");
+            assert (G::_save_memory || G::_start_mode_type == G::StartModeType::START_MODE_SIM);
             if (!new_nd->_left_child) {
                 new_nd->_partial=ps.getPartial(_npatterns*4);
                 for (unsigned p=0; p<_npatterns; p++) {
@@ -1288,12 +1288,12 @@ class Forest {
         _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
 #endif
         _taxon_map = other._taxon_map;
-        _species_indices = other._species_indices;
         _vector_prior = other._vector_prior;
         _lineages_per_species = other._lineages_per_species;
 #if defined (OLD_UPGMA)
         _starting_row = other._starting_row;
         _nincrements = other._nincrements;
+        _species_indices = other._species_indices;
 #endif
         _upgma_additions = other._upgma_additions;
         _upgma_starting_edgelen = other._upgma_starting_edgelen;
@@ -1429,7 +1429,8 @@ class Forest {
             nd->_name=species_names[i];
             _lineages.push_back(nd);
 #if defined (FASTER_SECOND_LEVEL)
-            if (G::_start_mode != "sim") {
+//            if (G::_start_mode != "sim") {
+            if (G::_start_mode_type != G::StartModeType::START_MODE_SIM) {
                 if (G::_taxon_to_species.count(nd->_name) == 0) {
                     throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd->_name));
                 }
@@ -1689,7 +1690,8 @@ class Forest {
                 break;
             }
 #if defined (FASTER_SECOND_LEVEL)
-            if (G::_start_mode != "sim") {
+//            if (G::_start_mode != "sim") {
+            if (G::_start_mode_type != G::StartModeType::START_MODE_SIM) {
                 if (G::_taxon_to_species.count(nd._name) == 0) {
                     throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd._name));
                 }
@@ -3374,6 +3376,7 @@ class Forest {
         _theta_map[new_species_name] = G::_theta;
     }
         
+#if defined (OLD_UPGMA)
     inline void Forest::createSpeciesIndices() {
         unsigned number = 0;
         for (auto &s:_species_partition) {
@@ -3387,6 +3390,7 @@ class Forest {
             _species_indices[name] = number - 1;
         }
     }
+#endif
         
     inline void Forest::createThetaMapFixedTheta(Lot::SharedPtr lot) {
         // map should be 2*nspecies - 1 size
@@ -3396,7 +3400,9 @@ class Forest {
         for (auto &s:_species_partition) {
             _species_names.push_back(s.first);
             number++;
+#if defined (OLD_UPGMA)
             _species_indices[s.first] = number - 1;
+#endif
         }
         assert (_species_names.size() == G::_nspecies);
         
@@ -3404,7 +3410,9 @@ class Forest {
             string name = boost::str(boost::format("node-%d")%number);
             number++;
             _species_names.push_back(name);
+#if defined (OLD_UPGMA)
             _species_indices[name] = number - 1;
+#endif
         }
         
         _theta_mean = G::_theta;
@@ -3423,7 +3431,9 @@ class Forest {
         for (auto &s:_species_partition) {
             _species_names.push_back(s.first);
             number++;
+#if defined (OLD_UPGMA)
             _species_indices[s.first] = number - 1;
+#endif
         }
         assert (_species_names.size() == G::_nspecies);
         
@@ -3431,7 +3441,9 @@ class Forest {
             string name = boost::str(boost::format("node-%d")%number);
             number++;
             _species_names.push_back(name);
+#if defined (OLD_UPGMA)
             _species_indices[name] = number - 1;
+#endif
         }
         
         // gamma mean = shape * scale

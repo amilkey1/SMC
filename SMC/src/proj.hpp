@@ -646,7 +646,9 @@ namespace proj {
 
     inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             string filename1 = "alt_species_trees.trees";
-            assert (G::_start_mode != "sim");
+        
+//            assert (G::_start_mode != "sim");
+            assert (G::_start_mode_type != G::StartModeType::START_MODE_SIM);
 
             unsigned count = 0;
             // save all species trees
@@ -683,7 +685,8 @@ namespace proj {
             unique_treef.close();
         }
 
-        assert (G::_start_mode != "sim");
+//        assert (G::_start_mode != "sim");
+        assert (G::_start_mode_type != G::StartModeType::START_MODE_SIM);
 
         unsigned count = 0;
             // save all species trees
@@ -757,7 +760,8 @@ namespace proj {
             unique_treef.close();
         }
 
-        if (G::_start_mode == "smc") {
+//        if (G::_start_mode == "smc") {
+        if (G::_start_mode_type == G::StartModeType::START_MODE_SMC) {
             // save all species trees
             ofstream treef("species_trees.trees");
             treef << "#nexus\n\n";
@@ -783,7 +787,8 @@ namespace proj {
         }
 
     inline void Proj::saveGeneTrees(vector<Particle> &v) const {
-        if (G::_start_mode == "smc") {
+//        if (G::_start_mode == "smc") {
+        if (G::_start_mode_type == G::StartModeType::START_MODE_SMC) {
             for (unsigned i=1; i<G::_nloci+1; i++) {
                 string fname = "gene" + to_string(i) + ".trees";
                 ofstream treef(fname);
@@ -984,6 +989,16 @@ namespace proj {
         else {
             throw XProj("must specify either JC or HKY for model type");
         }
+        
+        if (G::_start_mode == "smc") {
+            G::_start_mode_type = G::StartModeType::START_MODE_SMC;
+        }
+        else if (G::_start_mode == "sim") {
+            G::_start_mode_type = G::StartModeType::START_MODE_SIM;
+        }
+        else {
+            throw XProj("must specify either JC or HKY for model type");
+        }
     }
 
     inline void Proj::checkOutgroupName() {
@@ -1158,7 +1173,9 @@ namespace proj {
         
         unsigned count = 0;
         for (auto &p:my_vec) {
+#if defined (OLD_UPGMA)
             p.createSpeciesIndices();
+#endif
             vector<string> particle_newicks;
             for (int i = 0; i<newicks.size(); i++) {
                 // if number of particles > size of newicks, just use the same newick for each particle
@@ -2306,7 +2323,6 @@ namespace proj {
         
         if (G::_fix_theta) {
             particle.fixTheta();
-            particle.setFixTheta(true);
         }
         
         if (!G::_gene_newicks_specified) {
@@ -2776,8 +2792,6 @@ namespace proj {
                     filterSpeciesParticles(s, second_level_particles);
                 
                 }
-//                double total_seconds = sw.stop();
-//                cout << "total time for one species tree SMC: " << total_seconds << endl;
                 
                 if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
                     unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
@@ -3009,7 +3023,7 @@ namespace proj {
     }
 #endif
 
-//#if defined(USING_MPI)
+#if defined(USING_MPI)
     inline void Proj::growGeneTrees(Particle &particle, unsigned particle_number, unsigned gene_number, unsigned step) {
         cout << "GROWING GENE TREES MPI for step " << step << endl;
         //taxon joining and reweighting step
@@ -3101,7 +3115,7 @@ namespace proj {
         }
 #endif
     }
-//#endif
+#endif
 
     inline void Proj::calcPairwiseDistanceMatrix() {
         // Get number of data subsets
@@ -3231,7 +3245,8 @@ namespace proj {
         output("Starting serial version...\n");
 #endif
         if (G::_gene_newicks_specified) {
-            if (G::_start_mode == "sim") {
+//            if (G::_start_mode == "sim") {
+            if (G::_start_mode_type == G::StartModeType::START_MODE_SIM) {
                 throw XProj("cannot specify gene newicks and simulations");
             }
             try {
@@ -3250,7 +3265,8 @@ namespace proj {
             }
         }
         
-        else if (G::_start_mode == "sim") {
+//        else if (G::_start_mode == "sim") {
+        if (G::_start_mode_type == G::StartModeType::START_MODE_SIM) {
             if (G::_gene_newicks_specified) {
                 throw XProj("cannot specify gene newicks and simulations");
             }
@@ -3341,9 +3357,6 @@ namespace proj {
                     string species_newick = handleSpeciesNewick();
                     unsigned count = 0;
                     for (auto &p:my_vec) {
-//                        if (count == 2472) {
-//                            cout << "stop";
-//                        }
                         p.processSpeciesNewick(species_newick);
                         count++;
                     }
@@ -3386,9 +3399,6 @@ namespace proj {
                 //run through each generation of particles
 
                 unsigned nsteps = (G::_ntaxa-1)*G::_nloci;
-                
-//                double total_seconds = sw.stop();
-//                cout << "total time initializing first level: " << total_seconds << endl;
                 
                 
 #if defined (USING_MPI)
@@ -3494,8 +3504,8 @@ namespace proj {
 #else
             
                 bool test = false;
+                assert (!test);
                 if (!test) {
-//                sw.start();
                 for (unsigned g=0; g<nsteps; g++){
                     if (g == 0) {
                             // reset gene order
@@ -3507,7 +3517,6 @@ namespace proj {
                         }
 
                         for (unsigned n=0; n<G::_ngroups; n++) {
-//                                for (unsigned l=0; l<G::_nloci; l++) {
                                 unsigned count = 1;
                                 vector<pair<double, unsigned>> randomize;
                                 for (unsigned l=0; l<list_size; l++) {
@@ -3524,17 +3533,12 @@ namespace proj {
                                         count = 1;
                                     }
                                 }
-//                                }
                         }
-                        // shuffle new particle order
-                        unsigned seed = rng.getSeed();
 
-                        // only shuffle particle indices, not particles // TODO: THIS IS NOT WORKING
-//                        std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
+                        // set gene order for first G::_nloci set of steps
                         unsigned ngroup = 0;
                         unsigned group_count = 0;
                         for (unsigned p=0; p<G::_nparticles*G::_ngroups; p++) {
-//                            cout << "particle " << p << " and group " << ngroup << endl;
                             my_vec[p].resetGeneOrder(g, new_gene_order[ngroup]);
                             if ((group_count+1)%G::_nparticles == 0) {
                                 ngroup++;
@@ -3604,7 +3608,7 @@ namespace proj {
                             // shuffle new particle order
                             unsigned seed = rng.getSeed();
                             
-                            // only shuffle particle indices, not particles // TODO: THIS IS NOT WORKING
+                            // only shuffle particle indices, not particles
                             std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
                             unsigned ngroup = 0;
                             unsigned group_count = 0;
@@ -3621,30 +3625,26 @@ namespace proj {
 //                      cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
                     }
                 } // g loop
-                
-//                total_seconds = sw.stop();
-//                cout << "\nTotal time for first  round: " << total_seconds << endl;
-//                cout << total_seconds << endl;
                 }
-                else {
-                    for (unsigned g=0; g<nsteps; g++){
-                        unsigned gene_number = my_vec[0].getNextGene();
-                        
-                        unsigned psuffix = 1;
-                        if (g > 0) {
-                            // set particle random number seeds
-                            for (auto &p:my_vec) {
-                                p.setSeed(rng.randint(1,9999) + psuffix);
-                                psuffix += 2;
-                            }
-                        }
-                        
-                        for (unsigned s = 0; s < G::_nparticles*G::_ngroups; ++s) {
-                            my_vec[s].checkPartition();
-                            growGeneTrees(my_vec[s], s, gene_number, g);
-                        }
-                    }
-                }
+//                else {
+//                    for (unsigned g=0; g<nsteps; g++){
+//                        unsigned gene_number = my_vec[0].getNextGene();
+//
+//                        unsigned psuffix = 1;
+//                        if (g > 0) {
+//                            // set particle random number seeds
+//                            for (auto &p:my_vec) {
+//                                p.setSeed(rng.randint(1,9999) + psuffix);
+//                                psuffix += 2;
+//                            }
+//                        }
+//
+//                        for (unsigned s = 0; s < G::_nparticles*G::_ngroups; ++s) {
+//                            my_vec[s].checkPartition();
+//                            growGeneTrees(my_vec[s], s, gene_number, g);
+//                        }
+//                    }
+//                }
 #endif
                 
                 if (G::_save_gene_trees) {
@@ -3787,6 +3787,7 @@ namespace proj {
                 for (auto &p:my_vec) {
                     // reset forest species partitions
                     p.clearPartials(); // no more likelihood calculations
+                    G::_generation = 0;
                     p.resetSpecies();
                     p.mapSpecies(_taxon_map, _species_names);
                 }

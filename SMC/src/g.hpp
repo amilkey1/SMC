@@ -13,6 +13,11 @@ namespace proj {
           MODEL_TYPE_HKY
         };
         
+        enum class StartModeType {
+          START_MODE_SIM,
+            START_MODE_SMC
+        };
+        
 #if defined (FASTER_SECOND_LEVEL)
         typedef unsigned long           species_t;
         static map<string, unsigned>    _taxon_to_species;
@@ -64,8 +69,6 @@ namespace proj {
         static unsigned             _nspecies;
         static unsigned             _ntaxa;
         static double               _infinity;
-        static double               _total_seconds_in_coal_likelihood;
-        static double               _test;
         static unsigned             _partial_arrays;
         static unsigned             _nstates;
         static double               _ploidy;
@@ -73,12 +76,12 @@ namespace proj {
         
         // other
         static vector<string>           _taxon_names;
-//        static vector<string>                  _species_names;
         
         static vector<vector<double> > _dmatrix;
         static vector<Split>           _dmatrix_rows;
         
         static ModelType _model_type;
+        static StartModeType _start_mode_type;
         
         // functions
         string inventName(unsigned k, bool lower_case);
