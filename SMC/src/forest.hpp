@@ -906,10 +906,11 @@ class Forest {
                 for (unsigned s = 0; s <G::_nstates; s++) {
                     double sum_over_child_states = 0.0;
                     for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
-                        double child_transition_prob = transition_prob_same;
-                        if (s_child != s) {
-                            child_transition_prob = transition_prob_dif;
-                        }
+//                        double child_transition_prob = transition_prob_same;
+//                        if (s_child != s) {
+//                            child_transition_prob = transition_prob_dif;
+//                        }
+                        double child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
 //                        double child_transition_prob = calcTransitionProbabilityJC(s, s_child, child->_edge_length);
                         double child_partial = child_partial_array[p*G::_nstates + s_child];
                         sum_over_child_states += child_transition_prob * child_partial;
