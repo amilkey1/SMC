@@ -508,7 +508,6 @@ inline vector<double> Particle::getVectorPrior() {
         bool done = false;
                 
         while (!done) {
-//            checkPartition();
             vector<pair<double, string>> rates_by_species = _forests[next_gene].calcForestRate(_lot);
             double total_rate = 0.0;
             double gene_increment = -1.0;

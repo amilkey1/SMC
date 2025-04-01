@@ -120,9 +120,9 @@ class Forest {
         void                            renumberInternals();
         bool                            canHaveSibling(Node * nd, bool rooted, bool allow_polytomies);
         vector<tuple<string, string, string>>              buildFromNewickTopology(const string newick);
-        pair<Node*, Node*>              chooseAllPairs(list<Node*> &nodes, double increment, string species, Lot::SharedPtr lot);
-        tuple<Node*, Node*, Node*>      createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, double increment, string species);
-        pair<Node*, Node*>              getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list);
+        pair<Node*, Node*>              chooseAllPairs(vector<Node*> &nodes, double increment, string species, Lot::SharedPtr lot);
+        tuple<Node*, Node*, Node*>      createNewSubtree(pair<unsigned, unsigned> t, vector<Node*> node_list, double increment, string species);
+        pair<Node*, Node*>              getSubtreeAt(pair<unsigned, unsigned> t, vector<Node*> node_list);
         void                            debugShowDistanceMatrix(const vector<double> & d) const;
     
         void                            constructUPGMA();
@@ -175,7 +175,8 @@ class Forest {
     
         unsigned                        _first_pattern = 0;
         unsigned                        _index;
-        map<string, list<Node*> >       _species_partition;
+//        map<string, list<Node*> >       _species_partition;
+        map<string, vector<Node*> >       _species_partition;
         double                          _gene_tree_log_likelihood;
         double                          _log_joining_prob;
         vector<pair<double, double>>    _increments_and_priors;
@@ -899,19 +900,14 @@ class Forest {
             auto & child_partial_array = *(child->_partial);
             
             // calculate both transition probabilities before loop, then choose 1 based on s == s_child
-            double transition_prob_same = calcTransitionProbabilityJC(1, 1, child->_edge_length);
-            double transition_prob_dif = calcTransitionProbabilityJC(1, 2, child->_edge_length);
+            double transition_prob_same = calcTransitionProbabilityJC(0, 0, child->_edge_length);
+            double transition_prob_dif = calcTransitionProbabilityJC(0, 1, child->_edge_length);
 
             for (unsigned p = 0; p < _npatterns; p++) {
                 for (unsigned s = 0; s <G::_nstates; s++) {
                     double sum_over_child_states = 0.0;
                     for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
-//                        double child_transition_prob = transition_prob_same;
-//                        if (s_child != s) {
-//                            child_transition_prob = transition_prob_dif;
-//                        }
                         double child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-//                        double child_transition_prob = calcTransitionProbabilityJC(s, s_child, child->_edge_length);
                         double child_partial = child_partial_array[p*G::_nstates + s_child];
                         sum_over_child_states += child_transition_prob * child_partial;
                     }   // child state loop
@@ -1026,68 +1022,66 @@ class Forest {
     }
 
     inline double Forest::calcTransitionProbabilityHKY(double s, double s_child, double edge_length) {
-    //        StopWatch sw;
-    //        sw.start();
         double child_transition_prob = 0.0;
-        
-            double pi_A = G::_base_frequencies[0];
-            double pi_C = G::_base_frequencies[1];
-            double pi_G = G::_base_frequencies[2];
-            double pi_T = G::_base_frequencies[3];
+    
+        double pi_A = G::_base_frequencies[0];
+        double pi_C = G::_base_frequencies[1];
+        double pi_G = G::_base_frequencies[2];
+        double pi_T = G::_base_frequencies[3];
 
-            double pi_j = 0.0;
-            double PI_J = 0.0;
+        double pi_j = 0.0;
+        double PI_J = 0.0;
 
-            double phi = (pi_A+pi_G)*(pi_C+pi_T)+_kappa*(pi_A*pi_G+pi_C*pi_T);
-            double beta_t = 0.5*(edge_length * _relative_rate )/phi;
+        double phi = (pi_A+pi_G)*(pi_C+pi_T)+_kappa*(pi_A*pi_G+pi_C*pi_T);
+        double beta_t = 0.5*(edge_length * _relative_rate )/phi;
 
-            // transition prob depends only on ending state
-            if (s_child == 0) {
-                // purine
-                pi_j = pi_A;
-                PI_J = pi_A + pi_G;
+        // transition prob depends only on ending state
+        if (s_child == 0) {
+            // purine
+            pi_j = pi_A;
+            PI_J = pi_A + pi_G;
+        }
+        else if (s_child == 1) {
+            // pyrimidine
+            pi_j = pi_C;
+            PI_J = pi_C + pi_T;
+        }
+        else if (s_child == 2) {
+            // purine
+            pi_j = pi_G;
+            PI_J = pi_A + pi_G;
+        }
+        else if (s_child == 3) {
+            // pyrimidine
+            pi_j = pi_T;
+            PI_J = pi_C + pi_T;
+        }
+
+        while (true) {
+            if (s == s_child) {
+                // no transition or transversion
+                double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
+                double second_term = (PI_J-pi_j)/PI_J*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
+                child_transition_prob = pi_j*first_term+second_term;
+                break;
             }
-            else if (s_child == 1) {
-                // pyrimidine
-                pi_j = pi_C;
-                PI_J = pi_C + pi_T;
-            }
-            else if (s_child == 2) {
-                // purine
-                pi_j = pi_G;
-                PI_J = pi_A + pi_G;
-            }
-            else if (s_child == 3) {
-                // pyrimidine
-                pi_j = pi_T;
-                PI_J = pi_C + pi_T;
+
+            else if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
+                // transition
+                double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
+                double second_term = (1/PI_J)*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
+                child_transition_prob = pi_j*(first_term-second_term);
+                break;
             }
 
-            while (true) {
-                if (s == s_child) {
-                    // no transition or transversion
-                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
-                    double second_term = (PI_J-pi_j)/PI_J*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
-                    child_transition_prob = pi_j*first_term+second_term;
-                    break;
-                }
-
-                else if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
-                    // transition
-                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
-                    double second_term = (1/PI_J)*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
-                    child_transition_prob = pi_j*(first_term-second_term);
-                    break;
-                }
-
-                else {
-                    // transversion
-                    child_transition_prob = pi_j*(1-exp(-beta_t));
-                    break;
-                }
+            else {
+                // transversion
+                child_transition_prob = pi_j*(1-exp(-beta_t));
+                break;
             }
-            assert (child_transition_prob > 0.0);
-            return child_transition_prob;
+        }
+        assert (child_transition_prob > 0.0);
+        return child_transition_prob;
     }
 
     inline double Forest::calcLogLikelihood() {
@@ -1098,7 +1092,6 @@ class Forest {
         if (_forest_height > 0 && G::_upgma) {
             constructUPGMA();
         } // TODO: be careful
-
 
         for (auto &nd:_lineages) {
             double log_like = 0.0;
@@ -1112,12 +1105,13 @@ class Forest {
                 log_like += log(site_like)*counts[_first_pattern+p];
             }
 
-            if (_forest_height > 0 && G::_upgma) {
-                destroyUPGMA(); // TODO: be careful
-            }
-
             _gene_tree_log_likelihood += log_like;
+            
 //            debugLogLikelihood(nd, log_like);
+        }
+        
+        if (_forest_height > 0 && G::_upgma) {
+            destroyUPGMA();
         }
         
         return _gene_tree_log_likelihood;
@@ -1329,7 +1323,7 @@ class Forest {
 #endif
 
         // copy tree itself
-
+        
         if (other._nodes.size() > 0) { // otherwise, there is no forest and nothing needs to be copied
             _species_partition.clear();
             for (auto spiter : other._species_partition) {
@@ -1417,7 +1411,6 @@ class Forest {
                 }
             }
         }
-        
     }
 
     inline void Forest::setUpSpeciesForest(vector<string> &species_names) {
@@ -1664,7 +1657,8 @@ class Forest {
         
         unsigned before = (int) _species_partition.size();
 
-        list<Node*> &nodes = _species_partition[new_spp];
+//        list<Node*> &nodes = _species_partition[new_spp];
+        vector<Node*> &nodes = _species_partition[new_spp];
         copy(_species_partition[spp1].begin(), _species_partition[spp1].end(), back_inserter(nodes));
         copy(_species_partition[spp2].begin(), _species_partition[spp2].end(), back_inserter(nodes));
         _species_partition.erase(spp1);
@@ -2120,7 +2114,6 @@ class Forest {
             assert(child1);
             assert(child2);
             
-            
             revertNodeVector(_lineages, child1, child2, parent);
 
             //reset siblings and parents of original nodes back to 0
@@ -2132,9 +2125,10 @@ class Forest {
                 child2->_partial = nullptr;
             }
 
+            // don't need to clear new node because it will be removed from _nodes anyway?
             // clear new node from _nodes
             //clear new node that was just created
-            parent->clear(); //new_nd
+//            parent->clear(); //new_nd
             
             _upgma_additions.pop();
             _nodes.pop_back(); // remove unused node from node list
@@ -2165,10 +2159,6 @@ class Forest {
     }
 
     inline void Forest::constructUPGMA() {
-//        unsigned partial_arrays = 0;
-
-//        double prev_log_likelihood = _gene_tree_log_likelihood;
-//        showForest();
         assert(_index >= 0);
 
         // Create two maps:
@@ -2274,12 +2264,8 @@ class Forest {
             new_nd->_partial=ps.getPartial(_npatterns*4);
             assert(new_nd->_left_child->_right_sib);
             
-//            StopWatch sw;
-//            sw.start();
             G::_partial_arrays++;
-            calcPartialArrayJC(new_nd); // TODO: use JC model for all UPGMA
-//            double test = sw.stop();
-//            G::_test += test;
+            calcPartialArrayJC(new_nd); // use JC model for all UPGMA
             
             // Update distance matrix
             mergeDMatrixPair(dijrows, dij, subtree1->_split, subtree2->_split);
@@ -2301,15 +2287,6 @@ class Forest {
             
             --nsteps;
         }
-//        cout << "partial arrays = " << partial_arrays << endl;
-
-        
-//        _gene_tree_log_likelihood = calcLogLikelihood();
-//        _log_weight = _gene_tree_log_likelihood - prev_log_likelihood; // previous likelihood is the entire tree
-        
-        // destroy upgma
-//        destroyUPGMA();
-//        showForest();
     }
 
     inline void Forest::mergeDMatrixPair(vector<Split> & dmatrows, vector<double> & dmatrix, Split & s1, Split & s2) {
@@ -2835,7 +2812,7 @@ class Forest {
         cout << "\n";
     }
 
-    inline pair<Node*, Node*> Forest::chooseAllPairs(list<Node*> &node_list, double increment, string species, Lot::SharedPtr lot) {
+    inline pair<Node*, Node*> Forest::chooseAllPairs(vector<Node*> &node_list, double increment, string species, Lot::SharedPtr lot) {
           double prev_log_likelihood = _gene_tree_log_likelihood;
     //         _node_choices.clear();
           assert (_node_choices.size() == 0);
@@ -2898,7 +2875,7 @@ class Forest {
            return make_pair(subtree1, subtree2);
        }
 
-    inline pair<Node*, Node*> Forest::getSubtreeAt(pair<unsigned, unsigned> t, list<Node*> node_list) {
+    inline pair<Node*, Node*> Forest::getSubtreeAt(pair<unsigned, unsigned> t, vector<Node*> node_list) {
           Node *subtree1 = nullptr;
           Node *subtree2 = nullptr;
 
@@ -2923,7 +2900,7 @@ class Forest {
       }
 
 
-    inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsigned> t, list<Node*> node_list, double increment, string species) {
+    inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsigned> t, vector<Node*> node_list, double increment, string species) {
          pair<Node*, Node*> p = getSubtreeAt(t, node_list);
 
          Node* subtree1 = p.first;
@@ -2967,14 +2944,11 @@ class Forest {
 
     inline void Forest::allowCoalescence(string species_name, double increment, Lot::SharedPtr lot) {
          double prev_log_likelihood = _gene_tree_log_likelihood;
-
-        // TODO: BE CAREFUL
-//        for (auto &nd:_lineages) {
-//            nd->_edge_length = 0.003343;
-//        }
+        
          Node *subtree1 = nullptr;
          Node *subtree2 = nullptr;
-         list<Node*> nodes = _species_partition[species_name];
+//         list<Node*> nodes = _species_partition[species_name];
+        vector<Node*> nodes = _species_partition[species_name];
         
         assert (nodes.size() > 0);
 
@@ -3005,6 +2979,7 @@ class Forest {
                  }
              }
              
+             // TODO: be careful
              pair<Node*, Node*> t = chooseAllPairs(nodes, increment, species_name, lot);
              
              subtree1 = t.first;
@@ -3023,10 +2998,6 @@ class Forest {
              assert (t.first < nodes.size());
              assert (t.second < nodes.size());
 
-//             subtree1 = _lineages[7];
-//             subtree2 = _lineages[2]; // TODO: BE CAREFUL
-             // TODO: BE CAREFUL
-//             _forest_height = _lineages[0]->_edge_length;
              assert (subtree1 != subtree2);
          }
 
@@ -3108,7 +3079,8 @@ class Forest {
          }
         
         //update species list
-         updateNodeList(nodes, subtree1, subtree2, new_nd); // TODO: BE CAREFUL
+//         updateNodeList(nodes, subtree1, subtree2, new_nd);
+        updateNodeVector(nodes, subtree1, subtree2, new_nd);
          updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         
         if (G::_upgma) {
@@ -3157,41 +3129,8 @@ class Forest {
     }
 
     inline void Forest::updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode) {
-    //        showForest();
         // Delete delnode1 from node_vector
         auto it1 = find(node_vector.begin(), node_vector.end(), delnode1);
-    //        if (it1 == node_vector.end()) {
-    //            cout << "node to delete 1 has position " << delnode1->_position_in_lineages << " and name " << delnode1->_name << endl;
-    //            cout << delnode1->_name << " position " << delnode1->_position_in_lineages << endl;
-    //            cout << "\tedge len " << delnode1->_edge_length << endl;
-    //            if (delnode1->_parent) {
-    //                cout << "\tparent " << delnode1->_parent << endl;
-    //            }
-    //            cout << "node to delete 2 has position " << delnode2->_position_in_lineages << " and name " << delnode2->_name << endl;
-    //            cout << delnode2->_name << " position " << delnode2->_position_in_lineages << endl;
-    //            cout << "\tedge len " << delnode2->_edge_length << endl;
-    //            if (delnode2->_parent) {
-    //                cout << "\tparent " << delnode2->_parent << endl;
-    //            }
-    //            cout << "node to add has position " << addnode->_position_in_lineages << " and name " << addnode->_name << endl;
-    //            cout << "lineages is: ";
-    //            for (auto &nd:_lineages) {
-    //                cout << nd->_name << " position " << nd->_position_in_lineages << endl;
-    //                cout << "\tedge len " << nd->_edge_length << endl;
-    //                if (nd->_parent) {
-    //                    cout << "\tparent " << nd->_parent << endl;
-    //                }
-    //            }
-    //
-    //            cout << "nodes is: ";
-    //            for (auto &nd:_nodes) {
-    //                cout << nd._name << " position " << nd._position_in_lineages << endl;
-    //                cout << "\tedge len " << nd._edge_length << endl;
-    //                if (nd._parent) {
-    //                    cout << "\tparent " << nd._parent << endl;
-    //                }
-    //            }
-    //        }
         assert(it1 != node_vector.end());
         node_vector.erase(it1);
 
@@ -5070,344 +5009,6 @@ class Forest {
             }
         }
     }
-
-    //    inline void Forest::buildFromNewickMPI(const std::string newick, bool rooted, bool allow_polytomies) {
-    //        unsigned node_count = 0;
-    //        set<unsigned> used; // used to ensure that no two leaf nodes have the same number
-    //        unsigned curr_leaf = 0;
-    //        unsigned num_edge_lengths = 0;
-    //        int curr_node_index = 0;
-    //
-    //        // Remove comments from the supplied newick string
-    //        string commentless_newick = newick;
-    //        stripOutNexusComments(commentless_newick);
-    //
-    //        // Resize the _nodes vector
-    //        _nleaves = countNewickLeaves(commentless_newick);
-    //        unsigned ninternals = countNewickInternals(commentless_newick);
-    //    //        if (_nleaves < 4) {
-    //    //            throw XProj("Expecting newick tree description to have at least 4 leaves");
-    //    //        }
-    //        unsigned max_nodes = _nleaves + ninternals;
-    //        // TODO: if polytomies, max nodes is not this
-    ////        unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
-    //        _nodes.resize(max_nodes);
-    //    //        int b=0;
-    //        for (auto & nd : _nodes ) {
-    //            nd._name = "";
-    //            nd._number = -1;
-    //        }
-    //
-    //        try {
-    //            // no root node
-    //
-    //            // Root node is the last node in _nodes
-    //            auto l_front = _nodes.begin();
-    //            // TODO: adding
-    ////            l_front->_name = "unused";
-    //            std::advance(l_front, curr_node_index); // TODO: curr_node_index should be 0
-    //            Node *nd = &*l_front;
-    //            curr_node_index = -1;
-    //
-    ////            if (rooted) {
-    ////                auto l_front = _nodes.begin();
-    ////                std::advance(l_front, ++curr_node_index);
-    ////                nd = &*l_front;
-    ////
-    ////                auto parent = _nodes.begin();
-    ////                std::advance(parent, curr_node_index - 1);
-    ////                nd->_parent = &*parent;
-    ////                nd->_parent->_left_child = nd;
-    ////                nd->_name = "unused";
-    ////            }
-    //
-    //            // Some flags to keep track of what we did last
-    //            enum {
-    //                Prev_Tok_LParen        = 0x01,    // previous token was a left parenthesis ('(')
-    //                Prev_Tok_RParen        = 0x02,    // previous token was a right parenthesis (')')
-    //                Prev_Tok_Colon        = 0x04,    // previous token was a colon (':')
-    //                Prev_Tok_Comma        = 0x08,    // previous token was a comma (',')
-    //                Prev_Tok_Name        = 0x10,    // previous token was a node name (e.g. '2', 'P._articulata')
-    //                Prev_Tok_EdgeLen    = 0x20    // previous token was an edge length (e.g. '0.1', '1.7e-3')
-    //            };
-    //            unsigned previous = Prev_Tok_LParen;
-    //
-    //            // Some useful flag combinations
-    //            unsigned LParen_Valid = (Prev_Tok_LParen | Prev_Tok_Comma);
-    //            unsigned RParen_Valid = (Prev_Tok_RParen | Prev_Tok_Name | Prev_Tok_EdgeLen);
-    //            unsigned Comma_Valid  = (Prev_Tok_RParen | Prev_Tok_Name | Prev_Tok_EdgeLen);
-    //            unsigned Colon_Valid  = (Prev_Tok_RParen | Prev_Tok_Name);
-    //            unsigned Name_Valid   = (Prev_Tok_RParen | Prev_Tok_LParen | Prev_Tok_Comma);
-    //
-    //            // Set to true while reading an edge length
-    //            bool inside_edge_length = false;
-    //            std::string edge_length_str;
-    //            unsigned edge_length_position = 0;
-    //
-    //            // Set to true while reading a node name surrounded by (single) quotes
-    //            bool inside_quoted_name = false;
-    //
-    //            // Set to true while reading a node name not surrounded by (single) quotes
-    //            bool inside_unquoted_name = false;
-    //
-    //            // Set to start of each node name and used in case of error
-    //            unsigned node_name_position = 0;
-    //
-    //            // loop through the characters in newick, building up tree as we go
-    //            unsigned position_in_string = 0;
-    //            for (auto ch : commentless_newick) {
-    //                position_in_string++;
-    //
-    //                if (inside_quoted_name) {
-    //                    if (ch == '\'') {
-    //                        inside_quoted_name = false;
-    //                        node_name_position = 0;
-    //                        if (!nd->_left_child) {
-    //                            curr_leaf++;
-    //                        }
-    //                        previous = Prev_Tok_Name;
-    //                    }
-    //                    else if (iswspace(ch))
-    //                        nd->_name += ' ';
-    //                    else {
-    //                        nd->_name += ch;
-    //                    }
-    //
-    //                    continue;
-    //                }
-    //                else if (inside_unquoted_name) {
-    //                    if (ch == '(')
-    //                        throw XProj(boost::str(boost::format("Unexpected left parenthesis inside node name at position %d in tree description") % node_name_position));
-    //
-    //                    if (iswspace(ch) || ch == ':' || ch == ',' || ch == ')') {
-    //                        inside_unquoted_name = false;
-    //
-    //                        // Expect node name only after a left paren (child's name), a comma (sib's name) or a right paren (parent's name)
-    //                        if (!(previous & Name_Valid))
-    //                            throw XProj(boost::str(boost::format("Unexpected node name (%s) at position %d in tree description") % nd->_name % node_name_position));
-    //
-    //                        if (!nd->_left_child) {
-    //                            curr_leaf++;
-    //                        }
-    //
-    //                        previous = Prev_Tok_Name;
-    //                    }
-    //                    else {
-    //                        nd->_name += ch;
-    //                        continue;
-    //                    }
-    //                }
-    //                else if (inside_edge_length) {
-    //                    if (ch == ',' || ch == ')' || iswspace(ch)) {
-    //                        inside_edge_length = false;
-    //                        edge_length_position = 0;
-    //                        extractEdgeLen(nd, edge_length_str);
-    //                        ++num_edge_lengths;
-    //                        previous = Prev_Tok_EdgeLen;
-    //                        node_count++;
-    //                    }
-    //                    else {
-    //                        bool valid = (ch =='e' || ch == 'E' || ch =='.' || ch == '-' || ch == '+' || isdigit(ch));
-    //                        if (!valid)
-    //                            throw XProj(boost::str(boost::format("Invalid branch length character (%c) at position %d in tree description") % ch % position_in_string));
-    //                        edge_length_str += ch;
-    //                        continue;
-    //                    }
-    //                }
-    //
-    //                if (iswspace(ch))
-    //                    continue;
-    //
-    //                switch(ch) {
-    //                    case ';':
-    //                        break;
-    //
-    //                    case ')':
-    //                        // If nd is bottommost node, expecting left paren or semicolon, but not right paren
-    //                        if (!nd->_parent)
-    //                            throw XProj(boost::str(boost::format("Too many right parentheses at position %d in tree description") % position_in_string));
-    //
-    //                        // Expect right paren only after an edge length, a node name, or another right paren
-    //                        if (!(previous & RParen_Valid))
-    //                            throw XProj(boost::str(boost::format("Unexpected right parenthesisat position %d in tree description") % position_in_string));
-    //
-    //                        // Go down a level
-    //                        nd = nd->_parent;
-    //                        if (!nd->_left_child->_right_sib)
-    //                            throw XProj(boost::str(boost::format("Internal node has only one child at position %d in tree description") % position_in_string));
-    //                        previous = Prev_Tok_RParen;
-    //                        break;
-    //
-    //                    case ':':
-    //                        // Expect colon only after a node name or another right paren
-    //                        if (!(previous & Colon_Valid))
-    //                            throw XProj(boost::str(boost::format("Unexpected colon at position %d in tree description") % position_in_string));
-    //                        previous = Prev_Tok_Colon;
-    //                        break;
-    //
-    //                    case ',':
-    //                    {
-    //                        // Expect comma only after an edge length, a node name, or a right paren
-    //                        if (!nd->_parent || !(previous & Comma_Valid))
-    //                            throw XProj(boost::str(boost::format("Unexpected comma at position %d in tree description") % position_in_string));
-    //
-    //                        // Check for polytomies
-    //                        if (!canHaveSibling(nd, rooted, allow_polytomies)) {
-    //                            throw XProj(boost::str(boost::format("Polytomy found in the following tree description but polytomies prohibited:\n%s") % newick));
-    //                        }
-    //
-    //                        // Create the sibling
-    //                        curr_node_index++;
-    //                        if (curr_node_index == _nodes.size())
-    //                            throw XProj(boost::str(boost::format("Too many nodes specified by tree description (%d nodes allocated for %d leaves)") % _nodes.size() % _nleaves));
-    //
-    //                        auto l_front = _nodes.begin();
-    //                        std::advance(l_front, curr_node_index);
-    //                        nd->_right_sib = &*l_front;
-    //
-    //                        nd->_right_sib->_parent = nd->_parent;
-    //                        nd = nd->_right_sib;
-    //                        previous = Prev_Tok_Comma;
-    //                        break;
-    //                    }
-    //
-    //                    case '(':
-    //                    {
-    //                        // Expect left paren only after a comma or another left paren
-    //                        if (!(previous & LParen_Valid))
-    //                            throw XProj(boost::str(boost::format("Not expecting left parenthesis at position %d in tree description") % position_in_string));
-    //
-    //                        // Create new node above and to the left of the current node
-    //                        assert(!nd->_left_child);
-    //                        curr_node_index++;
-    //                        if (curr_node_index == _nodes.size())
-    //                            throw XProj(boost::str(boost::format("malformed tree description (more than %d nodes specified)") % _nodes.size()));
-    //
-    //                        auto l_front = _nodes.begin();
-    //                        std::advance(l_front, curr_node_index);
-    //                        // TODO: don't need next part because no root?
-    ////                        nd->_left_child = &*l_front;
-    //
-    ////                        nd->_left_child->_parent = nd;
-    ////                        nd = nd->_left_child;
-    //                        previous = Prev_Tok_LParen;
-    //                        break;
-    //                    }
-    //
-    //                    case '\'':
-    //                        // Encountered an apostrophe, which always indicates the start of a
-    //                        // node name (but note that node names do not have to be quoted)
-    //
-    //                        // Expect node name only after a left paren (child's name), a comma (sib's name)
-    //                        // or a right paren (parent's name)
-    //                        if (!(previous & Name_Valid))
-    //                            throw XProj(boost::str(boost::format("Not expecting node name at position %d in tree description") % position_in_string));
-    //
-    //                        // Get the rest of the name
-    //                        nd->_name.clear();
-    //
-    //                        inside_quoted_name = true;
-    //                        node_name_position = position_in_string;
-    //
-    //                        break;
-    //
-    //                    default:
-    //                        // Get here if ch is not one of ();:,'
-    //
-    //                        // Expecting either an edge length or an unquoted node name
-    //                        if (previous == Prev_Tok_Colon) {
-    //                            // Edge length expected (e.g. "235", "0.12345", "1.7e-3")
-    //                            inside_edge_length = true;
-    //                            edge_length_position = position_in_string;
-    //                            edge_length_str = ch;
-    //                        }
-    //                        else {
-    //                            // Get the node name
-    //                            nd->_name = ch;
-    //
-    //                            inside_unquoted_name = true;
-    //                            node_name_position = position_in_string;
-    //                        }
-    //                }   // end of switch statement
-    //            }   // loop over characters in newick string
-    //
-    //            if (inside_unquoted_name) {
-    //                cout << "entering exception " << endl;
-    //                throw XProj(boost::str(boost::format("Tree description ended before end of node name starting at position %d was found") % node_name_position));
-    //            }
-    //            if (inside_edge_length)
-    //                throw XProj(boost::str(boost::format("Tree description ended before end of edge length starting at position %d was found") % edge_length_position));
-    //            if (inside_quoted_name)
-    //                throw XProj(boost::str(boost::format("Expecting single quote to mark the end of node name at position %d in tree description") % node_name_position));
-    //
-    ////            // remove extra fake nodes
-    ////            unsigned count = (unsigned) _nodes.size()-1;
-    ////            for (auto iter=_nodes.rbegin(); iter != _nodes.rend(); iter++) {
-    ////                if (iter->_edge_length == Node::_smallest_edge_length) {
-    ////                    _nodes.erase(iter);
-    ////                    count--;
-    ////                }
-    ////            }
-    //
-    //            for (auto &nd:_nodes) {
-    //                if (nd._parent) {
-    //                    if (nd._parent->_name == "unused") {
-    //                        nd._parent = nullptr;
-    //                    }
-    //                }
-    //            }
-    //            _nodes.pop_front(); // remove node at beginning of list because it's an extra root
-    //            // remove parent from new last node
-    //            _nodes.front()._parent = NULL;
-    //
-    //            if (allow_polytomies) {
-    //                _nodes.pop_front(); // TODO: need to remove the extra 0.0 at the end of the partial newick
-    //            }
-    //
-    //            unsigned nnodes_to_remove = (unsigned) _nodes.size() - node_count;
-    //            if (!allow_polytomies) {
-    //                assert (nnodes_to_remove == 0);
-    //            }
-    //            for (unsigned n=0; n<nnodes_to_remove; n++) {
-    //                _nodes.pop_back();
-    //            }
-    //
-    //            if (rooted) {
-    //                refreshPreorder();
-    //            }
-    //            renumberInternals();
-    //        }
-    //
-    //        catch(XProj &x) {
-    //            clear();
-    //            throw x;
-    //        }
-    //
-    //        // TODO: moved this up
-    ////        _nodes.pop_front(); // remove node at beginning of list because it's an extra root
-    ////        // remove parent from new last node
-    ////        _nodes.front()._parent = NULL;
-    ////
-    //        _nodes.sort(
-    //             [this](Node& lhs, Node& rhs) {
-    ////                 return lhs._left_child->_height < rhs._left_child->_height; } );  // TODO: is this just lhs->_height and rhs->_height?
-    //                 return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
-    //        _lineages.clear();
-    //
-    //        for (auto &nd:_nodes) {
-    //            if (!nd._parent) {
-    //                _lineages.push_back(&nd);
-    //            }
-    //        }
-    ////        _lineages.push_back(&_nodes.back());
-    //
-    //        // reset node names
-    //        int j = 0;
-    //        for (auto &nd:_nodes) {
-    //            nd._number = j;
-    //            j++;
-    //        }
-    //    }
 
     inline void Forest::extractNodeNumberFromName(Node * nd, std::set<unsigned> & used) {
         assert(nd);

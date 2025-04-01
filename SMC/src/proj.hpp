@@ -2469,12 +2469,7 @@ namespace proj {
 //        unsigned count = 0;
         if (G::_nthreads == 1) {
           for (auto & p : particles) {
-//              cout << "particle " << count << endl;
-//              if (count == 2472) {
-//                  cout << "stop";
-//              }
               p.proposal();
-//              count++;
           }
         }
         else {
@@ -2578,21 +2573,25 @@ namespace proj {
         rng.setSeed(_random_seed);
 
         unsigned ntaxa = 0;
+        G::_nspecies = G::_sim_nspecies;
         
         if (G::_ntaxaperspecies.size() == 1) {
             ntaxa = G::_ntaxaperspecies[0];
             for (int i=0; i<G::_sim_nspecies-1; i++) {
                 G::_ntaxaperspecies.push_back(ntaxa);
             }
+            G::_ntaxa = ntaxa * G::_nspecies;
         }
         else {
             for (auto &t:G::_ntaxaperspecies) {
                 ntaxa += t;
             }
+            G::_ntaxa = ntaxa;
         }
         
-        G::_ntaxa = ntaxa;
-        G::_nspecies = (unsigned) G::_ntaxaperspecies.size();
+//        G::_ntaxa = ntaxa * G::_nspecies;
+        assert (G::_nspecies == (unsigned) G::_ntaxaperspecies.size());
+//        G::_nspecies = (unsigned) G::_ntaxaperspecies.size();
 
         vector<Particle> sim_vec(1);
         sim_vec[0] = Particle();
@@ -2624,7 +2623,7 @@ namespace proj {
         
         assert (ntaxa > 0);
         
-        unsigned list_size = (ntaxa-1)*G::_nloci;
+        unsigned list_size = (G::_ntaxa-1)*G::_nloci;
         vector<unsigned> gene_order;
         
         unsigned count = 1;
@@ -3271,6 +3270,7 @@ namespace proj {
             }
             
             _first_line = true;
+            G::_upgma = false;
             
             try {
                 simulateData();
