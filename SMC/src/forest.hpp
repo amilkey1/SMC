@@ -158,8 +158,10 @@ class Forest {
 #endif
 
         void                            setNodeHeights();
+#if defined (USING_MPIE)
         void                            resetSpeciesPartition(string species_partition);
         map<string, vector<string>>     saveSpeciesPartition();
+#endif
         void                            setGeneUPGMAMatrices();
     
         map<string, double>             _theta_map;
@@ -175,7 +177,6 @@ class Forest {
     
         unsigned                        _first_pattern = 0;
         unsigned                        _index;
-//        map<string, list<Node*> >       _species_partition;
         map<string, vector<Node*> >       _species_partition;
         double                          _gene_tree_log_likelihood;
         double                          _log_joining_prob;
@@ -1657,8 +1658,8 @@ class Forest {
         
         unsigned before = (int) _species_partition.size();
 
-//        list<Node*> &nodes = _species_partition[new_spp];
         vector<Node*> &nodes = _species_partition[new_spp];
+        
         copy(_species_partition[spp1].begin(), _species_partition[spp1].end(), back_inserter(nodes));
         copy(_species_partition[spp2].begin(), _species_partition[spp2].end(), back_inserter(nodes));
         _species_partition.erase(spp1);
@@ -2947,7 +2948,6 @@ class Forest {
         
          Node *subtree1 = nullptr;
          Node *subtree2 = nullptr;
-//         list<Node*> nodes = _species_partition[species_name];
         vector<Node*> nodes = _species_partition[species_name];
         
         assert (nodes.size() > 0);
@@ -5872,6 +5872,7 @@ class Forest {
         }
     }
 
+#if defined (USING_MPIE)
     inline void Forest::resetSpeciesPartition(string species_partition_string) {
         _species_partition.clear();
         cout << species_partition_string << endl;
@@ -5891,7 +5892,9 @@ class Forest {
     //            }
     //        }
     }
+#endif
 
+#if defined (USING_MPI)
     inline map<string, vector<string>> Forest::saveSpeciesPartition() {
         map<string, vector<string>> species_partition_strings;
         for (auto &s:_species_partition) {
@@ -5903,6 +5906,7 @@ class Forest {
         }
         return species_partition_strings;
     }
+#endif
 
     #if defined (FASTER_SECOND_LEVEL)
     inline Node * Forest::findNextPreorderNew(Node * nd) const {
