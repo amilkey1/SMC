@@ -105,8 +105,6 @@ double Forest::_edge_rate_variance = 0.0;
 double Forest::_asrv_shape = numeric_limits<double>::infinity();
 double Forest::_comphet = numeric_limits<double>::infinity();
 
-unsigned G::_partial_arrays = 0.0;
-
 //vector<string> G::_species_names;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
@@ -146,7 +144,6 @@ int main(int argc, const char * argv[]) {
         proj.run();
         double total_seconds = sw.stop();
         cout << "total time: " << total_seconds << endl;
-        cout << "total partials in UPGMA: " << G::_partial_arrays << endl;
     }
     catch(std::exception & x) {
         std::cerr << "Exception: " << x.what() << std::endl;

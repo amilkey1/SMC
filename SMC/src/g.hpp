@@ -69,7 +69,6 @@ namespace proj {
         static unsigned             _nspecies;
         static unsigned             _ntaxa;
         static double               _infinity;
-        static unsigned             _partial_arrays;
         static unsigned             _nstates;
         static double               _ploidy;
         static double               _small_enough;

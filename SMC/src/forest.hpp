@@ -2277,7 +2277,6 @@ class Forest {
             new_nd->_partial=ps.getPartial(_npatterns*4);
             assert(new_nd->_left_child->_right_sib);
             
-            G::_partial_arrays++;
             calcPartialArrayJC(new_nd); // use JC model for all UPGMA
             
             // Update distance matrix
