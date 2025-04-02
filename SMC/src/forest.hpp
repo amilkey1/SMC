@@ -166,7 +166,8 @@ class Forest {
     
         map<string, double>             _theta_map;
         std::vector<Node *>             _lineages;
-        std::list<Node>                 _nodes;
+//        std::list<Node>                 _nodes;
+        vector<Node>                    _nodes;
 
         unsigned                        _nleaves;
         unsigned                        _ninternals;
@@ -326,7 +327,8 @@ class Forest {
         
         _data = d;
         
-        _nodes.resize(G::_ntaxa);
+        _nodes.resize(2*G::_ntaxa - 1);
+//        _nodes.reserve(2*G::_ntaxa - 1);
         _lineages.reserve(_nodes.size());
         unsigned i= 0;
         
@@ -374,11 +376,13 @@ class Forest {
         unsigned i = 0;
         auto &data_matrix=_data->getDataMatrix();
         
-        _nodes.resize(G::_ntaxa);
+        _nodes.resize(2*G::_ntaxa - 1);
         _lineages.reserve(_nodes.size());
+        
+//        _nodes.reserve(2*G::_ntaxa - 1);
         //create taxa
         for (unsigned i = 0; i < G::_ntaxa; i++) {
-            Node* nd = &*next(_nodes.begin(), i);
+            Node * nd = &(_nodes[i]);
             nd->_right_sib=0;
             nd->_name=" ";
             nd->_left_child=0;
@@ -1247,7 +1251,7 @@ class Forest {
         _lineages.reserve(_nodes.size());
         
         for (unsigned i = 0; i < G::_ntaxa; i++) {
-            Node* nd = &*next(_nodes.begin(), i);
+            Node * nd = &(_nodes[i]);
             nd->_right_sib=0;
             nd->_name="";
             nd->_left_child=0;
@@ -1330,7 +1334,7 @@ class Forest {
             for (auto spiter : other._species_partition) {
                 for (auto s : spiter.second) {
                     unsigned number = s->_number;
-                    Node* nd = &*next(_nodes.begin(), number);
+                    Node* nd = &_nodes[number];
                     _species_partition[spiter.first].push_back(nd);
                 }
             }
@@ -1349,12 +1353,12 @@ class Forest {
                 int k = othernd._number;
 
                 if (k>-1) {
-                    Node* nd = &*next(_nodes.begin(), k);
+                    Node* nd = &_nodes[k];
 
                 // copy parent
                     if (othernd._parent) {
                         unsigned parent_number = othernd._parent->_number;
-                        Node* parent = &*next(_nodes.begin(), parent_number);
+                        Node * parent = &_nodes[parent_number];
                         nd->_parent = parent;
                     }
                     else {
@@ -1364,7 +1368,7 @@ class Forest {
                 // copy left child
                     if (othernd._left_child) {
                     unsigned left_child_number = othernd._left_child->_number;
-                        Node* left_child = &*next(_nodes.begin(), left_child_number);
+                        Node * left_child = &_nodes[left_child_number];
                         nd->_left_child = left_child;
                 }
                     else {
@@ -1374,7 +1378,7 @@ class Forest {
                 // copy right sibling
                 if (othernd._right_sib) {
                     unsigned right_sib_number = othernd._right_sib->_number;
-                    Node* right_sib = &*next(_nodes.begin(), right_sib_number);
+                    Node * right_sib = &_nodes[right_sib_number];
                     nd->_right_sib = right_sib;
                 }
                 else {
@@ -1397,7 +1401,7 @@ class Forest {
             unsigned j = 0;
             for (auto othernd : other._lineages) {
                 unsigned k = othernd->_number;
-                Node* nd = &*next(_nodes.begin(), k);
+                Node * nd = &_nodes[k];
                 _lineages[j] = nd;
                 j++;
             }
@@ -1406,7 +1410,7 @@ class Forest {
                 unsigned m = 0;
                 for (auto othernd : other._preorder) {
                     unsigned n = othernd->_number;
-                    Node* nd = &*next(_nodes.begin(), n);
+                    Node * nd = &_nodes[n];
                     _preorder[m] = nd;
                     m++;
                 }
@@ -1419,11 +1423,12 @@ class Forest {
         assert (G::_nspecies = (unsigned) species_names.size());
         
         //create species
-        _nodes.resize(G::_nspecies);
+        _nodes.resize(2*G::_nspecies - 1);
         _lineages.reserve(_nodes.size());
+        
         //create taxa
         for (unsigned i = 0; i < G::_nspecies; i++) {
-            Node* nd = &*next(_nodes.begin(), i);
+            Node * nd = &(_nodes[i]);
             nd->_right_sib=0;
             nd->_name=" ";
             nd->_left_child=0;
@@ -1617,15 +1622,18 @@ class Forest {
             }
         }
         
-        Node nd;
-        _nodes.push_back(nd);
-        Node* new_nd = &_nodes.back();
-        new_nd->_parent=0;
+        Node * new_nd = &_nodes[_nleaves + _ninternals];
+        assert (new_nd->_parent==0);
+       assert (new_nd->_number == -1);
+       assert (new_nd->_right_sib == 0);
+//        _nodes.push_back(nd);
+//        Node* new_nd = &_nodes.back();
+//        new_nd->_parent=0;
         new_nd->_number=_nleaves+_ninternals;
         new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
         new_nd->_edge_length=0.0;
         _ninternals++;
-        new_nd->_right_sib=0;
+//        new_nd->_right_sib=0;
 
         new_nd->_left_child=subtree1;
         subtree1->_right_sib=subtree2;
@@ -2126,13 +2134,12 @@ class Forest {
                 child2->_partial = nullptr;
             }
 
-            // don't need to clear new node because it will be removed from _nodes anyway?
             // clear new node from _nodes
             //clear new node that was just created
-//            parent->clear(); //new_nd
+            parent->clear(); //new_nd
             
             _upgma_additions.pop();
-            _nodes.pop_back(); // remove unused node from node list
+//            _nodes.pop_back(); // remove unused node from node list
         
             _ninternals--;
         }
@@ -2232,16 +2239,21 @@ class Forest {
             //debugShowLineages();
 
             // Join lineages i and j
-            Node nd;
-            _nodes.push_back(nd);
-            Node* new_nd = &_nodes.back();
+//            Node nd;
+//            _nodes.push_back(nd);
+//            Node* new_nd = &_nodes.back();
+            Node * new_nd = &_nodes[_nleaves + _ninternals];
+            
+            assert (new_nd->_parent==0);
+           assert (new_nd->_number == -1);
+           assert (new_nd->_right_sib == 0);
 
             Node * subtree1 = node_for_row[i];
             Node * subtree2 = node_for_row[j];
             
-            new_nd->_parent=0;
+//            new_nd->_parent=0;
             new_nd->_number=_nleaves+_ninternals;
-            new_nd->_right_sib=0;
+//            new_nd->_right_sib=0;
 
             new_nd->_left_child=subtree1;
             subtree1->_right_sib=subtree2;
@@ -2589,16 +2601,21 @@ class Forest {
             //debugShowLineages();
             
             // Join lineages i and j
-            Node nd;
-            _nodes.push_back(nd);
-            Node* new_nd = &_nodes.back();
+//            Node nd;
+//            _nodes.push_back(nd);
+//            Node* new_nd = &_nodes.back();
+            Node * new_nd = &_nodes[_nleaves + _ninternals];
+            
+            assert (new_nd->_parent==0);
+           assert (new_nd->_number == -1);
+           assert (new_nd->_right_sib == 0);
 
             Node * subtree1 = _lineages[i];
             Node * subtree2 = _lineages[j];
             
-            new_nd->_parent=0;
+//            new_nd->_parent=0;
             new_nd->_number=_nleaves+_ninternals;
-            new_nd->_right_sib=0;
+//            new_nd->_right_sib=0;
 
             new_nd->_left_child=subtree1;
             subtree1->_right_sib=subtree2;
@@ -2720,7 +2737,7 @@ class Forest {
             parent->clear(); //new_nd
 
             _upgma_additions.pop();
-            _nodes.pop_back(); // remove unused node from node list
+//            _nodes.pop_back(); // remove unused node from node list
             
             _ninternals--;
         }
@@ -2880,7 +2897,7 @@ class Forest {
           Node *subtree1 = nullptr;
           Node *subtree2 = nullptr;
 
-          unsigned a = 0;
+          unsigned a = 0; // TODO: can make this fater because node_list is actually a vector now
           for (auto iter=node_list.begin(); iter != node_list.end(); iter++){
               if (a==t.first) {
                   subtree1 = *iter;
@@ -2908,13 +2925,20 @@ class Forest {
          Node* subtree2 = p.second;
 
     //        new node is always needed
-         Node nd;
-         _nodes.push_back(nd);
-         Node* new_nd = &_nodes.back();
-         new_nd->_parent=0;
+//         Node nd;
+//         _nodes.push_back(nd);
+//         Node* new_nd = &_nodes.back();
+        
+        Node * new_nd = &_nodes[_nleaves + _ninternals];
+        
+        assert (new_nd->_parent==0);
+       assert (new_nd->_number == -1);
+       assert (new_nd->_right_sib == 0);
+        
+//         new_nd->_parent=0;
          new_nd->_number=_nleaves+_ninternals;
          new_nd->_edge_length=0.0;
-         new_nd->_right_sib=0;
+//         new_nd->_right_sib=0;
 
          new_nd->_left_child=subtree1;
          subtree1->_right_sib=subtree2;
@@ -2979,7 +3003,6 @@ class Forest {
                  }
              }
              
-             // TODO: be careful
              pair<Node*, Node*> t = chooseAllPairs(nodes, increment, species_name, lot);
              
              subtree1 = t.first;
@@ -2990,27 +3013,26 @@ class Forest {
              assert (G::_proposal == "prior-prior" || one_choice);
              // prior-prior proposal
              pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
-             auto it1 = std::next(nodes.begin(), t.first);
-             subtree1 = *it1;
+             subtree1 = nodes[t.first];
+             subtree2 = nodes[t.second];
 
-             auto it2 = std::next(nodes.begin(), t.second);
-             subtree2 = *it2;
              assert (t.first < nodes.size());
              assert (t.second < nodes.size());
 
              assert (subtree1 != subtree2);
          }
 
-         //new node is always needed
-         Node nd;
-         _nodes.push_back(nd);
-         Node* new_nd = &_nodes.back();
+         // access next unused node
+        
+        Node * new_nd = &_nodes[_nleaves + _ninternals];
 
-         new_nd->_parent=0;
+        assert (new_nd->_parent==0);
+        assert (new_nd->_number == -1);
+        assert (new_nd->_right_sib == 0);
+        
          new_nd->_number=_nleaves+_ninternals;
          new_nd->_edge_length=0.0;
          _ninternals++;
-         new_nd->_right_sib=0;
         new_nd->_name = to_string(new_nd->_number);
 
          new_nd->_left_child=subtree1;
@@ -4666,14 +4688,16 @@ class Forest {
             throw x;
         }
 
-        _nodes.pop_front(); // remove node at beginning of list because it's an extra root
-        // remove parent from new last node
-        _nodes.front()._parent = NULL;
-
-        _nodes.sort(
-             [this](Node& lhs, Node& rhs) {
-    //                 return lhs._left_child->_height < rhs._left_child->_height; } ); // TODO: is this just lhs->_height and rhs->_height?
-                 return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
+        // TODO: fix for _nodes as vector
+        assert (1==2);
+//        _nodes.pop_front(); // remove node at beginning of list because it's an extra root
+//        // remove parent from new last node
+//        _nodes.front()._parent = NULL;
+//
+//        _nodes.sort(
+//             [this](Node& lhs, Node& rhs) {
+//    //                 return lhs._left_child->_height < rhs._left_child->_height; } ); // TODO: is this just lhs->_height and rhs->_height?
+//                 return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
 
         // reset node numbers and names that are not tips
         int j = 0;
@@ -4976,14 +5000,16 @@ class Forest {
             throw x;
         }
 
-        _nodes.pop_front(); // remove node at beginning of list because it's an extra root
-        // remove parent from new last node
-        _nodes.front()._parent = NULL;
-        
-        _nodes.sort(
-             [this](Node& lhs, Node& rhs) {
-    //                 return lhs._left_child->_height < rhs._left_child->_height; } );  // TODO: is this just lhs->_height and rhs->_height?
-                 return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
+        // TODO: fix for _nodes as vector
+        assert (1 == 2);
+//        _nodes.pop_front(); // remove node at beginning of list because it's an extra root
+//        // remove parent from new last node
+//        _nodes.front()._parent = NULL;
+//
+//        _nodes.sort(
+//             [this](Node& lhs, Node& rhs) {
+//    //                 return lhs._left_child->_height < rhs._left_child->_height; } );  // TODO: is this just lhs->_height and rhs->_height?
+//                 return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
         _lineages.clear();
         
         _lineages.push_back(&_nodes.back());
@@ -5335,11 +5361,13 @@ class Forest {
             unsigned ninternals = countNewickInternals(newick);
             unsigned max_internals = _nleaves-1;
             unsigned max_nodes = ninternals + _nleaves + 1;
-            if (ninternals != max_internals) {
-                _nodes.pop_front(); // if the tree is incomplete, delete both the root and subroot
-                _nodes.front()._parent = nullptr;
-                max_nodes--;
-            }
+            // TODO: fix for _nodes as vector
+            assert (1 == 2);
+//            if (ninternals != max_internals) {
+//                _nodes.pop_front(); // if the tree is incomplete, delete both the root and subroot
+//                _nodes.front()._parent = nullptr;
+//                max_nodes--;
+//            }
             
             _nodes.front()._name = "unused"; // break off root node since we are not using it
             
@@ -5351,18 +5379,20 @@ class Forest {
                     }
                 }
             }
-            _nodes.pop_front();
-            
-            unsigned nodes_to_delete = (unsigned)_nodes.size() - max_nodes;
-            for (unsigned i=0; i<nodes_to_delete; i++) {
-                _nodes.pop_back();
-            }
-            assert (_nodes.size() == max_nodes);
-            
-            // sort nodes by height
-            _nodes.sort(
-                 [this](Node& lhs, Node& rhs) {
-                     return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
+            // TODO: fix for _nodes as vector
+            assert ( 1 == 2);
+//            _nodes.pop_front();
+//
+//            unsigned nodes_to_delete = (unsigned)_nodes.size() - max_nodes;
+//            for (unsigned i=0; i<nodes_to_delete; i++) {
+//                _nodes.pop_back();
+//            }
+//            assert (_nodes.size() == max_nodes);
+//
+//            // sort nodes by height
+//            _nodes.sort(
+//                 [this](Node& lhs, Node& rhs) {
+//                     return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
                         
             // reset node numbers and names
             int j = 0;
@@ -5482,9 +5512,12 @@ class Forest {
                     Node* subtree1 = _lineages[0];
                     Node* subtree2 = _lineages[1];
                     
-                    Node nd;
-                    _nodes.push_back(nd);
-                    Node* new_nd = &_nodes.back();
+//                    Node nd;
+//                    _nodes.push_back(nd);
+//                    Node* new_nd = &_nodes.back();
+                    assert (1 == 2); // TODO: fix for _nodes as vector
+                    Node * new_nd = &_nodes[_nleaves + _ninternals];
+                    
                     new_nd->_parent=0;
                     new_nd->_number=_nleaves+_ninternals;
                     new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
@@ -5539,9 +5572,11 @@ class Forest {
                     Node* subtree1 = _lineages[0];
                     Node* subtree2 = _lineages[1];
                     
-                    Node nd;
-                    _nodes.push_back(nd);
-                    Node* new_nd = &_nodes.back();
+//                    Node nd;
+//                    _nodes.push_back(nd);
+//                    Node* new_nd = &_nodes.back();
+                    assert (1 == 2); // TODO: fix for _nodes as vector
+                    Node * new_nd = &_nodes[_nleaves + _ninternals];
                     new_nd->_parent=0;
                     new_nd->_number=_nleaves+_ninternals;
                     new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);

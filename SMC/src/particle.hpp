@@ -1424,7 +1424,7 @@ inline vector<double> Particle::getVectorPrior() {
                     //clear new node that was just created
                     nd->clear(); //new_nd
 
-                    _forests[0]._nodes.pop_back();
+//                    _forests[0]._nodes.pop_back();
 
                     amount_to_trim = _t[count - 2].second;
 
