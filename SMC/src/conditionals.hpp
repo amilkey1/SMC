@@ -35,3 +35,5 @@
 //#define OLD_UPGMA
 
 //#define UNUSED_FUNCTIONS
+
+# define SYSTEMATIC_FILTERING

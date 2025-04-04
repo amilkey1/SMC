@@ -164,6 +164,8 @@ class Forest {
 #endif
         void                            setGeneUPGMAMatrices();
     
+        static bool                            compareNodeHeights(const Node& a, const Node& b) ;
+    
         map<string, double>             _theta_map;
         std::vector<Node *>             _lineages;
 //        std::list<Node>                 _nodes;
@@ -457,7 +459,6 @@ class Forest {
         _relative_rate = 1.0;
         calcPartialArray(new_nd);
         
-//        showForest();
         calcLogLikelihood();
         
         // next step
@@ -2159,7 +2160,6 @@ class Forest {
         output(format("  Height after refreshAllHeightsAndPreorders = %g\n") % _forest_height);
         output("\n");
     #endif
-//        showForest();
         
         if (_lineages.size() == 1) {
             _lineages.back()->_partial = nullptr; // last step, only node with partials should be the new node, and partials are no longer needed if likelihood has been calculated
@@ -2703,7 +2703,6 @@ class Forest {
         _gene_tree_log_likelihood = calcLogLikelihood();
         _log_weight = _gene_tree_log_likelihood - prev_log_likelihood; // previous likelihood is the entire tree
             
-    //                showForest();
             
         if (G::_save_memory) {
             for (auto &nd:_nodes) {
@@ -4730,6 +4729,8 @@ class Forest {
     }
 
     inline void Forest::buildFromNewick(const std::string newick, bool rooted, bool allow_polytomies) {
+        list<Node> test_nodes;
+        _nodes.clear();
         
         set<unsigned> used; // used to ensure that no two leaf nodes have the same number
         unsigned curr_leaf = 0;
@@ -4746,25 +4747,28 @@ class Forest {
     //            throw XProj("Expecting newick tree description to have at least 4 leaves");
     //        }
         unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
-        _nodes.resize(max_nodes);
+        test_nodes.resize(max_nodes); // TODO: TEST
+        
     //        int b=0;
-        for (auto & nd : _nodes ) {
+        for (auto & nd : test_nodes ) {// TODO: TEST
             nd._name = "";
             nd._number = -1;
         }
 
         try {
             // Root node is the last node in _nodes
-            auto l_front = _nodes.begin();
+            auto l_front = test_nodes.begin(); // TODO: TEST
             std::advance(l_front, curr_node_index); // TODO: curr_node_index should be 0
             Node *nd = &*l_front;
+            
+//            Node *nd = &_nodes[curr_node_index];
 
             if (rooted) {
-                auto l_front = _nodes.begin();
+                auto l_front = test_nodes.begin(); // TODO: TEST
                 std::advance(l_front, ++curr_node_index);
                 nd = &*l_front;
 
-                auto parent = _nodes.begin();
+                auto parent = test_nodes.begin(); // TODO: TEST
                 std::advance(parent, curr_node_index - 1);
                 nd->_parent = &*parent;
                 nd->_parent->_left_child = nd;
@@ -4911,7 +4915,7 @@ class Forest {
                         if (curr_node_index == _nodes.size())
                             throw XProj(boost::str(boost::format("Too many nodes specified by tree description (%d nodes allocated for %d leaves)") % _nodes.size() % _nleaves));
 
-                        auto l_front = _nodes.begin();
+                        auto l_front = test_nodes.begin(); // TODO: TEST
                         std::advance(l_front, curr_node_index);
                         nd->_right_sib = &*l_front;
 
@@ -4933,7 +4937,7 @@ class Forest {
                         if (curr_node_index == _nodes.size())
                             throw XProj(boost::str(boost::format("malformed tree description (more than %d nodes specified)") % _nodes.size()));
 
-                        auto l_front = _nodes.begin();
+                        auto l_front = test_nodes.begin(); // TODO: TEST
                         std::advance(l_front, curr_node_index);
                         nd->_left_child = &*l_front;
 
@@ -4990,7 +4994,10 @@ class Forest {
                 throw XProj(boost::str(boost::format("Expecting single quote to mark the end of node name at position %d in tree description") % node_name_position));
 
             if (rooted) {
-                refreshPreorder();
+                for (auto &nd:test_nodes) {
+                    _nodes.push_back(nd);
+                }
+                refreshPreorder(); // TODO: clearing for now
             }
             renumberInternals();
         }
@@ -4998,17 +5005,21 @@ class Forest {
             clear();
             throw x;
         }
-
-        // TODO: fix for _nodes as vector
-        assert (1 == 2);
-//        _nodes.pop_front(); // remove node at beginning of list because it's an extra root
+        
+        test_nodes.pop_front(); // remove node at beginning of list because it's an extra root
 //        // remove parent from new last node
-//        _nodes.front()._parent = NULL;
+        test_nodes.front()._parent = NULL;
 //
-//        _nodes.sort(
-//             [this](Node& lhs, Node& rhs) {
-//    //                 return lhs._left_child->_height < rhs._left_child->_height; } );  // TODO: is this just lhs->_height and rhs->_height?
-//                 return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
+        test_nodes.sort(
+             [this](Node& lhs, Node& rhs) {
+                 return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
+        
+        _nodes.clear();
+        
+        _nodes.assign(test_nodes.begin(), test_nodes.end());
+        
+        refreshPreorder();
+        
         _lineages.clear();
         
         _lineages.push_back(&_nodes.back());
@@ -5019,6 +5030,7 @@ class Forest {
             nd._number = j;
             j++;
         }
+        
         
         if (_index == 0) { // rename internal nodes for species tree only
             for (auto &nd:_nodes) {
@@ -5033,6 +5045,27 @@ class Forest {
                 _nodes.back()._edge_length = 0.0;
             }
         }
+                
+        unsigned number = 0;
+        for (auto &nd:test_nodes) {
+            nd._number = number;
+            number++;
+        }
+        
+        // reset pointers so they point to new vector, not old list
+        for (auto &nd:_nodes) {
+            if (nd._left_child) {
+                nd._left_child = &_nodes[nd._left_child->_number];
+            }
+            if (nd._right_sib) {
+                nd._right_sib = &_nodes[nd._right_sib->_number];
+            }
+            if (nd._parent) {
+                nd._parent = &_nodes[nd._parent->_number];
+            }
+        }
+        
+//        test_nodes.clear();
     }
 
     inline void Forest::extractNodeNumberFromName(Node * nd, std::set<unsigned> & used) {
