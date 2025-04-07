@@ -1186,8 +1186,8 @@ namespace proj {
             }
             assert (particle_newicks.size() == G::_nloci);
             p.processGeneNewicks(particle_newicks);
-            p.resetSpecies();
-            p.mapSpecies(_taxon_map, _species_names);
+//            p.resetSpecies();
+//            p.mapSpecies(_taxon_map, _species_names);
             p.setNodeHeights();
             // TODO: can do this with the original template particle?
             count++;
@@ -1277,6 +1277,10 @@ namespace proj {
         
 #if defined (FASTER_SECOND_LEVEL)
         fasterSecondLevel(my_vec);
+        
+        if (G::_save_gene_trees) {
+            saveGeneTrees(my_vec);
+        }
 #else
 
         G::_nparticles = ngroups;
@@ -2846,8 +2850,11 @@ namespace proj {
             
                 // initialize particles
                 p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
-                p.resetSpecies();
-                p.mapSpecies(_taxon_map, _species_names);
+                
+                if (!G::_gene_newicks_specified) { // if starting from gene newicks, this is already built
+                    p.resetSpecies();
+                    p.mapSpecies(_taxon_map, _species_names);
+                }
             
                 second_level_particles.resize(G::_particle_increase, p);
                 
@@ -2869,7 +2876,7 @@ namespace proj {
 //                        p.showParticle();
                     }
                     
-//                    filterSpeciesParticles(s, second_level_particles);
+                    filterSpeciesParticles(s, second_level_particles);
                 
                 }
                 

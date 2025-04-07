@@ -1702,7 +1702,11 @@ class Forest {
             count++;
             assert (!nd._left_child);
             string species_name = taxon_map[nd._name];
-            _species_partition[species_name].push_back(&nd);
+            
+            if (!G::_gene_newicks_specified) {
+                _species_partition[species_name].push_back(&nd); // TODO: may need this for old second level even if starting from gene newicks?
+            }
+            
             if (count == G::_ntaxa) {
                 break;
             }
@@ -1719,7 +1723,9 @@ class Forest {
 #endif
         }
         
-        assert (_species_partition.size() == G::_nspecies);
+        if (!G::_gene_newicks_specified) {
+            assert (_species_partition.size() == G::_nspecies);
+        }
     }
     inline double Forest::calcTopologyPrior(unsigned nlineages) {
         _log_joining_prob += -log(0.5*nlineages*(nlineages-1));

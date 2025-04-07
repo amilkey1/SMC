@@ -1336,7 +1336,9 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::resetSpecies() {
-        _forests[0].clear();
+        if (!G::_gene_newicks_specified) {
+            _forests[0].clear();
+        } // otherwise, starting from complete gene trees and species tree is already set
         _generation = 0;
         setLogWeight(0.0);
         _log_coalescent_likelihood = 0.0;
