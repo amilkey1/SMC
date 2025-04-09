@@ -3410,6 +3410,15 @@ namespace proj {
                 G::_nspecies = (unsigned) _species_names.size();
                 G::_nloci = _data->getNumSubsets();
                 
+#if defined (REUSE_PARTIALS)
+                assert (G::_nloci > 0);
+                ps.setNLoci(G::_nloci);
+                for (unsigned locus = 1; locus < G::_nloci+1; locus++) {
+                    // Set length of partials for gene g
+                    ps.setNElements(G::_nstates*_data->getNumPatternsInSubset(locus-1), locus);
+                }
+#endif
+                
                 // set random number seed
                 rng.setSeed(_random_seed);
 

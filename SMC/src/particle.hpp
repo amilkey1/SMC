@@ -639,7 +639,6 @@ inline vector<double> Particle::getVectorPrior() {
             _log_weight = 0.0;
         }
         
-        string species_newick = _forests[0].makeNewick(8, true);
     }
 
 #if defined (FASTER_SECOND_LEVEL)

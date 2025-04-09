@@ -150,6 +150,10 @@ class Forest {
         Node *                          findNextPreorderNew(Node * nd) const;
         pair<double,double>             chooseSpeciesIncrementOnlySecondLevel(Lot::SharedPtr lot, double max_depth);
         void                            setTreeHeight();
+    
+#if defined (REUSE_PARTIALS)
+        void                            stowPartial(Node *nd);
+#endif
 
         
         vector<coalinfo_t>              _coalinfo;
@@ -411,14 +415,22 @@ class Forest {
                 nd->_name = name;
 
                 if (!G::_save_memory || (G::_save_memory && partials)) { // if save memory setting, don't set tip partials yet
+#if defined (REUSE_PARTIALS)
+                    nd->_partial=ps.getPartial(_npatterns*4, _index);
+#else
                     nd->_partial=ps.getPartial(_npatterns*4);
+#endif
                     for (unsigned p=0; p<_npatterns; p++) {
                         unsigned pp = _first_pattern+p;
                         for (unsigned s=0; s<G::_nstates; s++) {
                             Data::state_t state = (Data::state_t)1 << s;
                             Data::state_t d = data_matrix[nd->_number][pp];
                             double result = state & d;
+#if defined (REUSE_PARTIALS)
+                            (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
                             (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
                         }
                     }
                 }
@@ -882,28 +894,48 @@ class Forest {
             assert (G::_save_memory || G::_start_mode == "sim");
 //            assert (G::_save_memory || G::_start_mode_type == G::StartModeType::START_MODE_SIM);
             if (!new_nd->_left_child) {
+#if defined (REUSE_PARTIALS)
+                new_nd->_partial=ps.getPartial(_npatterns*4, _index);
+#else
                 new_nd->_partial=ps.getPartial(_npatterns*4);
+#endif
                 for (unsigned p=0; p<_npatterns; p++) {
                     unsigned pp = _first_pattern+p;
                     for (unsigned s=0; s<G::_nstates; s++) {
                         Data::state_t state = (Data::state_t)1 << s;
                         Data::state_t d = data_matrix[new_nd->_number][pp];
                         double result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (new_nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
                         (*new_nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
                     }
                 }
             }
         }
     
+#if defined (REUSE_PARTIALS)
+        auto & parent_partial_array = new_nd->_partial->_v;
+#else
         auto & parent_partial_array = *(new_nd->_partial);
+#endif
         for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
 
             if (child->_partial == nullptr) {
+#if defined (REUSE_PARTIALS)
+                child->_partial = ps.getPartial(_npatterns*4, _index);
+#else
                 child->_partial = ps.getPartial(_npatterns*4);
+#endif
                 calcPartialArrayJC(child);
             }
             assert (child->_partial != nullptr);
+#if defined (REUSE_PARTIALS)
+            auto & child_partial_array = child->_partial->_v;
+#else
             auto & child_partial_array = *(child->_partial);
+#endif
             
             // calculate both transition probabilities before loop, then choose 1 based on s == s_child
             double transition_prob_same = calcTransitionProbabilityJC(0, 0, child->_edge_length);
@@ -937,28 +969,48 @@ class Forest {
             assert (G::_save_memory || G::_start_mode == "sim");
 //            assert (G::_save_memory || G::_start_mode_type == G::StartModeType::START_MODE_SIM);
             if (!new_nd->_left_child) {
+#if defined (REUSE_PARTIALS)
+                new_nd->_partial=ps.getPartial(_npatterns*4, _index);
+#else
                 new_nd->_partial=ps.getPartial(_npatterns*4);
+#endif
                 for (unsigned p=0; p<_npatterns; p++) {
                     unsigned pp = _first_pattern+p;
                     for (unsigned s=0; s<G::_nstates; s++) {
                         Data::state_t state = (Data::state_t)1 << s;
                         Data::state_t d = data_matrix[new_nd->_number][pp];
                         double result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (new_nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
                         (*new_nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
                     }
                 }
             }
         }
 
+#if defined (REUSE_PARTIALS)
+        auto & parent_partial_array = new_nd->_partial->_v;
+#else
         auto & parent_partial_array = *(new_nd->_partial);
+#endif
         for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
 
             if (child->_partial == nullptr) {
+#if defined (REUSE_PARTIALS)
+                child->_partial = ps.getPartial(_npatterns*4, _index);
+#else
                 child->_partial = ps.getPartial(_npatterns*4);
+#endif
                 calcPartialArrayHKY(child);
             }
             assert (child->_partial != nullptr);
+#if defined (REUSE_PARTIALS)
+            auto & child_partial_array = child->_partial->_v;
+#else
             auto & child_partial_array = *(child->_partial);
+#endif
 
             for (unsigned p = 0; p < _npatterns; p++) {
                 for (unsigned s = 0; s <G::_nstates; s++) {
@@ -1104,7 +1156,11 @@ class Forest {
             for (unsigned p=0; p<_npatterns; p++) {
                 double site_like = 0.0;
                 for (unsigned s=0; s<G::_nstates; s++) {
+#if defined (REUSE_PARTIALS)
+                    double partial = (nd->_partial->_v)[p*G::_nstates+s];
+#else
                     double partial = (*nd->_partial)[p*G::_nstates+s];
+#endif
                     site_like += 0.25*partial;
                 }
                 assert(site_like>0);
@@ -2131,6 +2187,10 @@ class Forest {
             assert(child2);
             
             revertNodeVector(_lineages, child1, child2, parent);
+            
+#if defined (REUSE_PARTIALS)
+            stowPartial(parent);
+#endif
 
             //reset siblings and parents of original nodes back to 0
             child1->resetNode(); //subtree1
@@ -2149,6 +2209,7 @@ class Forest {
 //            _nodes.pop_back(); // remove unused node from node list
         
             _ninternals--;
+            
         }
         
         // Restore starting edge lengths
@@ -2171,6 +2232,24 @@ class Forest {
             _lineages.back()->_partial = nullptr; // last step, only node with partials should be the new node, and partials are no longer needed if likelihood has been calculated
         }
     }
+
+#if defined (REUSE_PARTIALS)
+    inline void Forest::stowPartial(Node * nd) {
+        if (nd && nd->_left_child && nd->_partial) {
+            // Nothing to do if nd or nd->_partial is null
+            // Only internal partials are ever reset/stowed;
+            // leaf partials are calculated at the beginning
+            // and never changed.
+            if (nd->_partial.use_count() == 1) {
+                // Partial is not being used by any other node, so it is
+                // safe to stow it in PartialStore for reuse later
+                ps.putPartial(_index, nd->_partial);
+            }
+        
+            nd->_partial.reset();
+        }
+    }
+#endif
 
     inline void Forest::constructUPGMA() {
         assert(_index >= 0);
@@ -2280,7 +2359,11 @@ class Forest {
             row_of_node[new_nd] = i;
 
             assert (new_nd->_partial == nullptr);
+#if defined (REUSE_PARTIALS)
+            new_nd->_partial=ps.getPartial(_npatterns*4, _index);
+#else
             new_nd->_partial=ps.getPartial(_npatterns*4);
+#endif
             assert(new_nd->_left_child->_right_sib);
             
             calcPartialArrayJC(new_nd); // use JC model for all UPGMA
@@ -2952,7 +3035,11 @@ class Forest {
 
          //always calculating partials now
          assert (new_nd->_partial == nullptr);
+#if defined (REUSE_PARTIALS)
+        new_nd->_partial=ps.getPartial(_npatterns*4, _index);
+#else
          new_nd->_partial=ps.getPartial(_npatterns*4);
+#endif
          assert(new_nd->_left_child->_right_sib);
         if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
             calcPartialArrayJC(new_nd);
@@ -2993,7 +3080,11 @@ class Forest {
              if (G::_save_memory) {
                  for (auto &nd:_lineages) {
                      if (nd->_partial == nullptr) {
+#if defined (REUSE_PARTIALS)
+                         nd->_partial = ps.getPartial(_npatterns*4, _index);
+#else
                          nd->_partial = ps.getPartial(_npatterns*4);
+#endif
                          if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
                              calcPartialArrayJC(nd);
                          }
@@ -3048,13 +3139,21 @@ class Forest {
          if (!G::_run_on_empty) {
              //always calculating partials now
              assert (new_nd->_partial == nullptr);
+#if defined (REUSE_PARTIALS)
+             new_nd->_partial=ps.getPartial(_npatterns*4, _index);
+#else
              new_nd->_partial=ps.getPartial(_npatterns*4);
+#endif
              assert(new_nd->_left_child->_right_sib);
 
              if (G::_save_memory) {
                  for (auto &nd:_lineages) {
                      if (nd->_partial == nullptr) {
+#if defined (REUSE_PARTIALS)
+                         nd->_partial = ps.getPartial(_npatterns*4, _index);
+#else
                          nd->_partial = ps.getPartial(_npatterns*4);
+#endif
                          if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
                              calcPartialArrayJC(nd);
                          }
