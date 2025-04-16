@@ -1905,6 +1905,87 @@ namespace proj {
             ess = computeEffectiveSampleSize(probs);
         }
         
+#if defined(SYSTEMATIC_FILTERING)
+        vector<unsigned> zeros;
+        zeros.reserve(G::_particle_increase);
+        vector<unsigned> nonzeros;
+        nonzeros.reserve(G::_particle_increase);
+        
+        // Zero vector of counts storing number of darts hitting each particle
+        vector<unsigned> counts (G::_particle_increase, 0);
+        
+        double cump = probs[0];
+        
+        unsigned group_number = particles[0].getGroupNumber();
+        double delta = _group_rng[group_number]->uniform() / G::_particle_increase;
+            
+        unsigned c = (unsigned)(floor(1.0 + G::_particle_increase*(cump - delta)));
+        if (c > 0) {
+            nonzeros.push_back(0);
+        }
+        else {
+            zeros.push_back(0);
+        }
+        counts[0] = c;
+        unsigned prev_cum_count = c;
+        for (unsigned i = 1; i < G::_particle_increase; ++i) {
+            cump += probs[i];
+            double cum_count = floor(1.0 + G::_particle_increase*(cump - delta));
+            if (cum_count > G::_particle_increase) {
+                cum_count = G::_particle_increase;
+            }
+            unsigned c = (unsigned)cum_count - prev_cum_count;
+            if (c > 0) {
+                nonzeros.push_back(i);
+            }
+            else {
+                zeros.push_back(i);
+            }
+            counts[i] = c;
+            prev_cum_count = cum_count;
+        }
+        
+        
+        // Example of following code that replaces dead
+        // particles with copies of surviving particles:
+        //             0  1  2  3  4  5  6  7  8  9
+        // _counts  = {0, 2, 0, 0, 0, 8, 0, 0, 0, 0}  size = 10
+        // zeros    = {0, 2, 3, 4, 6, 7, 8, 9}        size =  8
+        // nonzeros = {1, 5}                          size =  2
+        //
+        //  next_zero   next_nonzero   k   copy action taken
+        //  --------------------------------------------------------------
+        //      0             0        0   _particles[1] --> _particles[0]
+        //  --------------------------------------------------------------
+        //      1             1        0   _particles[5] --> _particles[2]
+        //      2             1        1   _particles[5] --> _particles[3]
+        //      3             1        2   _particles[5] --> _particles[4]
+        //      4             1        3   _particles[5] --> _particles[6]
+        //      5             1        4   _particles[5] --> _particles[7]
+        //      6             1        5   _particles[5] --> _particles[8]
+        //      7             1        6   _particles[5] --> _particles[9]
+        //  --------------------------------------------------------------
+        unsigned next_zero = 0;
+        unsigned next_nonzero = 0;
+        while (next_nonzero < nonzeros.size()) {
+            double index_survivor = nonzeros[next_nonzero];
+            unsigned ncopies = counts[index_survivor] - 1;
+            for (unsigned k = 0; k < ncopies; k++) {
+                double index_nonsurvivor = zeros[next_zero++];
+                
+                // Replace non-survivor with copy of survivor
+//                unsigned survivor_index_in_particles = particle_indices[index_survivor+start];
+//                unsigned non_survivor_index_in_particles = particle_indices[index_nonsurvivor+start];
+                
+                particles[index_survivor] = particles[index_nonsurvivor];
+            }
+            
+            ++next_nonzero;
+        }
+        
+        return ess;
+#else
+        
         // Compute cumulative probabilities
         partial_sum(probs.begin(), probs.end(), probs.begin());
 
@@ -1980,6 +2061,7 @@ namespace proj {
         }
         
         return ess;
+#endif
     }
 
     inline string Proj::inventName(unsigned k, bool lower_case) {

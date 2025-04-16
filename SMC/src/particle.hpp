@@ -539,7 +539,6 @@ inline vector<double> Particle::getVectorPrior() {
                 
                 unsigned index = selectEventLinearScale(event_choice_rates);
                 string species_name = rates_by_species[index].second;
-//                _forests[next_gene].showForest();
                 _forests[next_gene].allowCoalescence(species_name, gene_increment, _lot);
                 
 #if defined (OLD_UPGMA)
@@ -1922,8 +1921,6 @@ inline vector<double> Particle::getVectorPrior() {
         
     #if defined(DEBUG_COALLIKE)
         if (!coalinfo_vect.empty()) {
-//            output("\nContents of coalinfo_vect:\n", 0);
-//            output(format("%12s %6s %s\n") % "height" % "locus" % "species", 0);
             for (auto & cinfo : coalinfo_vect) {
                 double      height = get<0>(cinfo);
                 unsigned     locus = get<1>(cinfo);
@@ -1932,7 +1929,6 @@ inline vector<double> Particle::getVectorPrior() {
                 for (auto x : sppvect) {
                     s.push_back(to_string(x));
                 }
-//                output(format("%12.9f %6d %s\n") % height % locus % boost::algorithm::join(s, ","), 0);
             }
         }
     #endif
@@ -1990,21 +1986,6 @@ inline vector<double> Particle::getVectorPrior() {
         // Vector bavail stores branches that are in the species tree at the current height
         set<G::species_t, bitless> bavail(branches.begin(), branches.end());
         
-//        if (G::_verbose > 1) {
-//            output("\nParticle::calcLogCoalescentLikelihood:\n", 1);
-//            output("Key:\n", 1);
-//            output("  height:   height above leaf-level of this coalescence or speciation event\n", 1);
-//            output("  locus:    0 if speciation event, locus index for coalescence events\n", 1);
-//            output("  spp:      species of the two lineages involved in a coalescence/speciation event\n", 1);
-//            output("  b:        the species tree branch (i.e. species) to which this event contributes\n", 1);
-//            output("  n_jbk:    the number of coalescences for branch b\n", 1);
-//            output("  c_jbk:    the sojourn time prior to coalescence k\n", 1);
-//            output("  log(r_b): the log of 4/pj, where pj is the ploidy of locus j\n", 1);
-//            output("  gamma_b:  cumulative 2*n*(n-1)*c_jbk/pj over all loci for branch b\n", 1);
-//            output("  q_b:      the cumulative number of coalescences over all loci for branch b\n", 1);
-//            output(format("%12s %12s %25s %12s %12s %12s %12s %12s\n") % "height" % "locus" % "spp" % "b" % "n_jbk" % "c_jbk" % "gamma_b" % "q_b", 1);
-//        }
-
         // Walk down coalinfo_vect, accumulating Graham Jones r_b, q_b, and gamma_b
         for (auto & cinfo : coalinfo_vect) {
             double               height = get<0>(cinfo);
@@ -2059,10 +2040,6 @@ inline vector<double> Particle::getVectorPrior() {
                     bavail.erase(b);
                 }
                 bavail.insert(banc);
-
-//                if (G::_verbose > 1) {
-//                    output(format("%12.9f %12d %25s %12s %12s %12s %12s %12s\n") % height % 0 % spp_joined % banc % "-" % "-" % "-" % "-", 1);
-//                }
             }
             else {
                 // Coalescent event
@@ -2087,16 +2064,8 @@ inline vector<double> Particle::getVectorPrior() {
 
                 prev_height[locus][b] = height;
                 n_jb[locus][b]--;
-
-//                if (G::_verbose > 1) {
-//                    output(format("%12.9f %12d %25s %12d %12d %12.9f %12.9f %12d\n") % height % locus_plus_one % spp_joined % b % n_jbk % c_jbk % gamma_b[b] % q_b[b], 1);
-//                }
             }
         }
-
-//        if (G::_verbose > 1) {
-//            output(format("\n%12s %12s %12s %12s %12s %12s\n") % "b" % "q_b" % "log(r_b)" % "gamma_b" % "theta_b" % "logL", 1);
-//        }
 
         double log_likelihood = 0.0;
         
@@ -2111,17 +2080,7 @@ inline vector<double> Particle::getVectorPrior() {
                 log_likelihood += log_r_b[b];
                 log_likelihood -= (alpha + q_b[b])*log(beta + gamma_b[b]);
                 log_likelihood += boost::math::lgamma(alpha + q_b[b]);
-                
-//                if (G::_verbose > 1) {
-//                    output(format("%12d %12d %12.9f %12.9f %12.9f %12.9f\n") % b % q_b[b] % log_r_b[b] % gamma_b[b] % beta % log_likelihood, 1);
-//                }
             }
-
-//            if (G::_verbose > 1) {
-//                output(format("\nalpha = %.9f\n") % alpha, 1);
-//                output(format("beta  = %.9f\n") % beta, 1);
-//                output(format("log(coalescent likelihood) = %.5f\n") % log_likelihood, 1);
-//            }
         }
         else {
             double theta_b = G::_theta;
@@ -2134,18 +2093,7 @@ inline vector<double> Particle::getVectorPrior() {
                 sum_log_rb += log_r_b[b];
                 sum_gamma_b += gamma_b[b];
                 log_likelihood += log_r_b[b] - gamma_b[b]/theta_b - q_b[b]*log(theta_b);
-                
-//                if (G::_verbose > 1) {
-//                    output(format("%12d %12d %12.9f %12.9f %12.9f %12.9f\n") % b % q_b[b] % log_r_b[b] % gamma_b[b] % theta_b % log_likelihood, 1);
-//                }
             }
-            
-//            if (G::_verbose > 1) {
-//                output(format("\nsum log(r_b) = %.9f\n") % sum_log_rb, 1);
-//                output(format("sum q_b      = %d\n") % sum_qb, 1);
-//                output(format("sum gamma_b  = %d\n") % sum_gamma_b, 1);
-//                output(format("log(coalescent likelihood) = %.5f\n") % log_likelihood, 1);
-//            }
         }
 
         _log_coal_like = log_likelihood;

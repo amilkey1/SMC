@@ -892,7 +892,6 @@ class Forest {
         if (!new_nd->_left_child) {
             auto &data_matrix=_data->getDataMatrix();
             assert (G::_save_memory || G::_start_mode == "sim");
-//            assert (G::_save_memory || G::_start_mode_type == G::StartModeType::START_MODE_SIM);
             if (!new_nd->_left_child) {
 #if defined (REUSE_PARTIALS)
                 new_nd->_partial=ps.getPartial(_npatterns*4, _index);
@@ -941,6 +940,150 @@ class Forest {
             double transition_prob_same = calcTransitionProbabilityJC(0, 0, child->_edge_length);
             double transition_prob_dif = calcTransitionProbabilityJC(0, 1, child->_edge_length);
 
+#if defined (UNROLL_LOOPS) // TODO: this only holds for G::_nstates = 4
+            for (unsigned p = 0; p < _npatterns; p++) {
+                // loop 1
+                unsigned s = 0;
+                double sum_over_child_states = 0.0;
+                
+                // subloop 1
+                unsigned s_child = 0;
+                double child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                double child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                // subloop 2
+                s_child = 1;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                // subloop 3
+                s_child = 2;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                // subloop 4
+                s_child = 3;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                if (child == new_nd->_left_child) {
+                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
+                }
+                else {
+                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
+                }
+            
+                // loop 2
+                s = 1;
+                sum_over_child_states = 0.0;
+                
+                // subloop 1
+                s_child = 0;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                // subloop 2
+                s_child = 1;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                // subloop 3
+                s_child = 2;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                // subloop 4
+                s_child = 3;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                if (child == new_nd->_left_child) {
+                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
+                }
+                else {
+                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
+                }
+            
+                // loop 3
+                s = 2;
+                sum_over_child_states = 0.0;
+                
+                // subloop 1
+                s_child = 0;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                // subloop 2
+                s_child = 1;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                // subloop 3
+                s_child = 2;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                // subloop 4
+                s_child = 3;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                if (child == new_nd->_left_child) {
+                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
+                }
+                else {
+                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
+                }
+            
+                // loop 4
+                s = 3;
+                sum_over_child_states = 0.0;
+                
+                // subloop 1
+                s_child = 0;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                // subloop 2
+                s_child = 1;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                // subloop 3
+                s_child = 2;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                // subloop 4
+                s_child = 3;
+                child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
+                child_partial = child_partial_array[p*G::_nstates + s_child];
+                sum_over_child_states += child_transition_prob * child_partial;
+                
+                if (child == new_nd->_left_child) {
+                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
+                }
+                else {
+                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
+                }
+            }
+        } // child loop
+#else
             for (unsigned p = 0; p < _npatterns; p++) {
                 for (unsigned s = 0; s <G::_nstates; s++) {
                     double sum_over_child_states = 0.0;
@@ -956,6 +1099,7 @@ class Forest {
                 }   // parent state loop
             }   // pattern loop
         }   // child loop
+#endif
     }
 
 
@@ -2726,10 +2870,7 @@ class Forest {
             assert (new_nd->_partial == nullptr);
             new_nd->_partial=ps.getPartial(_npatterns*4);
             assert(new_nd->_left_child->_right_sib);
-    //        sw.start();
             calcPartialArrayJC(new_nd); // TODO: for now, always complete UPGMA with JC
-    //        double test = sw.stop();
-    //        G::_test += test;
                         
             // Update distance matrix
             for (unsigned k = 0; k < n; k++) {

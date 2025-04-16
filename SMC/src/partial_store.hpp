@@ -129,8 +129,10 @@ namespace proj {
         }
         else {
             size_t n = _storage[locus-1].size();
-            partial = _storage[locus-1].at(n-1);
-            _storage[locus-1].pop_back();
+            cout << "n: " << n << endl;
+            partial = _storage[locus-1].at(n-1); // TODO: is this a problem with multiple threads because they may both be modifying storage at the same time?
+            _storage[locus-1].pop_back();             // TODO: need to lock this, but then you may not get any speedup from threading? is there a separate partial store for each particle?
+            // TODO: maybe this is because of how they are initialized - all pointer stores pointing to same thing?
             _total_partials_reused++;
             _total_elements_reused += _nelements[locus-1];
         }
