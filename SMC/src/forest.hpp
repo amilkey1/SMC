@@ -422,6 +422,147 @@ class Forest {
 #endif
                     for (unsigned p=0; p<_npatterns; p++) {
                         unsigned pp = _first_pattern+p;
+#if defined (UNROLL_LOOPS)
+                        // loop 1
+                        unsigned s = 0;
+                        Data::state_t state = (Data::state_t)1 << s;
+                        Data::state_t d = data_matrix[nd->_number][pp];
+                        double result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
+                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
+                        
+                        // loop 2
+                        s = 1;
+                        state = (Data::state_t)1 << s;
+                        d = data_matrix[nd->_number][pp];
+                        result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
+                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
+                        
+                        // loop 3
+                        s = 2;
+                        state = (Data::state_t)1 << s;
+                        d = data_matrix[nd->_number][pp];
+                        result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
+                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
+                        
+                        // loop 4
+                        s = 3;
+                        state = (Data::state_t)1 << s;
+                        d = data_matrix[nd->_number][pp];
+                        result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
+                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
+                        
+#else
+                        
+#if defined (UNROLL_LOOPS)
+                        // loop 1
+                        unsigned s = 0;
+                        Data::state_t state = (Data::state_t)1 << s;
+                        Data::state_t d = data_matrix[nd->_number][pp];
+                        double result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
+                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
+                        
+                        // loop 2
+                        s = 1;
+                        state = (Data::state_t)1 << s;
+                        d = data_matrix[nd->_number][pp];
+                        result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
+                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
+                        
+                        // loop 3
+                        s = 2;
+                        state = (Data::state_t)1 << s;
+                        d = data_matrix[nd->_number][pp];
+                        result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
+                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
+                        
+                        // loop 4
+                        s = 3;
+                        state = (Data::state_t)1 << s;
+                        d = data_matrix[nd->_number][pp];
+                        result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
+                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
+#else
+#if defined (UNROLL_LOOPS)
+                        assert (1 == 2);
+                        // loop 1
+                        
+                        unsigned s = 0;
+                        Data::state_t state = (Data::state_t)1 << s;
+                        Data::state_t d = data_matrix[nd->_number][pp];
+                        double result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
+                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
+                        
+                        // loop 2
+                        s = 1;
+                        state = (Data::state_t)1 << s;
+                        d = data_matrix[nd->_number][pp];
+                        result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
+                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
+                        
+                        // loop 3
+                        s = 2;
+                        state = (Data::state_t)1 << s;
+                        d = data_matrix[nd->_number][pp];
+                        result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
+                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
+                        
+                        // loop 4
+                        s = 3;
+                        state = (Data::state_t)1 << s;
+                        d = data_matrix[nd->_number][pp];
+                        result = state & d;
+#if defined (REUSE_PARTIALS)
+                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#else
+                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+#endif
+                        
+
+#else
                         for (unsigned s=0; s<G::_nstates; s++) {
                             Data::state_t state = (Data::state_t)1 << s;
                             Data::state_t d = data_matrix[nd->_number][pp];
@@ -432,6 +573,9 @@ class Forest {
                             (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
                         }
+#endif
+#endif
+#endif
                     }
                 }
             }
@@ -574,14 +718,9 @@ class Forest {
         new_nd4->_partial=ps.getPartial(_npatterns*4);
         assert(new_nd4->_left_child->_right_sib);
         
-        
-//        showForest();
-        
         calcPartialArray(new_nd4);
         
         calcLogLikelihood();
-        
-//        showForest();
 #endif
         
     }
@@ -940,7 +1079,7 @@ class Forest {
             double transition_prob_same = calcTransitionProbabilityJC(0, 0, child->_edge_length);
             double transition_prob_dif = calcTransitionProbabilityJC(0, 1, child->_edge_length);
 
-#if defined (UNROLL_LOOPS) // TODO: this only holds for G::_nstates = 4
+#if defined (UNROLL_LOOPS)
             for (unsigned p = 0; p < _npatterns; p++) {
                 // loop 1
                 unsigned s = 0;
@@ -1120,6 +1259,7 @@ class Forest {
 #endif
                 for (unsigned p=0; p<_npatterns; p++) {
                     unsigned pp = _first_pattern+p;
+                    // TODO: unroll this loop
                     for (unsigned s=0; s<G::_nstates; s++) {
                         Data::state_t state = (Data::state_t)1 << s;
                         Data::state_t d = data_matrix[new_nd->_number][pp];
@@ -1157,6 +1297,7 @@ class Forest {
 #endif
 
             for (unsigned p = 0; p < _npatterns; p++) {
+                // TODO: unroll this loop
                 for (unsigned s = 0; s <G::_nstates; s++) {
                     double sum_over_child_states = 0.0;
                     for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
@@ -2256,6 +2397,7 @@ class Forest {
                     // Fill same_state and diff_state vectors
                     same_state.assign(npatterns, 0.0);
                     diff_state.assign(npatterns, 0.0);
+                    
                     for (unsigned p = 0; p < npatterns; p++) {
                         for (unsigned lstate = 0; lstate < G::_nstates; lstate++) {
                             auto & l_partial_array = *(lnode->_partial);
