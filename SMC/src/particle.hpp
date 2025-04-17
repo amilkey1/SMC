@@ -48,7 +48,7 @@ class Particle {
                                                         index++;
                                                     }
                                                 }
-        void                                    mapSpecies(map<string, string> &taxon_map, vector<string> &species_names);
+        void                                    mapSpecies(map<string, string> &taxon_map);
         void                                    saveForest(std::string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
@@ -130,7 +130,9 @@ class Particle {
         double                                          getSpeciesTreePrior();
         double                                          getAllPriors();
         double                                          getAllPriorsFirstRound();
+#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         vector<double>                                  getVectorPrior();
+#endif
         void                                            simulateData(vector<unsigned> sites_vector);
         unsigned                                        getNumDeepCoalescences() {return _num_deep_coalescences;}
         unsigned                                        getMaxDeepCoalescences(){return _max_deep_coal;}
@@ -441,10 +443,12 @@ class Particle {
         return total_prior;
     }
 
+#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
 inline vector<double> Particle::getVectorPrior() {
 // this is the InverseGamma(2, psi) prior on the population sizes
     return _forests[1]._vector_prior;
 }
+#endif
 
     inline double Particle::getLogLikelihood() {
         //retrieve likelihood for each gene tree
@@ -848,7 +852,9 @@ inline vector<double> Particle::getVectorPrior() {
 #else
         
         if (_generation == 0) {
+#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
             _forests[1]._vector_prior.clear();
+#endif
             for (int i=1; i<_forests.size(); i++) {
                 _forests[i].refreshPreorder();
                 _forests[i].calcMinDepth();
@@ -1200,9 +1206,9 @@ inline vector<double> Particle::getVectorPrior() {
         return sum_height;
     }
 
-    inline void Particle::mapSpecies(map<string, string> &taxon_map, vector<string> &species_names) {
+    inline void Particle::mapSpecies(map<string, string> &taxon_map) {
         //species tree
-        _forests[0].setUpSpeciesForest(species_names);
+        _forests[0].setUpSpeciesForest();
 
         if (_forests[1]._lineages.size() > 0) { // don't redo this for faster second level when nodes have been cleared from gene trees
             //gene trees
@@ -1369,7 +1375,6 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline void Particle::trimSpeciesTree() {
         map<string, double> theta_map = _forests[1]._theta_map;
-        vector<string> species_names = _forests[1]._species_names;
 
         unsigned spp_count = G::_nspecies*2 - 1;
 
@@ -1387,7 +1392,6 @@ inline vector<double> Particle::getVectorPrior() {
 
         if (trim) {
             double max_gene_tree_height = *max_element(gene_tree_heights.begin(), gene_tree_heights.end());
-//            cout << "max gene tree height is " << max_gene_tree_height << endl;
 
             bool done = false;
             unsigned count = (unsigned) _t.size();
@@ -1399,7 +1403,6 @@ inline vector<double> Particle::getVectorPrior() {
 
                 Node* nd = _forests[0]._lineages.back();
                 if (_forests[0]._lineages.size() < G::_nspecies) {
-//                    cout << "starting next round" << endl;
                     Node* subtree1 = nd->_left_child;
                     Node* subtree2 = nd->_left_child->_right_sib;
 
@@ -1413,18 +1416,7 @@ inline vector<double> Particle::getVectorPrior() {
                     //clear new node that was just created
                     nd->clear(); //new_nd
 
-//                    _forests[0]._nodes.pop_back();
-
                     amount_to_trim = _t[count - 2].second;
-
-//                    cout << "amount to trim = " << amount_to_trim << endl;
-//                    assert (amount_to_trim > 0.0);
-
-//                    cout << _t[0].second << endl;
-//                    cout << _t[1].second << endl;
-//                    cout << _t[2].second << endl;
-//                    cout << _t[3].second << endl;
-//                    cout << _t[4].second << endl;
 
                     _t.pop_back();
                     
@@ -1432,33 +1424,15 @@ inline vector<double> Particle::getVectorPrior() {
                         g.pop_back();
                     }
 
-//                    for (auto &g:_t_by_gene) {
-//                        for (auto &s:g) {
-//                            cout << s.second << endl;
-//                        }
-//                    }
-
                     _forests[0]._ninternals--;
 
 #if defined (DRAW_NEW_THETA)
-                    theta_map[species_names[spp_count-1]] = -1.0;
+                    theta_map[G::_species_names[spp_count-1]] = -1.0;
 #endif
 
-//                    cout << "test3" << endl;
-
                     spp_count--;
-//                    cout << "amount to trim = " << amount_to_trim << endl;
-
                 }
-
-//                cout << "amount to trim = " << amount_to_trim << endl;
-
                 assert (amount_to_trim > 0.0);
-//                cout << "species tree height is " << species_tree_height << endl;
-//                cout << "max gene tree height is " << max_gene_tree_height << endl;
-//                cout << "amount to trim is" << amount_to_trim << endl;
-
-//                cout << "species tree height - amount to trim = " << species_tree_height - amount_to_trim << endl;
 
                 if (species_tree_height - amount_to_trim > max_gene_tree_height) {
                     for (auto &nd:_forests[0]._lineages) {
@@ -1468,7 +1442,6 @@ inline vector<double> Particle::getVectorPrior() {
                 }
                 else {
                     amount_to_trim = species_tree_height - max_gene_tree_height;
-//                    cout << "amount to trim = " << amount_to_trim << endl;
                     assert (amount_to_trim > 0.0);
                     for (auto &nd:_forests[0]._lineages) {
                         nd->_edge_length -= amount_to_trim;
@@ -2122,7 +2095,9 @@ inline vector<double> Particle::getVectorPrior() {
             _forests[i]._nodes.clear();
             _forests[i]._lineages.clear();
             _forests[i]._preorder.clear();
+#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
             _forests[i]._vector_prior.clear();
+#endif
         }
     }
 #endif

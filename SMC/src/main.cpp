@@ -105,7 +105,7 @@ double Forest::_edge_rate_variance = 0.0;
 double Forest::_asrv_shape = numeric_limits<double>::infinity();
 double Forest::_comphet = numeric_limits<double>::infinity();
 
-//vector<string> G::_species_names;
+vector<string> G::_species_names;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT

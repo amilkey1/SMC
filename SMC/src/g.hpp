@@ -82,6 +82,8 @@ namespace proj {
         static ModelType _model_type;
         static StartModeType _start_mode_type;
         
+        static vector<string>       _species_names;
+        
         // functions
         string inventName(unsigned k, bool lower_case);
         

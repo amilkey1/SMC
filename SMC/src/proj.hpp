@@ -89,6 +89,10 @@ namespace proj {
             void                saveSpeciesTreesAltHierarchical(vector<Particle> &v) const;
             bool                isUnambiguous(Data::state_t s0) const;
             void                calcPairwiseDistanceMatrix();
+        
+#if defined (DRAW_NEW_THETA)
+            void                updateSpeciesNames();
+#endif
 
 
         private:
@@ -100,7 +104,6 @@ namespace proj {
             unsigned                    _random_seed;
             void                        summarizeData(Data::SharedPtr);
             double                      getRunningSum(const vector<double> &) const;
-            vector<string>              _species_names;
             map<string, string>         _taxon_map;
             void                        handleBaseFrequencies();
             void                        handleRelativeRates();
@@ -219,10 +222,14 @@ namespace proj {
 
                 double vector_prior = 0.0;
     #if defined DRAW_NEW_THETA
+#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
                 vector<double> vector_priors = p.getVectorPrior();
                 for (auto &v:vector_priors) {
                     vector_prior += v; // this is the InverseGamma(2, psi) prior on the 5 population sizes -- only for first round
                 }
+#else
+            vector_prior = 0;
+#endif
     #endif
 
                 double log_coalescent_likelihood = 0.0;
@@ -1095,11 +1102,6 @@ namespace proj {
             }
         
         return newick_string;
-            
-//            for (auto &p:particles) {
-//                p.processSpeciesNewick(newick_string);
-//                p.mapSpecies(_taxon_map, _species_names);
-//            }
     }
 
     inline void Proj::handleGeneNewicks() {
@@ -1151,7 +1153,8 @@ namespace proj {
 
         //set number of species to number in data file
         G::_ntaxa = _data->getNumTaxa();
-        G::_nspecies = (unsigned) _species_names.size();
+        assert (G::_species_names.size() > 0);
+        G::_nspecies = (unsigned) G::_species_names.size();
         G::_nloci = _data->getNumSubsets();
         rng.setSeed(_random_seed);
         
@@ -2108,7 +2111,7 @@ namespace proj {
                 _taxon_map.insert({taxon_name, species_name});
                 count++;
             }
-            _species_names.push_back(species_name);
+            G::_species_names.push_back(species_name);
         }
     }
 
@@ -2123,8 +2126,8 @@ namespace proj {
             if (matched) {
                 string species_name = match_obj[1];
                 string taxon_name = name;
-                if (find(_species_names.begin(), _species_names.end(), species_name) == _species_names.end()) {
-                    _species_names.push_back(species_name);
+                if (find(G::_species_names.begin(), G::_species_names.end(), species_name) == G::_species_names.end()) {
+                    G::_species_names.push_back(species_name);
                 }
                 _taxon_map[taxon_name]=species_name;
             }
@@ -2164,7 +2167,7 @@ namespace proj {
             // initialize particles
             p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
             p.resetSpecies();
-            p.mapSpecies(_taxon_map, _species_names);
+            p.mapSpecies(_taxon_map);
 
             second_level_particles.resize(G::_particle_increase, p);
 
@@ -2451,7 +2454,7 @@ namespace proj {
         for (unsigned i=first; i<last; i++){
             particles[i].setData(_data, _taxon_map, partials);
             partials = false;
-            particles[i].mapSpecies(_taxon_map, _species_names);
+            particles[i].mapSpecies(_taxon_map);
             particles[i].setRelativeRatesByGene(G::_double_relative_rates);
         }
     }
@@ -2467,7 +2470,7 @@ namespace proj {
         }
         
         particle.setData(_data, _taxon_map, partials);
-        particle.mapSpecies(_taxon_map, _species_names);
+        particle.mapSpecies(_taxon_map);
         
         particle.setRelativeRatesByGene(G::_double_relative_rates);
         
@@ -2537,7 +2540,7 @@ namespace proj {
             for (auto & p:particles ) { // TODO: can initialize some of these things in parallel - probably not worth it
                 p.setData(_data, _taxon_map, partials);
                 partials = false;
-                p.mapSpecies(_taxon_map, _species_names);
+                p.mapSpecies(_taxon_map);
                 
                 p.setRelativeRatesByGene(G::_double_relative_rates);
                 
@@ -2549,7 +2552,7 @@ namespace proj {
             // for simplicity, do first particle separately under every setting
             bool partials = true;
             particles[0].setData(_data, _taxon_map, partials);
-            particles[0].mapSpecies(_taxon_map, _species_names);
+            particles[0].mapSpecies(_taxon_map);
             particles[0].setRelativeRatesByGene(G::_double_relative_rates);
 
             if (particles.size() > 1) {
@@ -2774,6 +2777,7 @@ namespace proj {
 
         // make up the species map
         simSpeciesMap();
+        updateSpeciesNames();
 
         vector<string> taxpartition;
         for (auto &t:_taxon_map) {
@@ -2815,7 +2819,7 @@ namespace proj {
 
         sim_vec[0].setSimData(_data, _taxon_map, (unsigned) _taxon_map.size());
 
-        sim_vec[0].mapSpecies(_taxon_map, _species_names);
+        sim_vec[0].mapSpecies(_taxon_map);
 
         sim_vec[0].setNextSpeciesNumber(); // need to reset this now that number of species is known
         
@@ -2935,7 +2939,7 @@ namespace proj {
                 
                 if (!G::_gene_newicks_specified) { // if starting from gene newicks, this is already built
                     p.resetSpecies();
-                    p.mapSpecies(_taxon_map, _species_names);
+                    p.mapSpecies(_taxon_map);
                 }
             
                 second_level_particles.resize(G::_particle_increase, p);
@@ -3092,7 +3096,7 @@ namespace proj {
         if (taxa_from_data) {
             // Assume taxon names are already stored in _data object and no
             // species names have yet been stored
-            _species_names.clear();
+            G::_species_names.clear();
             assert(G::_taxon_names.size() > 0);
             for (auto & tname : G::_taxon_names) {
                 string species_name = Node::taxonNameToSpeciesName(tname);
@@ -3101,7 +3105,7 @@ namespace proj {
                 if (species_name_to_index.find(species_name) == species_name_to_index.end()) {
                     // species_name not found
                     species_index = nspecies;
-                    _species_names.push_back(species_name);
+                    G::_species_names.push_back(species_name);
                     species_name_to_index[species_name] = nspecies++;
                 } else {
                     // species_name found
@@ -3116,7 +3120,7 @@ namespace proj {
             
             // First build species_name_to_index from G::_species_names
             unsigned s = 0;
-            for (auto & species_name : _species_names) {
+            for (auto & species_name : G::_species_names) {
                 species_name_to_index[species_name] = s++;
             }
             
@@ -3138,7 +3142,7 @@ namespace proj {
         }
         
 //        output("\nMapping species names to species index:\n", 2);
-        for (auto & sname : _species_names) {
+        for (auto & sname : G::_species_names) {
             unsigned species_index = 0;
             if (species_name_to_index.count(sname) == 0)
                 throw XProj(format("Proj::buildSpeciesMap failed because key \"%s\" does not exist in species_name_to_index map") % sname);
@@ -3404,6 +3408,17 @@ namespace proj {
         return is_unambiguous;
     }
 
+#if defined (DRAW_NEW_THETA)
+    inline void Proj::updateSpeciesNames() {
+        unsigned number = G::_nspecies;
+        for (int i=0; i<G::_nspecies-1; i++) {
+            string name = boost::str(boost::format("node-%d")%number);
+            G::_species_names.push_back(name);
+            number++;
+        }
+    }
+#endif
+
     inline void Proj::run() {
 #if defined(USING_MPI)
         output("Starting MPI parallel version...\n");
@@ -3489,7 +3504,8 @@ namespace proj {
 
                 // set some global variables
                 G::_ntaxa = _data->getNumTaxa();
-                G::_nspecies = (unsigned) _species_names.size();
+                assert (G::_species_names.size() > 0);
+                G::_nspecies = (unsigned) G::_species_names.size();
                 G::_nloci = _data->getNumSubsets();
                 
 #if defined (REUSE_PARTIALS)
@@ -3558,6 +3574,7 @@ namespace proj {
 
 #if defined (DRAW_NEW_THETA)
                 assert (!G::_fix_theta);
+                updateSpeciesNames();
                 for (auto &p:my_vec) {
                     p.drawTheta();
                 }
