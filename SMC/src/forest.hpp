@@ -94,7 +94,6 @@ class Forest {
 #endif
     
         void                            clearPartials();
-        void                            setRelativeRate(double rel_rate) {_relative_rate = rel_rate;}
         unsigned                        getDeepCoal(tuple <string, string, string> species_joined);
         unsigned                        getMaxDeepCoal(tuple <string, string, string> species_joined);
         void                            setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species);
@@ -105,8 +104,8 @@ class Forest {
 #endif
         vector< pair<double, Node *>>   sortPreorder();
         void                            refreshPreorder();
-        void                            createThetaMap(Lot::SharedPtr lot, unordered_map<string, double>& theta_map, double theta_mean);
-        void                            createThetaMapFixedTheta(Lot::SharedPtr lot, unordered_map<string, double> &theta_map);
+        void                            createThetaMapOld(Lot::SharedPtr lot, unordered_map<string, double>& theta_map, double theta_mean);
+        void                            createThetaMapFixedThetaOld(Lot::SharedPtr lot, unordered_map<string, double> &theta_map);
         void                            updateThetaMap(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> &theta_map, double theta_mean);
         void                            updateThetaMapFixedTheta(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> &theta_map);
         void                            resetThetaMap(Lot::SharedPtr lot, unordered_map<string, double> &theta_map);
@@ -169,7 +168,7 @@ class Forest {
 #endif
         void                            setGeneUPGMAMatrices();
     
-        static bool                            compareNodeHeights(const Node& a, const Node& b) ;
+        static bool                     compareNodeHeights(const Node& a, const Node& b) ;
     
         std::vector<Node *>             _lineages;
         vector<Node>                    _nodes;
@@ -183,11 +182,14 @@ class Forest {
     
         unsigned                        _first_pattern = 0;
         unsigned                        _index;
-        map<string, vector<Node*> >       _species_partition;
+        map<string, vector<Node*> >     _species_partition;
         double                          _gene_tree_log_likelihood;
         double                          _log_joining_prob;
         vector<pair<double, double>>    _increments_and_priors;
+    
+#if defined (UNUSED_FUNCTIONS)
         bool                            _done;
+#endif
     
 #if defined (DEBUG_MODE)
         pair<Node*, Node*>                  _species_joined;
@@ -225,7 +227,6 @@ class Forest {
         vector<Split>                   _dmatrix_rows;
     
         vector<double>                  _starting_dij;
-        double                          _relative_rate;
         vector<pair<string, unsigned>>  _lineages_per_species;
         unsigned                        _partials_calculated_count;
         double                          _forest_height;
@@ -615,7 +616,6 @@ class Forest {
         new_nd->_partial=ps.getPartial(_npatterns*4);
         assert(new_nd->_left_child->_right_sib);
         
-        _relative_rate = 1.0;
         calcPartialArray(new_nd);
         
         calcLogLikelihood();
@@ -1326,9 +1326,11 @@ class Forest {
     }
 
     inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length) {
+        double relative_rate = G::_double_relative_rates[_index-1];
         assert(pi.size() == 4);
         assert(fabs(accumulate(pi.begin(), pi.end(), 0.0) - 1.0) < G::_small_enough);
-        assert(_relative_rate > 0.0);
+        assert(relative_rate > 0.0);
+        
         double transition_prob = 0.0;
         
         // F81 transition probabilities
@@ -1343,7 +1345,7 @@ class Forest {
         //    = 2*betat*((A + G)*(C + T) + kappa(AG + CT))
         //  betat = v/[2*( (A + G)(C + T) + kappa*(AG + CT) )]
         double kappa = 1.0;
-        double betat = 0.5*_relative_rate*edge_length/((pi[0] + pi[2])*(pi[1] + pi[3]) + kappa*(pi[0]*pi[2] + pi[1]*pi[3]));
+        double betat = 0.5*relative_rate*edge_length/((pi[0] + pi[2])*(pi[1] + pi[3]) + kappa*(pi[0]*pi[2] + pi[1]*pi[3]));
         
         if (is_transition) {
             double pi_j = pi[to];
@@ -1363,19 +1365,25 @@ class Forest {
     }
 
     inline double Forest::calcTransitionProbabilityJC(double s, double s_child, double edge_length) {
+        double relative_rate = G::_double_relative_rates[_index-1];
+        assert (relative_rate > 0.0);
+        
         double child_transition_prob = 0.0;
 
             if (s == s_child) {
-                child_transition_prob = 0.25 + 0.75*exp(-4.0*_relative_rate*edge_length/3.0);
+                child_transition_prob = 0.25 + 0.75*exp(-4.0*relative_rate*edge_length/3.0);
             }
             
             else {
-                child_transition_prob = 0.25 - 0.25*exp(-4.0*_relative_rate*edge_length/3.0);
+                child_transition_prob = 0.25 - 0.25*exp(-4.0*relative_rate*edge_length/3.0);
             }
             return child_transition_prob;
     }
 
     inline double Forest::calcTransitionProbabilityHKY(double s, double s_child, double edge_length) {
+        double relative_rate = G::_double_relative_rates[_index-1];
+        assert (relative_rate > 0.0);
+        
         double child_transition_prob = 0.0;
     
         double pi_A = G::_base_frequencies[0];
@@ -1387,7 +1395,7 @@ class Forest {
         double PI_J = 0.0;
 
         double phi = (pi_A+pi_G)*(pi_C+pi_T)+_kappa*(pi_A*pi_G+pi_C*pi_T);
-        double beta_t = 0.5*(edge_length * _relative_rate )/phi;
+        double beta_t = 0.5*(edge_length * relative_rate )/phi;
 
         // transition prob depends only on ending state
         if (s_child == 0) {
@@ -1640,7 +1648,6 @@ class Forest {
             _asrv_shape = other._asrv_shape;
             _comphet = other._comphet;
             _first_pattern      = other._first_pattern;
-            _relative_rate = other._relative_rate;
             _data               = other._data;
 //        }
         
@@ -2074,8 +2081,8 @@ class Forest {
                 break;
             }
 #if defined (FASTER_SECOND_LEVEL)
-            if (G::_start_mode != "sim") {
-//            if (G::_start_mode_type != G::StartModeType::START_MODE_SIM) {
+//            if (G::_start_mode != "sim") {
+            if (G::_start_mode_type != G::StartModeType::START_MODE_SIM) {
                 if (G::_taxon_to_species.count(nd._name) == 0) {
                     throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd._name));
                 }
@@ -3793,68 +3800,68 @@ class Forest {
     }
 #endif
         
-    inline void Forest::createThetaMapFixedTheta(Lot::SharedPtr lot, unordered_map<string, double>  &theta_map) {
-        // map should be 2*nspecies - 1 size
-        
-        assert (G::_species_names.size() == G::_nspecies);
-        
-#if defined (OLD_UPGMA)
-        unsigned number = 0;
-        for (auto &s:_species_partition) {
-            number++;
-            _species_indices[s.first] = number - 1;
-        }
-#endif
-        
-#if defined (OLD_UPGMA)
-        for (int i=0; i<G::_nspecies-1; i++) {
-            number++;
-            _species_indices[name] = number - 1;
-        }
-#endif
-        
-        for (auto &name:G::_species_names) {
-            theta_map[name] = G::_theta;
-        }
-    }
+//    inline void Forest::createThetaMapFixedThetaOld(Lot::SharedPtr lot, unordered_map<string, double>  &theta_map) {
+//        // map should be 2*nspecies - 1 size
+//        
+//        assert (G::_species_names.size() == G::_nspecies);
+//        
+//#if defined (OLD_UPGMA)
+//        unsigned number = 0;
+//        for (auto &s:_species_partition) {
+//            number++;
+//            _species_indices[s.first] = number - 1;
+//        }
+//#endif
+//        
+//#if defined (OLD_UPGMA)
+//        for (int i=0; i<G::_nspecies-1; i++) {
+//            number++;
+//            _species_indices[name] = number - 1;
+//        }
+//#endif
+//        
+//        for (auto &name:G::_species_names) {
+//            theta_map[name] = G::_theta;
+//        }
+//    }
 
-    inline void Forest::createThetaMap(Lot::SharedPtr lot, unordered_map<string, double> &theta_map, double theta_mean) {
-#if defined (OLD_UPGMA)
-        unsigned number = 0;
-        for (auto &s:_species_partition) {
-            number++;
-            _species_indices[s.first] = number - 1;
-        }
-#endif
-        
-#if defined (OLD_UPGMA)
-        for (int i=0; i<G::_nspecies-1; i++) {
-            string name = boost::str(boost::format("node-%d")%number);
-            number++;
-            _species_indices[name] = number - 1;
-        }
-#endif
-        
-        double scale = (2.0 - 1.0) / theta_mean;
-        assert (scale > 0.0);
-        for (auto &name:G::_species_names) {
-            double new_theta = 0.0;
-            if (new_theta < G::_small_enough) {
-                new_theta = 1 / (lot->gamma(2.0, scale));
-                assert (new_theta > 0.0);
-                theta_map[name] = new_theta;
-            }
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-            // pop mean = theta / 4
-            double a = 2.0;
-            double b = scale;
-            double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
-            double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
-            _vector_prior.push_back(log_inv_gamma_prior);
-#endif
-
-        }
-    }
+//    inline void Forest::createThetaMapOld(Lot::SharedPtr lot, unordered_map<string, double> &theta_map, double theta_mean) {
+//#if defined (OLD_UPGMA)
+//        unsigned number = 0;
+//        for (auto &s:_species_partition) {
+//            number++;
+//            _species_indices[s.first] = number - 1;
+//        }
+//#endif
+//
+//#if defined (OLD_UPGMA)
+//        for (int i=0; i<G::_nspecies-1; i++) {
+//            string name = boost::str(boost::format("node-%d")%number);
+//            number++;
+//            _species_indices[name] = number - 1;
+//        }
+//#endif
+//
+//        double scale = (2.0 - 1.0) / theta_mean;
+//        assert (scale > 0.0);
+//        for (auto &name:G::_species_names) {
+//            double new_theta = 0.0;
+//            if (new_theta < G::_small_enough) {
+//                new_theta = 1 / (lot->gamma(2.0, scale));
+//                assert (new_theta > 0.0);
+//                theta_map[name] = new_theta;
+//            }
+//#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
+//            // pop mean = theta / 4
+//            double a = 2.0;
+//            double b = scale;
+//            double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
+//            double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
+//            _vector_prior.push_back(log_inv_gamma_prior);
+//#endif
+//
+//        }
+//    }
 
 #if !defined (FASTER_SECOND_LEVEL)
     inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {

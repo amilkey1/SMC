@@ -88,6 +88,8 @@ class Particle {
         string                                  saveForestSpeciesPartition();
 #endif
         void                                    setGeneUPGMAMatrices();
+        void                                    createThetaMap();
+        void                                    createThetaMapFixedTheta();
     
         bool operator<(const Particle::SharedPtr & other) const {
             return _log_weight<other->_log_weight;
@@ -154,7 +156,6 @@ class Particle {
         void                                            setGeneOrder(vector<unsigned> gene_order) {_gene_order = gene_order;}
         void                                            resetGeneOrder(unsigned step, vector<unsigned> gene_order);
         void                                            trimSpeciesTree();
-        void                                            setRelativeRatesByGene(vector<double> rel_rates);
 #if defined (OLD_UPGMA)
         void                                            calcStartingRowCount();
         void                                            calcStartingUPGMAMatrix();
@@ -1100,17 +1101,12 @@ inline vector<double> Particle::getVectorPrior() {
                 theta_map[name] = G::_theta;      // create a theta map with all the same theta for simulations, set theta_mean to theta
             }
             
-//            for (int i=1; i<_forests.size(); i++) {
-////                _forests[i]._theta_map = theta_map;
-//                _forests[i]._theta_mean = G::_theta; // TODO: unnecessary now?
-//            }
-            
         }
         else {
             // create theta map
-//            _theta_map = _forests[1].createThetaMap(_lot, _theta_map);
-            _forests[1].createThetaMap(_lot, _theta_map, _theta_mean);
+            createThetaMap();
         }
+        
     }
     
     inline vector<double> Particle::getThetaVector() {
@@ -1130,20 +1126,16 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::fixTheta() {
-         _forests[1].createThetaMapFixedTheta(_lot, _theta_map); // create map for one forest, then copy it to all forests
-//        _theta_map = _forests[1].createThetaMapFixedTheta(_lot, _theta_map); // create map for one forest, then copy it to all forests
-//        double theta_mean = _forests[1]._theta_mean;
-//        unordered_map<string, double> theta_map = _forests[1]._theta_map;
+        createThetaMapFixedTheta();
+        
 #if defined (OLD_UPGMA)
         map<string, unsigned> species_indices = _forests[1]._species_indices;
 #endif
         if (_forests.size() > 2) {
             for (int i=2; i<_forests.size(); i++) {
-//                _forests[i]._theta_map = theta_map;
 #if defined (OLD_UPGMA)
                 _forests[i]._species_indices = species_indices;
 #endif
-//                _forests[i]._theta_mean = theta_mean;
             }
         }
     }
@@ -1168,11 +1160,13 @@ inline vector<double> Particle::getVectorPrior() {
         
         assert (_theta_mean > 0.0);
             
-        _forests[1].createThetaMap(_lot, _theta_map, _theta_mean); // create map for one forest, then copy it to all forests
-
-//        _theta_map = _forests[1].createThetaMap(_lot, _theta_map); // create map for one forest, then copy it to all forests
-//        double theta_mean = _forests[1]._theta_mean;
-//        unordered_map<string, double> theta_map = _forests[1]._theta_map;
+        if (G::_fix_theta) {
+            createThetaMapFixedTheta();
+        }
+        else {
+            createThetaMap(); // create map for particle
+        }
+        
 #if defined (OLD_UPGMA)
         map<string, unsigned> species_indices = _forests[1]._species_indices;
 #endif
@@ -1184,6 +1178,26 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
 //                _forests[i]._theta_mean = theta_mean;
             }
+        }
+    }
+
+    inline void Particle::createThetaMap() {
+        double scale = (2.0 - 1.0) / _theta_mean;
+        assert (scale > 0.0);
+        for (auto &name:G::_species_names) {
+            double new_theta = 0.0;
+            if (new_theta < G::_small_enough) {
+                new_theta = 1 / (_lot->gamma(2.0, scale));
+                assert (new_theta > 0.0);
+                _theta_map[name] = new_theta;
+            }
+
+        }
+    }
+
+    inline void Particle::createThetaMapFixedTheta() {
+        for (auto &name:G::_species_names) {
+            _theta_map[name] = G::_theta;
         }
     }
 
@@ -1718,12 +1732,6 @@ inline vector<double> Particle::getVectorPrior() {
         }
     }
 
-    inline void Particle::setRelativeRatesByGene(vector<double> rel_rates) {
-        for (unsigned i=1; i<_forests.size(); i++) {
-            _forests[i]._relative_rate = rel_rates[i-1];
-        }
-    }
-
     inline void Particle::setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species) {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].setNTaxaPerSpecies(ntaxa_per_species);
@@ -2144,6 +2152,9 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
 
     inline void Particle::resetGeneOrder(unsigned step, vector<unsigned> gene_order) {
+        if (_gene_order.size() == 0) {
+            _gene_order.resize((G::_ntaxa-1)*G::_nloci);
+        }
         unsigned count=0;
         if (step == 0) { // step 0 is different because this happens before any proposals have occurred
             for (unsigned s=step; s<G::_nloci; s++) {
