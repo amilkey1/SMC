@@ -129,16 +129,15 @@ namespace proj {
             double                      _starting_log_likelihood;
             vector<Lot::SharedPtr>      _group_rng;
         
-//#if defined(USING_MPI)
+#if defined(USING_MPI)
             void mpiSetSchedule();
             vector<unsigned>            _mpi_first_particle;
             vector<unsigned>            _mpi_last_particle;
             vector<string>              _starting_gene_newicks;
             vector<string>              _starting_species_newicks;
-//            vector<map<string, vector<string>>> _starting_species_partitions;
             vector<string>              _starting_species_partitions;
             void                        growGeneTrees(Particle &particles, unsigned particle_number, unsigned gene_number, unsigned step);
-//#endif
+#endif
 
     };
 
@@ -1408,8 +1407,8 @@ namespace proj {
 
                     proposeSpeciesParticles(use_vec);
                     
-                    
                     double ess = filterSpeciesParticles(s, use_vec);
+                    G::_generation++;
                     
                     if (G::_verbose > 1) {
                         cout << "   " << "ESS = " << ess << endl;
@@ -2166,6 +2165,7 @@ namespace proj {
 
             // initialize particles
             p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
+            G::_generation = 0;
             p.resetSpecies();
             p.mapSpecies(_taxon_map);
 
@@ -2191,6 +2191,7 @@ namespace proj {
                 }
                 
                 filterSpeciesParticles(s, second_level_particles);
+                G::_generation++;
             }
 
             
@@ -2260,6 +2261,7 @@ namespace proj {
                 }
 
                 double ess = filterSpeciesParticles(s, use_vec);
+                G::_generation++;
                 if (G::_verbose > 1) {
                     cout << "   " << "ESS = " << ess << endl;
                 }
@@ -2938,6 +2940,7 @@ namespace proj {
                 p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
                 
                 if (!G::_gene_newicks_specified) { // if starting from gene newicks, this is already built
+                    G::_generation = 0;
                     p.resetSpecies();
                     p.mapSpecies(_taxon_map);
                 }
@@ -2963,6 +2966,7 @@ namespace proj {
                     }
                     
                     filterSpeciesParticles(s, second_level_particles);
+                    G::_generation++;
                 
                 }
                 
@@ -3416,10 +3420,15 @@ namespace proj {
             G::_species_names.push_back(name);
             number++;
         }
+        
+#if !defined (FASTER_SECOND_LEVEL)
+        G::_ancestral_species_name = G::_species_names.back();
+#endif
     }
 #endif
 
     inline void Proj::run() {
+        G::_in_second_level = false;
 #if defined(USING_MPI)
         output("Starting MPI parallel version...\n");
         output(str(format("No. processors: %d\n") % ntasks));
@@ -3822,6 +3831,7 @@ namespace proj {
                         
 //                      cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
                     }
+                    G::_generation++;
                 } // g loop
                 }
 //                else {
@@ -3868,6 +3878,8 @@ namespace proj {
 
 #if defined (HIERARCHICAL_FILTERING)
                 saveSpeciesTreesAfterFirstRound(my_vec);
+                
+                G::_in_second_level = true;
                 
                 cout << "\n";
                 string filename1 = "species_trees.trees";
@@ -4106,6 +4118,7 @@ namespace proj {
                             proposeSpeciesParticles(use_vec);
 
                             double ess = filterSpeciesParticles(s, use_vec);
+                            G::_generation++;
                             
                             if (G::_verbose > 1) {
                                 cout << "   " << "ESS = " << ess << endl;

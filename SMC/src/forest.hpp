@@ -14,6 +14,7 @@
 #include "conditionals.hpp"
 #include <fstream>
 #include <map>
+#include <unordered_map>
 
 #include "lot.hpp"
 #include "g.hpp"
@@ -84,7 +85,7 @@ class Forest {
         void                            chooseSpeciesIncrement(Lot::SharedPtr lot);
         pair<double,double>             chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth);
         void                            allowCoalescence(string species_name, double increment, Lot::SharedPtr lot);
-        vector<pair<double, string>>    calcForestRate(Lot::SharedPtr lot);
+        vector<pair<double, string>>    calcForestRate(Lot::SharedPtr lot, unordered_map<string, double> theta_map);
         void                            updateSpeciesPartition(tuple<string, string, string> species_info);
         double                          calcTopologyPrior(unsigned nlineages);
     
@@ -104,14 +105,14 @@ class Forest {
 #endif
         vector< pair<double, Node *>>   sortPreorder();
         void                            refreshPreorder();
-        void                            createThetaMap(Lot::SharedPtr lot);
-        void                            createThetaMapFixedTheta(Lot::SharedPtr lot);
-        void                            updateThetaMap(Lot::SharedPtr lot, string new_species_name);
-        void                            updateThetaMapFixedTheta(Lot::SharedPtr lot, string new_species_name);
-        void                            resetThetaMap(Lot::SharedPtr lot);
-        void                            drawNewTheta(string new_species, Lot::SharedPtr lot);
+        void                            createThetaMap(Lot::SharedPtr lot, unordered_map<string, double>& theta_map, double theta_mean);
+        void                            createThetaMapFixedTheta(Lot::SharedPtr lot, unordered_map<string, double> &theta_map);
+        void                            updateThetaMap(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> &theta_map, double theta_mean);
+        void                            updateThetaMapFixedTheta(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> &theta_map);
+        void                            resetThetaMap(Lot::SharedPtr lot, unordered_map<string, double> &theta_map);
+        void                            drawNewTheta(string new_species, Lot::SharedPtr lot, unordered_map<string, double> &theta_map, double theta_mean);
         void                            buildFromNewick(const string newick, bool rooted, bool allow_polytomies);
-    vector<pair<tuple<string, string, string>, double>> buildFromNewickMPI(const string newick, bool rooted, bool allow_polytomies, Lot::SharedPtr lot);
+        vector<pair<tuple<string, string, string>, double>> buildFromNewickMPI(const string newick, bool rooted, bool allow_polytomies, Lot::SharedPtr lot);
         void                            extractNodeNumberFromName(Node * nd, std::set<unsigned> & used);
         void                            stripOutNexusComments(std::string & newick);
         unsigned                        countNewickLeaves(const std::string newick);
@@ -162,7 +163,7 @@ class Forest {
 #endif
 
         void                            setNodeHeights();
-#if defined (USING_MPIE)
+#if defined (USING_MPI)
         void                            resetSpeciesPartition(string species_partition);
         map<string, vector<string>>     saveSpeciesPartition();
 #endif
@@ -170,9 +171,7 @@ class Forest {
     
         static bool                            compareNodeHeights(const Node& a, const Node& b) ;
     
-        map<string, double>             _theta_map;
         std::vector<Node *>             _lineages;
-//        std::list<Node>                 _nodes;
         vector<Node>                    _nodes;
 
         unsigned                        _nleaves;
@@ -209,11 +208,9 @@ class Forest {
 #endif
     
         double                          _log_weight;
-        string                          _ancestral_species_name;
 #if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         vector<double>                  _vector_prior;
 #endif
-        double                          _theta_mean;
         vector<pair<Node*, Node*>>      _node_choices;
         vector<double>                  _log_likelihood_choices;
 #if defined (OLD_UPGMA)
@@ -284,8 +281,6 @@ class Forest {
         _nleaves=G::_ntaxa;
         _ninternals=0;
         _preorder.clear();
-        _theta_mean = 0.0;
-        _ancestral_species_name = "";
 #if !defined (FASTER_SECOND_LEVEL)
         _species_build.clear();
         _depths.clear();
@@ -422,7 +417,9 @@ class Forest {
 
                 if (!G::_save_memory || (G::_save_memory && partials)) { // if save memory setting, don't set tip partials yet
 #if defined (REUSE_PARTIALS)
+                    mtx.lock();
                     nd->_partial=ps.getPartial(_npatterns*4, _index);
+                    mtx.unlock();
 #else
                     nd->_partial=ps.getPartial(_npatterns*4);
 #endif
@@ -1039,7 +1036,9 @@ class Forest {
             assert (G::_save_memory || G::_start_mode == "sim");
             if (!new_nd->_left_child) {
 #if defined (REUSE_PARTIALS)
+                mtx.lock();
                 new_nd->_partial=ps.getPartial(_npatterns*4, _index);
+                mtx.unlock();
 #else
                 new_nd->_partial=ps.getPartial(_npatterns*4);
 #endif
@@ -1068,7 +1067,9 @@ class Forest {
 
             if (child->_partial == nullptr) {
 #if defined (REUSE_PARTIALS)
+                mtx.lock();
                 child->_partial = ps.getPartial(_npatterns*4, _index);
+                mtx.unlock();
 #else
                 child->_partial = ps.getPartial(_npatterns*4);
 #endif
@@ -1259,7 +1260,9 @@ class Forest {
 //            assert (G::_save_memory || G::_start_mode_type == G::StartModeType::START_MODE_SIM);
             if (!new_nd->_left_child) {
 #if defined (REUSE_PARTIALS)
+                mtx.lock();
                 new_nd->_partial=ps.getPartial(_npatterns*4, _index);
+                mtx.unlock();
 #else
                 new_nd->_partial=ps.getPartial(_npatterns*4);
 #endif
@@ -1289,7 +1292,9 @@ class Forest {
 
             if (child->_partial == nullptr) {
 #if defined (REUSE_PARTIALS)
+                mtx.lock();
                 child->_partial = ps.getPartial(_npatterns*4, _index);
+                mtx.unlock();
 #else
                 child->_partial = ps.getPartial(_npatterns*4);
 #endif
@@ -1615,36 +1620,33 @@ class Forest {
     }
 
     inline void Forest::operator=(const Forest & other) {
-        _npatterns = other._npatterns;
-        _edge_rate_variance = other._edge_rate_variance;
-        _asrv_shape = other._asrv_shape;
-        _comphet = other._comphet;
 //        _nodes.clear(); // don't need to clear _nodes because they will get overwritten
         _nodes.resize(other._nodes.size());
         _lineages.resize(other._lineages.size());
+        
         _nleaves            = other._nleaves;
         _ninternals         = other._ninternals;
         _last_edge_length   = other._last_edge_length;
         _index              = other._index;
-        _first_pattern      = other._first_pattern;
         _gene_tree_log_likelihood = other._gene_tree_log_likelihood;
-        _data               = other._data;
-        _log_joining_prob = other._log_joining_prob;
         _increments_and_priors = other._increments_and_priors;
-        _relative_rate = other._relative_rate;
         _preorder.resize(other._preorder.size());
-        _theta_map = other._theta_map;
-        _theta_mean = other._theta_mean;
-#if !defined (FASTER_SECOND_LEVEL)
-        _species_build = other._species_build;
-        _depths = other._depths;
-        _panmictic_coalescent_likelihood = other._panmictic_coalescent_likelihood;
-        _log_coalescent_likelihood = other._log_coalescent_likelihood;
-        _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
-        _ancestral_species_name = other._ancestral_species_name;
-        _taxon_map = other._taxon_map;
-#endif
-//        _lineages_per_species = other._lineages_per_species; // TODO: only for simulations
+        
+        // the following data members apply only to the first round
+//        if (!G::_in_second_level) {
+            _log_joining_prob = other._log_joining_prob;
+            _npatterns = other._npatterns;
+            _edge_rate_variance = other._edge_rate_variance;
+            _asrv_shape = other._asrv_shape;
+            _comphet = other._comphet;
+            _first_pattern      = other._first_pattern;
+            _relative_rate = other._relative_rate;
+            _data               = other._data;
+//        }
+        
+        // the following data members apply only when simulating and do not need to be copied because simulating data only deals with one particle at a time
+//        _lineages_per_species = other._lineages_per_species;
+        
         
 #if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         _vector_prior = other._vector_prior;
@@ -1663,11 +1665,22 @@ class Forest {
         _starting_dij = other._starting_dij;
         _partials_calculated_count = other._partials_calculated_count;
         _forest_height = other._forest_height;
+        
+        // the following data members apply only to the second level
+//        if (G::_in_second_level) { // TODO: check this is really faster
 #if defined (FASTER_SECOND_LEVEL)
-        _coalinfo = other._coalinfo;
-        _preorders = other._preorders;
-        _next_node_number = other._next_node_number;
+            _coalinfo = other._coalinfo;
+            _preorders = other._preorders;
+            _next_node_number = other._next_node_number;
+#else
+            _species_build = other._species_build;
+            _depths = other._depths;
+            _panmictic_coalescent_likelihood = other._panmictic_coalescent_likelihood;
+            _log_coalescent_likelihood = other._log_coalescent_likelihood;
+            _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
+            _taxon_map = other._taxon_map;
 #endif
+//        }
         
 #if defined (DEBUG_MODE)
         _species_joined = other._species_joined;
@@ -2484,7 +2497,9 @@ class Forest {
             revertNodeVector(_lineages, child1, child2, parent);
             
 #if defined (REUSE_PARTIALS)
+            mtx.lock();
             stowPartial(parent);
+            mtx.unlock();
 #endif
 
             //reset siblings and parents of original nodes back to 0
@@ -2655,7 +2670,9 @@ class Forest {
 
             assert (new_nd->_partial == nullptr);
 #if defined (REUSE_PARTIALS)
+            mtx.lock();
             new_nd->_partial=ps.getPartial(_npatterns*4, _index);
+            mtx.unlock();
 #else
             new_nd->_partial=ps.getPartial(_npatterns*4);
 #endif
@@ -3328,7 +3345,9 @@ class Forest {
          //always calculating partials now
          assert (new_nd->_partial == nullptr);
 #if defined (REUSE_PARTIALS)
+        mtx.lock();
         new_nd->_partial=ps.getPartial(_npatterns*4, _index);
+        mtx.unlock();
 #else
          new_nd->_partial=ps.getPartial(_npatterns*4);
 #endif
@@ -3373,7 +3392,9 @@ class Forest {
                  for (auto &nd:_lineages) {
                      if (nd->_partial == nullptr) {
 #if defined (REUSE_PARTIALS)
+                         mtx.lock();
                          nd->_partial = ps.getPartial(_npatterns*4, _index);
+                         mtx.unlock();
 #else
                          nd->_partial = ps.getPartial(_npatterns*4);
 #endif
@@ -3432,7 +3453,9 @@ class Forest {
              //always calculating partials now
              assert (new_nd->_partial == nullptr);
 #if defined (REUSE_PARTIALS)
+             mtx.lock();
              new_nd->_partial=ps.getPartial(_npatterns*4, _index);
+             mtx.unlock();
 #else
              new_nd->_partial=ps.getPartial(_npatterns*4);
 #endif
@@ -3442,7 +3465,9 @@ class Forest {
                  for (auto &nd:_lineages) {
                      if (nd->_partial == nullptr) {
 #if defined (REUSE_PARTIALS)
+                         mtx.lock();
                          nd->_partial = ps.getPartial(_npatterns*4, _index);
+                         mtx.unlock();
 #else
                          nd->_partial = ps.getPartial(_npatterns*4);
 #endif
@@ -3623,7 +3648,7 @@ class Forest {
         return sum_height;
     }
 
-    inline vector<pair<double, string>> Forest::calcForestRate(Lot::SharedPtr lot) {
+    inline vector<pair<double, string>> Forest::calcForestRate(Lot::SharedPtr lot, unordered_map<string, double> theta_map) {
         vector<pair<double, string>> rates;
         pair<double, string> rate_and_name;
 
@@ -3631,7 +3656,7 @@ class Forest {
             if (s.second.size() > 1) { // if size == 0, no possibility of coalescence and rate is 0
                 double population_coalescence_rate = 0.0;
     #if defined (DRAW_NEW_THETA)
-                    double population_theta = _theta_map[s.first];
+                    double population_theta = theta_map[s.first];
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
     #else
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/G::_theta;
@@ -3653,8 +3678,8 @@ class Forest {
         _forest_height += _last_edge_length;
     }
 
-    inline void Forest::resetThetaMap(Lot::SharedPtr lot) { // TODO: not sure if this works if not doing jones coalescent likelihood - double check
-        assert (_theta_map.size() == 0);
+    inline void Forest::resetThetaMap(Lot::SharedPtr lot, unordered_map<string, double> &theta_map) { // TODO: not sure if this works if not doing jones coalescent likelihood - double check
+        assert (theta_map.size() == 0);
         // map should be 2*nspecies - 1 size
         unsigned number = 0;
         vector<string> species_names;
@@ -3669,8 +3694,6 @@ class Forest {
             number++;
             species_names.push_back(name);
         }
-        
-        _ancestral_species_name = species_names.back();
         
         assert (species_names.size() == 2*G::_nspecies - 1);
         
@@ -3690,7 +3713,7 @@ class Forest {
                 if (new_theta < G::_small_enough) {
                     new_theta = 1 / (lot->gamma(2.0, scale));
                     assert (new_theta > 0.0);
-                    _theta_map[name] = new_theta;
+                    theta_map[name] = new_theta;
                 }
                 
 #if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
@@ -3703,53 +3726,55 @@ class Forest {
 #endif
             }
             else {
-                _theta_map[name] = -1;
+                theta_map[name] = -1;
             }
             count++;
         }
     }
 
-    inline void Forest::drawNewTheta(string new_species, Lot::SharedPtr lot) {
+    inline void Forest::drawNewTheta(string new_species, Lot::SharedPtr lot, unordered_map<string, double> & theta_map, double theta_mean) {
         // draw a new theta for the newest species population
-        double scale = 1 / _theta_mean;
+        double scale = 1 / theta_mean;
         double new_theta = 0.0;
         if (new_theta < G::_small_enough) {
             new_theta = 1 / lot->gamma(2.0, scale);
-            _theta_map[new_species] = new_theta;
+            theta_map[new_species] = new_theta;
         }
+        
+#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         // pop mean = theta / 4
         double a = 2.0;
         double b = scale;
         double x = new_theta;
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
         _vector_prior.push_back(log_inv_gamma_prior);
 #endif
     }
 
-    inline void Forest::updateThetaMap(Lot::SharedPtr lot, string new_species_name) {
+    inline void Forest::updateThetaMap(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> & theta_map, double theta_mean) {
         // add a new theta for the most recently drawn species
-        double scale = (2.0 - 1.0) / _theta_mean;
+        double scale = (2.0 - 1.0) / theta_mean;
         assert (scale > 0.0);
         double new_theta = 0.0;
         if (new_theta < G::_small_enough) {
     //            new_theta = 1 / (lot->gamma(2.01, scale));
             new_theta = 1 / (lot->gamma(2.0, scale));
             assert (new_theta > 0.0);
-            _theta_map[new_species_name] = new_theta;
+            theta_map[new_species_name] = new_theta;
         }
+        
+#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         // pop mean = theta / 4
         double a = 2.0;
         double b = scale;
         double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
         _vector_prior.push_back(log_inv_gamma_prior);
 #endif
     }
         
-    inline void Forest::updateThetaMapFixedTheta(Lot::SharedPtr lot, string new_species_name) {
-        _theta_map[new_species_name] = G::_theta;
+    inline void Forest::updateThetaMapFixedTheta(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> & theta_map) {
+        theta_map[new_species_name] = G::_theta;
     }
         
 #if defined (OLD_UPGMA)
@@ -3768,7 +3793,7 @@ class Forest {
     }
 #endif
         
-    inline void Forest::createThetaMapFixedTheta(Lot::SharedPtr lot) {
+    inline void Forest::createThetaMapFixedTheta(Lot::SharedPtr lot, unordered_map<string, double>  &theta_map) {
         // map should be 2*nspecies - 1 size
         
         assert (G::_species_names.size() == G::_nspecies);
@@ -3788,14 +3813,12 @@ class Forest {
         }
 #endif
         
-        _theta_mean = G::_theta;
-        
         for (auto &name:G::_species_names) {
-            _theta_map[name] = G::_theta;
+            theta_map[name] = G::_theta;
         }
     }
 
-    inline void Forest::createThetaMap(Lot::SharedPtr lot) {
+    inline void Forest::createThetaMap(Lot::SharedPtr lot, unordered_map<string, double> &theta_map, double theta_mean) {
 #if defined (OLD_UPGMA)
         unsigned number = 0;
         for (auto &s:_species_partition) {
@@ -3812,27 +3835,14 @@ class Forest {
         }
 #endif
         
-        // gamma mean = shape * scale
-        // draw mean from lognormal distribution
-        // shape = 2.0 to be consistent with starbeast3
-        // scale = 1 / mean;
-        
-        if (G::_theta_proposal_mean > 0.0) {
-            assert (_theta_mean == 0.0);
-            _theta_mean = lot->gamma(1, G::_theta_proposal_mean); // equivalent to exponential(exponential_rate)
-        }
-        else {
-            _theta_mean = G::_theta; // if no proposal distribution specified, use one theta mean for all particles
-        }
-        
-        double scale = (2.0 - 1.0) / _theta_mean;
+        double scale = (2.0 - 1.0) / theta_mean;
         assert (scale > 0.0);
         for (auto &name:G::_species_names) {
             double new_theta = 0.0;
             if (new_theta < G::_small_enough) {
                 new_theta = 1 / (lot->gamma(2.0, scale));
                 assert (new_theta > 0.0);
-                _theta_map[name] = new_theta;
+                theta_map[name] = new_theta;
             }
 #if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
             // pop mean = theta / 4
@@ -3959,7 +3969,7 @@ class Forest {
                 // calculate prob of coalescence, ln(rate) - rate*increment
                 double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
     #if defined (DRAW_NEW_THETA)
-                double population_theta = _theta_map[_ancestral_species_name];
+                double population_theta = _theta_map[G::_ancestral_species_name];
                 assert (population_theta > 0.0);
                 double coalescence_rate = panmictic_nlineages*(panmictic_nlineages-1) / population_theta;
     #else

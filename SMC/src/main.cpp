@@ -105,6 +105,12 @@ double Forest::_edge_rate_variance = 0.0;
 double Forest::_asrv_shape = numeric_limits<double>::infinity();
 double Forest::_comphet = numeric_limits<double>::infinity();
 
+bool G::_in_second_level = false;
+unsigned G::_generation = 0;
+#if !defined (FASTER_SECOND_LEVEL)
+string G::_ancestral_species_name = "";
+#endif
+
 vector<string> G::_species_names;
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {

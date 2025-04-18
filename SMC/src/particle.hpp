@@ -4,6 +4,7 @@
 #include "boost/format.hpp"
 #include "boost/math/special_functions/gamma.hpp"
 #include <mutex>
+#include <unordered_map>
 
 using namespace std;
 using namespace boost;
@@ -59,10 +60,10 @@ class Particle {
 #if defined (DEBUG_MODE)
         double                                  getSpeciesIncrement () {return _forests[0]._last_edge_length;}
 #endif
-        double                                  getSpeciesLogWeight() const {return _log_species_weight;}
+        double                                  getSpeciesLogWeight() const {return _log_weight;}
         unsigned                                getPartialCount();
         void                                    setLogWeight(double w){_log_weight = w;}
-        void                                    setLogSpeciesWeight(double w){_log_species_weight = w;}
+        void                                    setLogSpeciesWeight(double w){_log_weight = w;}
 #if defined (UNUSED_FUNCTIONS)
         void                                    setLogLikelihood(vector<double> forest_likelihoods);
 #endif
@@ -70,14 +71,14 @@ class Particle {
         void                                    operator=(const Particle & other);
         const vector<Forest> &                  getForest() const {return _forests;}
         vector<double>                          getThetaMap();
-        double                                  getThetaMean(){return _forests[1]._theta_mean;}
+        double                                  getThetaMean(){return _theta_mean;}
         string                                  saveForestNewick() {
             return _forests[0].makeNewick(8, true);}
         string                                  saveForestNewickAlt() {return _forests[0].makeAltNewick(8, false);}
             
         string                                  saveGeneNewick(unsigned i) {
             return _forests[i].makeNewick(8, true);}
-        string                                  saveChangedForest() {return _forests[_gene_order[_generation-1]].makePartialNewick(8, true);}
+        string                                  saveChangedForest() {return _forests[_gene_order[G::_generation-1]].makePartialNewick(8, true);}
 #if defined (USING_MPI)
         unsigned                                getNextGene(){return _gene_order[G::_generation];}
         void                                    initSpeciesForest(string newick);
@@ -180,9 +181,7 @@ class Particle {
 #endif
         vector<Forest>                          _forests;
         double                                  _log_weight;
-        double                                  _log_species_weight;
         double                                  _log_likelihood;
-        int                                     _generation = 0;
         double                                  _log_coalescent_likelihood;
         mutable                                 Lot::SharedPtr _lot;
         unsigned                                _num_deep_coalescences;
@@ -191,8 +190,11 @@ class Particle {
         unsigned                                _next_species_number;
         vector<unsigned>                        _next_species_number_by_gene;
         vector<pair<tuple<string, string, string>, double>> _t;
-        vector<vector<pair<tuple<string, string, string>, double>>> _t_by_gene;
+        vector<vector<pair<tuple<string, string, string>, double>>> _t_by_gene; // TODO: should these be maps instead?
         vector<unsigned>                        _gene_order;
+    
+        unordered_map<string, double>           _theta_map;
+        double                                  _theta_mean;
 
 #if defined (UNUSED_FUNCTIONS)
         vector<double>                          _starting_log_likelihoods;
@@ -218,7 +220,7 @@ class Particle {
         cout << "  _forest: " << "\n";
 #if defined (DRAW_NEW_THETA)
         unsigned a = 1;
-        for (auto &t:_forests[1]._theta_map) {
+        for (auto &t:_theta_map) {
             cout << "theta " << a << " = " << t.second << endl;
             a++;
         }
@@ -232,7 +234,7 @@ class Particle {
     inline void Particle::showSpeciesParticle() {
         //print out weight of each species forest part of the particle
         cout << "\nParticle:\n";
-        cout << " _log_species_weight: " << _log_species_weight << "\n";
+        cout << " _log_species_weight: " << _log_weight << "\n";
         cout << "  _forest: " << "\n";
         cout << "\n";
         _forests[0].showForest();
@@ -240,7 +242,6 @@ class Particle {
 
     inline void Particle::clear() {
         _log_weight     = 0.0;
-        _log_species_weight = 0.0;
         _log_likelihood = 0.0;
         _forests.clear();
         _log_coalescent_likelihood = 0.0;
@@ -252,7 +253,6 @@ class Particle {
         _t_by_gene.clear();
         _next_species_number_by_gene.clear();
         _gene_order.clear();
-        _generation = 0;
         _group_number = 0;
 #if !defined (FASTER_SECOND_LEVEL)
         _species_branches = 0;
@@ -298,7 +298,7 @@ class Particle {
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
         }
-        if (_generation == 0 && !G::_run_on_empty) {
+        if (G::_generation == 0 && !G::_run_on_empty) {
             _log_weight = log_likelihood;
         }
 
@@ -330,7 +330,7 @@ class Particle {
 
     inline void Particle::setLogCoalescentLikelihood(double log_coal_like) {
         _log_coalescent_likelihood = log_coal_like;
-        _log_species_weight = _log_coalescent_likelihood;
+        _log_weight = _log_coalescent_likelihood;
     }
 
 #if defined (UNUSED_FUNCTIONS)
@@ -459,7 +459,7 @@ inline vector<double> Particle::getVectorPrior() {
             //total log likelihood is sum of gene tree log likelihoods
             log_likelihood += gene_tree_log_likelihood;
         }
-        if (_generation == 0 && !G::_run_on_empty) {
+        if (G::_generation == 0 && !G::_run_on_empty) {
             _log_weight = log_likelihood;
         }
 
@@ -467,16 +467,14 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::proposal() {
-//        cout << "proposal gen " << _generation << endl;
-//        checkPartition();
         double inv_gamma_modifier = 0.0;
         
-        unsigned next_gene = _gene_order[_generation];
+        unsigned next_gene = _gene_order[G::_generation];
 //        _forests[next_gene].showForest();
         bool calc_weight = false;
         
         if (G::_species_newick_name == "null") { // if specifying species newick, keep the species tree the same for all particles and never reset it in first level
-            if (_generation == 0) {
+            if (G::_generation == 0) {
                 buildEntireSpeciesTree();
                 // make a separate species tree information vector for each gene
                 for (unsigned i=1; i<_forests.size(); i++) {
@@ -485,7 +483,7 @@ inline vector<double> Particle::getVectorPrior() {
                 }
             }
 #if !defined (USING_MPI) // TODO: for now, don't rebuild tree for MPI
-            else if (_generation % G::_nloci == 0 && G::_start_mode_type == G::StartModeType::START_MODE_SMC) {
+            else if (G::_generation % G::_nloci == 0 && G::_start_mode_type == G::StartModeType::START_MODE_SMC) {
 //            else if (_generation % G::_nloci == 0 && G::_start_mode == "smc") { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
                 // don't rebuild the species tree at every step when simulating data
     //            cout << "trimming species tree " << endl;
@@ -501,7 +499,7 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
         }
         else {
-            if (_generation == 0) {
+            if (G::_generation == 0) {
                 for (unsigned i=1; i<_forests.size(); i++) {
                     _t_by_gene.push_back(_t);
                     _next_species_number_by_gene.push_back(0);
@@ -512,7 +510,7 @@ inline vector<double> Particle::getVectorPrior() {
         bool done = false;
                 
         while (!done) {
-            vector<pair<double, string>> rates_by_species = _forests[next_gene].calcForestRate(_lot);
+            vector<pair<double, string>> rates_by_species = _forests[next_gene].calcForestRate(_lot, _theta_map);
             double total_rate = 0.0;
             double gene_increment = -1.0;
             if (rates_by_species.size() > 0) {
@@ -592,13 +590,13 @@ inline vector<double> Particle::getVectorPrior() {
             }
         }
             
-         if (_forests[1]._theta_mean == 0.0) {
-             assert (G::_theta > 0.0);
-             for (int i=1; i<_forests.size(); i++) {
-                 _forests[i]._theta_mean = G::_theta;
-             }
-         }
-         assert (_forests[1]._theta_mean > 0.0);
+//         if (_forests[1]._theta_mean == 0.0) {
+//             assert (G::_theta > 0.0);
+//             for (int i=1; i<_forests.size(); i++) {
+//                 _forests[i]._theta_mean = G::_theta;
+//             }
+//         }
+         assert (_theta_mean > 0.0);
          
          done = true;
         
@@ -620,19 +618,19 @@ inline vector<double> Particle::getVectorPrior() {
         
 #if defined (WEIGHT_MODIFIER)
         // modifier only happens on first round
-        if (_generation == 0 && G::_theta_prior_mean > 0.0 && G::_theta_proposal_mean > 0.0) {
+        if (G::_generation == 0 && G::_theta_prior_mean > 0.0 && G::_theta_proposal_mean > 0.0) {
             if (G::_theta_prior_mean != G::_theta_proposal_mean) {
                 // else, log weight modifier is 0
                 double prior_rate = 1.0/G::_theta_prior_mean;
                 double proposal_rate = 1.0/G::_theta_proposal_mean;
-                double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_forests[1]._theta_mean;
+                double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_theta_mean;
 
                 _log_weight += log_weight_modifier;
             }
         }
 #endif
         
-        _generation++;
+//        _generation++;
         
         if (G::_start_mode_type == G::StartModeType::START_MODE_SMC && !G::_run_on_empty) {
 //        if (G::_start_mode == "smc" && !G::_run_on_empty) {
@@ -830,15 +828,15 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
         
 #endif
-            _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
+            _log_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
 #if !defined (UNCONSTRAINED_PROPOSAL)
-            double test = 1/_log_species_weight;
+            double test = 1/_log_weight;
             assert(test != -0); // assert coalescent likelihood is not -inf
 #endif
         
         if (G::_run_on_empty && !G::_run_on_empty_first_level_only) {
             assert (_log_coalescent_likelihood == 0.0);
-            assert (_log_species_weight == 0.0);
+            assert (_log_weight == 0.0);
         }
         _generation++;
     }
@@ -875,7 +873,6 @@ inline vector<double> Particle::getVectorPrior() {
             if (_forests.size() > 2) {
                 for (int i=2; i<_forests.size(); i++) {
                     _forests[i]._theta_map = _forests[1]._theta_map;
-                    _forests[i]._ancestral_species_name = _forests[1]._ancestral_species_name;
                 }
             }
 #endif
@@ -967,10 +964,10 @@ inline vector<double> Particle::getVectorPrior() {
         double nlineages = _forests[0]._lineages.size();
         constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
 #endif
-            _log_species_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
+        _log_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
 #if !defined (UNCONSTRAINED_PROPOSAL)
-            double test = 1/_log_species_weight;
-            assert(test != -0); // assert coalescent likelihood is not -inf
+        double test = 1/_log_weight;
+        assert(test != -0); // assert coalescent likelihood is not -inf
 #endif
         double neg_inf = -1*numeric_limits<double>::infinity();
         if (_log_coalescent_likelihood == neg_inf) {
@@ -1067,11 +1064,24 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
 
     inline void Particle::setNewTheta(bool fix_theta) {
+        // gamma mean = shape * scale
+        // draw mean from lognormal distribution
+        // shape = 2.0 to be consistent with starbeast3
+        // scale = 1 / mean;
+        
+        if (G::_theta_proposal_mean > 0.0) {
+            assert (_theta_mean == 0.0);
+            _theta_mean = _lot->gamma(1, G::_theta_proposal_mean); // equivalent to exponential(exponential_rate)
+        }
+        else {
+            _theta_mean = G::_theta; // if no proposal distribution specified, use one theta mean for all particles
+        }
+        
         if (fix_theta) { // fix theta for all populations
             // map should be 2*nspecies - 1 size
             unsigned number = 0;
             vector<string> species_names;
-            map<string, double> theta_map;
+            unordered_map<string, double> theta_map;
             
             for (auto &s:_forests[1]._species_partition) {
                 species_names.push_back(s.first);
@@ -1090,26 +1100,22 @@ inline vector<double> Particle::getVectorPrior() {
                 theta_map[name] = G::_theta;      // create a theta map with all the same theta for simulations, set theta_mean to theta
             }
             
-            for (int i=1; i<_forests.size(); i++) {
-                _forests[i]._theta_map = theta_map;
-                _forests[i]._theta_mean = G::_theta;
-            }
+//            for (int i=1; i<_forests.size(); i++) {
+////                _forests[i]._theta_map = theta_map;
+//                _forests[i]._theta_mean = G::_theta; // TODO: unnecessary now?
+//            }
             
         }
         else {
             // create theta map
-            _forests[1].createThetaMap(_lot);
-            if (_forests.size() > 2) {
-                for (int i=2; i<_forests.size(); i++) {
-                    _forests[i]._theta_map = _forests[1]._theta_map;
-                }
-            }
+//            _theta_map = _forests[1].createThetaMap(_lot, _theta_map);
+            _forests[1].createThetaMap(_lot, _theta_map, _theta_mean);
         }
     }
     
     inline vector<double> Particle::getThetaVector() {
         vector<double> theta_vec;
-        for (auto &t:_forests[1]._theta_map) {
+        for (auto &t:_theta_map) {
             theta_vec.push_back(t.second);
         }
         return theta_vec;
@@ -1117,26 +1123,27 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline double Particle::getPopMean() {
 #if defined (DRAW_NEW_THETA)
-        return _forests[1]._theta_mean;
+        return _theta_mean;
 #else
         return G::_theta;
 #endif
     }
 
     inline void Particle::fixTheta() {
-        _forests[1].createThetaMapFixedTheta(_lot); // create map for one forest, then copy it to all forests
-        double theta_mean = _forests[1]._theta_mean;
-        map<string, double> theta_map = _forests[1]._theta_map;
+         _forests[1].createThetaMapFixedTheta(_lot, _theta_map); // create map for one forest, then copy it to all forests
+//        _theta_map = _forests[1].createThetaMapFixedTheta(_lot, _theta_map); // create map for one forest, then copy it to all forests
+//        double theta_mean = _forests[1]._theta_mean;
+//        unordered_map<string, double> theta_map = _forests[1]._theta_map;
 #if defined (OLD_UPGMA)
         map<string, unsigned> species_indices = _forests[1]._species_indices;
 #endif
         if (_forests.size() > 2) {
             for (int i=2; i<_forests.size(); i++) {
-                _forests[i]._theta_map = theta_map;
+//                _forests[i]._theta_map = theta_map;
 #if defined (OLD_UPGMA)
                 _forests[i]._species_indices = species_indices;
 #endif
-                _forests[i]._theta_mean = theta_mean;
+//                _forests[i]._theta_mean = theta_mean;
             }
         }
     }
@@ -1145,20 +1152,37 @@ inline vector<double> Particle::getVectorPrior() {
         // set seed first
 //        assert (_psuffix > 0);
 //        setSeed(rng.randint(1,9999) + _psuffix);
+        
+        // gamma mean = shape * scale
+        // draw mean from lognormal distribution
+        // shape = 2.0 to be consistent with starbeast3
+        // scale = 1 / mean;
+        
+        if (G::_theta_proposal_mean > 0.0) {
+            assert (_theta_mean == 0.0);
+            _theta_mean = _lot->gamma(1, G::_theta_proposal_mean); // equivalent to exponential(exponential_rate)
+        }
+        else {
+            _theta_mean = G::_theta; // if no proposal distribution specified, use one theta mean for all particles
+        }
+        
+        assert (_theta_mean > 0.0);
             
-        _forests[1].createThetaMap(_lot); // create map for one forest, then copy it to all forests
-        double theta_mean = _forests[1]._theta_mean;
-        map<string, double> theta_map = _forests[1]._theta_map;
+        _forests[1].createThetaMap(_lot, _theta_map, _theta_mean); // create map for one forest, then copy it to all forests
+
+//        _theta_map = _forests[1].createThetaMap(_lot, _theta_map); // create map for one forest, then copy it to all forests
+//        double theta_mean = _forests[1]._theta_mean;
+//        unordered_map<string, double> theta_map = _forests[1]._theta_map;
 #if defined (OLD_UPGMA)
         map<string, unsigned> species_indices = _forests[1]._species_indices;
 #endif
         if (_forests.size() > 2) {
             for (unsigned i=2; i<_forests.size(); i++) {
-                _forests[i]._theta_map = theta_map;
+//                _forests[i]._theta_map = theta_map;
 #if defined (OLD_UPGMA)
                 _forests[i]._species_indices = species_indices;
 #endif
-                _forests[i]._theta_mean = theta_mean;
+//                _forests[i]._theta_mean = theta_mean;
             }
         }
     }
@@ -1285,7 +1309,7 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline vector<double> Particle::getThetaMap() {
         vector<double> thetas;
-        for (auto &t:_forests[1]._theta_map) {
+        for (auto &t:_theta_map) {
             thetas.push_back(t.second);
         }
         return thetas;
@@ -1335,15 +1359,15 @@ inline vector<double> Particle::getVectorPrior() {
             _forests[i].buildFromNewick(newicks[i-1], true, false); // newicks starts at 0
 //            _forests[i].showForest();
             _forests[i].refreshPreorder();
-            _forests[i]._theta_mean = G::_theta; // for now, set theta mean equal to whatever theta user specifies
+//            _forests[i]._theta_mean = G::_theta; // for now, set theta mean equal to whatever theta user specifies
         }
+        _theta_mean = G::_theta; // for now, set theta mean equal to whatever theta user specifies
     }
 
     inline void Particle::resetSpecies() {
         if (!G::_gene_newicks_specified) {
             _forests[0].clear();
         } // otherwise, starting from complete gene trees and species tree is already set
-        _generation = 0;
         setLogWeight(0.0);
         _log_coalescent_likelihood = 0.0;
 #if !defined (FASTER_SECOND_LEVEL)
@@ -1374,7 +1398,7 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::trimSpeciesTree() {
-        map<string, double> theta_map = _forests[1]._theta_map;
+//        unordered_map<string, double> theta_map = _forests[1]._theta_map;
 
         unsigned spp_count = G::_nspecies*2 - 1;
 
@@ -1397,7 +1421,6 @@ inline vector<double> Particle::getVectorPrior() {
             unsigned count = (unsigned) _t.size();
 
             while (!done) {
-//                _forests[0].showForest();
                 double species_tree_height = _forests[0]._forest_height;
                 double amount_to_trim = 0.0;
 
@@ -1427,7 +1450,7 @@ inline vector<double> Particle::getVectorPrior() {
                     _forests[0]._ninternals--;
 
 #if defined (DRAW_NEW_THETA)
-                    theta_map[G::_species_names[spp_count-1]] = -1.0;
+                    _theta_map[G::_species_names[spp_count-1]] = -1.0;
 #endif
 
                     spp_count--;
@@ -1460,9 +1483,9 @@ inline vector<double> Particle::getVectorPrior() {
         }
 
 #if defined (DRAW_NEW_THETA)
-        for (unsigned i=1; i<_forests.size(); i++) {
-            _forests[i]._theta_map = theta_map;
-        }
+//        for (unsigned i=1; i<_forests.size(); i++) {
+//            _forests[i]._theta_map = theta_map; // TODO: make a theta_map for particle and pass to all forests?
+//        }
 #endif
     }
 
@@ -1568,8 +1591,6 @@ inline vector<double> Particle::getVectorPrior() {
         bool trim_to_previous_join = false;
         
         if (trim_to_previous_join) {
-            map<string, double> theta_map = _forests[1]._theta_map;
-                        
             double min_branch_length = _forests[0]._lineages.back()->_edge_length; // species tree must remain at least as tall as it was after initial trimming
             for (auto &nd:_forests[0]._lineages) {
                 nd->_edge_length -= min_branch_length;
@@ -1620,26 +1641,20 @@ inline vector<double> Particle::getVectorPrior() {
             }
             
             // update theta map
-            for (auto t:theta_map) {
-                if (t.second == -1.0)  {
+            for (auto &s:G::_species_names) {
+                if (_theta_map[s] == -1.0) {
                     if (G::_fix_theta) {
-                        _forests[1].updateThetaMapFixedTheta(_lot, t.first);
+                        _forests[1].updateThetaMapFixedTheta(_lot, s, _theta_map);
                     }
                     else {
-                        _forests[1].updateThetaMap(_lot, t.first);
+                        _forests[1].updateThetaMap(_lot, s, _theta_map, _theta_mean);
                     }
-                }
-            }
-            
-            if (_forests.size() > 2) {
-                for (unsigned i=2; i<_forests.size(); i++) {
-                    _forests[i]._theta_map = _forests[1]._theta_map;
                 }
             }
             
         }
         else {
-            map<string, double> theta_map = _forests[1]._theta_map;
+//            unordered_map<string, double> theta_map = _forests[1]._theta_map;
             
             tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
             
@@ -1672,18 +1687,12 @@ inline vector<double> Particle::getVectorPrior() {
             
 #if defined (DRAW_NEW_THETA)
             // update theta map
-            for (auto t:theta_map) {
-                if (t.second == -1.0)  {
-                    _forests[1].updateThetaMap(_lot, t.first);
+            for (auto &s:G::_species_names) {
+                if (_theta_map[s] == -1.0) {
+                    _forests[1].updateThetaMap(_lot, s, _theta_map, _theta_mean);
                 }
             }
 #endif
-            
-            if (_forests.size() > 2) {
-                for (unsigned i=2; i<_forests.size(); i++) {
-                    _forests[i]._theta_map = _forests[1]._theta_map;
-                }
-            }
         }
  
     }
@@ -1774,7 +1783,8 @@ inline vector<double> Particle::getVectorPrior() {
         // Get maximum height of any gene tree
         double max_height = get<0>((*coalinfo_vect.rbegin()));
         
-        if (_generation > 0) {
+//        if (G::_generation > 0) {
+        if (_forests[0]._last_edge_length != 0.0) {
 
             // Create speciation event
             _forests[0].speciesTreeProposal(_lot);
@@ -1827,12 +1837,9 @@ inline vector<double> Particle::getVectorPrior() {
 
         // Compute coalescent likelihood and log weight
         calcLogCoalescentLikelihood(coalinfo_vect, /*integrate_out_thetas*/true, /*verbose*/false);
-        _log_species_weight = _log_coal_like - _prev_log_coal_like + log_weight_factor;
+        _log_weight = _log_coal_like - _prev_log_coal_like + log_weight_factor;
 
         resetPrevLogCoalLike();
-
-        _generation++;
-        
         return num_species_tree_lineages;
     }
 #endif
@@ -2190,10 +2197,8 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline void Particle::operator=(const Particle & other) {
         _log_weight     = other._log_weight;
-        _log_species_weight = other._log_species_weight;
         _log_likelihood = other._log_likelihood;
         _forests         = other._forests;
-        _generation     = other._generation;
         _t = other._t;
         _psuffix = other._psuffix;
         _next_species_number = other._next_species_number;
@@ -2201,13 +2206,12 @@ inline vector<double> Particle::getVectorPrior() {
         _next_species_number_by_gene = other._next_species_number_by_gene;
         _gene_order = other._gene_order;
         _group_number = other._group_number;
-//        _log_coal_like = other._log_coal_like; // do not need to save this
-//        _prev_log_coal_like = other._prev_log_coal_like; // do not need to save this
-        
-//        if (G::_start_mode_type == G::StartModeType::START_MODE_SIM) { // TODO: checking start mode seems slower than just copying?
-            _num_deep_coalescences = other._num_deep_coalescences;
-            _max_deep_coal = other._max_deep_coal;
-//        }
+        _theta_map = other._theta_map;
+        _theta_mean = other._theta_mean;
+
+        // the following data members apply only when simulating and do not need to be copied because simulating data only deals with one particle at a time
+//            _num_deep_coalescences = other._num_deep_coalescences;
+//            _max_deep_coal = other._max_deep_coal;
 
 #if !defined (FASTER_SECOND_LEVEL)
         _species_branches = other._species_branches;

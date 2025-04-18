@@ -84,6 +84,12 @@ namespace proj {
         
         static vector<string>       _species_names;
         
+        static bool                 _in_second_level;
+        static unsigned             _generation;
+#if !defined (FASTER_SECOND_LEVEL)
+        static string               _ancestral_species_name;
+#endif
+        
         // functions
         string inventName(unsigned k, bool lower_case);
         
