@@ -106,10 +106,10 @@ class Forest {
         void                            refreshPreorder();
         void                            createThetaMapOld(Lot::SharedPtr lot, unordered_map<string, double>& theta_map, double theta_mean);
         void                            createThetaMapFixedThetaOld(Lot::SharedPtr lot, unordered_map<string, double> &theta_map);
-        void                            updateThetaMap(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> &theta_map, double theta_mean);
-        void                            updateThetaMapFixedTheta(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> &theta_map);
-        void                            resetThetaMap(Lot::SharedPtr lot, unordered_map<string, double> &theta_map);
-        void                            drawNewTheta(string new_species, Lot::SharedPtr lot, unordered_map<string, double> &theta_map, double theta_mean);
+        void                            updateThetaMapOld(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> &theta_map, double theta_mean);
+        void                            updateThetaMapFixedThetaOld(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> &theta_map);
+        void                            resetThetaMapOld(Lot::SharedPtr lot, unordered_map<string, double> &theta_map);
+        void                            drawNewThetaOld(string new_species, Lot::SharedPtr lot, unordered_map<string, double> &theta_map, double theta_mean);
         void                            buildFromNewick(const string newick, bool rooted, bool allow_polytomies);
         vector<pair<tuple<string, string, string>, double>> buildFromNewickMPI(const string newick, bool rooted, bool allow_polytomies, Lot::SharedPtr lot);
         void                            extractNodeNumberFromName(Node * nd, std::set<unsigned> & used);
@@ -1453,7 +1453,7 @@ class Forest {
         
         if (_forest_height > 0 && G::_upgma) {
             constructUPGMA();
-        } // TODO: be careful
+        }
 
         for (auto &nd:_lineages) {
             double log_like = 0.0;
@@ -3448,7 +3448,7 @@ class Forest {
          new_nd->_number=_nleaves+_ninternals;
          new_nd->_edge_length=0.0;
          _ninternals++;
-        new_nd->_name = to_string(new_nd->_number);
+         new_nd->_name = to_string(new_nd->_number);
 
          new_nd->_left_child=subtree1;
          subtree1->_right_sib=subtree2;
@@ -3528,9 +3528,8 @@ class Forest {
          }
         
         //update species list
-//         updateNodeList(nodes, subtree1, subtree2, new_nd);
         updateNodeVector(nodes, subtree1, subtree2, new_nd);
-         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         
         if (G::_upgma) {
             new_nd->_split.resize(G::_ntaxa);
@@ -3540,18 +3539,16 @@ class Forest {
 
         _species_partition[species_name] = nodes;
 
-//        if (!G::_upgma) { // TODO: be careful
-             if ((G::_proposal == "prior-prior" || one_choice) && (!G::_run_on_empty) ) {
-                 _gene_tree_log_likelihood = calcLogLikelihood();
-                 _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
-             }
-        
-            if (G::_save_memory) {
-                for (auto &nd:_nodes) {
-                    nd._partial=nullptr;
-                }
+        if ((G::_proposal == "prior-prior" || one_choice) && (!G::_run_on_empty) ) {
+            _gene_tree_log_likelihood = calcLogLikelihood();
+            _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
+        }
+
+        if (G::_save_memory) {
+            for (auto &nd:_nodes) {
+                nd._partial=nullptr;
             }
-//        }
+        }
      }
 
     inline void Forest::debugForest() {
@@ -3685,7 +3682,7 @@ class Forest {
         _forest_height += _last_edge_length;
     }
 
-    inline void Forest::resetThetaMap(Lot::SharedPtr lot, unordered_map<string, double> &theta_map) { // TODO: not sure if this works if not doing jones coalescent likelihood - double check
+    inline void Forest::resetThetaMapOld(Lot::SharedPtr lot, unordered_map<string, double> &theta_map) { // TODO: not sure if this works if not doing jones coalescent likelihood - double check
         assert (theta_map.size() == 0);
         // map should be 2*nspecies - 1 size
         unsigned number = 0;
@@ -3739,7 +3736,7 @@ class Forest {
         }
     }
 
-    inline void Forest::drawNewTheta(string new_species, Lot::SharedPtr lot, unordered_map<string, double> & theta_map, double theta_mean) {
+    inline void Forest::drawNewThetaOld(string new_species, Lot::SharedPtr lot, unordered_map<string, double> & theta_map, double theta_mean) {
         // draw a new theta for the newest species population
         double scale = 1 / theta_mean;
         double new_theta = 0.0;
@@ -3758,7 +3755,7 @@ class Forest {
 #endif
     }
 
-    inline void Forest::updateThetaMap(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> & theta_map, double theta_mean) {
+    inline void Forest::updateThetaMapOld(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> & theta_map, double theta_mean) {
         // add a new theta for the most recently drawn species
         double scale = (2.0 - 1.0) / theta_mean;
         assert (scale > 0.0);
@@ -3780,7 +3777,7 @@ class Forest {
 #endif
     }
         
-    inline void Forest::updateThetaMapFixedTheta(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> & theta_map) {
+    inline void Forest::updateThetaMapFixedThetaOld(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> & theta_map) {
         theta_map[new_species_name] = G::_theta;
     }
         
@@ -3802,9 +3799,9 @@ class Forest {
         
 //    inline void Forest::createThetaMapFixedThetaOld(Lot::SharedPtr lot, unordered_map<string, double>  &theta_map) {
 //        // map should be 2*nspecies - 1 size
-//        
+//
 //        assert (G::_species_names.size() == G::_nspecies);
-//        
+//
 //#if defined (OLD_UPGMA)
 //        unsigned number = 0;
 //        for (auto &s:_species_partition) {
@@ -3812,14 +3809,14 @@ class Forest {
 //            _species_indices[s.first] = number - 1;
 //        }
 //#endif
-//        
+//
 //#if defined (OLD_UPGMA)
 //        for (int i=0; i<G::_nspecies-1; i++) {
 //            number++;
 //            _species_indices[name] = number - 1;
 //        }
 //#endif
-//        
+//
 //        for (auto &name:G::_species_names) {
 //            theta_map[name] = G::_theta;
 //        }

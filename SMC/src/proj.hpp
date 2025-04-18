@@ -1975,9 +1975,6 @@ namespace proj {
                 double index_nonsurvivor = zeros[next_zero++];
 
                 // Replace non-survivor with copy of survivor
-//                unsigned survivor_index_in_particles = particle_indices[index_survivor+start];
-//                unsigned non_survivor_index_in_particles = particle_indices[index_nonsurvivor+start];
-
                 particles[index_nonsurvivor] = particles[index_survivor];
             }
 
@@ -1997,7 +1994,6 @@ namespace proj {
         unsigned group_number = particles[0].getGroupNumber();
         
         for (unsigned i=0; i<nparticles; i++) {
-//            double u = rng.uniform();
             double u = _group_rng[group_number]->uniform();
             auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
             assert(it != probs.end());
@@ -2020,7 +2016,6 @@ namespace proj {
         }
         
         if (copying_needed) {
-
             // Locate first recipient
             unsigned recipient = 0;
             while (counts[recipient] != 0) {
@@ -2656,9 +2651,7 @@ namespace proj {
             G::_ntaxa = ntaxa;
         }
         
-//        G::_ntaxa = ntaxa * G::_nspecies;
         assert (G::_nspecies == (unsigned) G::_ntaxaperspecies.size());
-//        G::_nspecies = (unsigned) G::_ntaxaperspecies.size();
 
         vector<Particle> sim_vec(1);
         sim_vec[0] = Particle();
@@ -2729,6 +2722,7 @@ namespace proj {
 
         for (unsigned g=0; g<nsteps; g++){
             proposeParticles(sim_vec);
+            G::_generation++;
         }
         
         sim_vec[0].getNumDeepCoalescences();
@@ -3662,7 +3656,6 @@ namespace proj {
                         }
 
                         for (unsigned n=0; n<G::_ngroups; n++) {
-//                                for (unsigned l=0; l<G::_nloci; l++) {
                                 unsigned count = 1;
                                 vector<pair<double, unsigned>> randomize;
                                 for (unsigned l=0; l<list_size; l++) {
