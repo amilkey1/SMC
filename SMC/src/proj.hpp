@@ -1418,6 +1418,10 @@ namespace proj {
                     }
 
                 } // s loop
+                
+                for (auto &p:my_vec) {
+                    p.calcSpeciesTreeLength();
+                }
 
                 if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
                     unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
@@ -2197,6 +2201,9 @@ namespace proj {
                 G::_generation++;
             }
 
+            for (auto &p:second_level_particles) {
+                p.calcSpeciesTreeLength();
+            }
             
             if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
                 unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
@@ -2270,6 +2277,10 @@ namespace proj {
                 }
 
             } // s loop
+            
+            for (auto &p:use_vec) {
+                p.calcSpeciesTreeLength();
+            }
             
             if (G::_verbose > 1) {
                 cout << "finished with species tree proposals for subset " << i+1 << endl;
@@ -2853,6 +2864,10 @@ namespace proj {
                 
                 }
                 
+                for (auto &p:second_level_particles) {
+                    p.calcSpeciesTreeLength();
+                }
+                
                 if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
                     unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
                     if (sample_size == 0) {
@@ -2891,8 +2906,40 @@ namespace proj {
             u_strees << "end;" << endl;
             u_strees.close();
             
-//            double total_seconds = sw.stop();
-//            cout << "total time for second level: " << total_seconds << endl;
+            string line;
+            // For writing text file
+            // Creating ofstream & ifstream class object
+            ifstream in ("params-beast-comparison.log");
+            ofstream f("params-beast-comparison-final.log");
+            
+            unsigned line_count = 0;
+
+            while (!in.eof()) {
+                string text;
+
+                getline(in, text);
+
+                if (line_count == 0) {
+                    string add = "iter ";
+                    text = add + text;
+                }
+                else {
+                    if (text != "") {
+                        string add = to_string(line_count);
+                        text = add + text;
+                    }
+                }
+                if (text != "") {
+                    f << text << endl; // account for blank line at end of file
+                }
+                line_count++;
+            }
+
+            // remove existing params file and replace with copy
+            char oldfname[] = "params-beast-comparison.log";
+            char newfname[] = "params-beast-comparison-final.log";
+            filesystem::remove(oldfname);
+            std::rename(newfname, oldfname);
         }
         else {
             
@@ -3699,6 +3746,10 @@ namespace proj {
                         }
                 G::_generation++;
             } // g loop
+                
+            for (auto &p:my_vec) {
+                p.calcGeneTreeLengths();
+            }
 #endif
                 
                 if (G::_save_gene_trees) {
@@ -3967,6 +4018,10 @@ namespace proj {
                             }
 
                         } // s loop
+                        
+                        for (auto &p:my_vec) {
+                            p.calcSpeciesTreeLength();
+                        }
 
                         if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
                             unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));

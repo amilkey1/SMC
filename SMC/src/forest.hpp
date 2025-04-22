@@ -229,6 +229,7 @@ class Forest {
         vector<pair<string, unsigned>>  _lineages_per_species;
         unsigned                        _partials_calculated_count;
         double                          _forest_height;
+        double                          _forest_length;
     
 #if defined (DEBUG_MODE)
         void                            showSpeciesJoined();
@@ -237,6 +238,7 @@ class Forest {
         double                          calcTransitionProbabilityHKY(double s, double s_child, double edge_length);
         double                          calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length);
         double                          getTreeLength();
+        void                            calcTreeLength();
         double                          getLineageHeight(Node* nd);
         void                            addIncrement(double increment);
         void                            simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
@@ -281,6 +283,7 @@ class Forest {
         _nleaves=G::_ntaxa;
         _ninternals=0;
         _preorder.clear();
+        _forest_length = 0.0;
 #if !defined (FASTER_SECOND_LEVEL)
         _species_build.clear();
         _depths.clear();
@@ -1673,6 +1676,7 @@ class Forest {
         _gene_tree_log_likelihood = other._gene_tree_log_likelihood;
         _increments_and_priors = other._increments_and_priors;
         _preorder.resize(other._preorder.size());
+        _forest_length = other._forest_length;
         
         // the following data members apply only to the first round
         if (!G::_in_second_level) { // TODO: testing
@@ -3679,7 +3683,7 @@ class Forest {
         node_list.push_back(addnode);
     }
 
-    inline double Forest::getTreeLength() {
+    inline void Forest::calcTreeLength() {
         // sum of all edge lengths in tree
         double sum_height = 0.0;
         
@@ -3687,7 +3691,13 @@ class Forest {
             // sum edge lengths from all nodes
             sum_height += nd._edge_length;
         }
-        return sum_height;
+        _forest_length = sum_height;
+    }
+
+
+    inline double Forest::getTreeLength() {
+        // sum of all edge lengths in tree
+        return _forest_length;
     }
 
     inline vector<pair<double, string>> Forest::calcForestRate(Lot::SharedPtr lot, unordered_map<string, double> theta_map) {

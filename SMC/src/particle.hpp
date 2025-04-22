@@ -133,6 +133,8 @@ class Particle {
         double                                          getSpeciesTreeLength();
         vector<double>                                  getGeneTreeHeights();
         vector<double>                                  getGeneTreeLengths();
+        void                                            calcGeneTreeLengths();
+        void                                            calcSpeciesTreeLength();
         vector<double>                                  getGeneTreeLogLikelihoods();
         vector<double>                                  getGeneTreePriors();
         inline vector<double>                           getGeneTreeCoalescentLikelihoods();
@@ -366,6 +368,16 @@ class Particle {
             gene_tree_heights.push_back(_forests[i]._forest_height);
         }
         return gene_tree_heights;
+    }
+
+    inline void Particle::calcGeneTreeLengths() {
+        for (unsigned f=1; f<_forests.size(); f++) {
+            _forests[f].calcTreeLength();
+        }
+    }
+
+    inline void Particle::calcSpeciesTreeLength() {
+        _forests[0].calcTreeLength();
     }
 
     inline vector<double> Particle::getGeneTreeLengths() {
