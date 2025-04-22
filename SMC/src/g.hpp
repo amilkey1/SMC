@@ -53,6 +53,7 @@ namespace proj {
         static bool                 _gene_newicks_specified;
         static unsigned             _ngenes_provided;
         static string               _species_newick_name;
+        static bool                 _species_newick_specified;
         static bool                 _fix_theta_for_simulations;
         static bool                 _fix_theta;
         static double               _theta;

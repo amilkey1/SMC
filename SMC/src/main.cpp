@@ -65,6 +65,7 @@ bool        G::_save_gene_trees = true;
 bool        G::_gene_newicks_specified = false;
 unsigned    G::_ngenes_provided = 2;
 string      G::_species_newick_name = "";
+bool        G::_species_newick_specified = false;
 bool        G::_fix_theta_for_simulations = true;
 bool        G::_fix_theta = true;
 double      G::_theta = 0.1;

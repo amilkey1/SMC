@@ -25,7 +25,7 @@ namespace proj {
 
                                         Node();
                                         ~Node();
-
+        
                     Node *              getParent()                 {return _parent;}
                     Node *              getLeftChild()              {return _left_child;}
                     Node *              getRightSib()               {return _right_sib;}
@@ -150,5 +150,6 @@ namespace proj {
         _parent=0;
         _right_sib=0;
     }
+
 }
 

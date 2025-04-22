@@ -1003,6 +1003,10 @@ namespace proj {
         else {
             throw XProj("must specify either JC or HKY for model type");
         }
+        
+        if (G::_species_newick_name != "null") {
+            G::_species_newick_specified = true;
+        }
     }
 
     inline void Proj::checkOutgroupName() {
@@ -1102,6 +1106,7 @@ namespace proj {
     }
 
     inline void Proj::handleGeneNewicks() {
+        G::_in_second_level = true;
         vector<vector<string>> newicks; // vector of vector of newicks, 1 vector per gene
         _first_line = true;
         if (G::_ngenes_provided == 0) {
@@ -2159,9 +2164,13 @@ namespace proj {
 
             // initialize particles
             p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
-            G::_generation = 0;
-            p.resetSpecies();
-            p.mapSpecies(_taxon_map);
+
+            
+            if (!G::_gene_newicks_specified) { // if starting from gene newicks, this is already built
+                G::_generation = 0;
+                p.resetSpecies();
+                p.mapSpecies(_taxon_map);
+            }
 
             second_level_particles.resize(G::_particle_increase, p);
 
@@ -2729,10 +2738,8 @@ namespace proj {
         sim_vec[0].getMaxDeepCoalescences();
 
         cout << "\nBuilding species tree and associated gene trees....\n";
-//        vector<string> taxon_names;
         G::_taxon_names.clear();
         for (auto &t:_taxon_map) {
-//            taxon_names.push_back(t.first);
             G::_taxon_names.push_back(t.first);
         }
 
@@ -3427,7 +3434,7 @@ namespace proj {
                     psuffix += 2;
                 }
                 
-                if (G::_species_newick_name != "null") {
+                if (G::_species_newick_specified) {
                     string species_newick = handleSpeciesNewick();
                     unsigned count = 0;
                     for (auto &p:my_vec) {
@@ -3445,7 +3452,7 @@ namespace proj {
                     psuffix += 2;
                 }
                 
-//                if (G::_species_newick_name != "null") {
+//                if (G::_species_newick_specified) {
 //                    handleSpeciesNewick(my_vec);
 //                }
 

@@ -155,10 +155,9 @@ class Forest {
         void                            stowPartial(Node *nd);
 #endif
 
-        
-        vector<coalinfo_t>              _coalinfo;
-        mutable vector<Node::ptr_vect_t> _preorders;
-        mutable unsigned                _next_node_number;
+        vector<coalinfo_t>                  _coalinfo;
+        mutable vector<Node::ptr_vect_t>    _preorders;
+        mutable unsigned                    _next_node_number;
 #endif
 
         void                            setNodeHeights();
@@ -1085,148 +1084,181 @@ class Forest {
             // calculate both transition probabilities before loop, then choose 1 based on s == s_child
             double transition_prob_same = calcTransitionProbabilityJC(0, 0, child->_edge_length);
             double transition_prob_dif = calcTransitionProbabilityJC(0, 1, child->_edge_length);
-
+            
 #if defined (UNROLL_LOOPS)
+//            double * ppa = &parent_partial_array[0];
+            
             for (unsigned p = 0; p < _npatterns; p++) {
+                unsigned pxnstates = p*G::_nstates;
+                // TODO: calculate p*G::_nstates here
+                
                 // loop 1
                 unsigned s = 0;
                 double sum_over_child_states = 0.0;
+                unsigned index = pxnstates+s;
                 
                 // subloop 1
                 unsigned s_child = 0;
                 double child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                double child_partial = child_partial_array[p*G::_nstates + s_child];
+                double child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
                 // subloop 2
                 s_child = 1;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
                 // subloop 3
                 s_child = 2;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
                 // subloop 4
                 s_child = 3;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
-                if (child == new_nd->_left_child) {
-                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
-                }
-                else {
-                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
-                }
+//                if (child == new_nd->_left_child) { // TODO: faster way to compare two nodes? - try starting with partials = 1, then always multiply
+////                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
+//                    *ppa++ = sum_over_child_states;
+//                }
+//                else {
+//                if (child == new_nd->_left_child) {
+//                    assert (*ppa == 1.0);
+//                }
+//                    *ppa++ *= sum_over_child_states;
+//                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
+                parent_partial_array[index] *= sum_over_child_states;
+//                }
             
                 // loop 2
                 s = 1;
                 sum_over_child_states = 0.0;
+                index = pxnstates+s;
                 
                 // subloop 1
                 s_child = 0;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
                 // subloop 2
                 s_child = 1;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
                 // subloop 3
                 s_child = 2;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
                 // subloop 4
                 s_child = 3;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
-                
-                if (child == new_nd->_left_child) {
-                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
-                }
-                else {
-                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
-                }
+//
+//                if (child == new_nd->_left_child) {
+//                    assert (*ppa == 1.0);
+//                }
+//                if (child == new_nd->_left_child) {
+//                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
+//                    *ppa++ = sum_over_child_states;
+//                }
+//                else {
+                parent_partial_array[index] *= sum_over_child_states;
+//                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
+//                    *ppa++ *= sum_over_child_states;
+//                }
             
                 // loop 3
                 s = 2;
                 sum_over_child_states = 0.0;
+                index = p*G::_nstates+s;
                 
                 // subloop 1
                 s_child = 0;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
                 // subloop 2
                 s_child = 1;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
                 // subloop 3
                 s_child = 2;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
                 // subloop 4
                 s_child = 3;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
-                if (child == new_nd->_left_child) {
-                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
-                }
-                else {
-                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
-                }
+//                if (child == new_nd->_left_child) {
+//                    assert (*ppa == 1.0);
+//                }
+//                if (child == new_nd->_left_child) {
+////                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
+//                    *ppa++ = sum_over_child_states;
+//                }
+//                else {
+                parent_partial_array[index] *= sum_over_child_states;
+//                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
+//                    *ppa++ *= sum_over_child_states;
+//                }
             
                 // loop 4
                 s = 3;
                 sum_over_child_states = 0.0;
+                index = pxnstates+s;
                 
                 // subloop 1
                 s_child = 0;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
                 // subloop 2
                 s_child = 1;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
                 // subloop 3
                 s_child = 2;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
                 // subloop 4
                 s_child = 3;
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
-                child_partial = child_partial_array[p*G::_nstates + s_child];
+                child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
-                if (child == new_nd->_left_child) {
-                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
-                }
-                else {
-                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
-                }
+//                if (child == new_nd->_left_child) {
+//                    assert (*ppa == 1.0);
+//                }
+//                if (child == new_nd->_left_child) {
+////                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
+//                    *ppa++ = sum_over_child_states;
+//                }
+//                else {
+                parent_partial_array[index] *= sum_over_child_states;
+//                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
+//                    *ppa++ *= sum_over_child_states;
+//                }
             }
         } // child loop
 #else
@@ -1238,10 +1270,12 @@ class Forest {
                         double child_partial = child_partial_array[p*G::_nstates + s_child];
                         sum_over_child_states += child_transition_prob * child_partial;
                     }   // child state loop
-                    if (child == new_nd->_left_child)
-                        parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
-                    else
+//                    if (child == new_nd->_left_child) {
+//                        parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
+//                    }
+//                    else {
                         parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
+//                    }
                 }   // parent state loop
             }   // pattern loop
         }   // child loop
@@ -1641,7 +1675,7 @@ class Forest {
         _preorder.resize(other._preorder.size());
         
         // the following data members apply only to the first round
-//        if (!G::_in_second_level) {
+        if (!G::_in_second_level) { // TODO: testing
             _log_joining_prob = other._log_joining_prob;
             _npatterns = other._npatterns;
             _edge_rate_variance = other._edge_rate_variance;
@@ -1649,10 +1683,14 @@ class Forest {
             _comphet = other._comphet;
             _first_pattern      = other._first_pattern;
             _data               = other._data;
-//        }
+        }
         
         // the following data members apply only when simulating and do not need to be copied because simulating data only deals with one particle at a time
 //        _lineages_per_species = other._lineages_per_species;
+        
+        // the following data members get reset if using prior-post and do not need to be copied
+//       _node_choices = other._node_choices;
+//       _log_likelihood_choices = other._log_likelihood_choices;
         
         
 #if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
@@ -1674,7 +1712,7 @@ class Forest {
         _forest_height = other._forest_height;
         
         // the following data members apply only to the second level
-//        if (G::_in_second_level) { // TODO: check this is really faster
+        if (G::_in_second_level) { // TODO: testing
 #if defined (FASTER_SECOND_LEVEL)
             _coalinfo = other._coalinfo;
             _preorders = other._preorders;
@@ -1687,7 +1725,7 @@ class Forest {
             _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
             _taxon_map = other._taxon_map;
 #endif
-//        }
+        }
         
 #if defined (DEBUG_MODE)
         _species_joined = other._species_joined;
@@ -1700,7 +1738,7 @@ class Forest {
         // copy tree itself
         
         if (other._nodes.size() > 0) { // otherwise, there is no forest and nothing needs to be copied
-            _species_partition.clear();
+            _species_partition.clear(); // TODO: can rewrite this without clearing?
             for (auto spiter : other._species_partition) {
                 for (auto s : spiter.second) {
                     unsigned number = s->_number;

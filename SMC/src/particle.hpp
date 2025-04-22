@@ -175,7 +175,6 @@ class Particle {
         unsigned                                        proposeSpeciationEvent();
         double                                          findHeightNextCoalescentEvent(double hstart, vector<Forest::coalinfo_t> & coalinfo_vect);
         double                                          calcLogCoalescentLikelihood(vector<Forest::coalinfo_t> & coalinfo_vect, bool integrate_out_thetas, bool verbose);
-        void                                            resetPrevLogCoalLike();
         void                                            clearGeneForests();
 #endif
         void                                            setNodeHeights();
@@ -184,13 +183,12 @@ class Particle {
 
 #if defined (FASTER_SECOND_LEVEL)
         double                                  _log_coal_like;
-        double                                  _prev_log_coal_like;
 #endif
         vector<Forest>                          _forests;
         double                                  _log_weight;
         double                                  _log_likelihood;
         double                                  _log_coalescent_likelihood;
-        mutable                                 Lot::SharedPtr _lot;
+        mutable Lot::SharedPtr                  _lot;
         unsigned                                _num_deep_coalescences;
         unsigned                                _max_deep_coal;
         unsigned                                _psuffix;
@@ -477,9 +475,13 @@ inline vector<double> Particle::getVectorPrior() {
         double inv_gamma_modifier = 0.0;
         
         unsigned next_gene = _gene_order[G::_generation];
+        
+//        if (next_gene == 1) {
+//            cout << "stop";
+//        }
         bool calc_weight = false;
         
-        if (G::_species_newick_name == "null") { // if specifying species newick, keep the species tree the same for all particles and never reset it in first level
+        if (!G::_species_newick_specified) { // if specifying species newick, keep the species tree the same for all particles and never reset it in first level
             if (G::_generation == 0) {
                 buildEntireSpeciesTree();
                 // make a separate species tree information vector for each gene
@@ -489,7 +491,7 @@ inline vector<double> Particle::getVectorPrior() {
                 }
             }
 #if !defined (USING_MPI)
-            else if (G::_generation % G::_nloci == 0 && G::_start_mode_type == G::StartModeType::START_MODE_SMC) { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it
+            else if (G::_generation % G::_nloci == 0 && G::_start_mode_type == G::StartModeType::START_MODE_SMC) { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it  // TODO: for now, don't rebuild tree for MPI
                     trimSpeciesTree();
                 if (_forests[0]._lineages.size() > 1) {
                     rebuildSpeciesTree();
@@ -497,7 +499,7 @@ inline vector<double> Particle::getVectorPrior() {
             }
 #endif
         }
-        else { // TODO: for now, don't rebuild tree for MPI
+        else {
             if (G::_generation == 0) {
                 for (unsigned i=1; i<_forests.size(); i++) {
                     _t_by_gene.push_back(_t);
@@ -523,8 +525,6 @@ inline vector<double> Particle::getVectorPrior() {
             
             unsigned next_species_index = _next_species_number_by_gene[next_gene-1];
             double species_increment = _t_by_gene[next_gene-1][next_species_index].second;
-            
-            string species_name = "species";
             
           // if total rate is 0, gene increment will be -1.0, which will be taken care of
 
@@ -1299,7 +1299,8 @@ inline vector<double> Particle::getVectorPrior() {
         //species tree
         _forests[0].setUpSpeciesForest();
 
-        if (_forests[1]._lineages.size() > 0) { // don't redo this for faster second level when nodes have been cleared from gene trees
+        if (!G::_in_second_level) {
+//        if (_forests[1]._lineages.size() > 0) { // don't redo this for faster second level when nodes have been cleared from gene trees
             //gene trees
             for (unsigned i=1; i<_forests.size(); i++) {
                 _forests[i].setUpGeneForest(taxon_map);
@@ -1422,7 +1423,6 @@ inline vector<double> Particle::getVectorPrior() {
         for (int i=1; i<_forests.size(); i++) {
 //            _forests[i]._nodes.clear();
             _forests[i].buildFromNewick(newicks[i-1], true, false); // newicks starts at 0
-//            _forests[i].showForest();
             _forests[i].refreshPreorder();
 //            _forests[i]._theta_mean = G::_theta; // for now, set theta mean equal to whatever theta user specifies
         }
@@ -1451,8 +1451,8 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
         _forests[0]._last_edge_length = 0.0;
         _forests[0]._increments_and_priors.clear();
-        _t.clear();
-        _t_by_gene.clear();
+//        _t.clear();  // TODO: testing - don't reset these because they will not get copied in the copy constructor
+//        _t_by_gene.clear();
 #if defined (FASTER_SECOND_LEVEL)
         _forests[0].refreshAllPreorders();
 #endif
@@ -1799,6 +1799,8 @@ inline vector<double> Particle::getVectorPrior() {
 
 #if defined (FASTER_SECOND_LEVEL)
     inline unsigned Particle::proposeSpeciationEvent() {
+        double prev_log_coal_like = _log_coal_like;
+        
         // This function is only used for proposing speciation events when there are
         // complete gene trees available. It thus draws increments from a truncated
         // exponential distribution where the trunction point is the next height at
@@ -1888,9 +1890,8 @@ inline vector<double> Particle::getVectorPrior() {
 
         // Compute coalescent likelihood and log weight
         calcLogCoalescentLikelihood(coalinfo_vect, /*integrate_out_thetas*/true, /*verbose*/false);
-        _log_weight = _log_coal_like - _prev_log_coal_like + log_weight_factor;
+        _log_weight = _log_coal_like - prev_log_coal_like + log_weight_factor;
 
-        resetPrevLogCoalLike();
         return num_species_tree_lineages;
     }
 #endif
@@ -2139,19 +2140,13 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
 #if defined (FASTER_SECOND_LEVEL)
-    inline void Particle::resetPrevLogCoalLike() {
-        _prev_log_coal_like = _log_coal_like;
-    }
-#endif
-
-#if defined (FASTER_SECOND_LEVEL)
     inline void Particle::clearGeneForests() {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].saveCoalInfoInitial();
             _forests[i].setTreeHeight();
-            _forests[i]._data = nullptr;
+//            _forests[i]._data = nullptr; // TODO: testing - don't need to clear these because they will not get copied in the copy constructor
             _forests[i]._nodes.clear();
-            _forests[i]._lineages.clear();
+//            _forests[i]._lineages.clear(); // TODO: testing - don't need to clear these because they will not get copied in the copy constructor
             _forests[i]._preorder.clear();
 #if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
             _forests[i]._vector_prior.clear();
@@ -2250,32 +2245,35 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::operator=(const Particle & other) {
+        if (!G::_in_second_level) { // TODO: testing
+            _log_likelihood = other._log_likelihood;
+            _t_by_gene = other._t_by_gene;
+            _t = other._t;
+            _next_species_number_by_gene = other._next_species_number_by_gene;
+            _next_species_number = other._next_species_number;
+            _gene_order = other._gene_order;
+        }
+        
         _log_weight     = other._log_weight;
-        _log_likelihood = other._log_likelihood;
         _forests         = other._forests;
-        _t = other._t;
         _psuffix = other._psuffix;
-        _next_species_number = other._next_species_number;
-        _t_by_gene = other._t_by_gene;
-        _next_species_number_by_gene = other._next_species_number_by_gene;
-        _gene_order = other._gene_order;
         _group_number = other._group_number;
-        _theta_map = other._theta_map;
+        _theta_map = other._theta_map; // TODO: is this slow to copy?
         _theta_mean = other._theta_mean;
 
         // the following data members apply only when simulating and do not need to be copied because simulating data only deals with one particle at a time
 //            _num_deep_coalescences = other._num_deep_coalescences;
 //            _max_deep_coal = other._max_deep_coal;
 
-#if !defined (FASTER_SECOND_LEVEL)
+        if (G::_in_second_level) { // TODO: testing
+#if defined (FASTER_SECOND_LEVEL)
+        _log_coal_like = other._log_coal_like;
+#else
         _species_branches = other._species_branches;
         _log_coalescent_likelihood = other._log_coalescent_likelihood;
         _species_tree_height = other._species_tree_height;
 #endif
-#if defined (FASTER_SECOND_LEVEL)
-        _log_coal_like = other._log_coal_like;
-        _prev_log_coal_like = other._prev_log_coal_like;
-#endif
+        }
         
 #if defined (UNUSED_FUNCTIONS)
         _starting_log_likelihoods = other._starting_log_likelihoods;
