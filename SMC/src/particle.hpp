@@ -2202,16 +2202,25 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
 
     inline void Particle::resetGeneOrder(unsigned step, vector<unsigned> gene_order) {
+        unsigned count=0;
+        
         if (_gene_order.size() == 0) {
             _gene_order.resize((G::_ntaxa-1)*G::_nloci);
-        }
-        unsigned count=0;
-        if (step == 0) { // step 0 is different because this happens before any proposals have occurred
+            
+            assert (step == 0);
+            // step 0 is different because this happens before any proposals have occurred
             for (unsigned s=step; s<G::_nloci; s++) {
                 _gene_order[s] = gene_order[count];
                 count++;
             }
         }
+//        unsigned count=0;
+//        if (step == 0) { // step 0 is different because this happens before any proposals have occurred
+//            for (unsigned s=step; s<G::_nloci; s++) {
+//                _gene_order[s] = gene_order[count];
+//                count++;
+//            }
+//        }
         else {
             for (unsigned s=step+1; s<step+G::_nloci+1; s++) {
                 _gene_order[s] = gene_order[count];

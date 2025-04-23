@@ -1737,11 +1737,14 @@ namespace proj {
         vector<unsigned> nonzeros;
         nonzeros.reserve(G::_nparticles);
         
+        unsigned group_number = start / G::_nparticles;
+        
         // Zero vector of counts storing number of darts hitting each particle
         vector<unsigned> counts (G::_nparticles, 0);
         
         double cump = probs[0];
-        double delta = rng.uniform()/G::_nparticles;
+//        double delta = rng.uniform()/G::_nparticles; // TODO: this needs to be group rnseed
+        double delta = _group_rng[group_number]->uniform() / G::_nparticles;
         unsigned c = (unsigned)(floor(1.0 + G::_nparticles*(cump - delta)));
         if (c > 0) {
             nonzeros.push_back(0);
@@ -3695,7 +3698,11 @@ namespace proj {
                 if (filter) {
                         
                     // parallelize filtering by subgroup
-                    filterParticlesThreading(my_vec, g, particle_indices);
+                    filterParticlesThreading(my_vec, g, particle_indices); // TODO: with threading, groups may get filtered in different orders, which may affect which random number seeds go with each particle
+                    
+//                    for (auto &p:my_vec) {
+//                        p.showSpeciesParticle();
+//                    }
                     
 //                      filterParticlesMixing(particle_indices, my_vec); // for now, don't do multinomial resampling
                     
