@@ -44,6 +44,7 @@ unsigned    G::_major_version       = 1;
 unsigned    G::_minor_version       = 0;
 string      G::_start_mode          = "smc";
 string      G::_proposal = "prior-prior";
+bool        G::_prior_prior = true;
 string      G::_model = "JC";
 string      G::_outgroup = "none";
 bool        G::_run_on_empty = false;

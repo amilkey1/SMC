@@ -31,6 +31,7 @@ namespace proj {
         static unsigned             _major_version;
         static unsigned             _minor_version;
         static string               _proposal;
+        static bool                 _prior_prior;
         static string               _model;
         static string               _outgroup;
         static bool                 _run_on_empty;

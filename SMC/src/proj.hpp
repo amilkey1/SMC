@@ -1007,6 +1007,10 @@ namespace proj {
         if (G::_species_newick_name != "null") {
             G::_species_newick_specified = true;
         }
+        
+        if (G::_proposal == "prior-prior") {
+            G::_prior_prior = true;
+        }
     }
 
     inline void Proj::checkOutgroupName() {
@@ -1178,7 +1182,7 @@ namespace proj {
         
         unsigned count = 0;
         for (auto &p:my_vec) {
-#if defined (OLD_UPGMA)
+#if !defined (FASTER_SECOND_LEVEL)
             p.createSpeciesIndices();
 #endif
             vector<string> particle_newicks;
@@ -2685,6 +2689,7 @@ namespace proj {
 
         G::_run_on_empty = true;
         G::_proposal = "prior-prior";
+        G::_prior_prior = true;
 
         _data = Data::SharedPtr(new Data());
         _data->setPartition(_partition);
@@ -3416,6 +3421,7 @@ namespace proj {
 
             if (G::_run_on_empty) { // if running with no data, choose taxa to join at random
                 G::_proposal = "prior-prior";
+                G::_prior_prior = true;
             }
 
             try {
@@ -3698,11 +3704,7 @@ namespace proj {
                 if (filter) {
                         
                     // parallelize filtering by subgroup
-                    filterParticlesThreading(my_vec, g, particle_indices); // TODO: with threading, groups may get filtered in different orders, which may affect which random number seeds go with each particle
-                    
-//                    for (auto &p:my_vec) {
-//                        p.showSpeciesParticle();
-//                    }
+                    filterParticlesThreading(my_vec, g, particle_indices);
                     
 //                      filterParticlesMixing(particle_indices, my_vec); // for now, don't do multinomial resampling
                     
@@ -3894,7 +3896,7 @@ namespace proj {
                     p.clearPartials(); // no more likelihood calculations
                     G::_generation = 0;
                     p.resetSpecies();
-                    p.mapSpecies(_taxon_map, _species_names);
+                    p.mapSpecies(_taxon_map);
                 }
 
                 vector<Particle> new_vec;

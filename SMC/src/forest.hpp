@@ -132,10 +132,17 @@ class Forest {
 #if defined (OLD_UPGMA)
         void                            buildStartingRow();
         void                            buildRestOfTreeFaster();
-        void                            createSpeciesIndices();
+#endif
+    
+#if !defined (FASTER_SECOND_LEVEL)
+    void                            createSpeciesIndices();
 #endif
         vector<pair<tuple<string, string, string>, double>>                            resetLineages(Lot::SharedPtr lot);
         vector<pair<tuple<string, string, string>, double>> resetT();
+    
+#if defined (REUSE_PARTIALS)
+        void                            stowPartial(Node *nd);
+#endif
     
 #if defined (FASTER_SECOND_LEVEL)
         void                            saveCoalInfoInitial();
@@ -151,9 +158,6 @@ class Forest {
         pair<double,double>             chooseSpeciesIncrementOnlySecondLevel(Lot::SharedPtr lot, double max_depth);
         void                            setTreeHeight();
     
-#if defined (REUSE_PARTIALS)
-        void                            stowPartial(Node *nd);
-#endif
 
         vector<coalinfo_t>                  _coalinfo;
         mutable vector<Node::ptr_vect_t>    _preorders;
@@ -216,6 +220,8 @@ class Forest {
         vector<double>                  _log_likelihood_choices;
 #if defined (OLD_UPGMA)
         map<Node*,  unsigned>           _starting_row;
+#endif
+#if !defined (FASTER_SECOND_LEVEL)
         map<string, unsigned>           _species_indices;
 #endif
         stack<Node *>                   _upgma_additions;
@@ -244,7 +250,9 @@ class Forest {
         void                            simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
     
 #if !defined (FASTER_SECOND_LEVEL)
+#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         double                          calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
+#endif
         pair<vector<double>, vector<unsigned>>  calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build);
         pair<vector<double>, vector<unsigned>>  calcInitialCoalescentLikelihoodIntegratingOutTheta();
         pair<vector<double>, vector<unsigned>>  calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build);
@@ -298,8 +306,11 @@ class Forest {
 #if defined (OLD_UPGMA)
         _starting_row.clear();
         _nincrements = 0;
+#endif
+#if !defined (FASTER_SECOND_LEVEL)
         _species_indices.clear();
 #endif
+        
         _upgma_additions = stack<Node*>();
         _upgma_starting_edgelen.clear();
 
@@ -1089,11 +1100,8 @@ class Forest {
             double transition_prob_dif = calcTransitionProbabilityJC(0, 1, child->_edge_length);
             
 #if defined (UNROLL_LOOPS)
-//            double * ppa = &parent_partial_array[0];
-            
             for (unsigned p = 0; p < _npatterns; p++) {
                 unsigned pxnstates = p*G::_nstates;
-                // TODO: calculate p*G::_nstates here
                 
                 // loop 1
                 unsigned s = 0;
@@ -1123,19 +1131,8 @@ class Forest {
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
                 child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
-                
-//                if (child == new_nd->_left_child) { // TODO: faster way to compare two nodes? - try starting with partials = 1, then always multiply
-////                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
-//                    *ppa++ = sum_over_child_states;
-//                }
-//                else {
-//                if (child == new_nd->_left_child) {
-//                    assert (*ppa == 1.0);
-//                }
-//                    *ppa++ *= sum_over_child_states;
-//                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
+
                 parent_partial_array[index] *= sum_over_child_states;
-//                }
             
                 // loop 2
                 s = 1;
@@ -1165,24 +1162,13 @@ class Forest {
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
                 child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
-//
-//                if (child == new_nd->_left_child) {
-//                    assert (*ppa == 1.0);
-//                }
-//                if (child == new_nd->_left_child) {
-//                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
-//                    *ppa++ = sum_over_child_states;
-//                }
-//                else {
+                
                 parent_partial_array[index] *= sum_over_child_states;
-//                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
-//                    *ppa++ *= sum_over_child_states;
-//                }
             
                 // loop 3
                 s = 2;
                 sum_over_child_states = 0.0;
-                index = p*G::_nstates+s;
+                index = pxnstates+s;
                 
                 // subloop 1
                 s_child = 0;
@@ -1207,19 +1193,8 @@ class Forest {
                 child_transition_prob = (s == s_child ? transition_prob_same : transition_prob_dif);
                 child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
-                
-//                if (child == new_nd->_left_child) {
-//                    assert (*ppa == 1.0);
-//                }
-//                if (child == new_nd->_left_child) {
-////                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
-//                    *ppa++ = sum_over_child_states;
-//                }
-//                else {
+
                 parent_partial_array[index] *= sum_over_child_states;
-//                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
-//                    *ppa++ *= sum_over_child_states;
-//                }
             
                 // loop 4
                 s = 3;
@@ -1250,18 +1225,7 @@ class Forest {
                 child_partial = child_partial_array[pxnstates + s_child];
                 sum_over_child_states += child_transition_prob * child_partial;
                 
-//                if (child == new_nd->_left_child) {
-//                    assert (*ppa == 1.0);
-//                }
-//                if (child == new_nd->_left_child) {
-////                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
-//                    *ppa++ = sum_over_child_states;
-//                }
-//                else {
                 parent_partial_array[index] *= sum_over_child_states;
-//                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
-//                    *ppa++ *= sum_over_child_states;
-//                }
             }
         } // child loop
 #else
@@ -1703,8 +1667,12 @@ class Forest {
 #if defined (OLD_UPGMA)
         _starting_row = other._starting_row;
         _nincrements = other._nincrements;
+#endif
+        
+#if !defined (FASTER_SECOND_LEVEL)
         _species_indices = other._species_indices;
 #endif
+        
         _upgma_additions = other._upgma_additions;
         _upgma_starting_edgelen = other._upgma_starting_edgelen;
 
@@ -3436,7 +3404,7 @@ class Forest {
              one_choice = true;
          }
 
-         if (G::_proposal == "prior-post" && (!one_choice)) {
+         if (!G::_prior_prior && (!one_choice)) {
              if (G::_save_memory) {
                  for (auto &nd:_lineages) {
                      if (nd->_partial == nullptr) {
@@ -3467,7 +3435,7 @@ class Forest {
          }
          
          else {
-             assert (G::_proposal == "prior-prior" || one_choice);
+             assert (G::_prior_prior || one_choice);
              // prior-prior proposal
              pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
              subtree1 = nodes[t.first];
@@ -3581,7 +3549,7 @@ class Forest {
 
         _species_partition[species_name] = nodes;
 
-        if ((G::_proposal == "prior-prior" || one_choice) && (!G::_run_on_empty) ) {
+        if ((G::_prior_prior || one_choice) && (!G::_run_on_empty) ) {
             _gene_tree_log_likelihood = calcLogLikelihood();
             _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
         }
@@ -3829,7 +3797,7 @@ class Forest {
         theta_map[new_species_name] = G::_theta;
     }
         
-#if defined (OLD_UPGMA)
+#if !defined (FASTER_SECOND_LEVEL)
     inline void Forest::createSpeciesIndices() {
         unsigned number = 0;
         for (auto &s:_species_partition) {
@@ -3909,6 +3877,7 @@ class Forest {
 //    }
 
 #if !defined (FASTER_SECOND_LEVEL)
+# if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
     inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {
         _panmictic_coalescent_likelihood = 0.0;
 
@@ -4079,6 +4048,7 @@ class Forest {
         return log_coalescent_likelihood;
     }
 #endif
+#endif
 
 #if !defined (FASTER_SECOND_LEVEL)
     inline pair<vector<double>, vector<unsigned>> Forest::calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build) {
@@ -4170,7 +4140,8 @@ class Forest {
                                         if (s.first == species) {
                                             bool found = (find(s.second.begin(), s.second.end(), search_nd->_right_sib) != s.second.end());
                                             if (found ) {
-                                                updateNodeList(s.second, search_nd, search_nd->_right_sib, search_nd->_parent); // update the species lineage
+                                                updateNodeVector(s.second, search_nd, search_nd->_right_sib, search_nd->_parent); // update the species lineage
+//                                                updateNodeList(s.second, search_nd, search_nd->_right_sib, search_nd->_parent); // update the species lineage
                                             }
                                             else {
                                                 q_b.clear(); // don't push back to q_b because it is full of ints
@@ -4384,7 +4355,8 @@ class Forest {
                                         if (s.first == species) {
                                             bool found = (find(s.second.begin(), s.second.end(), search_nd->_right_sib) != s.second.end());
                                             if (found ) {
-                                                updateNodeList(s.second, search_nd, search_nd->_right_sib, search_nd->_parent); // update the species lineage
+                                                updateNodeVector(s.second, search_nd, search_nd->_right_sib, search_nd->_parent); // update the species lineage
+//                                                updateNodeList(s.second, search_nd, search_nd->_right_sib, search_nd->_parent); // update the species lineage
                                             }
                                             else {
                                                 q_b.clear(); // don't push back to q_b because it is full of doubles
