@@ -184,7 +184,7 @@ class Forest {
         Data::SharedPtr                 _data;
     
         unsigned                        _first_pattern = 0;
-        unsigned                        _index;
+        unsigned                        _index; // gene indices start at 1, not 0
         map<string, vector<Node*> >     _species_partition;
         double                          _gene_tree_log_likelihood;
         double                          _log_joining_prob;
@@ -1629,21 +1629,23 @@ class Forest {
     }
 
     inline void Forest::operator=(const Forest & other) {
-//        _nodes.clear(); // don't need to clear _nodes because they will get overwritten
-        _nodes.resize(other._nodes.size());
+        _nodes.resize(other._nodes.size()); // don't need to clear these members because they will get overwritten
         _lineages.resize(other._lineages.size());
         
         _nleaves            = other._nleaves;
         _ninternals         = other._ninternals;
         _last_edge_length   = other._last_edge_length;
         _index              = other._index;
-        _gene_tree_log_likelihood = other._gene_tree_log_likelihood;
         _increments_and_priors = other._increments_and_priors;
         _preorder.resize(other._preorder.size());
         _forest_length = other._forest_length;
+            
+        _partials_calculated_count = other._partials_calculated_count;
+        _forest_height = other._forest_height;
         
         // the following data members apply only to the first round
         if (!G::_in_second_level) { // TODO: testing
+            _gene_tree_log_likelihood = other._gene_tree_log_likelihood;
             _log_joining_prob = other._log_joining_prob;
             _npatterns = other._npatterns;
             _edge_rate_variance = other._edge_rate_variance;
@@ -1651,6 +1653,14 @@ class Forest {
             _comphet = other._comphet;
             _first_pattern      = other._first_pattern;
             _data               = other._data;
+            
+            _upgma_additions = other._upgma_additions;
+            _upgma_starting_edgelen = other._upgma_starting_edgelen;
+
+            _dmatrix = other._dmatrix;
+            _dmatrix_rows = other._dmatrix_rows;
+            
+            _starting_dij = other._starting_dij;
         }
         
         // the following data members apply only when simulating and do not need to be copied because simulating data only deals with one particle at a time
@@ -1672,16 +1682,6 @@ class Forest {
 #if !defined (FASTER_SECOND_LEVEL)
         _species_indices = other._species_indices;
 #endif
-        
-        _upgma_additions = other._upgma_additions;
-        _upgma_starting_edgelen = other._upgma_starting_edgelen;
-
-        _dmatrix = other._dmatrix;
-        _dmatrix_rows = other._dmatrix_rows;
-        
-        _starting_dij = other._starting_dij;
-        _partials_calculated_count = other._partials_calculated_count;
-        _forest_height = other._forest_height;
         
         // the following data members apply only to the second level
         if (G::_in_second_level) { // TODO: testing
@@ -1710,7 +1710,22 @@ class Forest {
         // copy tree itself
         
         if (other._nodes.size() > 0) { // otherwise, there is no forest and nothing needs to be copied
+            
+#if defined (FASTER_SECOND_LEVEL) // don't need to save the species partition for the second level
+            if (!G::_in_second_level) {
+                    _species_partition.clear(); // TODO: can rewrite this without clearing?
+                                    
+                for (auto spiter : other._species_partition) {
+                    for (auto s : spiter.second) {
+                        unsigned number = s->_number;
+                        Node* nd = &_nodes[number];
+                        _species_partition[spiter.first].push_back(nd);
+                    }
+                }
+            }
+#else
             _species_partition.clear(); // TODO: can rewrite this without clearing?
+                
             for (auto spiter : other._species_partition) {
                 for (auto s : spiter.second) {
                     unsigned number = s->_number;
@@ -1718,6 +1733,7 @@ class Forest {
                     _species_partition[spiter.first].push_back(nd);
                 }
             }
+#endif
             
 #if defined (OLD_UPGMA)
             _starting_row.clear();
@@ -4751,7 +4767,7 @@ class Forest {
 
     inline unsigned Forest::countNewickInternals(const string newick) {
         size_t count = count_if(newick.begin(), newick.end(), []( char c ){return c =='(';});
-        return count - 1;
+        return (unsigned) (count - 1);
     }
 
     inline unsigned Forest::countNewickLeaves(const std::string newick) {
@@ -6369,7 +6385,7 @@ class Forest {
         }
     }
 
-#if defined (USING_MPIE)
+#if defined (USING_MPI)
     inline void Forest::resetSpeciesPartition(string species_partition_string) {
         _species_partition.clear();
         cout << species_partition_string << endl;

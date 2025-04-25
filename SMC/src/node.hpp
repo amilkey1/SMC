@@ -16,6 +16,7 @@ namespace proj {
     class Node {
         friend class Likelihood;
         friend class Forest;
+        friend class SpeciesForest;
         friend class Particle;
 
         public:

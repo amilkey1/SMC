@@ -36,6 +36,7 @@ void output(string msg) {
 #endif
 
 #include "forest.hpp"
+#include "species-forest.hpp"
 #include "data.hpp"
 #include "particle.hpp"
 

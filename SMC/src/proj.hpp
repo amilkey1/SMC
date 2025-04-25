@@ -884,7 +884,7 @@ namespace proj {
         ("simcomphet",   boost::program_options::value(&Forest::_comphet)->default_value(G::_infinity), "Dirichlet parameter governing compositional heterogeneity (default value results in compositional homogeneity (used only if startmode is 'sim')")
         ("save_gene_trees_separately", boost::program_options::value(&G::_save_gene_trees_separately)->default_value(false), "for simulations, save gene trees in separate files")
         ("newick_path", boost::program_options::value(&G::_newick_path)->default_value("."), "path to gene newicks are if starting from gene newicks and only performing SMC on second round")
-        ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(5), "number of populations")
+        ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(1), "number of populations")
         ("upgma", boost::program_options::value(&G::_upgma)->default_value(true), "set to false to not use UPGMA completion")
         ;
 
@@ -1747,7 +1747,6 @@ namespace proj {
         vector<unsigned> counts (G::_nparticles, 0);
         
         double cump = probs[0];
-//        double delta = rng.uniform()/G::_nparticles; // TODO: this needs to be group rnseed
         double delta = _group_rng[group_number]->uniform() / G::_nparticles;
         unsigned c = (unsigned)(floor(1.0 + G::_nparticles*(cump - delta)));
         if (c > 0) {
@@ -3870,6 +3869,7 @@ namespace proj {
 //                cout << "\nTotal time setting files for second round: " << total_seconds << endl;
 //                cout << total_seconds << endl;
                 
+//                my_vec[0].showParticle();
 #if defined (FASTER_SECOND_LEVEL)
                 fasterSecondLevel(my_vec);
 #else
