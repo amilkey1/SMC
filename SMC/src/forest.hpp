@@ -74,16 +74,12 @@ class Forest {
         void                            calcPartialArrayHKY(Node* new_nd);
 
         void                            setUpGeneForest(map<string, string> &taxon_map);
-        void                            setUpSpeciesForest();
-        tuple<string,string, string>    speciesTreeProposal(Lot::SharedPtr lot);
         void                            updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                            updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
         void                            revertNodeVector(vector<Node *> & node_vector, Node * addnode1, Node * addnode2, Node * delnode1);
         double                          getRunningSumChoices(vector<double> &log_weight_choices);
         vector<double>                  reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
         int                             selectPair(vector<double> weight_vec, Lot::SharedPtr lot);
-        void                            chooseSpeciesIncrement(Lot::SharedPtr lot);
-        pair<double,double>             chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth);
         void                            allowCoalescence(string species_name, double increment, Lot::SharedPtr lot);
         vector<pair<double, string>>    calcForestRate(Lot::SharedPtr lot, unordered_map<string, double> theta_map);
         void                            updateSpeciesPartition(tuple<string, string, string> species_info);
@@ -104,14 +100,7 @@ class Forest {
 #endif
         vector< pair<double, Node *>>   sortPreorder();
         void                            refreshPreorder();
-        void                            createThetaMapOld(Lot::SharedPtr lot, unordered_map<string, double>& theta_map, double theta_mean);
-        void                            createThetaMapFixedThetaOld(Lot::SharedPtr lot, unordered_map<string, double> &theta_map);
-        void                            updateThetaMapOld(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> &theta_map, double theta_mean);
-        void                            updateThetaMapFixedThetaOld(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> &theta_map);
-        void                            resetThetaMapOld(Lot::SharedPtr lot, unordered_map<string, double> &theta_map);
-        void                            drawNewThetaOld(string new_species, Lot::SharedPtr lot, unordered_map<string, double> &theta_map, double theta_mean);
         void                            buildFromNewick(const string newick, bool rooted, bool allow_polytomies);
-        vector<pair<tuple<string, string, string>, double>> buildFromNewickMPI(const string newick, bool rooted, bool allow_polytomies, Lot::SharedPtr lot);
         void                            extractNodeNumberFromName(Node * nd, std::set<unsigned> & used);
         void                            stripOutNexusComments(std::string & newick);
         unsigned                        countNewickLeaves(const std::string newick);
@@ -135,9 +124,12 @@ class Forest {
 #endif
     
 #if !defined (FASTER_SECOND_LEVEL)
-    void                            createSpeciesIndices();
+    void                                createSpeciesIndices();
 #endif
+    
+#if defined (USING_MPI)
         vector<pair<tuple<string, string, string>, double>>                            resetLineages(Lot::SharedPtr lot);
+#endif
         vector<pair<tuple<string, string, string>, double>> resetT();
     
 #if defined (REUSE_PARTIALS)
@@ -147,20 +139,16 @@ class Forest {
 #if defined (FASTER_SECOND_LEVEL)
         void                            saveCoalInfoInitial();
         void                            saveCoalInfoGeneForest(vector<Forest::coalinfo_t> & coalinfo_vect) const;
-        void                            saveCoalInfoSpeciesTree(vector<Forest::coalinfo_t> & coalinfo_vect, bool cap);
         void                            addCoalInfoElem(const Node *, vector<coalinfo_t> & recipient);
-        void                            buildCoalInfoVect();
+//        void                            buildCoalInfoVect();
         void                            fixupCoalInfo(vector<coalinfo_t> & coalinfo_vect, vector<coalinfo_t> & sppinfo_vect) const;
         static bool                     subsumed(G::species_t test_species, G::species_t subtending_species);
-        void                            refreshAllPreorders() const;
         void                            refreshPreorderNew(vector<Node*> & preorder) const;
         Node *                          findNextPreorderNew(Node * nd) const;
-        pair<double,double>             chooseSpeciesIncrementOnlySecondLevel(Lot::SharedPtr lot, double max_depth);
         void                            setTreeHeight();
     
 
         vector<coalinfo_t>                  _coalinfo;
-        mutable vector<Node::ptr_vect_t>    _preorders;
         mutable unsigned                    _next_node_number;
 #endif
 
@@ -168,6 +156,7 @@ class Forest {
 #if defined (USING_MPI)
         void                            resetSpeciesPartition(string species_partition);
         map<string, vector<string>>     saveSpeciesPartition();
+    vector<pair<tuple<string, string, string>, double>> buildFromNewickMPI(const string newick, bool rooted, bool allow_polytomies, Lot::SharedPtr lot);
 #endif
         void                            setGeneUPGMAMatrices();
     
@@ -251,7 +240,7 @@ class Forest {
     
 #if !defined (FASTER_SECOND_LEVEL)
 #if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-        double                          calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
+        double                             calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
 #endif
         pair<vector<double>, vector<unsigned>>  calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build);
         pair<vector<double>, vector<unsigned>>  calcInitialCoalescentLikelihoodIntegratingOutTheta();
@@ -320,7 +309,6 @@ class Forest {
         _forest_height = 0.0;
 #if defined (FASTER_SECOND_LEVEL)
         _coalinfo.clear();
-        _preorders.clear();
         _next_node_number = 0;
 #endif
         
@@ -1632,19 +1620,15 @@ class Forest {
         _nodes.resize(other._nodes.size()); // don't need to clear these members because they will get overwritten
         _lineages.resize(other._lineages.size());
         
-        _nleaves            = other._nleaves;
-        _ninternals         = other._ninternals;
-        _last_edge_length   = other._last_edge_length;
-        _index              = other._index;
-        _increments_and_priors = other._increments_and_priors;
-        _preorder.resize(other._preorder.size());
-        _forest_length = other._forest_length;
-            
-        _partials_calculated_count = other._partials_calculated_count;
-        _forest_height = other._forest_height;
-        
         // the following data members apply only to the first round
         if (!G::_in_second_level) { // TODO: testing
+            
+            _nleaves            = other._nleaves;
+            _ninternals         = other._ninternals;
+            _last_edge_length   = other._last_edge_length;
+            
+            _preorder.resize(other._preorder.size());
+            
             _gene_tree_log_likelihood = other._gene_tree_log_likelihood;
             _log_joining_prob = other._log_joining_prob;
             _npatterns = other._npatterns;
@@ -1662,6 +1646,13 @@ class Forest {
             
             _starting_dij = other._starting_dij;
         }
+        
+        _index              = other._index;
+        _increments_and_priors = other._increments_and_priors;
+        _forest_length = other._forest_length;
+            
+        _partials_calculated_count = other._partials_calculated_count;
+        _forest_height = other._forest_height;
         
         // the following data members apply only when simulating and do not need to be copied because simulating data only deals with one particle at a time
 //        _lineages_per_species = other._lineages_per_species;
@@ -1687,7 +1678,6 @@ class Forest {
         if (G::_in_second_level) { // TODO: testing
 #if defined (FASTER_SECOND_LEVEL)
             _coalinfo = other._coalinfo;
-            _preorders = other._preorders;
             _next_node_number = other._next_node_number;
 #else
             _species_build = other._species_build;
@@ -1812,246 +1802,6 @@ class Forest {
                 }
             }
         }
-    }
-
-    inline void Forest::setUpSpeciesForest() {
-        _index = 0;
-        
-        //create species
-        _nodes.resize(2*G::_nspecies - 1);
-        _lineages.reserve(_nodes.size());
-        
-        //create taxa
-        for (unsigned i = 0; i < G::_nspecies; i++) {
-            Node * nd = &(_nodes[i]);
-            nd->_right_sib=0;
-            nd->_name=" ";
-            nd->_left_child=0;
-            nd->_right_sib=0;
-            nd->_parent=0;
-            nd->_number=i;
-            nd->_edge_length=0.0;
-            nd->_height = 0.0;
-            nd->_position_in_lineages=i;
-            nd->_name=G::_species_names[i];
-            _lineages.push_back(nd);
-#if defined (FASTER_SECOND_LEVEL)
-            if (G::_start_mode != "sim") {
-//            if (G::_start_mode_type != G::StartModeType::START_MODE_SIM) {
-                if (G::_taxon_to_species.count(nd->_name) == 0) {
-                    throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd->_name));
-                }
-                else {
-                    Node::setSpeciesBit(nd->_species, G::_taxon_to_species.at(nd->_name), /*init_to_zero_first*/true);
-                }
-            }
-#endif
-            }
-        
-        _nleaves=G::_nspecies;
-        _ninternals=0;
-    }
-
-    inline pair<double,double> Forest::chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth) {
-        unsigned nlineages = (unsigned) _lineages.size();
-        
-        if (max_depth > 0.0) {
-            double rate = (G::_lambda)*_lineages.size();
-            
-            double u = lot->uniform();
-            double inner_term = 1-exp(-rate*max_depth);
-            _last_edge_length = -log(1-u*inner_term)/rate;
-            assert (_last_edge_length < max_depth);
-            for (auto nd:_lineages) {
-                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
-            }
-            
-            // lorad only works if all topologies the same - then don't include the prior on joins b/c it is fixed
-            double increment_prior = (log(rate)-_last_edge_length*rate);
-                        
-            _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior)); // do not include constrained factor in increment prior
-        }
-        else {
-            double rate = G::_lambda*_lineages.size();
-            
-            assert (lot != nullptr);
-            _last_edge_length = lot->gamma(1.0, 1.0/rate);
-
-            for (auto nd:_lineages) {
-                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
-            }
-            
-            double nChooseTwo = _lineages.size()*(_lineages.size() - 1);
-            double log_prob_join = log(2/nChooseTwo);
-            double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
-
-            _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior));
-
-        }
-        
-#if !defined (FASTER_SECOND_LEVEL)
-        if (_species_build.size() == 0) {
-            _species_build.push_back(make_pair(make_tuple("null", "null", "null"), _last_edge_length));
-        }
-        else {
-            _species_build.back().second = _last_edge_length;
-        }
-#endif
-        
-        double constrained_factor = log(1 - exp(-1*nlineages*G::_lambda*max_depth));
-        
-        _forest_height += _last_edge_length;
-        
-        return make_pair(_last_edge_length, constrained_factor);
-
-    }
-
-#if defined (FASTER_SECOND_LEVEL)
-    inline pair<double,double> Forest::chooseSpeciesIncrementOnlySecondLevel(Lot::SharedPtr lot, double max_depth) {
-        double nlineages = (double) _lineages.size();
-        
-            max_depth = max_depth - _forest_height;
-            
-            assert (max_depth >= 0.0);
-        
-        if (max_depth > 0.0) {
-            double rate = (G::_lambda)*_lineages.size();
-            
-            double u = lot->uniform();
-            double inner_term = 1-exp(-rate*max_depth);
-            _last_edge_length = -log(1-u*inner_term)/rate;
-            assert (_last_edge_length < max_depth);
-            for (auto nd:_lineages) {
-                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
-            }
-            
-            // lorad only works if all topologies the same - then don't include the prior on joins b/c it is fixed
-            double increment_prior = (log(rate)-_last_edge_length*rate);
-                        
-            _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior)); // do not include constrained factor in increment prior
-        }
-        else {
-            double rate = G::_lambda*_lineages.size();
-            
-            assert (lot != nullptr);
-            _last_edge_length = lot->gamma(1.0, 1.0/rate);
-
-            for (auto nd:_lineages) {
-                nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
-            }
-            
-            double nChooseTwo = _lineages.size()*(_lineages.size() - 1);
-            double log_prob_join = log(2/nChooseTwo);
-            double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
-
-            _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior));
-
-        }
-        
-#if !defined (FASTER_SECOND_LEVEL)
-        if (_species_build.size() == 0) {
-            _species_build.push_back(make_pair(make_tuple("null", "null", "null"), _last_edge_length));
-        }
-        else {
-            _species_build.back().second = _last_edge_length;
-        }
-#endif
-        
-        double constrained_factor = log(1 - exp(-1*nlineages*G::_lambda*max_depth));
-        
-        _forest_height += _last_edge_length;
-        
-        return make_pair(_last_edge_length, constrained_factor);
-
-    }
-#endif
-
-
-    inline void Forest::chooseSpeciesIncrement(Lot::SharedPtr lot) {
-        double rate = G::_lambda*_lineages.size();
-        
-        assert (lot != nullptr);
-        _last_edge_length = lot->gamma(1.0, 1.0/rate);
-
-        for (auto nd:_lineages) {
-            nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
-        }
-        
-#if defined (FASTER_SECOND_LEVEL)
-        _forest_height += _last_edge_length;
-#endif
-    }
-
-
-    inline tuple<string,string, string> Forest::speciesTreeProposal(Lot::SharedPtr lot) {
-        // this function creates a new node and joins two species
-        
-        bool done = false;
-        Node* subtree1 = nullptr;
-        Node* subtree2 = nullptr;
-        
-        while (!done) {
-            assert (lot != nullptr);
-            pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
-            assert (t.first != t.second);
-            
-            subtree1=_lineages[t.first];
-            subtree2=_lineages[t.second];
-            assert (t.first < _lineages.size());
-            assert (t.second < _lineages.size());
-            assert(!subtree1->_parent && !subtree2->_parent);
-            
-            if (G::_outgroup != "none") {
-                if (subtree1->_name != G::_outgroup && subtree2->_name != G::_outgroup && _lineages.size() > 2) { // outgroup can only be chosen on the last step
-                    done = true;
-                }
-                else if (_lineages.size() == 2) {
-                    done = true;
-                }
-            }
-            else {
-                done = true;
-            }
-            if (G::_outgroup == "none") {
-                assert (done == true);
-            }
-        }
-        
-        Node * new_nd = &_nodes[_nleaves + _ninternals];
-        assert (new_nd->_parent==0);
-       assert (new_nd->_number == -1);
-       assert (new_nd->_right_sib == 0);
-//        _nodes.push_back(nd);
-//        Node* new_nd = &_nodes.back();
-//        new_nd->_parent=0;
-        new_nd->_number=_nleaves+_ninternals;
-        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
-        new_nd->_edge_length=0.0;
-        _ninternals++;
-//        new_nd->_right_sib=0;
-
-        new_nd->_left_child=subtree1;
-        subtree1->_right_sib=subtree2;
-
-        subtree1->_parent=new_nd;
-        subtree2->_parent=new_nd;
-        
-        updateNodeVector (_lineages, subtree1, subtree2, new_nd);
-
-#if defined (DEBUG_MODE)
-        if (_lineages.size() > 1) {
-            _species_joined = make_pair(subtree1, subtree2); // last step just joins remaining two
-        }
-#endif
-        
-        new_nd->_height = _forest_height;
-        
-        calcTopologyPrior((int) _lineages.size()+1);
-
-#if !defined (FASTER_SECOND_LEVEL)
-        _species_build.push_back(make_pair(make_tuple(subtree1->_name, subtree2->_name, new_nd->_name), 0.0));
-#endif
-        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
     }
 
     inline void Forest::updateSpeciesPartition(tuple<string, string, string> species_info) {
@@ -3712,105 +3462,6 @@ class Forest {
         _last_edge_length = increment;
         
         _forest_height += _last_edge_length;
-    }
-
-    inline void Forest::resetThetaMapOld(Lot::SharedPtr lot, unordered_map<string, double> &theta_map) { // TODO: not sure if this works if not doing jones coalescent likelihood - double check
-        assert (theta_map.size() == 0);
-        // map should be 2*nspecies - 1 size
-        unsigned number = 0;
-        vector<string> species_names;
-        
-        for (auto &s:_species_partition) {
-            species_names.push_back(s.first);
-            number++;
-        }
-        
-        for (int i=0; i<G::_nspecies-1; i++) {
-            string name = boost::str(boost::format("node-%d")%number);
-            number++;
-            species_names.push_back(name);
-        }
-        
-        assert (species_names.size() == 2*G::_nspecies - 1);
-        
-        // draw thetas for tips of species trees and ancestral population
-        // for all other populations, theta = -1
-        
-        if (G::_theta_proposal_mean == 0.0) {
-            assert (G::_theta > 0.0);
-            G::_theta_proposal_mean = G::_theta;
-        }
-        double scale = 1 / G::_theta_proposal_mean;
-        
-        unsigned count = 0;
-        for (auto &name:species_names) {
-            if (count < G::_nspecies || count == 2*G::_nspecies-2) {
-                double new_theta = 0.0;
-                if (new_theta < G::_small_enough) {
-                    new_theta = 1 / (lot->gamma(2.0, scale));
-                    assert (new_theta > 0.0);
-                    theta_map[name] = new_theta;
-                }
-                
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-                // pop mean = theta / 4
-                double a = 2.0;
-                double b = scale;
-                double x = new_theta;
-                double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
-                _vector_prior.push_back(log_inv_gamma_prior);
-#endif
-            }
-            else {
-                theta_map[name] = -1;
-            }
-            count++;
-        }
-    }
-
-    inline void Forest::drawNewThetaOld(string new_species, Lot::SharedPtr lot, unordered_map<string, double> & theta_map, double theta_mean) {
-        // draw a new theta for the newest species population
-        double scale = 1 / theta_mean;
-        double new_theta = 0.0;
-        if (new_theta < G::_small_enough) {
-            new_theta = 1 / lot->gamma(2.0, scale);
-            theta_map[new_species] = new_theta;
-        }
-        
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-        // pop mean = theta / 4
-        double a = 2.0;
-        double b = scale;
-        double x = new_theta;
-        double log_inv_gamma_prior = (a*log(b) - lgamma(a) - (a+1)*log(x) - b/x);
-        _vector_prior.push_back(log_inv_gamma_prior);
-#endif
-    }
-
-    inline void Forest::updateThetaMapOld(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> & theta_map, double theta_mean) {
-        // add a new theta for the most recently drawn species
-        double scale = (2.0 - 1.0) / theta_mean;
-        assert (scale > 0.0);
-        double new_theta = 0.0;
-        if (new_theta < G::_small_enough) {
-    //            new_theta = 1 / (lot->gamma(2.01, scale));
-            new_theta = 1 / (lot->gamma(2.0, scale));
-            assert (new_theta > 0.0);
-            theta_map[new_species_name] = new_theta;
-        }
-        
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-        // pop mean = theta / 4
-        double a = 2.0;
-        double b = scale;
-        double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
-        double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
-        _vector_prior.push_back(log_inv_gamma_prior);
-#endif
-    }
-        
-    inline void Forest::updateThetaMapFixedThetaOld(Lot::SharedPtr lot, string new_species_name, unordered_map<string, double> & theta_map) {
-        theta_map[new_species_name] = G::_theta;
     }
         
 #if !defined (FASTER_SECOND_LEVEL)
@@ -5543,6 +5194,7 @@ class Forest {
             throw XProj(boost::str(boost::format("node name (%s) not interpretable as a positive integer") % nd->_name));
     }
 
+#if defined (USING_MPI)
     inline vector<pair<tuple<string, string, string>, double>> Forest::buildFromNewickMPI(const std::string newick, bool rooted, bool allow_polytomies, Lot::SharedPtr lot) {
         vector<pair<tuple<string, string, string>, double>> new_t;
         // TODO: this doesn't seem to work if the tree is complete? leaves out the last node?
@@ -5943,7 +5595,9 @@ class Forest {
         }
         return new_t;
     }
+#endif
 
+#if defined (USING_MPI)
     inline vector<pair<tuple<string, string, string>, double>> Forest::resetLineages(Lot::SharedPtr lot) {
         // this function rebuilds the _lineages vector, setting _position_in_lineages
         // this function also rebuilds _t for use in reading in a species newick
@@ -6081,6 +5735,7 @@ class Forest {
         }
         return new_t;
     }
+#endif
 
     #if defined (FASTER_SECOND_LEVEL)
     inline void Forest::addCoalInfoElem(const Node * nd, vector<coalinfo_t> & recipient) {
@@ -6120,34 +5775,6 @@ class Forest {
         // Copy tuples stored in _coalinfo to end of coalinfo_vect
         coalinfo_vect.insert(coalinfo_vect.end(), _coalinfo.begin(), _coalinfo.end());
     }
-    #endif
-
-    #if defined (FASTER_SECOND_LEVEL)
-    inline void Forest::buildCoalInfoVect() {
-        assert (_index == 0);
-        
-        refreshAllPreorders(); // TODO: don't always need to refresh preorders?
-        
-        _coalinfo.clear();
-        for (auto & preorder : _preorders) {
-            for (auto nd : boost::adaptors::reverse(preorder)) {
-                if (nd->_left_child) {
-                    // nd is an internal node
-                    assert(nd->_height != G::_infinity);
-                    assert(nd->_left_child->_right_sib);
-                    assert(nd->_left_child->_right_sib->_right_sib == nullptr);
-                    nd->_species = (nd->_left_child->_species | nd->_left_child->_right_sib->_species);
-                    addCoalInfoElem(nd, _coalinfo);
-                }
-                else {
-                    // nd is a leaf node
-                    unsigned spp_index = G::_taxon_to_species.at(nd->_name);
-                    nd->_species = (G::species_t)1 << spp_index;
-                }
-            }
-        }
-    }
-
     #endif
 
     #if defined (FASTER_SECOND_LEVEL)
@@ -6290,61 +5917,6 @@ class Forest {
             }
         }
     }
-    #endif
-
-    #if defined (FASTER_SECOND_LEVEL)
-    inline void Forest::saveCoalInfoSpeciesTree(vector<Forest::coalinfo_t> & coalinfo_vect, bool cap) {
-        // Appends to coalinfo_vect; clear coalinfo_vect before calling if desired
-        // Assumes heights and preorders are up-to-date; call
-        //   heightsInternalsPreorders() beforehand to ensure this
-        
-        // Dump _coalinfo into coalinfo_vect
-        if (!_coalinfo.empty()) {
-            coalinfo_vect.insert(coalinfo_vect.begin(), _coalinfo.begin(), _coalinfo.end());
-        }
-        
-        if (cap) {
-            // Create an entry pooling the remaining species
-            if (_lineages.size() > 1) {
-                vector<G::species_t> sppvect;
-                for (auto nd : _lineages) {
-                    sppvect.push_back(nd->_species);
-                }
-                coalinfo_vect.push_back(make_tuple(
-                    _forest_height,
-                    0,
-                    sppvect)
-                );
-            }
-        }
-    }
-    #endif
-
-    #if defined (FASTER_SECOND_LEVEL)
-    inline void Forest::refreshAllPreorders() const {
-        // For each subtree stored in _lineages, create a vector of node pointers in preorder sequence
-        assert (_index == 0); // only need to call this for a species tree
-        _next_node_number = G::_nspecies;
-        _preorders.clear();
-        if (_lineages.size() == 0)
-            return;
-        
-        for (auto nd : _lineages) {
-            if (nd->_left_child) {
-                nd->_number = _next_node_number++;
-            }
-            
-            // lineage is a Node::ptr_vect_t (i.e. vector<Node *>)
-            // lineage[0] is the first node pointer in the preorder sequence for this lineage
-            // Add a new vector to _preorders containing, for now, just the root of the subtree
-            _preorders.push_back({nd});
-            
-            // Now add the nodes above the root in preorder sequence
-            Node::ptr_vect_t & preorder_vector = *_preorders.rbegin();
-            refreshPreorderNew(preorder_vector);
-        }
-    }
-
     #endif
 
     #if defined (FASTER_SECOND_LEVEL)

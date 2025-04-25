@@ -152,7 +152,6 @@ class Particle {
         double                                          calcInitialCoalescentLikelihood();
         void                                            processGeneNewicks(vector<string> newicks);
         void                                            processSpeciesNewick(string newick_string);
-        void                                            setNextSpeciesNumber() {_next_species_number = G::_nspecies;}
         string                                          getTranslateBlock();
         void                                            buildEntireSpeciesTree();
         void                                            rebuildSpeciesTree();
@@ -188,7 +187,6 @@ class Particle {
         unsigned                                _num_deep_coalescences;
         unsigned                                _max_deep_coal;
         unsigned                                _psuffix;
-        unsigned                                _next_species_number;
         vector<unsigned>                        _next_species_number_by_gene;
         vector<pair<tuple<string, string, string>, double>> _t;
         vector<vector<pair<tuple<string, string, string>, double>>> _t_by_gene; // TODO: should these be maps instead?
@@ -252,7 +250,6 @@ class Particle {
         _max_deep_coal = 0.0;
         _t.clear();
         _psuffix = 0;
-        _next_species_number = G::_nspecies;
         _t_by_gene.clear();
         _next_species_number_by_gene.clear();
         _gene_order.clear();
@@ -1442,9 +1439,9 @@ inline vector<double> Particle::getVectorPrior() {
     // Simulate sequence data
         unsigned starting_site = 0;
         for (int i=0; i<_gene_forests.size(); i++) {
-            unsigned nsites = sites_vector[i-1];
+            unsigned nsites = sites_vector[i];
             _gene_forests[i].simulateData(_lot, starting_site, nsites);
-            starting_site += sites_vector[i-1];
+            starting_site += sites_vector[i];
         }
     }
 
@@ -2330,7 +2327,6 @@ inline vector<double> Particle::getVectorPrior() {
             _t_by_gene = other._t_by_gene;
             _t = other._t;
             _next_species_number_by_gene = other._next_species_number_by_gene;
-            _next_species_number = other._next_species_number;
             _gene_order = other._gene_order;
         }
         

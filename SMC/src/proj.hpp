@@ -2739,7 +2739,7 @@ namespace proj {
 
         sim_vec[0].mapSpecies(_taxon_map);
 
-        sim_vec[0].setNextSpeciesNumber(); // need to reset this now that number of species is known
+//        sim_vec[0].setNextSpeciesNumber(); // need to reset this now that number of species is known
         
         sim_vec[0].setNewTheta(G::_fix_theta_for_simulations);
                 

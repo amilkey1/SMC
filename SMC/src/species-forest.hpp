@@ -89,7 +89,6 @@ class SpeciesForest {
     
 #if defined (FASTER_SECOND_LEVEL)
         void                            saveCoalInfoInitial();
-        void                            saveCoalInfoGeneForest(vector<SpeciesForest::coalinfo_t> & coalinfo_vect) const;
         void                            saveCoalInfoSpeciesTree(vector<SpeciesForest::coalinfo_t> & coalinfo_vect, bool cap);
         void                            addCoalInfoElem(const Node *, vector<coalinfo_t> & recipient);
         void                            buildCoalInfoVect();
@@ -121,14 +120,10 @@ class SpeciesForest {
         vector<pair<double, double>>    _increments_and_priors;
     
 #if defined (DEBUG_MODE)
-        pair<Node*, Node*>                  _species_joined;
+        pair<Node*, Node*>              _species_joined;
 #endif
     
         vector<Node*>                   _preorder;
-//
-//#if !defined (FASTER_SECOND_LEVEL)
-//        map<string, string>             _taxon_map;
-//#endif
     
         double                          _forest_height;
         double                          _forest_length;
@@ -141,8 +136,6 @@ class SpeciesForest {
         double                          getLineageHeight(Node* nd);
         void                            addIncrement(double increment);
             
-        unsigned                        multinomialDraw(Lot::SharedPtr lot, const vector<double> & probs);
-
     public:
 
         typedef std::shared_ptr<Forest> SharedPtr;
@@ -191,10 +184,6 @@ class SpeciesForest {
         #if defined (FASTER_SECOND_LEVEL)
         _coalinfo.clear();
         _preorders.clear();
-#endif
-        
-#if defined (UNUSED_FUNCTIONS)
-        _done = false;
 #endif
     }
 
@@ -481,7 +470,7 @@ class SpeciesForest {
         
         _lineages.reserve(_nodes.size());
         
-        for (unsigned i = 0; i < G::_ntaxa; i++) {
+        for (unsigned i = 0; i < G::_nspecies; i++) {
             Node * nd = &(_nodes[i]);
             nd->_right_sib=0;
             nd->_name="";
@@ -492,34 +481,34 @@ class SpeciesForest {
             nd->_edge_length = edge_length;
             nd->_position_in_lineages=i;
             }
-        _nleaves=G::_ntaxa;
+        _nleaves=G::_nspecies;
         _ninternals=0;
         _last_edge_length = 0.0;
     }
 
     inline void SpeciesForest::operator=(const SpeciesForest & other) {
-            _nodes.resize(other._nodes.size()); // don't need to clear these members because they will get overwritten
-            _lineages.resize(other._lineages.size());
+        _nodes.resize(other._nodes.size()); // don't need to clear these members because they will get overwritten
+        _lineages.resize(other._lineages.size());
             
-            _nleaves            = other._nleaves;
-            _ninternals         = other._ninternals;
-            _last_edge_length   = other._last_edge_length;
-            _increments_and_priors = other._increments_and_priors;
-    //                _preorder.resize(other._preorder.size());
-            _forest_length = other._forest_length;
-            _forest_height = other._forest_height;
+        _nleaves            = other._nleaves;
+        _ninternals         = other._ninternals;
+        _last_edge_length   = other._last_edge_length;
+        _increments_and_priors = other._increments_and_priors;
+        _preorder.resize(other._preorder.size());
+        _forest_length = other._forest_length;
+        _forest_height = other._forest_height;
             
-            // the following data members apply only to the first round
-            if (!G::_in_second_level) {
-                _log_joining_prob = other._log_joining_prob;
-            }
+        // the following data members apply only to the first round
+        if (!G::_in_second_level) {
+            _log_joining_prob = other._log_joining_prob;
+        }
+        
+//        if (G::_in_second_level) {
+//            _coalinfo = other._coalinfo; // TODO: don't copy this because it gets reset - but maybe it's faster to copy it?
+//        }
             
     #if defined (DEBUG_MODE)
-            _species_joined = other._species_joined;
-    #endif
-            
-    #if defined (UNUSED_FUNCTIONS)
-            _done = other._done;
+        _species_joined = other._species_joined;
     #endif
 
             // copy tree itself
@@ -567,10 +556,10 @@ class SpeciesForest {
                 nd->_edge_length = othernd._edge_length;
                 nd->_position_in_lineages = othernd._position_in_lineages;
                 nd->_height = othernd._height;
-    //                    nd->_split = othernd._split;
-    #if defined (FASTER_SECOND_LEVEL)
-                nd->_species = othernd._species;
-    #endif
+                    
+                    // don't need to copy these members
+                    // nd->_split = othernd._split;
+                    // nd->_species = othernd._species;
                 }
             }
 
@@ -613,17 +602,6 @@ class SpeciesForest {
             nd->_position_in_lineages=i;
             nd->_name=G::_species_names[i];
             _lineages.push_back(nd);
-#if defined (FASTER_SECOND_LEVEL)
-            if (G::_start_mode != "sim") {
-//            if (G::_start_mode_type != G::StartModeType::START_MODE_SIM) {
-                if (G::_taxon_to_species.count(nd->_name) == 0) {
-                    throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd->_name));
-                }
-                else {
-                    Node::setSpeciesBit(nd->_species, G::_taxon_to_species.at(nd->_name), /*init_to_zero_first*/true);
-                }
-            }
-#endif
             }
         
         _nleaves=G::_nspecies;
@@ -2356,26 +2334,6 @@ class SpeciesForest {
                 })
             )
         );
-    }
-    #endif
-
-    #if defined (FASTER_SECOND_LEVEL)
-    inline void SpeciesForest::saveCoalInfoGeneForest(vector<Forest::coalinfo_t> & coalinfo_vect) const {
-        // Appends to coalinfo_vect; clear before calling if desired
-        // GeneForest version ignores cap argument.
-        // Assumes heights and preorders are up-to-date; call
-        //   heightsInternalsPreorders() beforehand to ensure this
-        
-        // coalinfo_t is a tuple with these elements:
-        // - height of node
-        // - 1-offset gene index (0 means speciation)
-        // - vector of child species
-        
-        // Should only be called for complete gene trees
-    //        assert(_lineages.size() == 1);
-
-        // Copy tuples stored in _coalinfo to end of coalinfo_vect
-        coalinfo_vect.insert(coalinfo_vect.end(), _coalinfo.begin(), _coalinfo.end());
     }
     #endif
 
