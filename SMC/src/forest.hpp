@@ -1620,6 +1620,8 @@ class Forest {
         _nodes.resize(other._nodes.size()); // don't need to clear these members because they will get overwritten
         _lineages.resize(other._lineages.size());
         
+        _gene_tree_log_likelihood = other._gene_tree_log_likelihood;
+        
         // the following data members apply only to the first round
         if (!G::_in_second_level) { // TODO: testing
             
@@ -1629,7 +1631,6 @@ class Forest {
             
             _preorder.resize(other._preorder.size());
             
-            _gene_tree_log_likelihood = other._gene_tree_log_likelihood;
             _log_joining_prob = other._log_joining_prob;
             _npatterns = other._npatterns;
             _edge_rate_variance = other._edge_rate_variance;
@@ -1677,7 +1678,9 @@ class Forest {
         // the following data members apply only to the second level
         if (G::_in_second_level) { // TODO: testing
 #if defined (FASTER_SECOND_LEVEL)
-            _coalinfo = other._coalinfo;
+//            _coalinfo = other._coalinfo;
+            _coalinfo = std::move(other._coalinfo);
+
             _next_node_number = other._next_node_number;
 #else
             _species_build = other._species_build;
@@ -1703,15 +1706,61 @@ class Forest {
             
 #if defined (FASTER_SECOND_LEVEL) // don't need to save the species partition for the second level
             if (!G::_in_second_level) {
-                    _species_partition.clear(); // TODO: can rewrite this without clearing?
-                                    
-                for (auto spiter : other._species_partition) {
-                    for (auto s : spiter.second) {
-                        unsigned number = s->_number;
-                        Node* nd = &_nodes[number];
-                        _species_partition[spiter.first].push_back(nd);
-                    }
+//                if (_species_partition != other._species_partition) {
+//                    cout << "stop";
+//                }
+                        
+                _species_partition.clear(); // TODO: can rewrite this without clearing? maybe faster if species names are not strings?
+
+            for (auto spiter : other._species_partition) {
+                for (auto s : spiter.second) {
+                    unsigned number = s->_number;
+                    Node* nd = &_nodes[number];
+                    _species_partition[spiter.first].push_back(nd);
                 }
+            }
+//
+//                vector<string> names;
+//                for (auto &s:other._species_partition) {
+//                    names.push_back(s.first);
+//                }
+//
+//                vector<unsigned> names_to_erase;
+//
+//                unsigned count = 0;
+//                unsigned name_number = 0;
+//                for (auto spiter : other._species_partition) {
+//                    count = 0;
+//                    for (auto s : spiter.second) {
+//                        unsigned number = s->_number;
+//                        Node* nd = &_nodes[number];
+//                        if (count == 0) {
+//                            vector<Node*> nds;
+//                            nds.push_back(nd);
+//                            _species_partition[spiter.first] = nds;
+//                        }
+//                        else {
+//                            _species_partition[spiter.first].push_back(nd);
+//                        }
+//                        count++;
+//                    }
+//                    names_to_erase.push_back(name_number);
+//                    name_number++;
+//                }
+//
+//                for (int num = (int) names_to_erase.size()-1; num > -1; num--) {
+//                    names.erase(names.begin() + names_to_erase[num]);
+//                }
+//
+//                for (auto &s:_species_partition) {
+//                    auto it = std::find(names.begin(), names.end(), s.first);
+//
+//                    // Check if the item was found in the remaining names
+//                    if (it != names.end()) {
+//                        _species_partition.erase(s.first);
+//                    }
+//                }
+                
             }
 #else
             _species_partition.clear(); // TODO: can rewrite this without clearing?

@@ -169,7 +169,6 @@ class SpeciesForest {
         _panmictic_coalescent_likelihood = 0.0;
         _log_coalescent_likelihood = 0.0;
         _log_coalescent_likelihood_increment = 0.0;
-        _taxon_map.clear();
 #endif
 #if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         _vector_prior.clear();
