@@ -191,7 +191,6 @@ class SpeciesForest {
         *this = other;
     }
 
-
     inline unsigned SpeciesForest::numLeaves() const {
         return _nleaves;
     }
@@ -620,11 +619,12 @@ class SpeciesForest {
             for (auto nd:_lineages) {
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
             }
-            
+             
+#if !defined (HIERARCHICAL_FILTERING)
             // lorad only works if all topologies the same - then don't include the prior on joins b/c it is fixed
             double increment_prior = (log(rate)-_last_edge_length*rate);
-                        
             _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior)); // do not include constrained factor in increment prior
+#endif
         }
         else {
             double rate = G::_lambda*_lineages.size();
@@ -635,13 +635,13 @@ class SpeciesForest {
             for (auto nd:_lineages) {
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
             }
-            
+
+#if !defined (HIERARCHICAL_FILTERING)
             double nChooseTwo = _lineages.size()*(_lineages.size() - 1);
             double log_prob_join = log(2/nChooseTwo);
             double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
-
             _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior));
-
+#endif
         }
         
 #if !defined (FASTER_SECOND_LEVEL)

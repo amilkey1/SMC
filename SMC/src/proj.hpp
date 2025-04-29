@@ -244,7 +244,7 @@ namespace proj {
 
                 logf << "\t" << log_likelihood;
 
-                logf << "\t" << log_prior - log_coalescent_likelihood; // starbeast3 does not include coalescent likelihood in this prior
+                logf << "\t" << log_prior; // starbeast3 does not include coalescent likelihood in this prior
 
 
                 logf << "\t" << vector_prior;
@@ -374,7 +374,7 @@ namespace proj {
 
             logf << "\t" << log_likelihood;
 
-            logf << "\t" << log_prior - log_coalescent_likelihood; // starbeast3 does not include coalescent likelihood in this prior
+            logf << "\t" << log_prior; // starbeast3 does not include coalescent likelihood in the prior
 
             logf << "\t" << vector_prior;
 
@@ -2503,8 +2503,10 @@ namespace proj {
             particle.fixTheta();
         }
         
-        if (G::_upgma && !G::_gene_newicks_specified) {
-            particle.setGeneUPGMAMatrices();
+        if (G::_upgma) {
+            if (G::_upgma && !G::_gene_newicks_specified) {
+                particle.setGeneUPGMAMatrices();
+            }
         }
     }
 
@@ -2848,7 +2850,7 @@ namespace proj {
                 }
             
                 second_level_particles.resize(G::_particle_increase, p);
-                
+                                
                 for (unsigned s=0; s<G::_nspecies-1; s++) {  // skip last round of filtering because weights are always 0
                     if (G::_verbose > 1) {
                         cout << "starting species step " << s+1 << " of " << G::_nspecies-1 << endl;
@@ -3467,8 +3469,10 @@ namespace proj {
                 }
 #endif
                 
-                if (!G::_gene_newicks_specified) {
-                    calcPairwiseDistanceMatrix();
+                if (G::_upgma) {
+                    if (!G::_gene_newicks_specified) {
+                        calcPairwiseDistanceMatrix();
+                    }
                 }
                 
                 Particle p;

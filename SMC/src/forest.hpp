@@ -1444,6 +1444,59 @@ class Forest {
             constructUPGMA();
         }
 
+#if defined (UNROLL_LOOPS)
+        for (auto &nd:_lineages) {
+            double log_like = 0.0;
+            for (unsigned p=0; p<_npatterns; p++) {
+                double site_like = 0.0;
+                unsigned pxnstates = p*G::_nstates;
+                
+                // loop 1
+                unsigned s = 0;
+#if defined (REUSE_PARTIALS)
+                double partial = (nd->_partial->_v)[pxnstates+s];
+#else
+                double partial = (*nd->_partial)[pxnstates+s];
+#endif
+                site_like += 0.25*partial;
+                
+                // loop 2
+                s = 1;
+#if defined (REUSE_PARTIALS)
+                partial = (nd->_partial->_v)[pxnstates+s];
+#else
+                partial = (*nd->_partial)[pxnstates+s];
+#endif
+                site_like += 0.25*partial;
+                
+                // loop 3
+                s = 2;
+#if defined (REUSE_PARTIALS)
+                partial = (nd->_partial->_v)[pxnstates+s];
+#else
+                partial = (*nd->_partial)[pxnstates+s];
+#endif
+                site_like += 0.25*partial;
+                
+                // loop 4
+                s = 3;
+#if defined (REUSE_PARTIALS)
+                partial = (nd->_partial->_v)[pxnstates+s];
+#else
+                partial = (*nd->_partial)[pxnstates+s];
+#endif
+                site_like += 0.25*partial;
+            
+                
+                assert(site_like>0);
+                log_like += log(site_like)*counts[_first_pattern+p];
+            }
+
+            _gene_tree_log_likelihood += log_like;
+            
+//            debugLogLikelihood(nd, log_like);
+        }
+#else
         for (auto &nd:_lineages) {
             double log_like = 0.0;
             for (unsigned p=0; p<_npatterns; p++) {
@@ -1464,6 +1517,7 @@ class Forest {
             
 //            debugLogLikelihood(nd, log_like);
         }
+#endif
         
         if (_forest_height > 0 && G::_upgma) {
             destroyUPGMA();
@@ -1639,13 +1693,15 @@ class Forest {
             _first_pattern      = other._first_pattern;
             _data               = other._data;
             
-            _upgma_additions = other._upgma_additions;
-            _upgma_starting_edgelen = other._upgma_starting_edgelen;
+            if (G::_upgma) {
+                _upgma_additions = other._upgma_additions;
+                _upgma_starting_edgelen = other._upgma_starting_edgelen;
 
-            _dmatrix = other._dmatrix;
-            _dmatrix_rows = other._dmatrix_rows;
-            
-            _starting_dij = other._starting_dij;
+                _dmatrix = other._dmatrix;
+                _dmatrix_rows = other._dmatrix_rows;
+                
+                _starting_dij = other._starting_dij;
+            }
         }
         
         _index              = other._index;
@@ -3528,69 +3584,6 @@ class Forest {
         }
     }
 #endif
-        
-//    inline void Forest::createThetaMapFixedThetaOld(Lot::SharedPtr lot, unordered_map<string, double>  &theta_map) {
-//        // map should be 2*nspecies - 1 size
-//
-//        assert (G::_species_names.size() == G::_nspecies);
-//
-//#if defined (OLD_UPGMA)
-//        unsigned number = 0;
-//        for (auto &s:_species_partition) {
-//            number++;
-//            _species_indices[s.first] = number - 1;
-//        }
-//#endif
-//
-//#if defined (OLD_UPGMA)
-//        for (int i=0; i<G::_nspecies-1; i++) {
-//            number++;
-//            _species_indices[name] = number - 1;
-//        }
-//#endif
-//
-//        for (auto &name:G::_species_names) {
-//            theta_map[name] = G::_theta;
-//        }
-//    }
-
-//    inline void Forest::createThetaMapOld(Lot::SharedPtr lot, unordered_map<string, double> &theta_map, double theta_mean) {
-//#if defined (OLD_UPGMA)
-//        unsigned number = 0;
-//        for (auto &s:_species_partition) {
-//            number++;
-//            _species_indices[s.first] = number - 1;
-//        }
-//#endif
-//
-//#if defined (OLD_UPGMA)
-//        for (int i=0; i<G::_nspecies-1; i++) {
-//            string name = boost::str(boost::format("node-%d")%number);
-//            number++;
-//            _species_indices[name] = number - 1;
-//        }
-//#endif
-//
-//        double scale = (2.0 - 1.0) / theta_mean;
-//        assert (scale > 0.0);
-//        for (auto &name:G::_species_names) {
-//            double new_theta = 0.0;
-//            if (new_theta < G::_small_enough) {
-//                new_theta = 1 / (lot->gamma(2.0, scale));
-//                assert (new_theta > 0.0);
-//                theta_map[name] = new_theta;
-//            }
-//#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-//            // pop mean = theta / 4
-//            double a = 2.0;
-//            double b = scale;
-//            double x = new_theta; //  x is theta, not theta / 4 like it is for starbeast3
-//            double log_inv_gamma_prior = - 1 / (b*x) - (a + 1) * log(x) - a*log(b) - lgamma(a);
-//            _vector_prior.push_back(log_inv_gamma_prior);
-//#endif
-//
-//        }
-//    }
 
 #if !defined (FASTER_SECOND_LEVEL)
 # if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
