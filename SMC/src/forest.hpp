@@ -50,7 +50,6 @@ class Forest {
         typedef tuple<double, unsigned, vector<G::species_t> >  coalinfo_t;
 #endif
 
-        unsigned                        numLeaves() const;
         unsigned                        numInternals() const;
         unsigned                        numNodes() const;
         void                            showForest();
@@ -165,7 +164,6 @@ class Forest {
         std::vector<Node *>             _lineages;
         vector<Node>                    _nodes;
 
-        unsigned                        _nleaves;
         unsigned                        _ninternals;
         unsigned                        _npatterns;
         double                          _last_edge_length;
@@ -277,7 +275,6 @@ class Forest {
         _log_weight = 0.0;
         _gene_tree_log_likelihood = 0.0;
         _log_joining_prob = 0.0;
-        _nleaves=G::_ntaxa;
         _ninternals=0;
         _preorder.clear();
         _forest_length = 0.0;
@@ -332,7 +329,6 @@ class Forest {
         _index = index;
         assert (index > 0);         //don't set data for species tree, though it doesn't really matter for simulations
         G::_ntaxa = ntaxa;
-        _nleaves = ntaxa;
         
         _data = d;
         
@@ -599,8 +595,8 @@ class Forest {
         _nodes.push_back(nd);
         Node* new_nd = &_nodes.back();
         new_nd->_parent=0;
-        new_nd->_number=_nleaves+_ninternals;
-        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
+        new_nd->_number=G::_ntaxa+_ninternals;
+        new_nd->_name+=boost::str(boost::format("node-%d")%new_nd->_number);
         new_nd->_edge_length=0.0;
         _ninternals++;
         new_nd->_right_sib=0;
@@ -633,7 +629,7 @@ class Forest {
         _nodes.push_back(nd2);
         Node* new_nd2 = &_nodes.back();
         new_nd2->_parent=0;
-        new_nd2->_number=_nleaves+_ninternals;
+        new_nd2->_number=G::_ntaxa+_ninternals;
         new_nd2->_name=boost::str(boost::format("node-%d")%new_nd2->_number);
         new_nd2->_edge_length=0.0;
         _ninternals++;
@@ -667,7 +663,7 @@ class Forest {
         _nodes.push_back(nd3);
         Node* new_nd3 = &_nodes.back();
         new_nd3->_parent=0;
-        new_nd3->_number=_nleaves+_ninternals;
+        new_nd3->_number=G::_ntaxa+_ninternals;
         new_nd3->_name=boost::str(boost::format("node-%d")%new_nd3->_number);
         new_nd3->_edge_length=0.0;
         _ninternals++;
@@ -704,7 +700,7 @@ class Forest {
         _nodes.push_back(nd4);
         Node* new_nd4 = &_nodes.back();
         new_nd4->_parent=0;
-        new_nd4->_number=_nleaves+_ninternals;
+        new_nd4->_number=G::_ntaxa+_ninternals;
         new_nd4->_name=boost::str(boost::format("node-%d")%new_nd4->_number);
         new_nd4->_edge_length=0.0;
         _ninternals++;
@@ -727,10 +723,6 @@ class Forest {
         calcLogLikelihood();
 #endif
         
-    }
-
-    inline unsigned Forest::numLeaves() const {
-        return _nleaves;
     }
 
     inline unsigned Forest::numInternals() const {
@@ -1665,7 +1657,6 @@ class Forest {
             nd->_edge_length = edge_length;
             nd->_position_in_lineages=i;
             }
-        _nleaves=G::_ntaxa;
         _ninternals=0;
         _last_edge_length = 0.0;
     }
@@ -1679,7 +1670,6 @@ class Forest {
         // the following data members apply only to the first round
         if (!G::_in_second_level) { // TODO: testing
             
-            _nleaves            = other._nleaves;
             _ninternals         = other._ninternals;
             _last_edge_length   = other._last_edge_length;
             
@@ -1762,64 +1752,60 @@ class Forest {
             
 #if defined (FASTER_SECOND_LEVEL) // don't need to save the species partition for the second level
             if (!G::_in_second_level) {
-//                if (_species_partition != other._species_partition) {
-//                    cout << "stop";
-//                }
+                
+                bool faster_spp_partition = true;
+                
+                if (!faster_spp_partition) {
                         
                 _species_partition.clear(); // TODO: can rewrite this without clearing? maybe faster if species names are not strings?
 
-            for (auto spiter : other._species_partition) {
-                for (auto s : spiter.second) {
-                    unsigned number = s->_number;
-                    Node* nd = &_nodes[number];
-                    _species_partition[spiter.first].push_back(nd);
+                for (auto spiter : other._species_partition) {
+                    for (auto s : spiter.second) {
+                        unsigned number = s->_number;
+                        Node* nd = &_nodes[number];
+                        _species_partition[spiter.first].push_back(nd);
+                    }
                 }
             }
-//
-//                vector<string> names;
-//                for (auto &s:other._species_partition) {
-//                    names.push_back(s.first);
-//                }
-//
-//                vector<unsigned> names_to_erase;
-//
-//                unsigned count = 0;
-//                unsigned name_number = 0;
-//                for (auto spiter : other._species_partition) {
-//                    count = 0;
-//                    for (auto s : spiter.second) {
-//                        unsigned number = s->_number;
-//                        Node* nd = &_nodes[number];
-//                        if (count == 0) {
-//                            vector<Node*> nds;
-//                            nds.push_back(nd);
-//                            _species_partition[spiter.first] = nds;
-//                        }
-//                        else {
-//                            _species_partition[spiter.first].push_back(nd);
-//                        }
-//                        count++;
-//                    }
-//                    names_to_erase.push_back(name_number);
-//                    name_number++;
-//                }
-//
-//                for (int num = (int) names_to_erase.size()-1; num > -1; num--) {
-//                    names.erase(names.begin() + names_to_erase[num]);
-//                }
-//
-//                for (auto &s:_species_partition) {
-//                    auto it = std::find(names.begin(), names.end(), s.first);
-//
-//                    // Check if the item was found in the remaining names
-//                    if (it != names.end()) {
-//                        _species_partition.erase(s.first);
-//                    }
-//                }
+                    
+            else {
+                vector<string> names;
+                names.reserve(other._species_partition.size());
                 
+                for (auto &s:other._species_partition) {
+                    names.push_back(s.first);
+                }
+
+                unsigned count = 0;
+                for (auto &spiter : other._species_partition) {
+                    count = 0;
+                    for (auto &s : spiter.second) {
+                        unsigned number = s->_number;
+                        Node* nd = &_nodes[number];
+                        if (count == 0) {
+                            vector<Node*> nds;
+                            nds.push_back(nd);
+                            _species_partition[spiter.first] = nds;
+                        }
+                        else {
+                            _species_partition[spiter.first].push_back(nd);
+                        }
+                        count++;
+                    }
+                }
+                
+                // iterate through species partition and erase any entries that are not in names vector from other._species_partition
+                for (auto it = _species_partition.begin(); it != _species_partition.end();) {
+                    if (std::find(names.begin(), names.end(), it->first) == names.end()) {
+                        it = _species_partition.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
             }
+        }
 #else
-            _species_partition.clear(); // TODO: can rewrite this without clearing?
+            _species_partition.clear();
                 
             for (auto spiter : other._species_partition) {
                 for (auto s : spiter.second) {
@@ -1839,7 +1825,7 @@ class Forest {
             }
 #endif
 
-            for (auto othernd : other._nodes) {
+            for (auto &othernd : other._nodes) {
                 // get number of next node in preorder sequence (serves as index of node in _nodes vector)
                 int k = othernd._number;
 
@@ -1890,7 +1876,7 @@ class Forest {
             }
 
             unsigned j = 0;
-            for (auto othernd : other._lineages) {
+            for (auto &othernd : other._lineages) {
                 unsigned k = othernd->_number;
                 Node * nd = &_nodes[k];
                 _lineages[j] = nd;
@@ -1899,7 +1885,7 @@ class Forest {
             
             if (other._preorder.size() > 0) {
                 unsigned m = 0;
-                for (auto othernd : other._preorder) {
+                for (auto &othernd : other._preorder) {
                     unsigned n = othernd->_number;
                     Node * nd = &_nodes[n];
                     _preorder[m] = nd;
@@ -2411,7 +2397,7 @@ class Forest {
         }
         
         // Restore starting edge lengths
-        for (auto nd : _lineages) {
+        for (auto &nd : _lineages) {
             nd->_edge_length = _upgma_starting_edgelen.at(nd);
         }
         
@@ -2515,7 +2501,7 @@ class Forest {
             if (dh < 0.0)
                 dh = 0.0;
             h0 += dh;
-            for (auto nd : _lineages) {
+            for (auto &nd : _lineages) {
                 nd->_edge_length += dh;
             }
             
@@ -2525,7 +2511,7 @@ class Forest {
 //            Node nd;
 //            _nodes.push_back(nd);
 //            Node* new_nd = &_nodes.back();
-            Node * new_nd = &_nodes[_nleaves + _ninternals];
+            Node * new_nd = &_nodes[G::_ntaxa + _ninternals];
             
             assert (new_nd->_parent==0);
            assert (new_nd->_number == -1);
@@ -2535,7 +2521,7 @@ class Forest {
             Node * subtree2 = node_for_row[j];
             
 //            new_nd->_parent=0;
-            new_nd->_number=_nleaves+_ninternals;
+            new_nd->_number=G::_ntaxa+_ninternals;
 //            new_nd->_right_sib=0;
 
             new_nd->_left_child=subtree1;
@@ -2879,7 +2865,7 @@ class Forest {
             
             assert (edge_len_to_add > 0.0);
             assert (v == v); // check v is not NaN
-            for (auto nd : _lineages) {
+            for (auto &nd : _lineages) {
         //                nd->_edge_length += (0.5*v - upgma_height);
                 nd->_edge_length += edge_len_to_add;
             }
@@ -2892,7 +2878,7 @@ class Forest {
 //            Node nd;
 //            _nodes.push_back(nd);
 //            Node* new_nd = &_nodes.back();
-            Node * new_nd = &_nodes[_nleaves + _ninternals];
+            Node * new_nd = &_nodes[G::_ntaxa + _ninternals];
             
             assert (new_nd->_parent==0);
            assert (new_nd->_number == -1);
@@ -2902,7 +2888,7 @@ class Forest {
             Node * subtree2 = _lineages[j];
             
 //            new_nd->_parent=0;
-            new_nd->_number=_nleaves+_ninternals;
+            new_nd->_number=G::_ntaxa+_ninternals;
 //            new_nd->_right_sib=0;
 
             new_nd->_left_child=subtree1;
@@ -2941,7 +2927,7 @@ class Forest {
             }
             
             // Sanity check
-            for (auto nd : _lineages) {
+            for (auto &nd : _lineages) {
                 assert(!nd->_right_sib);
                 assert(!nd->_parent);
             }
@@ -3213,14 +3199,14 @@ class Forest {
 //         _nodes.push_back(nd);
 //         Node* new_nd = &_nodes.back();
         
-        Node * new_nd = &_nodes[_nleaves + _ninternals];
+        Node * new_nd = &_nodes[G::_ntaxa + _ninternals];
         
         assert (new_nd->_parent==0);
        assert (new_nd->_number == -1);
        assert (new_nd->_right_sib == 0);
         
 //         new_nd->_parent=0;
-         new_nd->_number=_nleaves+_ninternals;
+         new_nd->_number=G::_ntaxa+_ninternals;
          new_nd->_edge_length=0.0;
 //         new_nd->_right_sib=0;
 
@@ -3320,16 +3306,16 @@ class Forest {
 
          // access next unused node
         
-        Node * new_nd = &_nodes[_nleaves + _ninternals];
+        Node * new_nd = &_nodes[G::_ntaxa + _ninternals];
 
         assert (new_nd->_parent==0);
         assert (new_nd->_number == -1);
         assert (new_nd->_right_sib == 0);
         
-         new_nd->_number=_nleaves+_ninternals;
+         new_nd->_number=G::_ntaxa+_ninternals;
          new_nd->_edge_length=0.0;
          _ninternals++;
-         new_nd->_name = to_string(new_nd->_number);
+         new_nd->_name += to_string(new_nd->_number);
 
          new_nd->_left_child=subtree1;
          subtree1->_right_sib=subtree2;
@@ -3450,7 +3436,6 @@ class Forest {
             }
             cout << endl;
         }
-        cout << "   _nleaves " << _nleaves << " ";
         cout << "   _ninternals " << _ninternals << " ";
         cout << endl;
     }
@@ -4505,15 +4490,15 @@ class Forest {
         assert(_preorder.size() > 0);
 
         // Renumber internal nodes in postorder sequence
-        unsigned curr_internal = _nleaves;
-        for (auto nd : boost::adaptors::reverse(_preorder)) {
+        unsigned curr_internal = G::_ntaxa;
+        for (auto & nd : boost::adaptors::reverse(_preorder)) {
             if (nd->_left_child) {
                 // nd is an internal node
                 nd->_number = curr_internal++;
             }
         }
 
-        _ninternals = curr_internal - _nleaves;
+        _ninternals = curr_internal - G::_ntaxa;
 
         // If the tree has polytomies, then there are Node objects stored in
         // the _tree->_nodes vector that have not yet been numbered. These can
@@ -4563,12 +4548,12 @@ class Forest {
         stripOutNexusComments(commentless_newick);
 
         // Resize the _nodes vector
-        _nleaves = countNewickLeaves(commentless_newick);
+//        _nleaves = countNewickLeaves(commentless_newick);
         
     //        if (_nleaves < 4) {
     //            throw XProj("Expecting newick tree description to have at least 4 leaves");
     //        }
-        unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
+        unsigned max_nodes = 2*G::_ntaxa - (rooted ? 0 : 2);
         _nodes.resize(max_nodes);
         for (auto & nd : _nodes ) {
             nd._name = "";
@@ -4626,7 +4611,7 @@ class Forest {
 
             // loop through the characters in newick, building up tree as we go
             unsigned position_in_string = 0;
-            for (auto ch : commentless_newick) {
+            for (auto &ch : commentless_newick) {
                 position_in_string++;
 
                 if (inside_quoted_name) {
@@ -4731,7 +4716,7 @@ class Forest {
                         // Create the sibling
                         curr_node_index++;
                         if (curr_node_index == _nodes.size())
-                            throw XProj(boost::str(boost::format("Too many nodes specified by tree description (%d nodes allocated for %d leaves)") % _nodes.size() % _nleaves));
+                            throw XProj(boost::str(boost::format("Too many nodes specified by tree description (%d nodes allocated for %d leaves)") % _nodes.size() % G::_ntaxa));
 
                         auto l_front = _nodes.begin();
                         std::advance(l_front, curr_node_index);
@@ -4881,11 +4866,11 @@ class Forest {
         stripOutNexusComments(commentless_newick);
 
         // Resize the _nodes vector
-        _nleaves = countNewickLeaves(commentless_newick);
+        G::_ntaxa = countNewickLeaves(commentless_newick);
     //        if (_nleaves < 4) {
     //            throw XProj("Expecting newick tree description to have at least 4 leaves");
     //        }
-        unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
+        unsigned max_nodes = 2*G::_ntaxa - (rooted ? 0 : 2);
         test_nodes.resize(max_nodes); // TODO: TEST
         
     //        int b=0;
@@ -4947,7 +4932,7 @@ class Forest {
 
             // loop through the characters in newick, building up tree as we go
             unsigned position_in_string = 0;
-            for (auto ch : commentless_newick) {
+            for (auto &ch : commentless_newick) {
                 position_in_string++;
 
                 if (inside_quoted_name) {
@@ -5052,7 +5037,7 @@ class Forest {
                         // Create the sibling
                         curr_node_index++;
                         if (curr_node_index == _nodes.size())
-                            throw XProj(boost::str(boost::format("Too many nodes specified by tree description (%d nodes allocated for %d leaves)") % _nodes.size() % _nleaves));
+                            throw XProj(boost::str(boost::format("Too many nodes specified by tree description (%d nodes allocated for %d leaves)") % _nodes.size() % G::_ntaxa));
 
                         auto l_front = test_nodes.begin(); // TODO: TEST
                         std::advance(l_front, curr_node_index);
@@ -5253,8 +5238,8 @@ class Forest {
         stripOutNexusComments(commentless_newick);
 
         // Resize the _nodes vector
-        _nleaves = countNewickLeaves(commentless_newick);
-        unsigned max_nodes = 2*_nleaves - (rooted ? 0 : 2);
+        G::_ntaxa = countNewickLeaves(commentless_newick);
+        unsigned max_nodes = 2*G::_ntaxa - (rooted ? 0 : 2);
         _nodes.resize(max_nodes);
         for (auto & nd : _nodes ) {
             nd._number = -1;
@@ -5323,7 +5308,7 @@ class Forest {
 
             // loop through the characters in newick, building up tree as we go
             unsigned position_in_string = 0;
-            for (auto ch : commentless_newick) {
+            for (auto &ch : commentless_newick) {
                 position_in_string++;
 
                 if (inside_quoted_name) {
@@ -5430,7 +5415,7 @@ class Forest {
                         // Create the sibling
                         curr_node_index++;
                         if (curr_node_index == _nodes.size())
-                            throw XProj(boost::str(boost::format("Too many nodes specified by tree description (%d nodes allocated for %d leaves)") % _nodes.size() % _nleaves));
+                            throw XProj(boost::str(boost::format("Too many nodes specified by tree description (%d nodes allocated for %d leaves)") % _nodes.size() % G::_ntaxa));
                         auto l_front = _nodes.begin();
                         std::advance(l_front, curr_node_index);
                         nd->_right_sib = &*l_front;
@@ -5529,10 +5514,10 @@ class Forest {
             if (inside_quoted_name)
                 throw XProj(boost::str(boost::format("Expecting single quote to mark the end of node name at position %d in tree description") % node_name_position));
 
-    //            unsigned max_nodes = countNewickInternals(newick) + _nleaves;
+    //            unsigned max_nodes = countNewickInternals(newick) + G::_ntaxa;
             unsigned ninternals = countNewickInternals(newick);
-            unsigned max_internals = _nleaves-1;
-            unsigned max_nodes = ninternals + _nleaves + 1;
+            unsigned max_internals = G::_ntaxa-1;
+            unsigned max_nodes = ninternals + G::_ntaxa + 1;
             // TODO: fix for _nodes as vector
             assert (1 == 2);
 //            if (ninternals != max_internals) {
@@ -5581,7 +5566,7 @@ class Forest {
     //                cout << "number = " << nd._number << endl;
     //            }
             
-            unsigned num = _nleaves;
+            unsigned num = G::_ntaxa;
             
             if (_index == 0) { // rename internal nodes for species tree only
                 for (auto &nd:_nodes) {
@@ -5690,10 +5675,10 @@ class Forest {
 //                    _nodes.push_back(nd);
 //                    Node* new_nd = &_nodes.back();
                     assert (1 == 2); // TODO: fix for _nodes as vector
-                    Node * new_nd = &_nodes[_nleaves + _ninternals];
+                    Node * new_nd = &_nodes[G::_ntaxa + _ninternals];
                     
                     new_nd->_parent=0;
-                    new_nd->_number=_nleaves+_ninternals;
+                    new_nd->_number=G::_ntaxa+_ninternals;
                     new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
                     new_nd->_edge_length=0.0;
                     _ninternals++;
@@ -5750,9 +5735,9 @@ class Forest {
 //                    _nodes.push_back(nd);
 //                    Node* new_nd = &_nodes.back();
                     assert (1 == 2); // TODO: fix for _nodes as vector
-                    Node * new_nd = &_nodes[_nleaves + _ninternals];
+                    Node * new_nd = &_nodes[G::_ntaxa + _ninternals];
                     new_nd->_parent=0;
-                    new_nd->_number=_nleaves+_ninternals;
+                    new_nd->_number=G::_ntaxa+_ninternals;
                     new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
                     new_nd->_edge_length=0.0;
                     _ninternals++;
@@ -5834,7 +5819,7 @@ class Forest {
         refreshPreorder();
         
         // TODO: check node height - don't need to calculate, can just keep track as you go
-            for (auto nd : boost::adaptors::reverse(_preorder)) {
+            for (auto&  nd : boost::adaptors::reverse(_preorder)) {
                 if (nd->_left_child) {
                     // nd is an internal node
     //                    assert(nd->_height != _infinity);
@@ -6003,7 +5988,7 @@ class Forest {
     inline void Forest::resetSpeciesPartition(string species_partition_string) {
         _species_partition.clear();
         cout << species_partition_string << endl;
-        for (auto s:species_partition_string) {
+        for (auto &s:species_partition_string) {
             cout << s << endl;
         }
         

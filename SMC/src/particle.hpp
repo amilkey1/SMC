@@ -280,7 +280,6 @@ class Particle {
         cout << "\nParticle " << name << ":\n";
         cout << "  _log_weight:               " << _log_weight                 << "\n" ;
         // species forest
-        cout << "  _species_forest._nleaves:          " << _species_forest._nleaves            << "\n";
         cout << "  _species_forest._ninternals:       " << _species_forest._ninternals         << "\n";
         cout << "  _species_forest._npatterns:        " << _species_forest._npatterns          << "\n";
         cout << "  _species_forest._last_edge_length: " << _species_forest._last_edge_length   << "\n";
@@ -289,7 +288,6 @@ class Particle {
         // gene forests
         for (auto &_forest:_gene_forests) {
             cout << "  _log_likelihood:           " << _forest._gene_tree_log_likelihood << "\n";
-            cout << "  _forest._nleaves:          " << _forest._nleaves            << "\n";
             cout << "  _forest._ninternals:       " << _forest._ninternals         << "\n";
             cout << "  _forest._npatterns:        " << _forest._npatterns          << "\n";
             cout << "  _forest._last_edge_length: " << _forest._last_edge_length   << "\n";
@@ -300,7 +298,7 @@ class Particle {
     inline double Particle::calcLogLikelihood() {
         //calculate likelihood for each gene tree
         double log_likelihood = 0.0;
-        for (auto f:_gene_forests) {
+        for (auto &f:_gene_forests) {
             double gene_tree_log_likelihood = f.calcLogLikelihood();
             assert(!isnan (log_likelihood));
             //total log likelihood is sum of gene tree log likelihoods
@@ -2026,7 +2024,7 @@ inline vector<double> Particle::getVectorPrior() {
                 unsigned     locus = get<1>(cinfo);
                 auto & sppvect = get<2>(cinfo);
                 vector<string> s;
-                for (auto x : sppvect) {
+                for (auto & x : sppvect) {
                     s.push_back(to_string(x));
                 }
             }
@@ -2095,7 +2093,7 @@ inline vector<double> Particle::getVectorPrior() {
             vector<G::species_t> & b_vect = get<2>(cinfo);
             
             G::species_t banc = 0;
-            for (auto b : b_vect)
+            for (auto & b : b_vect)
                 banc |= b;
                 
             if (locus_plus_one == 0) {
@@ -2110,7 +2108,7 @@ inline vector<double> Particle::getVectorPrior() {
                 for (unsigned g = 0; g < G::_nloci; g++) {
                     // Account for non-coalescence since the last coalescent
                     unsigned nsum = 0;
-                    for (auto b : b_vect) {
+                    for (auto & b : b_vect) {
                         if (prev_height[g].count(b) == 0) {
                             prev_height[g][b] = 0.0;
                         }
@@ -2129,14 +2127,14 @@ inline vector<double> Particle::getVectorPrior() {
                     // Pool lineages from descendant species to create
                     // counts for the new ancestral species
                     n_jb[g][banc] = 0;
-                    for (auto b : b_vect) {
+                    for (auto & b : b_vect) {
                         n_jb[g].erase(b);
                     }
                     n_jb[g][banc] = nsum; //nleft + nright;
                     
                 }
                       
-                for (auto b : b_vect) {
+                for (auto & b : b_vect) {
                     bavail.erase(b);
                 }
                 bavail.insert(banc);
@@ -2176,7 +2174,7 @@ inline vector<double> Particle::getVectorPrior() {
             double B = (double)branches.size();
             log_likelihood  = B*alpha*log(beta);
             log_likelihood -= B*boost::math::lgamma(alpha);
-            for (auto b : branches) {
+            for (auto & b : branches) {
                 log_likelihood += log_r_b[b];
                 log_likelihood -= (alpha + q_b[b])*log(beta + gamma_b[b]);
                 log_likelihood += boost::math::lgamma(alpha + q_b[b]);
@@ -2188,7 +2186,7 @@ inline vector<double> Particle::getVectorPrior() {
             double sum_log_rb = 0.0;
             double sum_gamma_b = 0.0;
             unsigned sum_qb = 0;
-            for (auto b : branches) {
+            for (auto & b : branches) {
                 sum_qb += q_b[b];
                 sum_log_rb += log_r_b[b];
                 sum_gamma_b += gamma_b[b];

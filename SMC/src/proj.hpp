@@ -914,7 +914,7 @@ namespace proj {
         // definition into name and character set string and add to _partition
         if (vm.count("subset") > 0) {
             _partition.reset(new Partition());
-            for (auto s : partition_subsets) {
+            for (auto  s : partition_subsets) {
                 _partition->parseSubsetDefinition(s);
             }
         }
