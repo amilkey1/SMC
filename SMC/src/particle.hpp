@@ -1097,9 +1097,9 @@ inline vector<double> Particle::getVectorPrior() {
     }
     
     inline vector<double> Particle::getThetaVector() {
-        vector<double> theta_vec;
-        for (auto &t:_theta_map) {
-            theta_vec.push_back(t.second);
+        vector<double> theta_vec; // _theta_map is unsorted, so get species names in the correct order
+        for (unsigned s=0; s<G::_species_names.size(); s++) {
+            theta_vec.push_back(_theta_map[G::_species_names[s]]);
         }
         return theta_vec;
     }
@@ -2169,7 +2169,11 @@ inline vector<double> Particle::getVectorPrior() {
         
         if (integrate_out_thetas) {
             double alpha = 2.0; // G::_invgamma_shape;
+#if defined (DRAW_NEW_THETA)
+            double beta = _theta_mean; // TODO: double check - G::_theta or _theta_mean?
+#else
             double beta = G::_theta;
+#endif
             assert(beta > 0.0);
             double B = (double)branches.size();
             log_likelihood  = B*alpha*log(beta);

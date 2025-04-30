@@ -3,7 +3,7 @@
 //#   include <mpi.h>
 //#endif
 
-//#define NDEBUG // disable asserts for efficiency / memory improvement
+#define NDEBUG // disable asserts for efficiency / memory improvement
 
 #define USE_TOTAL_RATE
 
@@ -34,7 +34,7 @@
 
 //#define OLD_UPGMA // DO NOT USE - DOES NOT WORK CURRENTLY AND WAS SLOWER
 
-//#define UNUSED_FUNCTIONS
+//#define UNUSED_FUNCTIONS // DO NOT USE
 
 #define SYSTEMATIC_FILTERING
 

@@ -502,7 +502,6 @@ class SpeciesForest {
 
             // copy tree itself
             
-        if (other._nodes.size() > 0) { // otherwise, there is no forest and nothing needs to be copied
             for (auto & othernd : other._nodes) {
                 // get number of next node in preorder sequence (serves as index of node in _nodes vector)
                 int k = othernd._number;
@@ -569,7 +568,6 @@ class SpeciesForest {
                     m++;
                 }
             }
-        }
     }
 
     inline void SpeciesForest::setUpSpeciesForest() {

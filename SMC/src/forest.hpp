@@ -1662,14 +1662,15 @@ class Forest {
     }
 
     inline void Forest::operator=(const Forest & other) {
-        _nodes.resize(other._nodes.size()); // don't need to clear these members because they will get overwritten
-        _lineages.resize(other._lineages.size());
+        if (other._nodes.size() > 0) {
+            _nodes.resize(other._nodes.size()); // don't need to clear these members because they will get overwritten
+            _lineages.resize(other._lineages.size());
+        }
         
         _gene_tree_log_likelihood = other._gene_tree_log_likelihood;
         
         // the following data members apply only to the first round
-        if (!G::_in_second_level) { // TODO: testing
-            
+        if (!G::_in_second_level) {
             _ninternals         = other._ninternals;
             _last_edge_length   = other._last_edge_length;
             
@@ -1694,7 +1695,7 @@ class Forest {
             }
         }
         
-        _index              = other._index;
+        _index              = other._index; // TODO: things like this will be the same as the copied particle - need to copy them in the constructor still?
         _increments_and_priors = other._increments_and_priors;
         _forest_length = other._forest_length;
             
@@ -1724,8 +1725,8 @@ class Forest {
         // the following data members apply only to the second level
         if (G::_in_second_level) { // TODO: testing
 #if defined (FASTER_SECOND_LEVEL)
-//            _coalinfo = other._coalinfo;
-            _coalinfo = std::move(other._coalinfo);
+            _coalinfo.reserve(other._coalinfo.size());
+            _coalinfo = other._coalinfo;
 
             _next_node_number = other._next_node_number;
 #else
@@ -1769,23 +1770,34 @@ class Forest {
             }
                     
             else {
-                vector<string> names;
-                names.reserve(other._species_partition.size());
-                
-                for (auto &s:other._species_partition) {
-                    names.push_back(s.first);
+                vector<string> names_to_erase;
+                names_to_erase.reserve(_species_partition.size());
+                for (auto &s:_species_partition) {
+                    names_to_erase.push_back(s.first);
                 }
+//                vector<string> names;
+//                names.reserve(other._species_partition.size());
+//
+//                for (auto &s:other._species_partition) {
+//                    names.push_back(s.first);
+//                }
 
                 unsigned count = 0;
                 for (auto &spiter : other._species_partition) {
+                    // if key is found in names_to_erase, delete it from names_to_erase because it shouldn't be erased
+                    if (std::find(names_to_erase.begin(), names_to_erase.end(), spiter.first) != names_to_erase.end()) {
+                        names_to_erase.erase(std::remove(names_to_erase.begin(), names_to_erase.end(), spiter.first), names_to_erase.end());
+                    }
                     count = 0;
                     for (auto &s : spiter.second) {
                         unsigned number = s->_number;
                         Node* nd = &_nodes[number];
                         if (count == 0) {
-                            vector<Node*> nds;
-                            nds.push_back(nd);
-                            _species_partition[spiter.first] = nds;
+                            _species_partition[spiter.first].clear();
+                            _species_partition[spiter.first].push_back(nd);
+//                            vector<Node*> nds;
+//                            nds.push_back(nd);
+//                            _species_partition[spiter.first] = nds;
                         }
                         else {
                             _species_partition[spiter.first].push_back(nd);
@@ -1794,14 +1806,18 @@ class Forest {
                     }
                 }
                 
-                // iterate through species partition and erase any entries that are not in names vector from other._species_partition
-                for (auto it = _species_partition.begin(); it != _species_partition.end();) {
-                    if (std::find(names.begin(), names.end(), it->first) == names.end()) {
-                        it = _species_partition.erase(it);
-                    } else {
-                        ++it;
-                    }
+                for (unsigned n=0; n<names_to_erase.size(); n++) {
+                    _species_partition.erase(names_to_erase[n]);
                 }
+                
+                // iterate through species partition and erase any entries that are not in names vector from other._species_partition
+//                for (auto it = _species_partition.begin(); it != _species_partition.end();) {
+//                    if (std::find(names.begin(), names.end(), it->first) == names.end()) {
+//                        it = _species_partition.erase(it);
+//                    } else {
+//                        ++it;
+//                    }
+//                }
             }
         }
 #else
