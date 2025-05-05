@@ -398,7 +398,11 @@ class Forest {
             nd->_height = 0.0;
             nd->_position_in_lineages=i;
             _lineages.push_back(nd);
-            if (G::_upgma) {
+        }
+        
+        if (G::_upgma) {
+            for (unsigned i = 0; i < G::_ntaxa; i++) {
+                Node * nd = &(_nodes[i]);
                 // set splits
                 nd->_split.resize(G::_ntaxa);
                 nd->_split.setBitAt(i);
@@ -422,17 +426,20 @@ class Forest {
                     nd->_partial=ps.getPartial(_npatterns*4);
 #endif
                     for (unsigned p=0; p<_npatterns; p++) {
+                        
                         unsigned pp = _first_pattern+p;
 #if defined (UNROLL_LOOPS)
+                        unsigned pxnstates = p*G::_nstates;
+                        
                         // loop 1
                         unsigned s = 0;
                         Data::state_t state = (Data::state_t)1 << s;
                         Data::state_t d = data_matrix[nd->_number][pp];
                         double result = state & d;
 #if defined (REUSE_PARTIALS)
-                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #else
-                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
                         
                         // loop 2
@@ -441,9 +448,9 @@ class Forest {
                         d = data_matrix[nd->_number][pp];
                         result = state & d;
 #if defined (REUSE_PARTIALS)
-                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #else
-                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
                         
                         // loop 3
@@ -452,9 +459,9 @@ class Forest {
                         d = data_matrix[nd->_number][pp];
                         result = state & d;
 #if defined (REUSE_PARTIALS)
-                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #else
-                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
                         
                         // loop 4
@@ -463,9 +470,9 @@ class Forest {
                         d = data_matrix[nd->_number][pp];
                         result = state & d;
 #if defined (REUSE_PARTIALS)
-                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #else
-                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
                         
 #else
@@ -477,9 +484,9 @@ class Forest {
                         Data::state_t d = data_matrix[nd->_number][pp];
                         double result = state & d;
 #if defined (REUSE_PARTIALS)
-                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #else
-                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
                         
                         // loop 2
@@ -488,9 +495,9 @@ class Forest {
                         d = data_matrix[nd->_number][pp];
                         result = state & d;
 #if defined (REUSE_PARTIALS)
-                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #else
-                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
                         
                         // loop 3
@@ -499,9 +506,9 @@ class Forest {
                         d = data_matrix[nd->_number][pp];
                         result = state & d;
 #if defined (REUSE_PARTIALS)
-                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #else
-                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
                         
                         // loop 4
@@ -510,9 +517,9 @@ class Forest {
                         d = data_matrix[nd->_number][pp];
                         result = state & d;
 #if defined (REUSE_PARTIALS)
-                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #else
-                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
 #else
 #if defined (UNROLL_LOOPS)
@@ -524,9 +531,9 @@ class Forest {
                         Data::state_t d = data_matrix[nd->_number][pp];
                         double result = state & d;
 #if defined (REUSE_PARTIALS)
-                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #else
-                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
                         
                         // loop 2
@@ -535,9 +542,9 @@ class Forest {
                         d = data_matrix[nd->_number][pp];
                         result = state & d;
 #if defined (REUSE_PARTIALS)
-                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #else
-                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
                         
                         // loop 3
@@ -546,9 +553,9 @@ class Forest {
                         d = data_matrix[nd->_number][pp];
                         result = state & d;
 #if defined (REUSE_PARTIALS)
-                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #else
-                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
                         
                         // loop 4
@@ -557,9 +564,9 @@ class Forest {
                         d = data_matrix[nd->_number][pp];
                         result = state & d;
 #if defined (REUSE_PARTIALS)
-                        (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #else
-                        (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                        (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
                         
 
@@ -569,9 +576,9 @@ class Forest {
                             Data::state_t d = data_matrix[nd->_number][pp];
                             double result = state & d;
 #if defined (REUSE_PARTIALS)
-                            (nd->_partial->_v)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                            (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #else
-                            (*nd->_partial)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                            (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
 #endif
                         }
 #endif
@@ -1237,8 +1244,7 @@ class Forest {
 
         if (!new_nd->_left_child) {
             auto &data_matrix=_data->getDataMatrix();
-            assert (G::_save_memory || G::_start_mode == "sim");
-//            assert (G::_save_memory || G::_start_mode_type == G::StartModeType::START_MODE_SIM);
+            assert (G::_save_memory || G::_start_mode_type == G::StartModeType::START_MODE_SIM);
             if (!new_nd->_left_child) {
 #if defined (REUSE_PARTIALS)
                 mtx.lock();
@@ -1432,8 +1438,10 @@ class Forest {
         auto &counts = _data->getPatternCounts();
         _gene_tree_log_likelihood = 0.0;
         
-        if (_forest_height > 0 && G::_upgma) {
-            constructUPGMA();
+        if (G::_upgma) {
+            if (_forest_height > 0) {
+                constructUPGMA();
+            }
         }
 
 #if defined (UNROLL_LOOPS)
@@ -1511,8 +1519,10 @@ class Forest {
         }
 #endif
         
-        if (_forest_height > 0 && G::_upgma) {
-            destroyUPGMA();
+        if (G::_upgma) {
+            if (_forest_height) {
+                destroyUPGMA();
+            }
         }
         
         return _gene_tree_log_likelihood;
@@ -1758,67 +1768,53 @@ class Forest {
                 
                 if (!faster_spp_partition) {
                         
-                _species_partition.clear(); // TODO: can rewrite this without clearing? maybe faster if species names are not strings?
+                    _species_partition.clear(); // TODO: can rewrite this without clearing? maybe faster if species names are not strings?
 
-                for (auto spiter : other._species_partition) {
-                    for (auto s : spiter.second) {
-                        unsigned number = s->_number;
-                        Node* nd = &_nodes[number];
-                        _species_partition[spiter.first].push_back(nd);
+                    for (auto spiter : other._species_partition) {
+                        for (auto s : spiter.second) {
+                            unsigned number = s->_number;
+                            Node* nd = &_nodes[number];
+                            _species_partition[spiter.first].push_back(nd);
+                        }
                     }
                 }
-            }
                     
-            else {
-                vector<string> names_to_erase;
-                names_to_erase.reserve(_species_partition.size());
-                for (auto &s:_species_partition) {
-                    names_to_erase.push_back(s.first);
-                }
-//                vector<string> names;
-//                names.reserve(other._species_partition.size());
-//
-//                for (auto &s:other._species_partition) {
-//                    names.push_back(s.first);
-//                }
+                else {
+                    vector<string> names_to_erase;
+                    names_to_erase.reserve(_species_partition.size());
+                    for (auto &s:_species_partition) {
+                        names_to_erase.push_back(s.first);
+                    }
 
-                unsigned count = 0;
-                for (auto &spiter : other._species_partition) {
-                    // if key is found in names_to_erase, delete it from names_to_erase because it shouldn't be erased
-                    if (std::find(names_to_erase.begin(), names_to_erase.end(), spiter.first) != names_to_erase.end()) {
-                        names_to_erase.erase(std::remove(names_to_erase.begin(), names_to_erase.end(), spiter.first), names_to_erase.end());
+                    unsigned count = 0;
+                    for (auto &spiter : other._species_partition) {
+                        // if key is found in names_to_erase, delete it from names_to_erase because it shouldn't be erased
+                        auto position = std::find(names_to_erase.begin(), names_to_erase.end(), spiter.first);
+                        if (position != names_to_erase.end()) {
+                            names_to_erase.erase(position);
+                        }
+                        count = 0;
+                        for (auto &s : spiter.second) {
+                            unsigned number = s->_number;
+                            Node* nd = &_nodes[number];
+                            if (count == 0) {
+                                _species_partition[spiter.first].clear();
+                                _species_partition[spiter.first].push_back(nd);
+    //                            vector<Node*> nds;
+    //                            nds.push_back(nd);
+    //                            _species_partition[spiter.first] = nds;
+                            }
+                            else {
+                                _species_partition[spiter.first].push_back(nd);
+                            }
+                            count++;
+                        }
                     }
-                    count = 0;
-                    for (auto &s : spiter.second) {
-                        unsigned number = s->_number;
-                        Node* nd = &_nodes[number];
-                        if (count == 0) {
-                            _species_partition[spiter.first].clear();
-                            _species_partition[spiter.first].push_back(nd);
-//                            vector<Node*> nds;
-//                            nds.push_back(nd);
-//                            _species_partition[spiter.first] = nds;
-                        }
-                        else {
-                            _species_partition[spiter.first].push_back(nd);
-                        }
-                        count++;
+                    
+                    for (unsigned n=0; n<names_to_erase.size(); n++) {
+                        _species_partition.erase(names_to_erase[n]);
                     }
                 }
-                
-                for (unsigned n=0; n<names_to_erase.size(); n++) {
-                    _species_partition.erase(names_to_erase[n]);
-                }
-                
-                // iterate through species partition and erase any entries that are not in names vector from other._species_partition
-//                for (auto it = _species_partition.begin(); it != _species_partition.end();) {
-//                    if (std::find(names.begin(), names.end(), it->first) == names.end()) {
-//                        it = _species_partition.erase(it);
-//                    } else {
-//                        ++it;
-//                    }
-//                }
-            }
         }
 #else
             _species_partition.clear();
@@ -1947,7 +1943,8 @@ class Forest {
         _taxon_map = taxon_map;
 #endif
         assert (_index >0);
-        _species_partition.clear();
+        assert (_species_partition.size() == 0);
+//        _species_partition.clear();
         
         unsigned count = 0;
         
@@ -1964,7 +1961,6 @@ class Forest {
                 break;
             }
 #if defined (FASTER_SECOND_LEVEL)
-//            if (G::_start_mode != "sim") {
             if (G::_start_mode_type != G::StartModeType::START_MODE_SIM) {
                 if (G::_taxon_to_species.count(nd._name) == 0) {
                     throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd._name));

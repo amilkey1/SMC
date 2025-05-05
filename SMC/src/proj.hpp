@@ -71,6 +71,7 @@ namespace proj {
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
             void                proposeParticleGroupRange(unsigned first, unsigned last, vector<vector<Particle>> &particles);
             void                proposeParticles(vector<Particle> &particles);
+            void                proposeParticlesSim(vector<Particle> &particles);
             void                proposeParticlesParallelizeByGroup(vector<vector<Particle>> &particles);
             void                simulateData();
             void                writePaupFile(vector<Particle> particles, vector<string> taxpartition);
@@ -100,6 +101,8 @@ namespace proj {
             double                      _log_marginal_likelihood = 0.0;
             double                      _log_species_tree_marginal_likelihood = 0.0;
             unsigned                    _random_seed;
+            unsigned long               _partials_needed;
+        
             void                        summarizeData(Data::SharedPtr);
             double                      getRunningSum(const vector<double> &) const;
             map<string, string>         _taxon_map;
@@ -170,10 +173,11 @@ namespace proj {
         partialf << "total times partials calculated: ";
         
         unsigned partial_count = 0;
-            for (auto &p:particles) {
-                partial_count += p.getPartialCount();
-            }
+        for (auto &p:particles) {
+            partial_count += p.getPartialCount();
+        }
         partialf << partial_count << "\n";
+        
         partialf.close();
     }
 
@@ -651,7 +655,6 @@ namespace proj {
     inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v) const {
             string filename1 = "alt_species_trees.trees";
         
-//            assert (G::_start_mode != "sim");
             assert (G::_start_mode_type != G::StartModeType::START_MODE_SIM);
 
             unsigned count = 0;
@@ -689,7 +692,6 @@ namespace proj {
             unique_treef.close();
         }
 
-//        assert (G::_start_mode != "sim");
         assert (G::_start_mode_type != G::StartModeType::START_MODE_SIM);
 
         unsigned count = 0;
@@ -764,7 +766,6 @@ namespace proj {
             unique_treef.close();
         }
 
-//        if (G::_start_mode == "smc") {
         if (G::_start_mode_type == G::StartModeType::START_MODE_SMC) {
             // save all species trees
             ofstream treef("species_trees.trees");
@@ -791,7 +792,6 @@ namespace proj {
         }
 
     inline void Proj::saveGeneTrees(vector<Particle> &v) const {
-//        if (G::_start_mode == "smc") {
         if (G::_start_mode_type == G::StartModeType::START_MODE_SMC) {
             for (unsigned i=1; i<G::_nloci+1; i++) {
                 string fname = "gene" + to_string(i) + ".trees";
@@ -2504,7 +2504,7 @@ namespace proj {
         }
         
         if (G::_upgma) {
-            if (G::_upgma && !G::_gene_newicks_specified) {
+            if (!G::_gene_newicks_specified) {
                 particle.setGeneUPGMAMatrices();
             }
         }
@@ -2552,6 +2552,13 @@ namespace proj {
           for (unsigned i = 0; i < threads.size(); i++) {
             threads[i].join();
           }
+        }
+    }
+
+    inline void Proj::proposeParticlesSim(vector<Particle> &particles) {
+        assert(G::_nthreads > 0); // don't thread for simulations
+        for (auto & p : particles) {
+            p.proposalSim();
         }
     }
 
@@ -2750,7 +2757,7 @@ namespace proj {
         unsigned nsteps = (unsigned) (_taxon_map.size()-1)*G::_nloci;
 
         for (unsigned g=0; g<nsteps; g++){
-            proposeParticles(sim_vec);
+            proposeParticlesSim(sim_vec);
             G::_generation++;
         }
         
@@ -2821,6 +2828,7 @@ namespace proj {
         unsigned group_number = 0;
         for (auto &p:particles) {
             p.setGroupNumber(group_number);
+            p.setSortedThetaVector();
             group_number++;
         }
         
@@ -2869,6 +2877,7 @@ namespace proj {
                     }
                     
                     filterSpeciesParticles(s, second_level_particles);
+                    
                     G::_generation++;
                 
                 }
@@ -3510,10 +3519,6 @@ namespace proj {
                     g->setSeed(rng.randint(1,9999)+psuffix);
                     psuffix += 2;
                 }
-                
-//                if (G::_species_newick_specified) {
-//                    handleSpeciesNewick(my_vec);
-//                }
 
 #if defined (DRAW_NEW_THETA)
                 updateSpeciesNames();
@@ -3642,6 +3647,15 @@ namespace proj {
         MPI_Barrier(MPI_COMM_WORLD);
 
 #else
+//                unsigned long k = G::_ntaxa - 1; // different if saving memory
+//
+//                if (G::_upgma) {
+//                    _partials_needed = (0.5*k*(k + 1)*G::_nparticles*G::_nloci)*G::_ngroups;
+//                }
+//                else {
+//                    _partials_needed = k*G::_nparticles*G::_nloci*G::_ngroups;
+//                }
+                
             for (unsigned g=0; g<nsteps; g++) {
                 if (g == 0) {
                     // reset gene order
@@ -3873,7 +3887,6 @@ namespace proj {
 //                cout << "\nTotal time setting files for second round: " << total_seconds << endl;
 //                cout << total_seconds << endl;
                 
-//                my_vec[0].showParticle();
 #if defined (FASTER_SECOND_LEVEL)
                 fasterSecondLevel(my_vec);
 #else

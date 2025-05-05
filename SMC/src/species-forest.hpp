@@ -2328,7 +2328,7 @@ class SpeciesForest {
         
         refreshAllPreorders(); // TODO: don't always need to refresh preorders?
         
-        _coalinfo.clear();
+        _coalinfo.clear(); // TODO: why clear this and reconstruct each time?
         for (auto & preorder : _preorders) {
             for (auto & nd : boost::adaptors::reverse(preorder)) {
                 if (nd->_left_child) {
