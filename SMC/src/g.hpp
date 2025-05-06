@@ -23,6 +23,12 @@ namespace proj {
         static map<string, unsigned>    _taxon_to_species;
 #endif
         
+#if defined (LAZY_COPYING)
+        typedef pair<unsigned, unsigned>                        uint_pair_t;
+        typedef tuple<double,G::species_t,G::species_t>         merge_t; // <speciation height, spp 1, spp 2>
+        typedef vector<merge_t>                                 merge_vect_t;
+#endif
+        
         // Program settings used in processCommandLineOptions
         static bool                 _use_gpu;
         static bool                 _ambig_missing;
@@ -94,6 +100,7 @@ namespace proj {
         
         // functions
         string inventName(unsigned k, bool lower_case);
+        static unsigned multinomialDraw(Lot::SharedPtr lot, const vector<double> & probs);
         
     };
 
@@ -127,6 +134,41 @@ namespace proj {
         }
         string species_name(letters.rbegin(), letters.rend());
         return species_name;
+    }
+
+    inline unsigned G::multinomialDraw(Lot::SharedPtr lot, const vector<double> & probs) {
+        // Compute cumulative probababilities
+        vector<double> cumprobs(probs.size());
+        partial_sum(probs.begin(), probs.end(), cumprobs.begin());
+        assert(fabs(*(cumprobs.rbegin()) - 1.0) < 0.0001);
+
+        // Draw a Uniform(0,1) random deviate
+        double u = lot->uniform();
+
+        // Find first element in cumprobs greater than u
+        // e.g. probs = {0.2, 0.3, 0.4, 0.1}, u = 0.6, should return 2
+        // because u falls in the third bin
+        //
+        //   |   0   |     1     |        2      | 3 | <-- bins
+        //   |---+---+---+---+---+---+---+---+---+---|
+        //   |       |           |   |           |   |
+        //   0      0.2         0.5  |          0.9  1 <-- cumulative probabilities
+        //                          0.6 <-- u
+        //
+        // cumprobs = {0.2, 0.5, 0.9, 1.0}, u = 0.6
+        //               |         |
+        //               begin()   it
+        // returns 2 = 2 - 0
+        auto it = find_if(cumprobs.begin(), cumprobs.end(), [u](double cumpr){return cumpr > u;});
+        if (it == cumprobs.end()) {
+            double last_cumprob = *(cumprobs.rbegin());
+            throw XProj(format("G::multinomialDraw failed: u = %.9f, last cumprob = %.9f") % u % last_cumprob);
+        }
+
+        auto d = std::distance(cumprobs.begin(), it);
+        assert(d >= 0);
+        assert(d < probs.size());
+        return (unsigned)d;
     }
 
 

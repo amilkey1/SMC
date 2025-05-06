@@ -3,13 +3,13 @@
 //#   include <mpi.h>
 //#endif
 
-#define NDEBUG // disable asserts for efficiency / memory improvement
+//#define NDEBUG // disable asserts for efficiency / memory improvement
 
 #define USE_TOTAL_RATE
 
-#define HIERARCHICAL_FILTERING
+//#define HIERARCHICAL_FILTERING
 
-#define DRAW_NEW_THETA // TODO: FOR NOW, TURN THIS OFF IF MPI TURNED ON
+//#define DRAW_NEW_THETA // TODO: FOR NOW, TURN THIS OFF IF MPI or LAZY COPYING TURNED ON
 
 //#define UNCONSTRAINED_PROPOSAL 
 
@@ -41,3 +41,5 @@
 #define REUSE_PARTIALS
 
 #define UNROLL_LOOPS
+
+#define LAZY_COPYING // TODO: only works with JC model

@@ -29,6 +29,7 @@
 /* Begin PBXFileReference section */
 		220195C127BD892B00E8A1CF /* partial_store.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = partial_store.hpp; sourceTree = "<group>"; };
 		224AE6A82D15DFF900BEEAF8 /* stopwatch.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = stopwatch.hpp; sourceTree = "<group>"; };
+		225D236D2DC8F49B000F6E6F /* forest-extension.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = "forest-extension.hpp"; sourceTree = "<group>"; };
 		2262089F2DBBC27200777832 /* species-forest.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = "species-forest.hpp"; sourceTree = "<group>"; };
 		2267216B2A841C5800CBC17D /* conditionals.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = conditionals.hpp; sourceTree = "<group>"; };
 		2286C59526FE2D6C001BF8AA /* SMC */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SMC; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -117,6 +118,7 @@
 				220195C127BD892B00E8A1CF /* partial_store.hpp */,
 				22C9156E2D6E59EA00DEE475 /* g.hpp */,
 				2262089F2DBBC27200777832 /* species-forest.hpp */,
+				225D236D2DC8F49B000F6E6F /* forest-extension.hpp */,
 			);
 			path = src;
 			sourceTree = "<group>";

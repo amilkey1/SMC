@@ -62,7 +62,12 @@ class SpeciesForest {
         string                          makePartialNewick(unsigned precision, bool use_names);
  
         void                            setUpSpeciesForest();
+        void                            setSpeciesFromNodeName(Node * nd);
+#if defined (LAZY_COPYING)
+        tuple<G::species_t,G::species_t, G::species_t>    speciesTreeProposal(Lot::SharedPtr lot);
+#else
         tuple<string,string, string>    speciesTreeProposal(Lot::SharedPtr lot);
+#endif
         void                            updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                            updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
         void                            revertNodeVector(vector<Node *> & node_vector, Node * addnode1, Node * addnode2, Node * delnode1);
@@ -133,6 +138,10 @@ class SpeciesForest {
         void                            calcTreeLength();
         double                          getLineageHeight(Node* nd);
         void                            addIncrement(double increment);
+    
+#if defined (LAZY_COPYING)
+        void                            saveCoalInfo(vector<Forest::coalinfo_t> & coalinfo_vect, bool cap = false) const;
+#endif
             
     public:
 
@@ -544,6 +553,7 @@ class SpeciesForest {
                 nd->_edge_length = othernd._edge_length;
                 nd->_position_in_lineages = othernd._position_in_lineages;
                 nd->_height = othernd._height;
+                nd->_species = othernd._species;
                     
                     // don't need to copy these members
                     // nd->_split = othernd._split;
@@ -589,10 +599,25 @@ class SpeciesForest {
             nd->_position_in_lineages=i;
             nd->_name=G::_species_names[i];
             _lineages.push_back(nd);
+#if defined (LAZY_COPYING)
+            setSpeciesFromNodeName(nd);
+#endif
             }
         
         _ninternals=0;
     }
+
+#if defined (LAZY_COPYING)
+    inline void SpeciesForest::setSpeciesFromNodeName(Node * nd) {
+        auto it = find(G::_species_names.begin(), G::_species_names.end(), nd->_name);
+        if (it == G::_species_names.end())
+            throw XProj(str(format("Could not find an index for the species name \"%s\"") % nd->_name));
+        else {
+            unsigned i = (unsigned)std::distance(G::_species_names.begin(), it);
+            Node::setSpeciesBit(nd->_species, i, /*init_to_zero_first*/true);
+        }
+    }
+#endif
 
     inline pair<double,double> SpeciesForest::chooseSpeciesIncrementOnly(Lot::SharedPtr lot, double max_depth) {
         unsigned nlineages = (unsigned) _lineages.size();
@@ -726,6 +751,81 @@ class SpeciesForest {
     }
 
 
+#if defined (LAZY_COPYING)
+    inline tuple<G::species_t,G::species_t, G::species_t> SpeciesForest::speciesTreeProposal(Lot::SharedPtr lot) {
+        // this function creates a new node and joins two species
+        
+        bool done = false;
+        Node* subtree1 = nullptr;
+        Node* subtree2 = nullptr;
+        
+        while (!done) {
+            assert (lot != nullptr);
+            pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
+            assert (t.first != t.second);
+            
+            subtree1=_lineages[t.first];
+            subtree2=_lineages[t.second]; // TODO: update species bits
+            assert (t.first < _lineages.size());
+            assert (t.second < _lineages.size());
+            assert(!subtree1->_parent && !subtree2->_parent);
+            
+            if (G::_outgroup != "none") {
+                if (subtree1->_name != G::_outgroup && subtree2->_name != G::_outgroup && _lineages.size() > 2) { // outgroup can only be chosen on the last step
+                    done = true;
+                }
+                else if (_lineages.size() == 2) {
+                    done = true;
+                }
+            }
+            else {
+                done = true;
+            }
+            if (G::_outgroup == "none") {
+                assert (done == true);
+            }
+        }
+        
+        Node * new_nd = &_nodes[G::_nspecies + _ninternals];
+        assert (new_nd->_parent==0);
+       assert (new_nd->_number == -1);
+       assert (new_nd->_right_sib == 0);
+        new_nd->_number=G::_nspecies+_ninternals;
+        new_nd->_name+=boost::str(boost::format("node-%d")%new_nd->_number);
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+        
+        updateNodeVector (_lineages, subtree1, subtree2, new_nd);
+
+    #if defined (DEBUG_MODE)
+        if (_lineages.size() > 1) {
+            _species_joined = make_pair(subtree1, subtree2); // last step just joins remaining two
+        }
+    #endif
+        
+        new_nd->_height = _forest_height;
+        
+        calcTopologyPrior((int) _lineages.size()+1);
+
+    #if !defined (FASTER_SECOND_LEVEL)
+        _species_build.push_back(make_pair(make_tuple(subtree1->_name, subtree2->_name, new_nd->_name), 0.0));
+    #endif
+        
+#if defined (LAZY_COPYING)
+        assert (new_nd->_left_child->_species == subtree1->_species);
+        assert (new_nd->_left_child->_right_sib->_species == subtree2->_species);
+        new_nd->_species = (new_nd->_left_child->_species | new_nd->_left_child->_right_sib->_species);
+#endif
+        
+        return make_tuple(subtree1->_species, subtree2->_species, new_nd->_species);
+    }
+#else
     inline tuple<string,string, string> SpeciesForest::speciesTreeProposal(Lot::SharedPtr lot) {
         // this function creates a new node and joins two species
         
@@ -796,6 +896,7 @@ class SpeciesForest {
 #endif
         return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
     }
+#endif
 
 #if defined (DEBUG_MODE)
     inline void SpeciesForest::showSpeciesJoined() {
@@ -2618,6 +2719,34 @@ class SpeciesForest {
         }
         return next;
     }
+
+#if defined(LAZY_COPYING)
+    inline void SpeciesForest::saveCoalInfo(vector<Forest::coalinfo_t> & coalinfo_vect, bool cap) const {
+        // Appends to coalinfo_vect; clear coalinfo_vect before calling if desired
+        // Assumes heights and preorders are up-to-date; call
+        //   heightsInternalsPreorders() beforehand to ensure this
+
+        // Dump _coalinfo into coalinfo_vect
+        if (!_coalinfo.empty()) {
+            coalinfo_vect.insert(coalinfo_vect.begin(), _coalinfo.begin(), _coalinfo.end());
+        }
+        
+        if (cap) {
+            // Create an entry pooling the remaining species
+            if (_lineages.size() > 1) {
+                vector<G::species_t> sppvect;
+                for (auto nd : _lineages) {
+                    sppvect.push_back(nd->_species);
+                }
+                coalinfo_vect.push_back(make_tuple(
+                    _forest_height,
+                    0,
+                    sppvect)
+                );
+            }
+        }
+    }
+#endif
 
     #endif
     }

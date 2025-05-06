@@ -78,6 +78,9 @@ namespace proj {
             void                initializeParticle(Particle &particle);
             void                handleGeneNewicks();
             string              handleSpeciesNewick();
+#if defined(LAZY_COPYING)
+            void                buildNonzeroMap(vector<Particle> & particles, unsigned locus, map<const void *, list<unsigned> > & nonzero_map, const vector<unsigned> & nonzeros, vector<unsigned> particle_indices, unsigned start, unsigned end);
+#endif
             double              filterParticles(unsigned step, vector<Particle> & particles, vector<unsigned> &particle_indices, unsigned start, unsigned end);
             void                filterParticlesThreading(vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices);
             void                filterParticlesRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices);
@@ -1774,6 +1777,19 @@ namespace proj {
             prev_cum_count = cum_count;
         }
         
+#if defined(LAZY_COPYING)
+        unsigned locus = particles[particle_indices[start]].getNextGene() - 1; // subtract 1 because vector of gene forests starts at 0
+        assert (locus == particles[particle_indices[end]].getNextGene() - 1);
+        // Create map (nonzero_map) in which the key for an element
+        // is the memory address of a gene forest and
+        // the value is a vector of indices of non-zero counts.
+        // This map is used to determine which of the nonzeros
+        // that need to be copied (last nonzero count for any
+        // memory address does not need to be copied and can be
+        // modified in place).
+        map<const void *, list<unsigned> > nonzero_map;
+        buildNonzeroMap(particles, locus, nonzero_map, nonzeros, particle_indices, start, end);
+#endif
         
         // Example of following code that replaces dead
         // particles with copies of surviving particles:
@@ -1798,6 +1814,10 @@ namespace proj {
         unsigned next_nonzero = 0;
         while (next_nonzero < nonzeros.size()) {
             double index_survivor = nonzeros[next_nonzero];
+#if defined(LAZY_COPYING)
+            unsigned index_survivor_in_particles = particle_indices[index_survivor+start];
+            particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map);
+#endif
             unsigned ncopies = counts[index_survivor] - 1;
             for (unsigned k = 0; k < ncopies; k++) {
                 double index_nonsurvivor = zeros[next_zero++];
@@ -1893,6 +1913,26 @@ namespace proj {
 #endif
 
     }
+
+#if defined(LAZY_COPYING)
+    inline void Proj::buildNonzeroMap(vector<Particle> &particles, unsigned locus, map<const void *, list<unsigned> > & nonzero_map, const vector<unsigned> & nonzeros, vector<unsigned> particle_indices, unsigned start, unsigned end) {
+        
+        for (auto i : nonzeros) {
+            unsigned particle_index = particle_indices[start + i];
+            void * ptr = particles[particle_index].getGeneForestPtr(locus).get();
+
+//            void * ptr = particles[i].getGeneForestPtr(locus).get();
+            if (nonzero_map.count(ptr) > 0) {
+//                nonzero_map[ptr].push_back(i);
+                nonzero_map[ptr].push_back(particle_index);
+            }
+            else {
+//                nonzero_map[ptr] = {i};
+                nonzero_map[ptr] = {particle_index};
+            }
+        }
+    }
+#endif
 
     inline double Proj::filterSpeciesParticles(unsigned step, vector<Particle> & particles) {
         unsigned nparticles = (unsigned) particles.size();
@@ -2704,7 +2744,10 @@ namespace proj {
 
         // make up the species map
         simSpeciesMap();
+        
+#if defined (DRAW_NEW_THETA)
         updateSpeciesNames();
+#endif
 
         vector<string> taxpartition;
         for (auto &t:_taxon_map) {

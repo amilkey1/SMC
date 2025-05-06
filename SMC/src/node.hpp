@@ -11,11 +11,18 @@ namespace proj {
 
     class Likelihood;
     class Forest;
+#if defined (LAZY_COPYING)
+    class ForestExtension;
+#endif
+    class SpeciesForest;
     class Particle;
 
     class Node {
         friend class Likelihood;
         friend class Forest;
+#if defined (LAZY_COPYING)
+        friend class ForestExtension;
+#endif
         friend class SpeciesForest;
         friend class Particle;
 
@@ -41,6 +48,7 @@ namespace proj {
 
                     void                clearPointers()             {_left_child = _right_sib = _parent = 0;}
                     void                resetNode();
+                    void                resetSpeciesNode();
                                         
                     static const double _smallest_edge_length;
 
@@ -52,6 +60,10 @@ namespace proj {
             static void             setSpeciesBits(G::species_t & to_species, const G::species_t & from_species, bool init_to_zero_first);
             static void             setSpeciesBit(G::species_t & to_species, unsigned i, bool init_to_zero_first);
             const G::species_t &    getSpecies() const {return _species;}
+#endif
+        
+#if defined (LAZY_COPYING)
+        void                            setSpecies(const G::species_t other);
 #endif
         
         private:
@@ -151,6 +163,23 @@ namespace proj {
         _parent=0;
         _right_sib=0;
     }
+
+    inline void Node::resetSpeciesNode() {
+        _parent=0;
+        _right_sib=0;
+//    #if defined (LAZY_COPYING)
+//        if (_number > G::_nspecies - 1) {
+//        _species = 0; // only reset species for non-tip nodes
+//        }
+//    #endif
+    }
+
+
+#if defined (LAZY_COPYING)
+    inline void Node::setSpecies(const G::species_t spp) {
+        _species = spp;
+    }
+#endif
 
 }
 

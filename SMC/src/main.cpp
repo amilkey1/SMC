@@ -35,9 +35,12 @@ void output(string msg) {
 }
 #endif
 
-#include "forest.hpp"
-#include "species-forest.hpp"
 #include "data.hpp"
+#include "forest.hpp"
+#if defined(LAZY_COPYING)
+#   include "forest-extension.hpp"
+#endif
+#include "species-forest.hpp"
 #include "particle.hpp"
 
 string      G::_program_name        = "smc";
@@ -113,6 +116,8 @@ unsigned G::_generation = 0;
 #if !defined (FASTER_SECOND_LEVEL)
 string G::_ancestral_species_name = "";
 #endif
+
+unsigned Forest::_partials_calculated_count;
 
 vector<string> G::_species_names;
 
