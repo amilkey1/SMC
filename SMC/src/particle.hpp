@@ -90,8 +90,7 @@ class Particle {
             return _species_forest.makeNewick(8, true);}
         string                                  saveForestNewickAlt() {return _species_forest.makeAltNewick(8, false);}
             
-        string                                  saveGeneNewick(unsigned i) {
-            return _gene_forests[i-1].makeNewick(8, true);}
+        string                                  saveGeneNewick(unsigned i);
         string                                  saveChangedForest() {return _gene_forests[_gene_order[G::_generation-1]-1].makePartialNewick(8, true);}
         unsigned                                getNextGene(){return _gene_order[G::_generation];}
 #if defined (USING_MPI)
@@ -2486,6 +2485,19 @@ inline vector<double> Particle::getVectorPrior() {
 
 #if defined (FASTER_SECOND_LEVEL)
     inline void Particle::clearGeneForests() {
+#if defined (LAZY_COPYING)
+        for (unsigned i=0; i<_gene_forest_ptrs.size(); i++) {
+            _gene_forest_ptrs[i]->saveCoalInfoInitial();
+            _gene_forest_ptrs[i]->setTreeHeight(); // TODO: only need to do these things once per pointer
+//            _gene_forest_ptrs[i]->_data = nullptr; // don't need to clear these because they will not get copied in the copy constructor
+//            _gene_forest_ptrs[i]->_nodes.clear();
+//            _gene_forest_ptrs[i]->_lineages.clear(); // don't need clear these because they will not get copied in the copy constructor
+            _gene_forest_ptrs[i]->_preorder.clear();
+#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
+            _gene_forest_ptrs[i]->_vector_prior.clear();
+#endif
+            
+#else
         for (unsigned i=0; i<_gene_forests.size(); i++) {
             _gene_forests[i].saveCoalInfoInitial();
             _gene_forests[i].setTreeHeight();
@@ -2495,6 +2507,7 @@ inline vector<double> Particle::getVectorPrior() {
             _gene_forests[i]._preorder.clear();
 #if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
             _gene_forests[i]._vector_prior.clear();
+#endif
 #endif
         }
     }
@@ -2798,6 +2811,14 @@ inline void Particle::rebuildCoalInfo() {
         return _gene_forest_ptrs[locus];
     }
 #endif
+        
+    inline string Particle::saveGeneNewick(unsigned i) {
+#if defined (LAZY_COPYING)
+        return _gene_forest_ptrs[i-1]->makeNewick(8, true);
+#else
+        return _gene_forests[i-1].makeNewick(8, true);
+#endif
+    }
 
     inline void Particle::operator=(const Particle & other) {
         if (!G::_in_second_level) { // TODO: testing
@@ -2819,7 +2840,9 @@ inline void Particle::rebuildCoalInfo() {
         
         _log_weight     = other._log_weight;
         _species_forest = other._species_forest;
+#if !defined (LAZY_COPYING)
         _gene_forests = other._gene_forests;
+#endif
         _psuffix = other._psuffix;
         _group_number = other._group_number;
         _theta_mean = other._theta_mean;

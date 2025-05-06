@@ -2213,7 +2213,9 @@ namespace proj {
             Particle p = particles[i];
 
             // initialize particles
+#if !defined (LAZY_COPYING)
             p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
+#endif
 
             
             if (!G::_gene_newicks_specified) { // if starting from gene newicks, this is already built
@@ -2885,6 +2887,13 @@ namespace proj {
             psuffix += 2;
         }
         
+        // save coal info for all existing gene pointers before starting any work to avoid timing issues
+#if defined (LAZY_COPYING)
+        for (auto &p:particles) {
+            p.clearGeneForests();
+        }
+#endif
+        
         if (G::_nthreads == 1) {
             for (unsigned g=0; g<ngroups; g++) { // propose and filter for each particle saved from first round
 
@@ -2892,7 +2901,9 @@ namespace proj {
                 vector<Particle > second_level_particles;
             
                 // initialize particles
+#if !defined (LAZY_COPYING)
                 p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
+#endif
                 
                 if (!G::_gene_newicks_specified) { // if starting from gene newicks, this is already built
                     G::_generation = 0;

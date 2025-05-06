@@ -1949,6 +1949,7 @@ class Forest {
         
         if (other._nodes.size() > 0) { // otherwise, there is no forest and nothing needs to be copied
             
+#if !defined (LAZY_COPYING) // no species partition to copy
 #if defined (FASTER_SECOND_LEVEL) // don't need to save the species partition for the second level
             if (!G::_in_second_level) {
                 
@@ -2014,6 +2015,7 @@ class Forest {
                     _species_partition[spiter.first].push_back(nd);
                 }
             }
+#endif
 #endif
             
 #if defined (OLD_UPGMA)
