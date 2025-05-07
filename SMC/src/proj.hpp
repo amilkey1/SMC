@@ -563,6 +563,18 @@ namespace proj {
                 count++;
             }
         }
+        
+        logf << "\n";
+        logf << "\n";
+        
+        for (auto &p:v) {
+            vector<double> thetas = p.getThetaMap();
+            unsigned count = 1;
+            for (auto &t:thetas) {
+                logf << "pop / 4 " << count << "\t" << t/4 << "\n";
+                count++;
+            }
+        }
     }
 
     inline void Proj::writeLoradFile(vector<Particle> &v) const {

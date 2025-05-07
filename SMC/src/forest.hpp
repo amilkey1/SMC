@@ -3873,8 +3873,11 @@ class Forest {
                 double population_coalescence_rate = 0.0;
     #if defined (DRAW_NEW_THETA)
                 G::species_t species = s.second[0]->_species;
-//                double population_theta = theta_map[s.first];
+#if defined (LAZY_COPYING)
                 double population_theta = theta_map[species];
+#else
+                double population_theta = theta_map[s.first];
+#endif
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
     #else
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/G::_theta;

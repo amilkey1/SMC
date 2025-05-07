@@ -1777,9 +1777,13 @@ inline vector<double> Particle::getVectorPrior() {
     //            new_theta = 1 / (lot->gamma(2.01, scale));
             new_theta = 1 / (_lot->gamma(2.0, scale));
             assert (new_theta > 0.0);
-            if (_theta_map.find(new_species_name) == _theta_map.end()) {
+#if defined (LAZY_COPYING)
+            if (_theta_map.count(new_species_name) == 0) {
                 _theta_map[new_species_name] = new_theta; // only update theta map if the species does not already exist in the map
-        }
+            }
+#else
+            _theta_map[new_species_name] = new_theta;
+#endif
         }
     }
 
@@ -2369,8 +2373,10 @@ inline vector<double> Particle::getVectorPrior() {
             if (_species_forest._lineages.size() > 1) {
                 species_joined = _species_forest.speciesTreeProposalSim(_lot);
                 G::species_t new_species_name = _species_forest._lineages.back()->_left_child->_species + _species_forest._lineages.back()->_left_child->_right_sib->_species;
+#if defined (LAZY_COPYING)
                 updateThetaMap(new_species_name);
                 _sorted_species_names.push_back(new_species_name);
+#endif
 
                 double edge_len = 0.0;
                 if (_species_forest._lineages.size() > 1) {
