@@ -3526,8 +3526,10 @@ namespace proj {
                     summarizeData(_data);
                 }
                 createSpeciesMap(_data);
+                
+                G::_nspecies = (unsigned) G::_species_names.size();
 #if defined (LAZY_COPYING)
-                createSpeciesMapTyped(); // TODO: can't do it this way
+                createSpeciesMapTyped();
 #endif
 
                 // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
@@ -3538,7 +3540,6 @@ namespace proj {
                 // set some global variables
                 G::_ntaxa = _data->getNumTaxa();
                 assert (G::_species_names.size() > 0);
-                G::_nspecies = (unsigned) G::_species_names.size();
                 G::_nloci = _data->getNumSubsets();
                 
 #if defined (REUSE_PARTIALS)
