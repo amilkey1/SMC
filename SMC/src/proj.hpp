@@ -2193,7 +2193,7 @@ namespace proj {
         assert (G::_nspecies > 0);
         G::species_t species_name = 1;
         G::species_t prev_species_name = 1;
-        for (unsigned i=0; i<G::_nspecies+1; i++) {
+        for (unsigned i=0; i<G::_nspecies; i++) {
             G::_species_names_typed.push_back(species_name);
             prev_species_name = species_name;
             species_name = prev_species_name + species_name;

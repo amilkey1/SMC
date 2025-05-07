@@ -101,8 +101,17 @@ class Forest {
         vector<pair<double, string>>    calcForestRate(Lot::SharedPtr lot, unordered_map<string, double> theta_map);
 #endif
     
+#if defined (LAZY_COPYING)
         vector<pair<double, string>>    calcForestRateSim(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map);
+#else
+        vector<pair<double, string>>    calcForestRateSim(Lot::SharedPtr lot, unordered_map<string, double> theta_map);
+#endif
         void                            updateSpeciesPartition(tuple<string, string, string> species_info);
+    
+#if defined (LAZY_COPYING)
+        void                            updateSpeciesPartitionSim(tuple<string, string, string> species_info, G::species_t new_species);
+#endif
+    
         double                          calcTopologyPrior(unsigned nlineages);
     
 #if defined (UNUSED_FUNCTIONS)
@@ -391,7 +400,9 @@ class Forest {
         
         //create taxa
         for (unsigned i = 0; i < G::_ntaxa; i++) {
+//#if defined (LAZY_COPYING)
 //            string taxon_name = G::_taxon_names[i];
+//#endif
             Node* nd = &*next(_nodes.begin(), i);
             nd->_right_sib=0;
             nd->_name=" ";
@@ -421,6 +432,10 @@ class Forest {
             taxon_names.push_back(t.first);
         }
         
+//#if defined (LAZY_COPYING)
+//        G::species_t curr_species = 1;
+//#endif
+        
         for (auto &nd:_lineages) {
             if (!nd->_left_child) {
                 // replace all spaces with underscores so that other programs do not have
@@ -428,6 +443,9 @@ class Forest {
                   std::string name = taxon_names[i++];
                   boost::replace_all(name, " ", "_");
                 nd->_name = name;
+//#if defined (LAZY_COPYING)
+//                nd->_species = curr_species;
+//#endif
             }
         }
     }
@@ -441,8 +459,10 @@ class Forest {
         _first_pattern = gene_begin_end.first;
         _npatterns = _data->getNumPatternsInSubset(index-1);
         
-//        const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
-//        unsigned i = 0;
+#if !defined (LAZY_COPYING)
+        const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
+        unsigned i = 0;
+#endif
         auto &data_matrix=_data->getDataMatrix();
         
         _nodes.resize(2*G::_ntaxa - 1);
@@ -2132,6 +2152,31 @@ class Forest {
         }
     }
 
+#if defined (LAZY_COPYING)
+    inline void Forest::updateSpeciesPartitionSim(tuple<string, string, string> species_info, G::species_t new_species_number) {
+        string spp1 = get<0>(species_info);
+        string spp2 = get<1>(species_info);
+        string new_spp = get<2>(species_info);
+        
+        unsigned before = (int) _species_partition.size();
+
+        vector<Node*> &nodes = _species_partition[new_spp];
+        
+        copy(_species_partition[spp1].begin(), _species_partition[spp1].end(), back_inserter(nodes));
+        copy(_species_partition[spp2].begin(), _species_partition[spp2].end(), back_inserter(nodes));
+        _species_partition.erase(spp1);
+        _species_partition.erase(spp2);
+        
+        if (spp1 != "null") {
+            assert (_species_partition.size() == before - 1);
+        }
+        
+        for (auto &nd:nodes) {
+            nd->_species = new_species_number;
+        }
+    }
+#endif
+
 #if defined (DEBUG_MODE)
     inline void Forest::showSpeciesJoined() {
         assert (_index==0);
@@ -2154,13 +2199,36 @@ class Forest {
         
         unsigned count = 0;
         
+#if defined (LAZY_COPYING)
+            G::species_t curr_species = 0;
+            string prev_species_name = "";
+#endif
         for (auto &nd:_nodes) {
             count++;
             assert (!nd._left_child);
             string species_name = taxon_map[nd._name];
             
+#if defined (LAZY_COPYING)
+            if (G::_start_mode_type == G::StartModeType::START_MODE_SIM) {
+            if (prev_species_name != species_name) {
+                if (curr_species == 0) {
+                    curr_species = 1;
+                }
+                else {
+                    curr_species += curr_species;
+                }
+            }
+        }
+#endif
+            
             if (!G::_gene_newicks_specified) {
                 _species_partition[species_name].push_back(&nd); // TODO: may need this for old second level even if starting from gene newicks?
+#if defined (LAZY_COPYING)
+                if (G::_start_mode_type == G::StartModeType::START_MODE_SIM) {
+                    nd._species = curr_species;
+                    prev_species_name = species_name;
+                }
+#endif
             }
             
             if (count == G::_ntaxa) {
@@ -3632,6 +3700,12 @@ class Forest {
             new_nd->_split += subtree1->_split;
             new_nd->_split += subtree2->_split;
         }
+        
+#if defined (LAZY_COPYING)
+        if (G::_start_mode_type == G::StartModeType::START_MODE_SIM) {
+            new_nd->_species = new_nd->_left_child->_species;
+        }
+#endif
 
         _species_partition[species_name] = nodes;
 
@@ -3786,21 +3860,25 @@ class Forest {
     }
 #endif
 
+#if defined (LAZY_COPYING)
     inline vector<pair<double, string>> Forest::calcForestRateSim(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map) {
+#else
+        inline vector<pair<double, string>> Forest::calcForestRateSim(Lot::SharedPtr lot, unordered_map<string, double> theta_map) {
+#endif
         vector<pair<double, string>> rates;
         pair<double, string> rate_and_name;
 
         for (auto &s:_species_partition) {
             if (s.second.size() > 1) { // if size == 0, no possibility of coalescence and rate is 0
                 double population_coalescence_rate = 0.0;
-                // TODO: fix this
-//                double population_theta = G::_theta;
-//    #if defined (DRAW_NEW_THETA)
+    #if defined (DRAW_NEW_THETA)
+                G::species_t species = s.second[0]->_species;
 //                double population_theta = theta_map[s.first];
-//                population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
-//    #else
+                double population_theta = theta_map[species];
+                population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
+    #else
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/G::_theta;
-//    #endif
+    #endif
                 string name = s.first;
                 rate_and_name = make_pair(population_coalescence_rate, name);
                 rates.push_back(rate_and_name);

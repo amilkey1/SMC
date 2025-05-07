@@ -250,6 +250,7 @@ class Particle {
         vector<unsigned>                        _prev_species_number_by_gene;
         vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>> _t;
         vector<vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>>> _t_by_gene;
+        vector<G::species_t>                    _sorted_species_names; // only use for simulations
 #else
         vector<pair<tuple<string, string, string>, double>> _t;
         vector<vector<pair<tuple<string, string, string>, double>>> _t_by_gene;
@@ -957,7 +958,11 @@ inline vector<double> Particle::getVectorPrior() {
                     _num_deep_coalescences += _gene_forests[next_gene-1].getDeepCoal(_t_by_gene_sim[next_gene - 1][next_species_index + 1].first);
                     _max_deep_coal += _gene_forests[next_gene-1].getMaxDeepCoal(_t_by_gene_sim[next_gene - 1][next_species_index + 1].first);
                     
+#if defined (LAZY_COPYING)
+                    _gene_forests[next_gene-1].updateSpeciesPartitionSim(_t_by_gene_sim[next_gene-1][next_species_index+1].first, _sorted_species_names[_next_species_number_by_gene[next_gene-1]]);
+#else
                     _gene_forests[next_gene-1].updateSpeciesPartition(_t_by_gene_sim[next_gene-1][next_species_index+1].first);
+#endif
                     assert (next_species_index < _t_by_gene_sim[next_gene-1].size());
                     _t_by_gene_sim[next_gene-1][next_species_index].second -= species_increment; // update species tree increments
                     assert (_t_by_gene_sim[next_gene-1][next_species_index].second == 0.0);
@@ -1772,7 +1777,9 @@ inline vector<double> Particle::getVectorPrior() {
     //            new_theta = 1 / (lot->gamma(2.01, scale));
             new_theta = 1 / (_lot->gamma(2.0, scale));
             assert (new_theta > 0.0);
-            _theta_map[new_species_name] = new_theta;
+            if (_theta_map.find(new_species_name) == _theta_map.end()) {
+                _theta_map[new_species_name] = new_theta; // only update theta map if the species does not already exist in the map
+        }
         }
     }
 
@@ -2349,6 +2356,10 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline void Particle::buildEntireSpeciesTreeSim() {
+//        for (auto &s:G::_species_names_typed) {
+//            _sorted_species_names.push_back(s);
+//        }
+        
         double edge_len = _species_forest.chooseSpeciesIncrementOnly(_lot, 0.0).first;
 
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
@@ -2357,6 +2368,9 @@ inline vector<double> Particle::getVectorPrior() {
         for (unsigned i=0; i < G::_nspecies-1; i++) {
             if (_species_forest._lineages.size() > 1) {
                 species_joined = _species_forest.speciesTreeProposalSim(_lot);
+                G::species_t new_species_name = _species_forest._lineages.back()->_left_child->_species + _species_forest._lineages.back()->_left_child->_right_sib->_species;
+                updateThetaMap(new_species_name);
+                _sorted_species_names.push_back(new_species_name);
 
                 double edge_len = 0.0;
                 if (_species_forest._lineages.size() > 1) {
@@ -2375,9 +2389,15 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline unsigned Particle::getPartialCount() {
         unsigned partial_count = 0;
+#if defined (LAZY_COPYING)
+        for (auto &f:_gene_forest_ptrs) {
+            partial_count += f->_partials_calculated_count;
+        }
+#else
         for (auto &f:_gene_forests) {
             partial_count += f._partials_calculated_count;
         }
+#endif
         return partial_count;
     }
 

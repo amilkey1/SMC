@@ -948,6 +948,8 @@ class SpeciesForest {
         subtree1->_parent=new_nd;
         subtree2->_parent=new_nd;
         
+        new_nd->_species = new_nd->_left_child->_species + new_nd->_left_child->_right_sib->_species;
+        
         updateNodeVector (_lineages, subtree1, subtree2, new_nd);
         
         new_nd->_height = _forest_height;
