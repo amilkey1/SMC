@@ -86,7 +86,6 @@ class Particle {
         double                                  getSpeciesIncrement () {return _species_forest._last_edge_length;}
 #endif
         double                                  getSpeciesLogWeight() const {return _log_weight;}
-        unsigned                                getPartialCount();
         void                                    setLogWeight(double w){_log_weight = w;}
         void                                    setLogSpeciesWeight(double w){_log_weight = w;}
 #if defined (UNUSED_FUNCTIONS)
@@ -2391,20 +2390,6 @@ inline vector<double> Particle::getVectorPrior() {
         for (unsigned i=0; i<_gene_forests.size(); i++) {
             _gene_forests[i].setNTaxaPerSpecies(ntaxa_per_species);
         }
-    }
-
-    inline unsigned Particle::getPartialCount() {
-        unsigned partial_count = 0;
-#if defined (LAZY_COPYING)
-        for (auto &f:_gene_forest_ptrs) {
-            partial_count += f->_partials_calculated_count;
-        }
-#else
-        for (auto &f:_gene_forests) {
-            partial_count += f._partials_calculated_count;
-        }
-#endif
-        return partial_count;
     }
 
 #if defined (FASTER_SECOND_LEVEL)

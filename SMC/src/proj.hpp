@@ -176,13 +176,11 @@ namespace proj {
 
     inline void Proj::writePartialCountFile(vector<Particle> &particles) {
         ofstream partialf("partial_count.txt");
-        partialf << "total times partials calculated: ";
+        partialf << "total partials needed: ";
         
-        unsigned partial_count = 0;
-        for (auto &p:particles) {
-            partial_count += p.getPartialCount();
-        }
-        partialf << partial_count << "\n";
+        unsigned num_partials_needed = ((G::_ntaxa - 1) * G::_nparticles * G::_nloci * G::_ngroups);
+        
+        partialf <<  num_partials_needed << "\n";
         
         partialf.close();
     }

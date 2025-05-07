@@ -80,6 +80,7 @@ namespace proj {
         static unsigned             _nstates;
         static double               _ploidy;
         static double               _small_enough;
+        static unsigned             _partial_count;
         
         // other
         static vector<string>           _taxon_names;

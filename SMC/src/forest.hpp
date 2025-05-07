@@ -274,7 +274,6 @@ class Forest {
     
         vector<double>                  _starting_dij;
         vector<pair<string, unsigned>>  _lineages_per_species;
-        static unsigned                 _partials_calculated_count;
         double                          _forest_height;
         double                          _forest_length;
     
@@ -359,7 +358,6 @@ class Forest {
 
         _starting_dij.clear();
         _lineages_per_species.clear();
-//        _partials_calculated_count = 0;
         _forest_height = 0.0;
 #if defined (FASTER_SECOND_LEVEL)
         _coalinfo.clear();
@@ -1125,7 +1123,7 @@ class Forest {
 
 #if defined (LAZY_COPYING)
     inline double Forest::calcPartialArrayJC(Node * new_nd, const Node * lchild, const Node * rchild) const {
-        _partials_calculated_count++;
+        G::_partial_count++;
         // Computes the partial array for new_nd and returns the difference in
         // log likelihood due to the addition of new_nd
         //char base[] = {'A','C','G','T'};
@@ -1245,7 +1243,7 @@ class Forest {
     }
 #else
     inline void Forest::calcPartialArrayJC(Node * new_nd) {
-        _partials_calculated_count++;
+        G::_partial_count++;
 
         assert (_index > 0);
     
@@ -1458,7 +1456,7 @@ class Forest {
 
 #if !defined (LAZY_COPYING)
     inline void Forest::calcPartialArrayHKY(Node * new_nd) {
-        _partials_calculated_count++;
+        G::_partial_count++;
 
         assert (_index > 0);
 
@@ -1935,7 +1933,6 @@ class Forest {
         _increments_and_priors = other._increments_and_priors;
         _forest_length = other._forest_length;
             
-//        _partials_calculated_count = other._partials_calculated_count;
         _forest_height = other._forest_height;
         
         // the following data members apply only when simulating and do not need to be copied because simulating data only deals with one particle at a time

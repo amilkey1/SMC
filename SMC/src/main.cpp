@@ -117,9 +117,8 @@ unsigned G::_generation = 0;
 string G::_ancestral_species_name = "";
 #endif
 
-unsigned Forest::_partials_calculated_count;
-
 vector<string> G::_species_names;
+unsigned G::_partial_count = 0;
 
 #if defined (LAZY_COPYING)
 vector<G::species_t> G::_species_names_typed;
