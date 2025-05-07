@@ -3,6 +3,7 @@
 #include "forest.hpp"
 #include "species-forest.hpp"
 #include "forest-extension.hpp"
+#include "forest-func.hpp"
 #include "boost/format.hpp"
 #include "boost/math/special_functions/gamma.hpp"
 #include <mutex>
@@ -56,23 +57,11 @@ class Particle {
                                                 }
         void                                    setSimData(Data::SharedPtr d, map<string, string> &taxon_map, unsigned ntaxa) {
                                                     int index = 1;
-//#if defined (LAZY_COPYING)
-//                                                    _gene_forest_ptrs.resize(G::_nloci);
-//                                                    _gene_forest_extensions.resize(G::_nloci);
-//                                                    for (unsigned g = 0; g < G::_nloci; g++) {
-//                                                        _gene_forest_ptrs[g] = Forest::SharedPtr(new Forest());
-//                                                        Forest::SharedPtr gfp = _gene_forest_ptrs[g];
-//                                                        gfp->setSimData(d, index, taxon_map, ntaxa);
-//                                                        index++;
-//                                                    }
-//
-//#else
                                                     _gene_forests.resize(G::_nloci);
                                                     for (auto &_gene_forest:_gene_forests) {
                                                         _gene_forest.setSimData(d, index, taxon_map, ntaxa);
                                                         index++;
                                                     }
-//#endif
                                                 }
         void                                    mapSpecies(map<string, string> &taxon_map);
         void                                    saveForest(std::string treefilename);
@@ -111,7 +100,10 @@ class Particle {
         void                                    initGeneForestSpeciesPartition(string species_partition);
         string                                  saveForestSpeciesPartition();
 #endif
+    
+#if defined (UPGMA)
         void                                    setGeneUPGMAMatrices();
+#endif
         void                                    createThetaMap();
         void                                    createThetaMapFixedTheta();
 #if defined (LAZY_COPYING)
@@ -229,8 +221,6 @@ class Particle {
             void                                        resetAllPrevLogLikelihood();
             void                                        rebuildCoalInfo();
             void                                        recordAllForests(vector<Forest::coalinfo_t> & coalinfo_vect) const;
-//            void                                        computeAllPartials();
-//            PartialStore::partial_t                     pullPartial(unsigned gene);
             void                                        stowPartial(unsigned gene, Node * nd);
 #endif
     
@@ -282,7 +272,7 @@ class Particle {
 #endif
     
 #if defined (LAZY_COPYING)
-        vector<double>             _prev_log_likelihoods;
+        vector<double>                          _prev_log_likelihoods;
 #endif
 };
 
@@ -2875,40 +2865,13 @@ inline vector<double> Particle::getVectorPrior() {
     }
 #endif
 
+#if defined (UPGMA)
     inline void Particle::setGeneUPGMAMatrices() {
         for (unsigned i=0; i<_gene_forests.size(); i++) {
             _gene_forests[i].setGeneUPGMAMatrices();
         }
     }
-
-#if defined(LAZY_COPYING)
-//    inline void Particle::resetGeneForests(bool compute_partials) {
-//        assert(G::_ntaxa > 0);
-//        assert(G::_nloci > 0);
-//        _prev_log_likelihoods.clear();
-//        _prev_log_likelihoods.resize(G::_nloci);
-//        _gene_forest_ptrs.clear();
-//        _gene_forest_ptrs.resize(G::_nloci);
-//        _gene_forest_extensions.resize(G::_nloci);
-//        for (unsigned g = 0; g < G::_nloci; g++) {
-//            _prev_log_likelihoods[g] = 0.0;
-//            _gene_forest_ptrs[g] = Forest::SharedPtr(new GeneForest());
-//            Forest::SharedPtr gfp = _gene_forest_ptrs[g];
-//            gfp->setData(_data);
-//            gfp->setRelRate(G::_double_relative_rates[g]);
-//            gfp->setGeneIndex(g);
-//            gfp->createTrivialForest(compute_partials);
-//        }
-//    }
 #endif
-
-//#if defined(LAZY_COPYING)
-//    inline void Particle::threadComputePartials(unsigned first, unsigned last) {
-//        for (unsigned k = first; k < last; k++) {
-//            _gene_forest_ptrs[k]->computeAllPartials();
-//        }
-//    }
-//#endif
 
 #if defined(LAZY_COPYING)
     inline void Particle::resetAllPrevLogLikelihood() {
@@ -2955,27 +2918,6 @@ inline void Particle::rebuildCoalInfo() {
         sort(coalinfo_vect.begin(), coalinfo_vect.end());
     }
 #endif
-
-//#if defined(LAZY_COPYING)
-//inline void Particle::computeAllPartials() {
-//    for (auto gfp : _gene_forest_ptrs) {
-//        gfp->computeAllPartials();
-//    }
-//}
-//#endif
-
-//#if defined(LAZY_COPYING)
-//    inline PartialStore::partial_t Particle::pullPartial(unsigned gene) {
-//        lock_guard<mutex> guard(mutex);
-//        assert(gene < _gene_forest_ptrs.size());
-//
-//        PartialStore::partial_t ptr;
-//
-//        // Grab one partial from partial storage
-//        ptr = ps.getPartial(gene);
-//        return ptr;
-//    }
-//#endif
 
 #if defined(LAZY_COPYING)
     inline void Particle::stowPartial(unsigned gene, Node * nd) {
@@ -3040,35 +2982,8 @@ inline void Particle::rebuildCoalInfo() {
         double incr = gfx.getProposedDelta();
         assert(incr > 0.0);
         
-//        _species_forest.showForest();
-        
-        const G::merge_vect_t mergers = gfx.getMergers(); // TODO: member access into incomplete type proj::ForestExtension
-//        const G::merge_vect_t mergers;
-//        _gene_forest_ptrs[locus]->showForest();
-//        vector<tuple<double, unsigned long, unsigned long>> mergers;
-//        for (unsigned i = _prev_species_number_by_gene[locus]; i<_next_species_number_by_gene[locus]+1; i++) {
-//            // add to mergers if the gene tree has eaten into any of the species tree increment (i.e. there is less increment left in _t_by_gene than in _t)
-//            // addincrandjoin function assumes the join goes with the branch length behind it (i.e. first join goes with first increment, not second increment)
-//            if (_t_by_gene[locus][i].second < _t[i].second) {
-//                double increment = _t[i].second - _t_by_gene[locus][i].second; // TODO: doesn't work because some of the increment may have been used in the previous step
-//
-//                // if the increment left in _t_by_gene is >0, don't join species because the gene tree hasn't reached the join yet
-////                if (_t_by_gene[locus][i].second > 0) {
-////                    mergers.push_back(make_tuple(increment, 0, 0));
-////                }
-////                else {
-//                if (_t_by_gene[locus][i].second == 0) {
-//                    mergers.push_back(make_tuple(increment, get<0>(_t_by_gene[locus][i+1].first), get<1>(_t_by_gene[locus][i+1].first)));
-//                }
-//            }
-//        }
-        Node* anc_node = gfp->addIncrAndJoin(incr, lsplit, rsplit, gfx, mergers);
-//        _gene_forest_ptrs[locus]->showForest();
-        
-        anc_node->_partial = gfx.getExtensionPartial(); // TODO: member access into incomplete type proj::ForestExtension
-        
-        //gfp->debugCheckBleedingEdge("after finalizeLatestJoin", _gene_forest_extensions[locus].getHeight());
-        
+        gfp->addIncrAndJoin(incr, lsplit, rsplit, gfx);
+                        
         // Can now get rid of extension
         _gene_forest_extensions[locus].undock();
     }
@@ -3127,7 +3042,7 @@ inline void Particle::rebuildCoalInfo() {
 //            _num_deep_coalescences = other._num_deep_coalescences;
 //            _max_deep_coal = other._max_deep_coal;
 
-        if (G::_in_second_level) { // TODO: testing
+        if (G::_in_second_level) {
             _log_coalescent_likelihood = other._log_coalescent_likelihood;
 #if !defined (FASTER_SECOND_LEVEL)
         _species_branches = other._species_branches;

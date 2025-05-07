@@ -55,6 +55,7 @@
 		22BD6F8F2707555A00DEB698 /* forest.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = forest.hpp; sourceTree = "<group>"; };
 		22BD6F902710806700DEB698 /* proj.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = proj.hpp; sourceTree = "<group>"; };
 		22C9156E2D6E59EA00DEE475 /* g.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = g.hpp; sourceTree = "<group>"; };
+		22F12B232DCC04E4003A70E0 /* forest-func.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = "forest-func.hpp"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -119,6 +120,7 @@
 				22C9156E2D6E59EA00DEE475 /* g.hpp */,
 				2262089F2DBBC27200777832 /* species-forest.hpp */,
 				225D236D2DC8F49B000F6E6F /* forest-extension.hpp */,
+				22F12B232DCC04E4003A70E0 /* forest-func.hpp */,
 			);
 			path = src;
 			sourceTree = "<group>";

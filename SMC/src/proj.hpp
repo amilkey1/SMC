@@ -2574,11 +2574,13 @@ namespace proj {
             particle.fixTheta();
         }
         
+#if defined (UPGMA)
         if (G::_upgma) {
             if (!G::_gene_newicks_specified) {
                 particle.setGeneUPGMAMatrices();
             }
         }
+#endif
     }
 
     inline void Proj::proposeParticlesParallelizeByGroup(vector<vector<Particle>> &particles) {

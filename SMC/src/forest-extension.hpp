@@ -168,7 +168,7 @@ namespace proj {
         // Add element to _mergers vector
         _mergers.push_back(make_tuple(_proposed_anc._height, left_spp, right_spp));
             
-        // Merge species in _species_vect // TODO: need to renumber the species names in _nodes in _docked_forest?
+        // Merge species in _species_vect
         G::species_t anc_spp = (left_spp | right_spp);
         for (auto & s : _species_vect) {
             if (s == left_spp || s == right_spp) {
@@ -239,32 +239,12 @@ namespace proj {
         assert (t2 < nsubtrees);
 
         return make_pair(t1, t2);
-        
-//        unsigned n = (unsigned)node_indices.size();
-//        assert(n > 1);
-//
-//        // Choose a random pair of lineages to join
-//        pair<unsigned,unsigned> chosen_pair = _lot->nchoose2(n);
-//        unsigned i = node_indices[chosen_pair.first];
-//        unsigned j = node_indices[chosen_pair.second];
-        
-        // Sanity checks
-//        assert(i != j);
-//        assert(i < _docked_gene_forest->_lineages.size());
-//        assert(j < _docked_gene_forest->_lineages.size());
-//
-//        return make_pair(i,j);
     }
 
     inline void ForestExtension::coalesce(double total_rate, G::species_t species_name) {
-        // Choose the species in which the coalescence will happen
-//        G::species_t spp = chooseSpecies(total_rate, G::_theta);
-//        _proposed_anc.setSpecies(spp);
-        
         _proposed_anc.setSpecies(species_name);
                     
         // Choose the two nodes to join
-//        G::uint_pair_t chosen = chooseNodesToJoin(_species_partition[spp]);
          G::uint_pair_t chosen = chooseNodesToJoin(_species_partition[species_name]);
         
         // Get pointers to the two nodes to join

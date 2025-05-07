@@ -144,10 +144,12 @@ class Forest {
         pair<Node*, Node*>              getSubtreeAt(pair<unsigned, unsigned> t, vector<Node*> node_list);
         void                            debugShowDistanceMatrix(const vector<double> & d) const;
     
+#if defined (UPGMA)
         void                            constructUPGMA();
         void                            destroyUPGMA();
         void                            mergeDMatrixPair(vector<Split> & dmatrows, vector<double> & dmatrix, Split & s1, Split & s2);
         void                            buildStartingUPGMAMatrix();
+#endif
 #if defined (OLD_UPGMA)
         void                            buildStartingRow();
         void                            buildRestOfTreeFaster();
@@ -187,32 +189,29 @@ class Forest {
         map<string, vector<string>>     saveSpeciesPartition();
     vector<pair<tuple<string, string, string>, double>> buildFromNewickMPI(const string newick, bool rooted, bool allow_polytomies, Lot::SharedPtr lot);
 #endif
+    
+#if defined (UPGMA)
         void                            setGeneUPGMAMatrices();
+#endif
     
         static bool                     compareNodeHeights(const Node& a, const Node& b) ;
     
 #if defined(LAZY_COPYING)
         PartialStore::partial_t         pullPartial();
         void                            buildCoalInfoVect();
-        void                            heightsInternalsPreorders();
-        void                            refreshAllHeightsAndPreorders();
         virtual pair<double, double>    getBoundaryExtension() const;
         void                            joinLineagePair(Node * new_nd, Node * subtree1, Node * subtree2);
         Node *                          getMostRecentAncestor();
         void                            refreshAllPreorders() const;
-        void                            resizeAllSplits(unsigned nleaves);
         void                            advanceAllLineagesBy(double increment);
-        Node*                           addIncrAndJoin(double incr, const Split & lsplit, const Split & rsplit, ForestExtension & gfx, const G::merge_vect_t mergers);
+        void                            addIncrAndJoin(double incr, const Split & lsplit, const Split & rsplit, ForestExtension & gfx);
         void                            copyLineageSpecies(vector<G::species_t> & species_of_lineages) const;
         void                            debugCheckBleedingEdge(string msg, double anc_height) const;
         void                            mergeSpecies(G::species_t left_species, G::species_t right_species, G::species_t anc_species);
-//        void                            computeAllPartials();
         void                            setLogLikelihood(double log_likelihood) {_gene_tree_log_likelihood = log_likelihood;}
-        Node *                          pullNode();
         unsigned                        checkNumberOfUniqueSpeciesInExistence();
     
         mutable vector<Node::ptr_vect_t> _preorders;
-        vector<unsigned>        _unused_nodes;
 #endif
     
         std::vector<Node *>             _lineages;
@@ -265,6 +264,8 @@ class Forest {
 #if !defined (FASTER_SECOND_LEVEL)
         map<string, unsigned>           _species_indices;
 #endif
+    
+#if defined (UPGMA)
         stack<Node *>                   _upgma_additions;
         map<Node *, double>             _upgma_starting_edgelen;
         
@@ -273,6 +274,8 @@ class Forest {
         vector<Split>                   _dmatrix_rows;
     
         vector<double>                  _starting_dij;
+#endif
+    
         vector<pair<string, unsigned>>  _lineages_per_species;
         double                          _forest_height;
         double                          _forest_length;
@@ -331,9 +334,6 @@ class Forest {
         _ninternals=0;
         _preorder.clear();
         _forest_length = 0.0;
-#if defined (LAZY_COPYING)
-        _unused_nodes.clear();
-#endif
 #if !defined (FASTER_SECOND_LEVEL)
         _species_build.clear();
         _depths.clear();
@@ -352,11 +352,14 @@ class Forest {
 #if !defined (FASTER_SECOND_LEVEL)
         _species_indices.clear();
 #endif
-        
+      
+#if defined (UPGMA)
         _upgma_additions = stack<Node*>();
         _upgma_starting_edgelen.clear();
 
         _starting_dij.clear();
+#endif
+        
         _lineages_per_species.clear();
         _forest_height = 0.0;
 #if defined (FASTER_SECOND_LEVEL)
@@ -378,11 +381,13 @@ class Forest {
         *this = other;
     }
 
+#if defined (UPGMA)
     inline void Forest::setGeneUPGMAMatrices() {
         assert (_index > 0);
         _dmatrix      = G::_dmatrix[_index-1];
         _dmatrix_rows = G::_dmatrix_rows;
     }
+#endif
 
     inline void Forest::setSimData(Data::SharedPtr d, int index, map<string, string> &taxon_map, unsigned ntaxa) {
         _index = index;
@@ -1657,11 +1662,13 @@ class Forest {
         auto &counts = _data->getPatternCounts();
         _gene_tree_log_likelihood = 0.0;
         
+#if defined (UPGMA)
         if (G::_upgma) {
             if (_forest_height > 0) {
                 constructUPGMA();
             }
         }
+#endif
 
 #if defined (UNROLL_LOOPS)
         for (auto &nd:_lineages) {
@@ -1738,11 +1745,13 @@ class Forest {
         }
 #endif
         
+#if defined (UPGMA)
         if (G::_upgma) {
             if (_forest_height) {
                 destroyUPGMA();
             }
         }
+#endif
         
         return _gene_tree_log_likelihood;
     }
@@ -1913,6 +1922,7 @@ class Forest {
             _first_pattern      = other._first_pattern;
             _data               = other._data;
             
+#if defined (UPGMA)
             if (G::_upgma) {
                 _upgma_additions = other._upgma_additions;
                 _upgma_starting_edgelen = other._upgma_starting_edgelen;
@@ -1922,10 +1932,10 @@ class Forest {
                 
                 _starting_dij = other._starting_dij;
             }
+#endif
             
 #if defined (LAZY_COPYING)
             _preorders.clear();
-            _unused_nodes = other._unused_nodes;
 #endif
         }
         
@@ -2636,6 +2646,7 @@ class Forest {
     }
 #endif
 
+#if defined (UPGMA)
     inline void Forest::destroyUPGMA() {
         if (G::_save_memory) {
              for (auto &nd:_nodes) {
@@ -2690,6 +2701,7 @@ class Forest {
             _lineages.back()->_partial = nullptr; // last step, only node with partials should be the new node, and partials are no longer needed if likelihood has been calculated
         }
     }
+#endif
 
 #if defined (REUSE_PARTIALS)
     inline void Forest::stowPartial(Node * nd) {
@@ -2709,6 +2721,7 @@ class Forest {
     }
 #endif
 
+#if defined (UPGMA)
     inline void Forest::constructUPGMA() {
         assert(_index >= 0);
 
@@ -2853,7 +2866,9 @@ class Forest {
             --nsteps;
         }
     }
+#endif
 
+#if defined (UPGMA)
     inline void Forest::mergeDMatrixPair(vector<Split> & dmatrows, vector<double> & dmatrix, Split & s1, Split & s2) {
         // dmatrix = [d10, d20, d21, d31, d31, d32]
         //   index =   0    1    2    3    4    5
@@ -3011,6 +3026,7 @@ class Forest {
         dmatrix = dmat2;
         dmatrows = drows2;
     }
+#endif
     
 #if defined (OLD_UPGMA)
     inline void Forest::buildRestOfTreeFaster() {
@@ -3670,6 +3686,7 @@ class Forest {
              subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
              subtree2->_partial=nullptr;
              
+#if defined (UPGMA)
              if (G::_upgma) {
                 // Update _dmatrix and _dmatrix_rows
                 Split s1 = subtree1->getSplit();
@@ -3685,6 +3702,7 @@ class Forest {
                 
                 mergeDMatrixPair(_dmatrix_rows, _dmatrix, s1, s2);
              }
+#endif
 
          }
         
@@ -6130,8 +6148,7 @@ class Forest {
     inline void Forest::saveCoalInfoGeneForest(vector<Forest::coalinfo_t> & coalinfo_vect) const {
         // Appends to coalinfo_vect; clear before calling if desired
         // GeneForest version ignores cap argument.
-        // Assumes heights and preorders are up-to-date; call
-        //   heightsInternalsPreorders() beforehand to ensure this
+        // Assumes heights and preorders are up-to-date
         
         // coalinfo_t is a tuple with these elements:
         // - height of node
@@ -6448,112 +6465,6 @@ class Forest {
 #endif
 
 #if defined (LAZY_COPYING)
-    inline void Forest::refreshAllHeightsAndPreorders() {
-        // Ensure this is not a gene forest extension
-        assert(getBoundaryExtension().first < 0);
-        
-        // Refreshes _preorders and then recalculates heights of all nodes
-        // and sets _forest_height
-        
-        resizeAllSplits(G::_ntaxa);
-        refreshAllPreorders();
-        _forest_height = 0.0;
-
-        // Set heights for each lineage in turn
-        for (auto & preorder : _preorders) {
-            for (auto nd : boost::adaptors::reverse(preorder)) {
-                assert(nd->_number > -1);
-                if (nd->_left_child) {
-                    // nd is an internal node
-                    assert(nd->_height != G::_infinity);
-                    if (nd->_height + nd->_edge_length > _forest_height)
-                        _forest_height = nd->_height + nd->_edge_length;
-                }
-                else {
-                    // nd is a leaf node
-                    nd->_height = 0.0;
-                    if (nd->_edge_length > _forest_height)
-                        _forest_height = nd->_edge_length;
-
-                    // Set bit corresponding to this leaf node's number
-                    nd->_split.setBitAt(nd->_number);
-                }
-                
-                if (nd->_parent) {
-                    // Set parent's height if nd is right-most child of its parent
-                    bool is_rightmost_child = !nd->_right_sib;
-                    double parent_height = nd->_height + nd->_edge_length;
-                    if (is_rightmost_child) {
-                        nd->_parent->_height = parent_height;
-                    }
-                    
-                    // If nd is not its parent's rightmost child, check ultrametric assumption
-                    assert(!is_rightmost_child || fabs(nd->_parent->_height - parent_height) < G::_small_enough);
-
-                    // Parent's bits are the union of the bits set in all its children
-                    nd->_parent->_split.addSplit(nd->_split);
-                }
-            }
-        }
-    }
-#endif
-
-#if defined(LAZY_COPYING)
-    inline void Forest::heightsInternalsPreorders() {
-        // Ensure this is not a gene forest extension
-        assert(getBoundaryExtension().first < 0);
-
-        // Recalculates heights of all nodes, refreshes preorder sequences, and renumbers internal nodes
-        assert(_lineages.size() == 1);
-        refreshAllPreorders();
-        _forest_height = 0.0;
-
-        // Check _height, _species, and pointers for each lineage in turn
-        for (auto & preorder : _preorders) {
-            for (auto nd : boost::adaptors::reverse(preorder)) {
-                if (nd->_left_child) {
-                    // nd is an internal node
-                    assert(nd->_height != G::_infinity);
-                    if (nd->_height > _forest_height)
-                        _forest_height = nd->_height;
-                    nd->_species = nd->_left_child->_species;
-                    assert(nd->_species > 0);
-                    assert(nd->_left_child->_right_sib);
-                    nd->_species |= nd->_left_child->_right_sib->_species;
-                    assert(nd->_left_child->_right_sib->_right_sib == nullptr);
-                    //addCoalInfoElem(nd);
-                }
-                else {
-                    // nd is a leaf node
-                    assert(nd->_number > -1);
-                    nd->_height = 0.0;
-                }
-                                
-                if (nd->_parent) {
-                    // Set parent's height if nd is right-most child of its parent
-                    bool is_rightmost_child = !nd->_right_sib;
-                    double parent_height = nd->_height + nd->_edge_length;
-                    if (is_rightmost_child) {
-                        nd->_parent->_height = parent_height;
-                    }
-                    
-                    // If nd is not its parent's rightmost child, check ultrametric assumption
-                    assert(!is_rightmost_child || fabs(nd->_parent->_height - parent_height) < G::_small_enough);
-                }
-            }
-        }
-    }
-#endif
-
-#if defined (LAZY_COPYING)
-    inline void Forest::resizeAllSplits(unsigned nleaves) {
-        for (auto & nd : _nodes) {
-            nd._split.resize(nleaves);
-        }
-    }
-#endif
-
-#if defined (LAZY_COPYING)
     inline void Forest::advanceAllLineagesBy(double increment) {
         // Add dt to the edge length of all lineage root nodes, unless
         // 1. there is just one lineage or
@@ -6725,114 +6636,6 @@ class Forest {
     }
 #endif
 
-#if defined(LAZY_COPYING)
-    inline Node* Forest::addIncrAndJoin(double incr, const Split & lsplit, const Split & rsplit, ForestExtension & gfx, const G::merge_vect_t mergers) {
-        // Identify the two nodes to join
-        Node * first_node = nullptr;
-        Node * second_node = nullptr;
-        for (auto nd : _lineages) {
-            const Split & s = nd->_split;
-            if (s == lsplit) {
-                first_node = nd;
-            }
-            else if (s == rsplit) {
-                second_node = nd;
-            }
-            if (first_node && second_node)
-                break;
-        }
-        
-        assert(first_node);
-        assert(second_node);
-        
-        // Increment all lineages
-//        const G::merge_vect_t mergers = gfx.getMergers();  // TODO: member access into incomplete type proj::ForestExtension
-        if (mergers.size() > 0) {
-            double used_increment = 0;
-            double starting_forest_height = _forest_height;
-            double partial_incr = 0.0;
-            for (auto m : mergers) {
-                // m is a tuple comprising:
-                // 0: height
-                // 1: first species to merge
-                // 2: second species to merge
-                double merge_height = get<0>(m);
-                G::species_t left_spp = get<1>(m);
-                G::species_t right_spp = get<2>(m);
-                G::species_t anc_spp = (left_spp | right_spp);
-                
-                // Bring all _lineages (and _forest_height) up to merge_height
-                partial_incr = merge_height - _forest_height;
-//                partial_incr = merge_height;
-                advanceAllLineagesBy(partial_incr);
-                
-                used_increment += partial_incr;
-                
-                // Merge left_spp and right_spp
-                mergeSpecies(left_spp, right_spp, anc_spp); // TODO: should never by a 0 and a non-zero here
-            }
-            
-            // TODO: already taken care of?
-            // Bring all _lineages (and _forest_height) up to final height
-            partial_incr = starting_forest_height + incr - _forest_height;
-//            partial_incr = incr - used_increment;
-            assert(partial_incr > 0.0);
-            advanceAllLineagesBy(partial_incr);
-        }
-        else {
-            advanceAllLineagesBy(incr);
-        }
-                
-        assert(first_node->getSpecies() == second_node->getSpecies());
-        assert(first_node->getSpecies() > 0);
-
-//        // Pull next available node to serve as ancestral node
-        Node * anc_node = &_nodes[G::_ntaxa + _ninternals];
-
-        assert (anc_node->_parent==0);
-        assert (anc_node->_number == -1);
-        assert (anc_node->_right_sib == 0);
-        
-        anc_node->_number=G::_ntaxa+_ninternals;
-        anc_node->_edge_length=0.0;
-         _ninternals++;
-        anc_node->_name += to_string(anc_node->_number);
-
-        anc_node->_left_child=first_node;
-        first_node->_right_sib=second_node;
-        
-        first_node->_parent = anc_node;
-        second_node->_parent = anc_node;
-        
-//        Node * anc_node = pullNode();
-        anc_node->_height = _forest_height;
-        anc_node->_species = first_node->getSpecies();
-
-        // Set anc_node split to union of the two child splits
-        anc_node->_split.resize(G::_ntaxa);
-        anc_node->_split += first_node->_split;
-        anc_node->_split += second_node->_split;
-        
-        // Set partial to supplied (already-calculated) partial
-//        anc_node->_partial = gfx.getExtensionPartial(); // TODO: member access into incomplete type proj::ForestExtension
-        
-        // Make the join // TODO: already done above
-//        joinLineagePair(anc_node, first_node, second_node);
-        
-        // Set species of anc node
-        assert(first_node->_species == second_node->_species);
-        assert(first_node->_species > 0);
-        assert(second_node->_species > 0);
-        anc_node->_species = first_node->_species;
-
-        // Fix up _lineages
-        updateNodeVector(_lineages, first_node, second_node, anc_node);
-        refreshAllPreorders();
-        
-        return anc_node;
-    }
-#endif
-
 #if defined (LAZY_COPYING)
     inline void Forest::joinLineagePair(Node * new_nd, Node * subtree1, Node * subtree2) {
         // Assumes pullNode has been called to obtain new_nd before calling this function
@@ -6861,26 +6664,6 @@ class Forest {
         subtree1->_right_sib = subtree2;
         subtree1->_parent    = new_nd;
         subtree2->_parent    = new_nd;
-    }
-#endif
-
-#if defined (LAZY_COPYING)
-    inline Node * Forest::pullNode() {
-        if (_unused_nodes.empty()) {
-            //unsigned nleaves = 2*(isSpeciesForest() ? G::_nspecies : G::_ntaxa) - 1;
-            throw XProj(str(format("Forest::pullNode tried to return a node beyond the end of the _nodes vector (%d nodes allocated for %d leaves)") % _nodes.size() % G::_ntaxa));
-        }
-        double node_index = _unused_nodes.back();
-        _unused_nodes.pop_back();
-        
-        Node * new_nd = &_nodes[node_index];
-        assert(new_nd->_number == node_index);
-        
-        assert(!new_nd->_partial);
-        new_nd->clear();
-        new_nd->_number = node_index;
-        new_nd->_split.resize(G::_ntaxa);
-        return new_nd;
     }
 #endif
 

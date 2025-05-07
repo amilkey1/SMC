@@ -2654,8 +2654,7 @@ class SpeciesForest {
     #if defined (FASTER_SECOND_LEVEL)
     inline void SpeciesForest::saveCoalInfoSpeciesTree(vector<Forest::coalinfo_t> & coalinfo_vect, bool cap) {
         // Appends to coalinfo_vect; clear coalinfo_vect before calling if desired
-        // Assumes heights and preorders are up-to-date; call
-        //   heightsInternalsPreorders() beforehand to ensure this
+        // Assumes heights and preorders are up-to-date
         
         // Dump _coalinfo into coalinfo_vect
         if (!_coalinfo.empty()) {
@@ -2781,8 +2780,7 @@ class SpeciesForest {
 #if defined(LAZY_COPYING)
     inline void SpeciesForest::saveCoalInfo(vector<Forest::coalinfo_t> & coalinfo_vect, bool cap) const {
         // Appends to coalinfo_vect; clear coalinfo_vect before calling if desired
-        // Assumes heights and preorders are up-to-date; call
-        //   heightsInternalsPreorders() beforehand to ensure this
+        // Assumes heights and preorders are up-to-date
 
         // Dump _coalinfo into coalinfo_vect
         if (!_coalinfo.empty()) {
