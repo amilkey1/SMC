@@ -95,7 +95,13 @@ class Forest {
         vector<double>                  reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
         int                             selectPair(vector<double> weight_vec, Lot::SharedPtr lot);
         void                            allowCoalescence(string species_name, double increment, Lot::SharedPtr lot);
+#if defined (LAZY_COPYING)
+        vector<pair<double, string>>    calcForestRate(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map);
+#else
         vector<pair<double, string>>    calcForestRate(Lot::SharedPtr lot, unordered_map<string, double> theta_map);
+#endif
+    
+        vector<pair<double, string>>    calcForestRateSim(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map);
         void                            updateSpeciesPartition(tuple<string, string, string> species_info);
         double                          calcTopologyPrior(unsigned nlineages);
     
@@ -385,6 +391,7 @@ class Forest {
         
         //create taxa
         for (unsigned i = 0; i < G::_ntaxa; i++) {
+//            string taxon_name = G::_taxon_names[i];
             Node* nd = &*next(_nodes.begin(), i);
             nd->_right_sib=0;
             nd->_name=" ";
@@ -396,6 +403,17 @@ class Forest {
             nd->_height = 0.0;
             nd->_position_in_lineages=i;
             _lineages.push_back(nd);
+            
+#if defined (LAZY_COPYING)
+//            _nodes[i]._name = taxon_name;
+            _nodes[i]._split.resize(G::_ntaxa);
+            _nodes[i]._split.setBitAt(i);
+//            if (G::_taxon_to_species.count(taxon_name) == 0)
+//                throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % taxon_name));
+//            else {
+//                Node::setSpeciesBit(_nodes[i]._species, G::_taxon_to_species.at(taxon_name), /*init_to_zero_first*/true);
+//            }
+#endif
         }
         
         vector<string> taxon_names;
@@ -423,8 +441,8 @@ class Forest {
         _first_pattern = gene_begin_end.first;
         _npatterns = _data->getNumPatternsInSubset(index-1);
         
-        const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
-        unsigned i = 0;
+//        const Data::taxon_names_t & taxon_names = _data->getTaxonNames();
+//        unsigned i = 0;
         auto &data_matrix=_data->getDataMatrix();
         
         _nodes.resize(2*G::_ntaxa - 1);
@@ -3735,6 +3753,17 @@ class Forest {
         return _forest_length;
     }
 
+#if defined (LAZY_COPYING)
+    inline vector<pair<double, string>> Forest::calcForestRate(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map) {
+        // TODO: write this function for simulating
+        vector<pair<double, string>> rates;
+        pair<double, string> rate_and_name;
+        
+        cout << "x";
+        
+        return rates;
+    }
+#else
     inline vector<pair<double, string>> Forest::calcForestRate(Lot::SharedPtr lot, unordered_map<string, double> theta_map) {
         vector<pair<double, string>> rates;
         pair<double, string> rate_and_name;
@@ -3743,11 +3772,35 @@ class Forest {
             if (s.second.size() > 1) { // if size == 0, no possibility of coalescence and rate is 0
                 double population_coalescence_rate = 0.0;
     #if defined (DRAW_NEW_THETA)
-                    double population_theta = theta_map[s.first];
+                double population_theta = theta_map[s.first];
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
     #else
                 population_coalescence_rate = s.second.size()*(s.second.size()-1)/G::_theta;
     #endif
+                string name = s.first;
+                rate_and_name = make_pair(population_coalescence_rate, name);
+                rates.push_back(rate_and_name);
+            }
+        }
+        return rates;
+    }
+#endif
+
+    inline vector<pair<double, string>> Forest::calcForestRateSim(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map) {
+        vector<pair<double, string>> rates;
+        pair<double, string> rate_and_name;
+
+        for (auto &s:_species_partition) {
+            if (s.second.size() > 1) { // if size == 0, no possibility of coalescence and rate is 0
+                double population_coalescence_rate = 0.0;
+                // TODO: fix this
+//                double population_theta = G::_theta;
+//    #if defined (DRAW_NEW_THETA)
+//                double population_theta = theta_map[s.first];
+//                population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
+//    #else
+                population_coalescence_rate = s.second.size()*(s.second.size()-1)/G::_theta;
+//    #endif
                 string name = s.first;
                 rate_and_name = make_pair(population_coalescence_rate, name);
                 rates.push_back(rate_and_name);

@@ -121,6 +121,10 @@ unsigned Forest::_partials_calculated_count;
 
 vector<string> G::_species_names;
 
+#if defined (LAZY_COPYING)
+vector<G::species_t> G::_species_names_typed;
+#endif
+
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT
     {"standard",             "KNKNTTTTRSRSIIMIQHQHPPPPRRRRLLLLEDEDAAAAGGGGVVVV*Y*YSSSS*CWCLFLF"},

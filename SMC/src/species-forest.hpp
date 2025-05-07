@@ -63,6 +63,7 @@ class SpeciesForest {
  
         void                            setUpSpeciesForest();
         void                            setSpeciesFromNodeName(Node * nd);
+        tuple<string,string, string>    speciesTreeProposalSim(Lot::SharedPtr lot);
 #if defined (LAZY_COPYING)
         tuple<G::species_t,G::species_t, G::species_t>    speciesTreeProposal(Lot::SharedPtr lot);
 #else
@@ -897,6 +898,61 @@ class SpeciesForest {
         return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
     }
 #endif
+
+    inline tuple<string,string, string> SpeciesForest::speciesTreeProposalSim(Lot::SharedPtr lot) {
+        // this function creates a new node and joins two species
+        
+        bool done = false;
+        Node* subtree1 = nullptr;
+        Node* subtree2 = nullptr;
+        
+        while (!done) {
+            assert (lot != nullptr);
+            pair<unsigned, unsigned> t = lot->nchoose2((unsigned) _lineages.size());
+            assert (t.first != t.second);
+            
+            subtree1=_lineages[t.first];
+            subtree2=_lineages[t.second];
+            assert (t.first < _lineages.size());
+            assert (t.second < _lineages.size());
+            assert(!subtree1->_parent && !subtree2->_parent);
+            
+            if (G::_outgroup != "none") {
+                if (subtree1->_name != G::_outgroup && subtree2->_name != G::_outgroup && _lineages.size() > 2) { // outgroup can only be chosen on the last step
+                    done = true;
+                }
+                else if (_lineages.size() == 2) {
+                    done = true;
+                }
+            }
+            else {
+                done = true;
+            }
+            if (G::_outgroup == "none") {
+                assert (done == true);
+            }
+        }
+        
+        Node * new_nd = &_nodes[G::_nspecies + _ninternals];
+        assert (new_nd->_parent==0);
+       assert (new_nd->_number == -1);
+       assert (new_nd->_right_sib == 0);
+        new_nd->_number=G::_nspecies+_ninternals;
+        new_nd->_name+=boost::str(boost::format("node-%d")%new_nd->_number);
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+        
+        updateNodeVector (_lineages, subtree1, subtree2, new_nd);
+        
+        new_nd->_height = _forest_height;
+        return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
+    }
 
 #if defined (DEBUG_MODE)
     inline void SpeciesForest::showSpeciesJoined() {

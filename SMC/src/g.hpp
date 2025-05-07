@@ -92,6 +92,10 @@ namespace proj {
         
         static vector<string>       _species_names;
         
+#if defined (LAZY_COPYING)
+        static vector<G::species_t> _species_names_typed;
+#endif
+        
         static bool                 _in_second_level;
         static unsigned             _generation;
 #if !defined (FASTER_SECOND_LEVEL)

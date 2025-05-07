@@ -10,6 +10,7 @@ namespace proj {
                             ForestExtension();
                                 
             void            dock(const Forest::SharedPtr gf, PartialStore::partial_t partial, Lot::SharedPtr lot);
+            void            dockSim(const Forest::SharedPtr gf, Lot::SharedPtr lot);
             void            undock();
 
             G::uint_pair_t  chooseNodesToJoin(const vector<unsigned> & node_indices) const;
@@ -29,8 +30,11 @@ namespace proj {
             void            addIncrement(double increment);
             void            coalesce(double total_rate, G::species_t species_name);
             void            debugCheckSpeciesVect() const;
+            unsigned        getDeepCoal(tuple <G::species_t, G::species_t, G::species_t> species_joined);
+            unsigned        getMaxDeepCoal(tuple <G::species_t, G::species_t, G::species_t> species_joined);
+            void            setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species);
         
-            inline vector<pair<double, unsigned long>> calcForestRate(Lot::SharedPtr lot, unordered_map<string, double> theta_map);
+            inline vector<pair<double, unsigned long>> calcForestRate(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map);
                     
             PartialStore::partial_t getExtensionPartial();
         
@@ -51,6 +55,7 @@ namespace proj {
             G::merge_vect_t               _mergers;
             sppmap_t                      _species_partition;
             Lot::SharedPtr                _lot;
+            vector<pair<G::species_t, unsigned>>  _lineages_per_species;
     };
     
     inline ForestExtension::ForestExtension() {
@@ -76,6 +81,26 @@ namespace proj {
         _proposed_anc._height = gf->getForestHeight();
         _proposed_anc._edge_length = 0.0;
         _proposed_anc._partial = partial;
+    }
+
+    inline void ForestExtension::dockSim(const Forest::SharedPtr gf, Lot::SharedPtr lot) {
+        // Check to make sure this extension was previously undocked
+        assert(gf);
+        assert(_docked_gene_forest == nullptr);
+        assert(_species_vect.empty());
+        
+        // Reset the random number generator
+        _lot = lot;
+
+        // Attach Forest
+        _docked_gene_forest = gf;
+        
+        // Create vector of species corresponding to lineages in _docked_gene_forest
+        _docked_gene_forest->copyLineageSpecies(_species_vect);
+        
+        _proposed_delta = 0.0;
+        _proposed_anc._height = gf->getForestHeight();
+        _proposed_anc._edge_length = 0.0;
     }
     
     inline void ForestExtension::undock() {
@@ -270,7 +295,73 @@ namespace proj {
         }
     }
 
+    inline unsigned ForestExtension::getDeepCoal(tuple <G::species_t, G::species_t, G::species_t> species_joined) {
+        unsigned num_deep_coal = 0;
+        
+        G::species_t spp1 = get<0> (species_joined);
+        G::species_t spp2 = get<1> (species_joined);
+        
+        unsigned nlineages1 = (unsigned) _species_partition[spp1].size();
+        unsigned nlineages2 = (unsigned) _species_partition[spp2].size();
+        
+        num_deep_coal += nlineages1 - 1;
+
+        num_deep_coal += nlineages2 - 1;
+        
+        return num_deep_coal;
+    }
+
+    inline unsigned ForestExtension::getMaxDeepCoal(tuple <G::species_t, G::species_t, G::species_t> species_joined) {
+        G::species_t species1 = get<0>(species_joined);
+        G::species_t species2 = get<1>(species_joined);
+        G::species_t species3 = get<2>(species_joined);
+        
+        unsigned lineages_to_coalesce = 0;
+        for (auto &m:_lineages_per_species) {
+            if (m.first == species1) {
+                lineages_to_coalesce += m.second;
+            }
+            else if (m.first == species2) {
+                lineages_to_coalesce += m.second;
+            }
+        }
+        
+        assert (lineages_to_coalesce > 0);
+        
+        unsigned max_deep_coal = lineages_to_coalesce - 1;
+        
+        // update _lineages_per_species
+        for (auto it = _lineages_per_species.begin(); it != _lineages_per_species.end();) {
+            if (it->first == species1) {
+                it = _lineages_per_species.erase(it);
+            }
+            else if (it->first == species2) {
+                it = _lineages_per_species.erase(it);
+            }
+            else {
+                it++;
+            }
+        }
+        
+        _lineages_per_species.push_back(make_pair(species3, lineages_to_coalesce));
+        
+        return max_deep_coal;
+    }
+
+    inline void ForestExtension::setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species) {
+        unsigned i = 0;
+        for (auto &s:G::_species_names_typed) {
+            _lineages_per_species.push_back(make_pair(s, ntaxa_per_species[i]));
+            i++;
+        }
+    }
+
+
+#if defined (LAZY_COPYING)
+    inline vector<pair<double, unsigned long>> ForestExtension::calcForestRate(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map) {
+#else
     inline vector<pair<double, unsigned long>> ForestExtension::calcForestRate(Lot::SharedPtr lot, unordered_map<string, double> theta_map) {
+#endif
         vector<pair<double, unsigned long>> rates;
         pair<double, unsigned long> rate_and_name;
         

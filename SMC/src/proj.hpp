@@ -61,6 +61,9 @@ namespace proj {
             void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(vector<Particle> &v, string filename, unsigned group_number);
             void                writePartialCountFile(vector<Particle> &particles);
             void                createSpeciesMap(Data::SharedPtr);
+#if defined (LAZY_COPYING)
+            void                createSpeciesMapTyped();
+#endif
             void                simSpeciesMap();
             string              inventName(unsigned k, bool lower_case);
             void                showFinal(vector<Particle> my_vec);
@@ -1163,6 +1166,9 @@ namespace proj {
         //set number of species to number in data file
         G::_ntaxa = _data->getNumTaxa();
         assert (G::_species_names.size() > 0);
+#if defined (LAZY_COPYING)
+        assert (G::_species_names_typed.size() > 0);
+#endif
         G::_nspecies = (unsigned) G::_species_names.size();
         G::_nloci = _data->getNumSubsets();
         rng.setSeed(_random_seed);
@@ -2182,6 +2188,19 @@ namespace proj {
         }
     }
 
+#if defined (LAZY_COPYING)
+    inline void Proj::createSpeciesMapTyped() {
+        assert (G::_nspecies > 0);
+        G::species_t species_name = 1;
+        G::species_t prev_species_name = 1;
+        for (unsigned i=0; i<G::_nspecies+1; i++) {
+            G::_species_names_typed.push_back(species_name);
+            prev_species_name = species_name;
+            species_name = prev_species_name + species_name;
+        }
+    }
+#endif
+
     inline void Proj::showFinal(vector<Particle> my_vec) {
         for (auto &p:my_vec){
             p.showParticle();
@@ -2749,6 +2768,10 @@ namespace proj {
         
 #if defined (DRAW_NEW_THETA)
         updateSpeciesNames();
+#endif
+        
+#if defined (LAZY_COPYING)
+        createSpeciesMapTyped(); // TODO: can't do it this way
 #endif
 
         vector<string> taxpartition;
@@ -3473,7 +3496,8 @@ namespace proj {
             _first_line = true;
             if (G::_verbose > 0) {
                 cout << "Starting..." << endl;
-                cout << "Current working directory: " << boost::filesystem::current_path() << endl;
+                cout << "Current working directory: " << filesystem::current_path() << endl;
+//                cout << "Current working directory: " << boost::filesystem::current_path() << endl;
                 cout << "Random seed: " << _random_seed << endl;
 #if defined (DRAW_NEW_THETA)
                 cout << "drawing new theta for each particle " << endl;
@@ -3502,6 +3526,9 @@ namespace proj {
                     summarizeData(_data);
                 }
                 createSpeciesMap(_data);
+#if defined (LAZY_COPYING)
+                createSpeciesMapTyped(); // TODO: can't do it this way
+#endif
 
                 // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
                 if (G::_outgroup != "none") {
@@ -3775,7 +3802,20 @@ namespace proj {
                 if (filter) {
                         
                     // parallelize filtering by subgroup
+#if defined (LAZY_COPYING)
+                    for (unsigned i=0; i<G::_ngroups; i++) {
+                        unsigned start = i * G::_nparticles;
+                        unsigned end = start + (G::_nparticles) - 1;
+                                    
+                        double ess = filterParticles(g, my_vec, particle_indices, start, end);
+                        
+                        if (G::_verbose > 1) {
+                            cout << "   " << "ESS = " << ess << endl;
+                        }
+                    }
+#else
                     filterParticlesThreading(my_vec, g, particle_indices);
+#endif
                     
 //                      filterParticlesMixing(particle_indices, my_vec); // for now, don't do multinomial resampling
                     
