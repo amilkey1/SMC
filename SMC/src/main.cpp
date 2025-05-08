@@ -92,9 +92,9 @@ double G::_infinity = numeric_limits<double>::infinity();
 vector<double> G::_base_frequencies;
 string      G::_string_base_frequencies;
 vector<string>           G::_taxon_names;
-unsigned    G::_nloci = 1;
-unsigned    G::_nspecies = 4;
-unsigned    G::_ntaxa = 12;
+unsigned    G::_nloci = 0;
+unsigned    G::_nspecies = 0;
+unsigned    G::_ntaxa = 0;
 
 map<string, unsigned>    G::_taxon_to_species;
 unsigned    G::_nstates = 4;

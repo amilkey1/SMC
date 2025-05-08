@@ -96,6 +96,10 @@ namespace proj {
 #if defined (DRAW_NEW_THETA)
             void                updateSpeciesNames();
 #endif
+        
+#if defined(SPECIES_IN_CONF)
+        static void     parseSpeciesDefinition(string s);
+#endif
 
 
         private:
@@ -802,6 +806,10 @@ namespace proj {
         std::vector<std::string> partition_subsets;
         boost::program_options::variables_map vm;
         boost::program_options::options_description desc("Allowed options");
+        
+#if defined(SPECIES_IN_CONF)
+        vector<string> species_definitions;
+#endif
 
         desc.add_options()
         ("help,h", "produce help message")
@@ -848,6 +856,9 @@ namespace proj {
         ("newick_path", boost::program_options::value(&G::_newick_path)->default_value("."), "path to gene newicks are if starting from gene newicks and only performing SMC on second round")
         ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(1), "number of populations")
         ("upgma", boost::program_options::value(&G::_upgma)->default_value(true), "set to false to not use UPGMA completion")
+#if defined(SPECIES_IN_CONF)
+        ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
+#endif
         ;
 
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -880,6 +891,14 @@ namespace proj {
                 _partition->parseSubsetDefinition(s);
             }
         }
+        
+#if defined(SPECIES_IN_CONF)
+        if (vm.count("species") > 0) {
+            for (auto s : species_definitions) {
+                parseSpeciesDefinition(s);
+            }
+        }
+#endif
 
         // If user specified "base_frequencies" in conf file, convert them to a vector<double>
         if (vm.count("base_frequencies") > 0) {
@@ -2941,6 +2960,79 @@ namespace proj {
     }
 #endif
 
+#if defined(SPECIES_IN_CONF)
+    inline void Proj::parseSpeciesDefinition(string s) {
+        // Given these definitions in the conf file:
+        //   species = A: a^A, b^A, c^A
+        //   species = B: d^B, e^B, f^B
+        //   species = C: g^C, h^C, i^C
+        //   species = D: j^D, k^D, l^D
+        //   species = E: m^E, n^E, o^E
+        // This would be the result:
+        //   G::_nspecies = 5
+        //   G::_species_names = ["A", "B", "C", "D", "E"]
+        //   G::_ntaxa = 15
+        //   G::_taxon_names = [
+        //      "a^A", "b^A", "c^A",
+        //      "d^B", "e^B", "f^B",
+        //      "g^C", "h^C", "i^C",
+        //      "j^D", "k^D", "l^D",
+        //      "m^E", "n^E", "o^E"]
+        //   G::_taxon_to_species["a^A"] = 0
+        //   G::_taxon_to_species["b^A"] = 0
+        //   G::_taxon_to_species["c^A"] = 0
+        //   G::_taxon_to_species["d^B"] = 1
+        //   G::_taxon_to_species["e^B"] = 1
+        //   G::_taxon_to_species["f^B"] = 1
+        //   G::_taxon_to_species["g^C"] = 2
+        //   G::_taxon_to_species["h^C"] = 2
+        //   G::_taxon_to_species["i^C"] = 2
+        //   G::_taxon_to_species["j^D"] = 3
+        //   G::_taxon_to_species["k^D"] = 3
+        //   G::_taxon_to_species["l^D"] = 3
+        //   G::_taxon_to_species["m^E"] = 4
+        //   G::_taxon_to_species["n^E"] = 4
+        //   G::_taxon_to_species["o^E"] = 4
+        //   G::_taxon_to_species["A"]   = 0
+        //   G::_taxon_to_species["B"]   = 1
+        //   G::_taxon_to_species["C"]   = 2
+        //   G::_taxon_to_species["D"]   = 3
+        //   G::_taxon_to_species["E"]   = 4
+        
+        vector<string> v;
+        
+        // First separate part before colon (stored in v[0])
+        // from the part after colon (stored in v[1])
+        split(v, s, boost::is_any_of(":"));
+        if (v.size() != 2)
+            throw XProj("Expecting exactly one colon in species definition");
+
+        string species_name = v[0];
+        string taxon_list = v[1];
+
+        // Now separate the part after the colon at commas to
+        // yield the taxa that are in that species
+        boost::trim(taxon_list);
+        split(v, taxon_list, boost::is_any_of(","));
+        for_each(v.begin(), v.end(), [](string & s){boost::trim(s);});
+        
+        //output(format("Species \"%s\":\n") % species_name, LogCateg::ALWAYS);
+        //for (string s : v) {
+        //    output(format("   Taxon \"%s\"\n") % s, LogCateg::ALWAYS);
+        //}
+        
+        G::_species_names.push_back(species_name);
+        G::_nspecies = (unsigned)G::_species_names.size();
+        unsigned i = (unsigned)(G::_nspecies - 1);
+        G::_taxon_to_species[species_name] = i;
+        for (auto t : v) {
+            G::_taxon_names.push_back(t);
+            G::_taxon_to_species[t] = i;
+            G::_ntaxa++;
+        }
+    }
+#endif
+
     inline void Proj::run() {
         G::_in_second_level = false;
 #if defined(USING_MPI)
@@ -3030,9 +3122,37 @@ namespace proj {
                     checkOutgroupName();
                 }
 
+#if defined(SPECIES_IN_CONF)
+            if (G::_nspecies > 0) {
+                // Species specified in the conf file
+                // Check that taxon names are the same as those
+                // in the data file
+                _data->checkTaxonNames(G::_taxon_names);
+                
                 // set some global variables
                 G::_ntaxa = _data->getNumTaxa();
                 assert (G::_species_names.size() > 0);
+                
+                assert (G::_ntaxa > 0);
+                assert (G::_nspecies > 0);
+            }
+            else {
+                // Copy taxon names to global variable _taxon_names
+                G::_ntaxa = _data->getNumTaxa();
+                _data->copyTaxonNames(G::_taxon_names);
+                
+                // Save species names to global variable _species_names
+                // and create global _taxon_to_species map that provides
+                // the species index for each taxon name
+                buildSpeciesMap(/*taxa_from_data*/true);
+                G::_nspecies = (unsigned) G::_species_names.size();
+                assert (G::_nspecies > 0);
+            }
+#else
+                // set some global variables
+                G::_ntaxa = _data->getNumTaxa();
+                assert (G::_species_names.size() > 0);
+#endif
                 G::_nloci = _data->getNumSubsets();
                 
 #if defined (REUSE_PARTIALS)
