@@ -459,8 +459,8 @@ class Forest {
                     for (unsigned p=0; p<_npatterns; p++) {
                         
                         unsigned pp = _first_pattern+p;
-#if defined (UNROLL_LOOPS)
                         unsigned pxnstates = p*G::_nstates;
+#if defined (UNROLL_LOOPS)
                         
                         // loop 1
                         unsigned s = 0;
@@ -1098,7 +1098,124 @@ class Forest {
                 unsigned pxnstates = p*G::_nstates;
                 //unsigned pp = first_pattern + p;
 
-                for (unsigned s = 0; s < G::_nstates; s++) { // TODO: unroll these loops
+#if defined (UNROLL_LOOPS)
+                // unroll parent loop
+                assert (G::_nstates == 4);
+                unsigned s = 0;
+                double sum_over_child_states = 0.0;
+                    
+                    // child state subloop 0
+                unsigned s_child = 0;
+                double child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_same * child_partial;
+                    
+                    // child state subloop 1
+                s_child = 1;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+
+                    
+                    // child state subloop 2
+                s_child = 2;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+                    
+                    // child state subloop 3
+                s_child = 3;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+
+                parent_partial_array[pxnstates + s] *= sum_over_child_states;
+                
+                s = 1;
+                sum_over_child_states = 0.0;
+                // child state subloop 0
+                s_child = 0;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+                    
+                    // child state subloop 1
+                s_child = 1;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_same * child_partial;
+                    
+                    // child state subloop 2
+                s_child = 2;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+                    
+                    // child state subloop 3
+                s_child = 3;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+
+                parent_partial_array[pxnstates + s] *= sum_over_child_states;
+                
+                s = 2;
+                sum_over_child_states = 0.0;
+                // child state subloop 0
+                s_child = 0;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+                    
+                    // child state subloop 1
+                s_child = 1;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+                    
+                    // child state subloop 2
+                s_child = 2;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_same * child_partial;
+                
+                    // child state subloop 3
+                s_child = 3;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+
+                parent_partial_array[pxnstates + s] *= sum_over_child_states;
+                
+                s = 3;
+                sum_over_child_states = 0.0;
+                // child state subloop 0
+                s_child = 0;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+                    
+                    // child state subloop 1
+                s_child = 1;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+                    
+                    // child state subloop 2
+                s_child = 2;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+                    
+                    // child state subloop 3
+                s_child = 3;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_same * child_partial;
+
+                parent_partial_array[pxnstates + s] *= sum_over_child_states;
+#else
+                for (unsigned s = 0; s < G::_nstates; s++) {
                     double sum_over_child_states = 0.0;
                     for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
                         double child_transition_prob = (s == s_child ? pr_same : pr_diff);
@@ -1109,6 +1226,7 @@ class Forest {
                     
                     parent_partial_array[pxnstates + s] *= sum_over_child_states;
                 }   // parent state loop
+#endif
             }   // pattern loop
         }
     #else
@@ -1161,11 +1279,38 @@ class Forest {
             double left_sitelike = 0.0;
             double right_sitelike = 0.0;
             double newnd_sitelike = 0.0;
+#if defined (UNROLL_LOOPS)
+            // loop 0
+            unsigned s = 0;
+            left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
+            right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
+            newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
+            
+            // loop 1
+            s = 1;
+            left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
+            right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
+            newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
+            
+            // loop 2
+            s = 2;
+            left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
+            right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
+            newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
+            
+            // loop 3
+            s = 3;
+            left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
+            right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
+            newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
+
+#else
             for (unsigned s = 0; s < G::_nstates; s++) {
                 left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
                 right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
                 newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
             }
+#endif
             prev_loglike += log(left_sitelike)*counts[pp];
             prev_loglike += log(right_sitelike)*counts[pp];
             curr_loglike += log(newnd_sitelike)*counts[pp];
@@ -1405,6 +1550,7 @@ class Forest {
 #endif
                 for (unsigned p=0; p<_npatterns; p++) {
                     unsigned pp = _first_pattern+p;
+                    
                     // TODO: unroll this loop
                     for (unsigned s=0; s<G::_nstates; s++) {
                         Data::state_t state = (Data::state_t)1 << s;
