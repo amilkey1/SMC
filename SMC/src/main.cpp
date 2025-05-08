@@ -19,6 +19,10 @@ proj::PartialStore ps;
 using namespace proj;
 using namespace std;
 
+// Include this header to enable macros that Valgrind recognizes
+// but which are ignored if Valgrind is not being used
+#include "valgrind.h"
+
 int my_rank = 0;
 #if defined(USING_MPI)
 //int my_rank = 0;

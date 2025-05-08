@@ -56,6 +56,7 @@
 		22BD6F902710806700DEB698 /* proj.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = proj.hpp; sourceTree = "<group>"; };
 		22C9156E2D6E59EA00DEE475 /* g.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = g.hpp; sourceTree = "<group>"; };
 		22F12B232DCC04E4003A70E0 /* forest-func.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = "forest-func.hpp"; sourceTree = "<group>"; };
+		22F12B242DCD27BD003A70E0 /* valgrind.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = valgrind.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -121,6 +122,7 @@
 				2262089F2DBBC27200777832 /* species-forest.hpp */,
 				225D236D2DC8F49B000F6E6F /* forest-extension.hpp */,
 				22F12B232DCC04E4003A70E0 /* forest-func.hpp */,
+				22F12B242DCD27BD003A70E0 /* valgrind.h */,
 			);
 			path = src;
 			sourceTree = "<group>";

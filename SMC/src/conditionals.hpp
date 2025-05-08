@@ -32,3 +32,5 @@
 #define LAZY_COPYING // TODO: only works with JC model
 
 //#define UPGMA // turn on UPGMA in conf file but turn this off to avoid creating any members associated with UPGMA
+
+//#define VALGRIND

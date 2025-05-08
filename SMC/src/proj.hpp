@@ -3357,6 +3357,11 @@ namespace proj {
                     }
                         }
                 G::_generation++;
+                
+#if defined (VALGRIND)
+                VALGRIND_PRINTF("~~> post 1st-level step %d at time %d\n", g, (unsigned)clock()); // g = step
+                VALGRIND_MONITOR_COMMAND(str(format("detailed_snapshot stepsnaps-%d.txt") % g).c_str());
+#endif
             } // g loop
                 
             for (auto &p:my_vec) {
