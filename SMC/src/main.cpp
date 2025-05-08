@@ -91,9 +91,8 @@ vector<string>           G::_taxon_names;
 unsigned    G::_nloci = 1;
 unsigned    G::_nspecies = 4;
 unsigned    G::_ntaxa = 12;
-#if defined (FASTER_SECOND_LEVEL)
+
 map<string, unsigned>    G::_taxon_to_species;
-#endif
 unsigned    G::_nstates = 4;
 double      G::_ploidy = 2.0;
 double      G::_small_enough = 0.0000001;
@@ -113,9 +112,6 @@ double Forest::_comphet = numeric_limits<double>::infinity();
 
 bool G::_in_second_level = false;
 unsigned G::_generation = 0;
-#if !defined (FASTER_SECOND_LEVEL)
-string G::_ancestral_species_name = "";
-#endif
 
 vector<string> G::_species_names;
 unsigned G::_partial_count = 0;

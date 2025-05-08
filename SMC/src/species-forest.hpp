@@ -42,9 +42,7 @@ class SpeciesForest {
                                     ~SpeciesForest();
         SpeciesForest(const SpeciesForest & other);
     
-#if defined (FASTER_SECOND_LEVEL)
         typedef tuple<double, unsigned, vector<G::species_t> >  coalinfo_t;
-#endif
 
         unsigned                        numInternals() const;
         unsigned                        numNodes() const;
@@ -92,7 +90,6 @@ class SpeciesForest {
         vector<pair<tuple<string, string, string>, double>>                            resetLineages(Lot::SharedPtr lot);
         vector<pair<tuple<string, string, string>, double>> resetT();
     
-#if defined (FASTER_SECOND_LEVEL)
         void                            saveCoalInfoInitial();
         void                            saveCoalInfoSpeciesTree(vector<SpeciesForest::coalinfo_t> & coalinfo_vect, bool cap);
         void                            addCoalInfoElem(const Node *, vector<coalinfo_t> & recipient);
@@ -109,7 +106,6 @@ class SpeciesForest {
         vector<coalinfo_t>                  _coalinfo;
         mutable vector<Node::ptr_vect_t>    _preorders;
         mutable unsigned                    _next_node_number;
-#endif
 
         void                            setNodeHeights();
     
@@ -170,27 +166,12 @@ class SpeciesForest {
         _preorder.clear();
         _forest_length = 0.0;
         _forest_height = 0.0;
-#if !defined (FASTER_SECOND_LEVEL)
-        _species_build.clear();
-        _depths.clear();
-        _panmictic_coalescent_likelihood = 0.0;
-        _log_coalescent_likelihood = 0.0;
-        _log_coalescent_likelihood_increment = 0.0;
-#endif
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-        _vector_prior.clear();
-#endif
 #if defined (OLD_UPGMA)
         _starting_row.clear();
         _nincrements = 0;
 #endif
-#if !defined (FASTER_SECOND_LEVEL)
-        _species_indices.clear();
-#endif
-        #if defined (FASTER_SECOND_LEVEL)
         _coalinfo.clear();
         _preorders.clear();
-#endif
     }
 
     inline SpeciesForest::SpeciesForest(const SpeciesForest & other) {
@@ -658,15 +639,6 @@ class SpeciesForest {
 #endif
         }
         
-#if !defined (FASTER_SECOND_LEVEL)
-        if (_species_build.size() == 0) {
-            _species_build.push_back(make_pair(make_tuple("null", "null", "null"), _last_edge_length));
-        }
-        else {
-            _species_build.back().second = _last_edge_length;
-        }
-#endif
-        
         double constrained_factor = log(1 - exp(-1*nlineages*G::_lambda*max_depth));
         
         _forest_height += _last_edge_length;
@@ -675,7 +647,6 @@ class SpeciesForest {
 
     }
 
-#if defined (FASTER_SECOND_LEVEL)
     inline pair<double,double> SpeciesForest::chooseSpeciesIncrementOnlySecondLevel(Lot::SharedPtr lot, double max_depth) {
         double nlineages = (double) _lineages.size();
         
@@ -717,15 +688,6 @@ class SpeciesForest {
 
         }
         
-#if !defined (FASTER_SECOND_LEVEL)
-        if (_species_build.size() == 0) {
-            _species_build.push_back(make_pair(make_tuple("null", "null", "null"), _last_edge_length));
-        }
-        else {
-            _species_build.back().second = _last_edge_length;
-        }
-#endif
-        
         double constrained_factor = log(1 - exp(-1*nlineages*G::_lambda*max_depth));
         
         _forest_height += _last_edge_length;
@@ -733,8 +695,6 @@ class SpeciesForest {
         return make_pair(_last_edge_length, constrained_factor);
 
     }
-#endif
-
 
     inline void SpeciesForest::chooseSpeciesIncrement(Lot::SharedPtr lot) {
         double rate = G::_lambda*_lineages.size();
@@ -746,9 +706,7 @@ class SpeciesForest {
             nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
         }
         
-#if defined (FASTER_SECOND_LEVEL)
         _forest_height += _last_edge_length;
-#endif
     }
 
 
@@ -813,10 +771,6 @@ class SpeciesForest {
         new_nd->_height = _forest_height;
         
         calcTopologyPrior((int) _lineages.size()+1);
-
-    #if !defined (FASTER_SECOND_LEVEL)
-        _species_build.push_back(make_pair(make_tuple(subtree1->_name, subtree2->_name, new_nd->_name), 0.0));
-    #endif
         
 #if defined (LAZY_COPYING)
         assert (new_nd->_left_child->_species == subtree1->_species);
@@ -891,10 +845,6 @@ class SpeciesForest {
         new_nd->_height = _forest_height;
         
         calcTopologyPrior((int) _lineages.size()+1);
-
-#if !defined (FASTER_SECOND_LEVEL)
-        _species_build.push_back(make_pair(make_tuple(subtree1->_name, subtree2->_name, new_nd->_name), 0.0));
-#endif
         return make_tuple(subtree1->_name, subtree2->_name, new_nd->_name);
     }
 #endif
@@ -2463,7 +2413,6 @@ class SpeciesForest {
         return new_t;
     }
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline void SpeciesForest::addCoalInfoElem(const Node * nd, vector<coalinfo_t> & recipient) {
         unsigned index = 0;
         // Assumes nd is an internal node
@@ -2480,9 +2429,7 @@ class SpeciesForest {
             )
         );
     }
-    #endif
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline void SpeciesForest::buildCoalInfoVect() {
         
         refreshAllPreorders(); // TODO: don't always need to refresh preorders?
@@ -2507,9 +2454,6 @@ class SpeciesForest {
         }
     }
 
-    #endif
-
-    #if defined (FASTER_SECOND_LEVEL)
     inline void SpeciesForest::saveCoalInfoInitial() {
         // coalinfo_t is a tuple with these elements:
         // - height of node
@@ -2540,21 +2484,18 @@ class SpeciesForest {
                 }
             }
         }
-    #endif
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline bool SpeciesForest::subsumed(G::species_t test_species, G::species_t subtending_species) {
         bool not_equal = (test_species != subtending_species);
         bool is_subset = ((test_species & subtending_species) == test_species);
-        if (not_equal && is_subset)
+        if (not_equal && is_subset) {
             return true;
-        else
+        }
+        else {
             return false;
+        }
     }
 
-    #endif
-
-    #if defined (FASTER_SECOND_LEVEL)
     inline void SpeciesForest::fixupCoalInfo(vector<coalinfo_t> & coalinfo_vect, vector<coalinfo_t> & sppinfo_vect) const {
         // No fixing up to do if there are no species tree joins
         if (sppinfo_vect.empty())
@@ -2649,9 +2590,7 @@ class SpeciesForest {
             }
         }
     }
-    #endif
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline void SpeciesForest::saveCoalInfoSpeciesTree(vector<Forest::coalinfo_t> & coalinfo_vect, bool cap) {
         // Appends to coalinfo_vect; clear coalinfo_vect before calling if desired
         // Assumes heights and preorders are up-to-date
@@ -2676,9 +2615,7 @@ class SpeciesForest {
             }
         }
     }
-    #endif
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline void SpeciesForest::refreshAllPreorders() const {
         // For each subtree stored in _lineages, create a vector of node pointers in preorder sequence
         _next_node_number = G::_nspecies;
@@ -2702,9 +2639,6 @@ class SpeciesForest {
         }
     }
 
-    #endif
-
-    #if defined (FASTER_SECOND_LEVEL)
     inline void SpeciesForest::refreshPreorderNew(vector<Node*> & preorder) const {
         // Assumes preorder just contains the root node when this function is called
         // Also assumes that _next_node_number was initialized prior to calling this function
@@ -2722,13 +2656,10 @@ class SpeciesForest {
                 break;
         }
     }
-    #endif
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline void SpeciesForest::setTreeHeight() {
         _forest_height = _lineages.back()->_height;
     }
-    #endif
 
     inline void SpeciesForest::setNodeHeights() {
         assert (_preorder.size() > 0);
@@ -2742,7 +2673,6 @@ class SpeciesForest {
         }
     }
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline Node * SpeciesForest::findNextPreorderNew(Node * nd) const {
         assert(nd);
         Node * next = 0;
@@ -2803,8 +2733,6 @@ class SpeciesForest {
         }
     }
 #endif
-
-    #endif
-    }
+}
 
 

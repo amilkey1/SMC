@@ -56,9 +56,7 @@ class Forest {
                                     ~Forest();
                                     Forest(const Forest & other);
     
-#if defined (FASTER_SECOND_LEVEL)
-        typedef tuple<double, unsigned, vector<G::species_t> >  coalinfo_t;
-#endif
+    typedef tuple<double, unsigned, vector<G::species_t> >  coalinfo_t;
 
         unsigned                        numInternals() const;
         unsigned                        numNodes() const;
@@ -114,20 +112,11 @@ class Forest {
     
         double                          calcTopologyPrior(unsigned nlineages);
     
-#if defined (UNUSED_FUNCTIONS)
-        void                            calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree);
-#endif
-    
         void                            clearPartials();
         double                          getLogLikelihood() const;
         unsigned                        getDeepCoal(tuple <string, string, string> species_joined);
         unsigned                        getMaxDeepCoal(tuple <string, string, string> species_joined);
         void                            setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species);
-#if !defined (FASTER_SECOND_LEVEL)
-        void                            resetDepthVector(tuple<string, string, string> species_joined);
-        vector<pair<double, pair<string, string>>>             getMinDepths();
-        void                            calcMinDepth();
-#endif
         vector< pair<double, Node *>>   sortPreorder();
         void                            refreshPreorder();
         void                            buildFromNewick(const string newick, bool rooted, bool allow_polytomies);
@@ -155,10 +144,6 @@ class Forest {
         void                            buildRestOfTreeFaster();
 #endif
     
-#if !defined (FASTER_SECOND_LEVEL)
-    void                                createSpeciesIndices();
-#endif
-    
 #if defined (USING_MPI)
         vector<pair<tuple<string, string, string>, double>>                            resetLineages(Lot::SharedPtr lot);
 #endif
@@ -168,7 +153,6 @@ class Forest {
         void                            stowPartial(Node *nd);
 #endif
     
-#if defined (FASTER_SECOND_LEVEL)
         void                            saveCoalInfoInitial();
         void                            saveCoalInfoGeneForest(vector<Forest::coalinfo_t> & coalinfo_vect) const;
         void                            addCoalInfoElem(const Node *, vector<coalinfo_t> & recipient);
@@ -181,7 +165,6 @@ class Forest {
 
         vector<coalinfo_t>                  _coalinfo;
         mutable unsigned                    _next_node_number;
-#endif
 
         void                            setNodeHeights();
 #if defined (USING_MPI)
@@ -230,39 +213,17 @@ class Forest {
         double                          _log_joining_prob;
         vector<pair<double, double>>    _increments_and_priors;
     
-#if defined (UNUSED_FUNCTIONS)
-        bool                            _done;
-#endif
-    
 #if defined (DEBUG_MODE)
         pair<Node*, Node*>                  _species_joined;
 #endif
-    
-#if !defined (FASTER_SECOND_LEVEL)
-        vector<pair<double, pair<string, string>>>          _depths;
-        vector<pair<tuple<string,string,string>, double>>   _species_build;
-        unsigned                                            _nincrements = 0;
-        double                          _log_coalescent_likelihood;
-        double                          _panmictic_coalescent_likelihood;
-        double                          _log_coalescent_likelihood_increment;
-#endif
+
         vector<Node*>                   _preorder;
     
-#if !defined (FASTER_SECOND_LEVEL)
-        map<string, string>             _taxon_map;
-#endif
-    
         double                          _log_weight;
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-        vector<double>                  _vector_prior;
-#endif
         vector<pair<Node*, Node*>>      _node_choices;
         vector<double>                  _log_likelihood_choices;
 #if defined (OLD_UPGMA)
         map<Node*,  unsigned>           _starting_row;
-#endif
-#if !defined (FASTER_SECOND_LEVEL)
-        map<string, unsigned>           _species_indices;
 #endif
     
 #if defined (UPGMA)
@@ -291,16 +252,6 @@ class Forest {
         double                          getLineageHeight(Node* nd);
         void                            addIncrement(double increment);
         void                            simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites);
-    
-#if !defined (FASTER_SECOND_LEVEL)
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-        double                             calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height);
-#endif
-        pair<vector<double>, vector<unsigned>>  calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build);
-        pair<vector<double>, vector<unsigned>>  calcInitialCoalescentLikelihoodIntegratingOutTheta();
-        pair<vector<double>, vector<unsigned>>  calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build);
-#endif
-        
         unsigned                        multinomialDraw(Lot::SharedPtr lot, const vector<double> & probs);
 
     public:
@@ -334,23 +285,9 @@ class Forest {
         _ninternals=0;
         _preorder.clear();
         _forest_length = 0.0;
-#if !defined (FASTER_SECOND_LEVEL)
-        _species_build.clear();
-        _depths.clear();
-        _panmictic_coalescent_likelihood = 0.0;
-        _log_coalescent_likelihood = 0.0;
-        _log_coalescent_likelihood_increment = 0.0;
-        _taxon_map.clear();
-#endif
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-        _vector_prior.clear();
-#endif
 #if defined (OLD_UPGMA)
         _starting_row.clear();
         _nincrements = 0;
-#endif
-#if !defined (FASTER_SECOND_LEVEL)
-        _species_indices.clear();
 #endif
       
 #if defined (UPGMA)
@@ -362,14 +299,8 @@ class Forest {
         
         _lineages_per_species.clear();
         _forest_height = 0.0;
-#if defined (FASTER_SECOND_LEVEL)
         _coalinfo.clear();
         _next_node_number = 0;
-#endif
-        
-#if defined (UNUSED_FUNCTIONS)
-        _done = false;
-#endif
         
 #if defined (LAZY_COPYING)
         _preorders.clear();
@@ -1164,22 +1095,19 @@ class Forest {
             double pr_same = calcTransitionProbabilityJC(0, 0, child->_edge_length + edgelen_extension);
             double pr_diff = calcTransitionProbabilityJC(0, 1, child->_edge_length + edgelen_extension);
             for (unsigned p = 0; p < npatterns; p++) {
+                unsigned pxnstates = p*G::_nstates;
                 //unsigned pp = first_pattern + p;
 
                 for (unsigned s = 0; s < G::_nstates; s++) { // TODO: unroll these loops
                     double sum_over_child_states = 0.0;
                     for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
                         double child_transition_prob = (s == s_child ? pr_same : pr_diff);
-                        double child_partial = child_partial_array[p*G::_nstates + s_child];
+                        double child_partial = child_partial_array[pxnstates + s_child];
                                                 
                         sum_over_child_states += child_transition_prob * child_partial;
                     }   // child state loop
                     
-                    if (child == lchild)
-                        parent_partial_array[p*G::_nstates + s] = sum_over_child_states;
-                    else {
-                        parent_partial_array[p*G::_nstates + s] *= sum_over_child_states;
-                    }
+                    parent_partial_array[pxnstates + s] *= sum_over_child_states;
                 }   // parent state loop
             }   // pattern loop
         }
@@ -1200,22 +1128,19 @@ class Forest {
             double pr_same = calcTransitionProbability(0, 0, child->_edge_length + edgelen_extension);
             double pr_diff = calcTransitionProbability(0, 1, child->_edge_length + edgelen_extension);
             for (unsigned p = 0; p < npatterns; p++) {
+                unsigned pxnstates = p*G::_nstates;
                 //unsigned pp = first_pattern + p;
 
                 for (unsigned s = 0; s < G::_nstates; s++) {
                     double sum_over_child_states = 0.0;
                     for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
                         double child_transition_prob = (s == s_child ? pr_same : pr_diff);
-                        double child_partial = child_partial_array[p*G::_nstates + s_child];
+                        double child_partial = child_partial_array[pxnstates + s_child];
                                                 
                         sum_over_child_states += child_transition_prob * child_partial;
                     }   // child state loop
                     
-                    if (child == new_nd->_left_child)
-                        parent_partial_array[p*G::_nstates + s] = sum_over_child_states;
-                    else {
-                        parent_partial_array[p*G::_nstates + s] *= sum_over_child_states;
-                    }
+                    parent_partial_array[pxnstates + s] *= sum_over_child_states;
                 }   // parent state loop
             }   // pattern loop
         }   // child loop
@@ -1229,15 +1154,17 @@ class Forest {
         auto & lchild_partial_array = lchild->_partial->_v;
         auto & rchild_partial_array = rchild->_partial->_v;
         for (unsigned p = 0; p < npatterns; p++) {
+            unsigned pxnstates = p*G::_nstates;
+            
             unsigned pp = first_pattern + p;
             //unsigned count = counts[pp];
             double left_sitelike = 0.0;
             double right_sitelike = 0.0;
             double newnd_sitelike = 0.0;
             for (unsigned s = 0; s < G::_nstates; s++) {
-                left_sitelike += 0.25*lchild_partial_array[p*G::_nstates + s];
-                right_sitelike += 0.25*rchild_partial_array[p*G::_nstates + s];
-                newnd_sitelike += 0.25*newnd_partial_array[p*G::_nstates + s];
+                left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
+                right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
+                newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
             }
             prev_loglike += log(left_sitelike)*counts[pp];
             prev_loglike += log(right_sitelike)*counts[pp];
@@ -1953,41 +1880,21 @@ class Forest {
 //       _log_likelihood_choices = other._log_likelihood_choices;
         
         
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-        _vector_prior = other._vector_prior;
-#endif
 #if defined (OLD_UPGMA)
         _starting_row = other._starting_row;
         _nincrements = other._nincrements;
 #endif
         
-#if !defined (FASTER_SECOND_LEVEL)
-        _species_indices = other._species_indices;
-#endif
-        
         // the following data members apply only to the second level
-        if (G::_in_second_level) { // TODO: testing
-#if defined (FASTER_SECOND_LEVEL)
+        if (G::_in_second_level) {
             _coalinfo.reserve(other._coalinfo.size());
             _coalinfo = other._coalinfo;
 
             _next_node_number = other._next_node_number;
-#else
-            _species_build = other._species_build;
-            _depths = other._depths;
-            _panmictic_coalescent_likelihood = other._panmictic_coalescent_likelihood;
-            _log_coalescent_likelihood = other._log_coalescent_likelihood;
-            _log_coalescent_likelihood_increment = other._log_coalescent_likelihood_increment;
-            _taxon_map = other._taxon_map;
-#endif
         }
         
 #if defined (DEBUG_MODE)
         _species_joined = other._species_joined;
-#endif
-        
-#if defined (UNUSED_FUNCTIONS)
-        _done = other._done;
 #endif
 
         // copy tree itself
@@ -1995,14 +1902,13 @@ class Forest {
         if (other._nodes.size() > 0) { // otherwise, there is no forest and nothing needs to be copied
             
 #if !defined (LAZY_COPYING) // no species partition to copy
-#if defined (FASTER_SECOND_LEVEL) // don't need to save the species partition for the second level
             if (!G::_in_second_level) {
                 
                 bool faster_spp_partition = true;
                 
                 if (!faster_spp_partition) {
                         
-                    _species_partition.clear(); // TODO: can rewrite this without clearing? maybe faster if species names are not strings?
+                    _species_partition.clear();
 
                     for (auto spiter : other._species_partition) {
                         for (auto s : spiter.second) {
@@ -2034,9 +1940,6 @@ class Forest {
                             if (count == 0) {
                                 _species_partition[spiter.first].clear();
                                 _species_partition[spiter.first].push_back(nd);
-    //                            vector<Node*> nds;
-    //                            nds.push_back(nd);
-    //                            _species_partition[spiter.first] = nds;
                             }
                             else {
                                 _species_partition[spiter.first].push_back(nd);
@@ -2050,17 +1953,6 @@ class Forest {
                     }
                 }
         }
-#else
-            _species_partition.clear();
-                
-            for (auto spiter : other._species_partition) {
-                for (auto s : spiter.second) {
-                    unsigned number = s->_number;
-                    Node* nd = &_nodes[number];
-                    _species_partition[spiter.first].push_back(nd);
-                }
-            }
-#endif
 #endif
             
 #if defined (OLD_UPGMA)
@@ -2197,9 +2089,6 @@ class Forest {
 #endif
 
     inline void Forest::setUpGeneForest(map<string, string> &taxon_map) {
-#if !defined (FASTER_SECOND_LEVEL)
-        _taxon_map = taxon_map;
-#endif
         assert (_index >0);
         assert (_species_partition.size() == 0);
 //        _species_partition.clear();
@@ -2241,7 +2130,6 @@ class Forest {
             if (count == G::_ntaxa) {
                 break;
             }
-#if defined (FASTER_SECOND_LEVEL)
             if (G::_start_mode_type != G::StartModeType::START_MODE_SIM) {
                 if (G::_taxon_to_species.count(nd._name) == 0) {
                     throw XProj(str(format("Could not find an index for the taxon name \"%s\"") % nd._name));
@@ -2250,7 +2138,6 @@ class Forest {
                     Node::setSpeciesBit(nd._species, G::_taxon_to_species.at(nd._name), /*init_to_zero_first*/true);
                 }
             }
-#endif
         }
         
         if (!G::_gene_newicks_specified) {
@@ -2268,175 +2155,6 @@ class Forest {
             nd._partial = nullptr;
         }
     }
-
-#if defined (UNUSED_FUNCTIONS)
-    inline void Forest::calcIncrementPrior(double increment, string species_name, bool new_increment, bool coalesced_gene, bool gene_tree) {
-#if defined (DRAW_NEW_THETA)
-        double log_increment_prior = 0.0;
-        
-        if (!_done) {
-            if (gene_tree) {
-                if (coalesced_gene) {
-                    // calculate increment prior
-                    for (auto &s:_species_partition) {
-                        bool coalescence = false;
-                        if (s.first == species_name) {
-                            coalescence = true;
-                        }
-                        else {
-                            coalescence = false;
-                        }
-
-                        if (coalescence) {
-                            assert (s.second.size() > 1);
-                            // if there is coalescence, need to use number of lineages before the join
-                            double population_theta = _theta_map[s.first];
-                            double coalescence_rate = (s.second.size())*(s.second.size()-1) / population_theta;
-                            assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
-                            double nChooseTwo = (s.second.size())*(s.second.size()-1);
-                            double log_prob_join = log(2/nChooseTwo);
-                            log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate) + log_prob_join;
-                        }
-                        else {
-                            // no coalescence
-                            double population_theta = _theta_map[s.first];
-                            double coalescence_rate = s.second.size()*(s.second.size() - 1) / population_theta;
-                            log_increment_prior -= increment*coalescence_rate;
-                        }
-                    }
-                }
-            
-                else if (!coalesced_gene) {
-                    // no coalescence
-                    for (auto &s:_species_partition) {
-                        double population_theta = _theta_map[s.first];
-                        double coalescence_rate = s.second.size() * (s.second.size() - 1) / population_theta;
-                        log_increment_prior -= increment*coalescence_rate;
-                    }
-                }
-            
-                if (new_increment) { // add a new increment to the list
-                    _increments_and_priors.push_back(make_pair(increment, log_increment_prior));
-                }
-            
-                else if (!new_increment) { // add to existing increment and prior
-                    assert (_increments_and_priors.size() > 0);
-                    _increments_and_priors.back().first += increment;
-                    _increments_and_priors.back().second += log_increment_prior;
-                }
-                _log_coalescent_likelihood += log_increment_prior;
-            }
-        
-            else {
-                // species tree
-                if (coalesced_gene) {
-                    double rate = G::_lambda*(_lineages.size());
-                    // calculate increment prior
-                    double nChooseTwo = (_lineages.size())*(_lineages.size()-1);
-                    double log_prob_join = log(2/nChooseTwo);
-//                    log_increment_prior = log(_lambda) - (increment * rate) + log_prob_join;
-//                    log_increment_prior = log(_lambda) - (increment * rate);
-                    log_increment_prior = log(rate) - (increment*rate) + log_prob_join;
-                }
-                else {
-                    double rate = G::_lambda*(_lineages.size());
-                    // calculate increment prior
-                    log_increment_prior = - (increment*rate);
-                }
-                
-                if (new_increment) {
-                    _increments_and_priors.push_back(make_pair(increment, log_increment_prior));
-                }
-                else {
-                    _increments_and_priors.back().first += increment;
-                    _increments_and_priors.back().second += log_increment_prior;
-                }
-                _log_coalescent_likelihood += log_increment_prior;
-            }
-            _log_coalescent_likelihood_increment = log_increment_prior;
-        }
-#else
-        double log_increment_prior = 0.0;
-        
-        if (!_done) {
-            if (gene_tree) {
-                if (coalesced_gene) {
-                    // calculate increment prior
-                    for (auto &s:_species_partition) {
-                        bool coalescence = false;
-                        if (s.first == species_name) {
-                            coalescence = true;
-                        }
-                        else {
-                            coalescence = false;
-                        }
-
-                        if (coalescence) {
-                            assert (s.second.size() > 1);
-                            // if there is coalescence, need to use number of lineages before the join
-                            double coalescence_rate = (s.second.size())*(s.second.size()-1) / G::_theta;
-                            assert (coalescence_rate > 0.0); // rate should be >0 if there is coalescence
-                            double nChooseTwo = (s.second.size())*(s.second.size()-1);
-                            double log_prob_join = log(2/nChooseTwo);
-                            log_increment_prior += log(coalescence_rate) - (increment*coalescence_rate) + log_prob_join;
-                        }
-                        else {
-                            // no coalescence
-                            double coalescence_rate = s.second.size()*(s.second.size() - 1) / G::_theta;
-                            log_increment_prior -= increment*coalescence_rate;
-                        }
-                    }
-                }
-            
-                else if (!coalesced_gene) {
-                    // no coalescence
-                    for (auto &s:_species_partition) {
-                        double coalescence_rate = s.second.size() * (s.second.size() - 1) / G::_theta;
-                        log_increment_prior -= increment*coalescence_rate;
-                    }
-                }
-            
-                if (new_increment) { // add a new increment to the list
-                    _increments_and_priors.push_back(make_pair(increment, log_increment_prior));
-                }
-            
-                else if (!new_increment) { // add to existing increment and prior
-                    assert (_increments_and_priors.size() > 0);
-                    _increments_and_priors.back().first += increment;
-                    _increments_and_priors.back().second += log_increment_prior;
-                }
-                _log_coalescent_likelihood += log_increment_prior;
-            }
-        
-            else {
-                // species tree
-                if (coalesced_gene) {
-                    double rate = G::_lambda*(_lineages.size());
-                    // calculate increment prior
-                    double nChooseTwo = (_lineages.size())*(_lineages.size()-1);
-                    double log_prob_join = log(2/nChooseTwo);
-                    log_increment_prior = log(rate) - (increment*rate) + log_prob_join;
-                }
-                else {
-                    double rate = G::_lambda*(_lineages.size());
-                    // calculate increment prior
-                    log_increment_prior = - (increment*rate);
-                }
-                
-                if (new_increment) {
-                    _increments_and_priors.push_back(make_pair(increment, log_increment_prior));
-                }
-                else {
-                    _increments_and_priors.back().first += increment;
-                    _increments_and_priors.back().second += log_increment_prior;
-                }
-                _log_coalescent_likelihood += log_increment_prior;
-            }
-            _log_coalescent_likelihood_increment = log_increment_prior;
-        }
-#endif
-    }
-#endif
 
 #if defined (OLD_UPGMA)
     struct negLogLikeDist {
@@ -3679,9 +3397,7 @@ class Forest {
 #endif
              new_nd->_height = _forest_height;
              
-    #if defined (FASTER_SECOND_LEVEL)
              new_nd->_species = 0;
-    #endif
 
              subtree1->_partial=nullptr; // throw away subtree partials now, no longer needed
              subtree2->_partial=nullptr;
@@ -3913,678 +3629,6 @@ class Forest {
         
         _forest_height += _last_edge_length;
     }
-        
-#if !defined (FASTER_SECOND_LEVEL)
-    inline void Forest::createSpeciesIndices() {
-        unsigned number = 0;
-        for (auto &s:_species_partition) {
-            number++;
-            _species_indices[s.first] = number - 1;
-        }
-        
-        for (int i=0; i<G::_nspecies-1; i++) {
-            string name = boost::str(boost::format("node-%d")%number);
-            number++;
-            _species_indices[name] = number - 1;
-        }
-    }
-#endif
-
-#if !defined (FASTER_SECOND_LEVEL)
-# if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-    inline double Forest::calcCoalescentLikelihood(double species_increment, tuple<string, string, string> species_joined, double species_tree_height) {
-        _panmictic_coalescent_likelihood = 0.0;
-
-        double neg_inf = -1*numeric_limits<double>::infinity();
-        vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
-        double log_coalescent_likelihood = 0.0;
-        double cum_time = 0.0;
-        int a = 0;
-
-        assert (heights_and_nodes.size() > 0);
-        if (species_increment > 0) {
-            for (unsigned i=_nincrements; i < heights_and_nodes.size(); i++) {
-                Node* node = nullptr;
-                if (heights_and_nodes[i].first < species_tree_height) {
-                    // calc coalescent prob and update species partition
-                    double increment = heights_and_nodes[i].first - (species_tree_height - species_increment) - cum_time;
-                    cum_time += increment;
-                    assert (increment > 0.0);
-                    // find node in species partition and calculate nlineages
-                    string species;
-                    for (auto &s:_species_partition) {
-                        for (auto &nd:s.second) {
-                            if (nd == heights_and_nodes[i].second->_left_child) {
-                                species = s.first; // TODO: can break out of this to be faster
-                                node = nd;
-                            }
-                        }
-                    }
-                    for (auto &s:_species_partition) {
-                        if (s.first == species) {
-                            // coalescence
-                            unsigned nlineages = (int) s.second.size();
-
-                            if (nlineages == 1) {
-                                log_coalescent_likelihood = neg_inf; // if there is only 1 lineage left, there cannot be coalescence
-                                return log_coalescent_likelihood;
-                            }
-    #if defined (DRAW_NEW_THETA)
-                            double population_theta = _theta_map[s.first];
-                            assert (population_theta > 0.0);
-                            double coalescence_rate = nlineages*(nlineages-1) / population_theta;
-    #else
-                            double coalescence_rate = nlineages*(nlineages-1) / G::_theta;
-    #endif
-                            double nChooseTwo = nlineages*(nlineages-1);
-                            double log_prob_join = log(2/nChooseTwo);
-                            log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
-
-                            bool found = (find(s.second.begin(), s.second.end(), node->_right_sib) != s.second.end());
-
-                            if (found) {
-                                updateNodeList(s.second, node, node->_right_sib, node->_parent); // update the species lineage
-                            }
-                            else {
-                                log_coalescent_likelihood = neg_inf;
-                            }
-                            a++;
-                        }
-                        else {
-                            // no coalescence
-                            unsigned nlineages = (int) s.second.size();
-
-    #if defined (DRAW_NEW_THETA)
-                            double population_theta = _theta_map[s.first];
-                            assert (population_theta > 0.0);
-                            double coalescence_rate = nlineages*(nlineages-1) / population_theta;
-    #else
-                            double coalescence_rate = nlineages*(nlineages-1) / G::_theta;
-    #endif
-                            log_coalescent_likelihood -= increment * coalescence_rate;
-                        }
-                    }
-
-                }
-            }
-            double remaining_chunk_of_branch = species_increment - cum_time;
-            // no coalescence
-            for (auto &s:_species_partition) {
-                unsigned nlineages = (int) s.second.size();
-    #if defined (DRAW_NEW_THETA)
-                double population_theta = _theta_map[s.first];
-                assert (population_theta > 0.0);
-                double coalescence_rate = nlineages*(nlineages-1) / population_theta;
-    #else
-                double coalescence_rate = nlineages*(nlineages-1) / G::_theta;
-    #endif
-                log_coalescent_likelihood -= remaining_chunk_of_branch * coalescence_rate;
-
-    //                cout << "pr no coalescence = " << -1 * remaining_chunk_of_branch * coalescence_rate << endl;
-            }
-            _nincrements += a;
-        }
-
-        // calculate coalescent likelihood for the rest of the panmictic tree
-        if (log_coalescent_likelihood != neg_inf) {
-        if (species_increment > 0.0) {
-            double cum_time = 0.0;
-            // calculate height of each join in the gene tree, minus the species tree height
-            // get number of lineages at beginning of that step and then decrement with each join
-            // don't increment _nincrements?
-
-            // start at _nincrements and go through heights and nodes list
-            int panmictic_nlineages = 0;
-            for (auto &s:_species_partition) {
-                panmictic_nlineages += s.second.size();
-            }
-
-            for (unsigned i=_nincrements; i < heights_and_nodes.size(); i++) {
-                // calculate increment (should be heights_and_nodes[i].first - species_tree_height - cum_time (no need to worry about species increment now)
-                // calculate prob of coalescence, ln(rate) - rate*increment
-                double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
-    #if defined (DRAW_NEW_THETA)
-                double population_theta = _theta_map[G::_ancestral_species_name];
-                assert (population_theta > 0.0);
-                double coalescence_rate = panmictic_nlineages*(panmictic_nlineages-1) / population_theta;
-    #else
-                double coalescence_rate = panmictic_nlineages*(panmictic_nlineages-1) / G::_theta;
-    #endif
-                double nChooseTwo = panmictic_nlineages*(panmictic_nlineages-1);
-                double log_prob_join = log(2/nChooseTwo);
-                _panmictic_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
-
-                cum_time += increment;
-                panmictic_nlineages--;
-            }
-            assert (panmictic_nlineages == 1);
-        }
-
-        else {
-            // final step; no deep coalescence; one species
-            assert (species_increment == 0.0);
-            assert (_species_partition.size() == 1);
-            for (unsigned i=_nincrements; i < heights_and_nodes.size(); i++) {
-                // there must be coalescence at this point
-                Node* node = nullptr;
-                string species;
-                for (auto &s:_species_partition) {
-                    for (auto &nd:s.second) {
-                        if (nd == heights_and_nodes[i].second->_left_child) {
-                            node = nd;
-                        }
-                    }
-                    for (auto &s:_species_partition) {
-                        // coalescence
-                        unsigned nlineages = (int) s.second.size();
-
-    #if defined (DRAW_NEW_THETA)
-                        double population_theta = _theta_map[s.first];
-                        double coalescence_rate = nlineages*(nlineages-1) / population_theta;
-    #else
-                        double coalescence_rate = nlineages*(nlineages-1) / G::_theta;
-    #endif
-                        double nChooseTwo = nlineages*(nlineages-1);
-                        double log_prob_join = log(2/nChooseTwo);
-                        double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
-                        log_coalescent_likelihood += log_prob_join + log(coalescence_rate) - (increment * coalescence_rate);
-
-                        updateNodeList(s.second, node, node->_right_sib, node->_parent); // update the species lineage
-                        a++;
-                        cum_time += increment;
-                    }
-                        // no deep coalescence to deal with
-                    }
-                }
-        }
-        }
-        _log_coalescent_likelihood += log_coalescent_likelihood;
-        return log_coalescent_likelihood;
-    }
-#endif
-#endif
-
-#if !defined (FASTER_SECOND_LEVEL)
-    inline pair<vector<double>, vector<unsigned>> Forest::calcCoalescentLikelihoodIntegratingOutThetaLastStep(vector<pair<tuple<string,string,string>, double>> species_build) {
-        vector<double> gamma_b; // contains gamma_b by species
-        vector<unsigned> q_b; // contains q_b by species
-        
-        gamma_b.resize(G::_nspecies + species_build.size());
-        q_b.resize(G::_nspecies + species_build.size());
-        
-        _panmictic_coalescent_likelihood = 0.0;
-        _log_coalescent_likelihood = 0.0;
-        
-        double neg_inf = -1*numeric_limits<double>::infinity();
-        vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
-        assert (heights_and_nodes.size() > 0);
-        
-        double log_coalescent_likelihood = 0.0;
-        double cum_time = 0.0;
-        string species;
-        bool found = false;
-        bool coalescence = false;
-        unsigned nlineages = 0;
-        unsigned a = 0;
-        double species_tree_height = 0.0;
-        
-        unsigned count = -1;
-        
-        assert (_taxon_map.size() > 0);
-        setUpGeneForest(_taxon_map); // TODO: don't have to redo this because it's the same at every step?
-        
-        for (unsigned gen=0; gen < species_build.size() - 1; gen++) { // don't go into last step because panmictic part will take care of that
-            count = -1;
-            tuple<string, string, string> species_joined = species_build[gen].first;
-            double species_increment = species_build[gen].second;
-            species_tree_height += species_increment;
-            
-            updateSpeciesPartition(species_joined);
-        
-            for (auto &s:_species_partition) { // TODO: how to check if gene tree violates species tree?
-                if (gamma_b.size() > 0 && gamma_b[0] != neg_inf) {
-                    count = _species_indices[s.first];
-                    
-                    bool done = false;
-                    cum_time = 0.0;
-                    species = s.first;
-                    for (unsigned i=0; i < heights_and_nodes.size(); i++) {
-                        if (!done) {
-                            found = false;
-                            coalescence = false;
-                            Node*search_nd = heights_and_nodes[i].second->_left_child;
-                            for (auto &nd:s.second) {
-                                if (nd == search_nd) {
-                                    search_nd = nd;
-                                    nlineages = (unsigned) s.second.size();
-                                    if (heights_and_nodes[i].first < species_tree_height) {
-                                        coalescence = true;
-                                        a++;
-                                    }
-                                    else {
-                                        done = true; // stop once gene increment goes below species tree height to avoid double counting some deep coalescences
-                                    }
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (found) {
-                                if (species_increment == 0.0) {
-                                    assert (coalescence); // no deep coalescence if last step
-                                }
-                                
-                                if (coalescence) {
-                                    if (s.second.size() == 1) {
-                                        q_b.clear(); // don't push back to q_b because it is full of ints
-                                        gamma_b.clear();
-                                        gamma_b.push_back(neg_inf);
-                                        done = true;
-                                        break;
-                                    }
-                                    
-                                    double increment = heights_and_nodes[i].first - (species_tree_height - species_increment) - cum_time; // find increment height
-                                    cum_time += increment;
-                                    assert (increment > 0.0);
-                                    assert (q_b.size() > 0);
-                                    assert (gamma_b.size() > 0);
-                                    
-                                    q_b[count] += 1;
-                                    gamma_b[count] += 4* increment * nlineages *(nlineages-1) / (2*G::_ploidy);
-                                    for (auto &s:_species_partition) {
-                                        if (s.first == species) {
-                                            bool found = (find(s.second.begin(), s.second.end(), search_nd->_right_sib) != s.second.end());
-                                            if (found ) {
-                                                updateNodeVector(s.second, search_nd, search_nd->_right_sib, search_nd->_parent); // update the species lineage
-//                                                updateNodeList(s.second, search_nd, search_nd->_right_sib, search_nd->_parent); // update the species lineage
-                                            }
-                                            else {
-                                                q_b.clear(); // don't push back to q_b because it is full of ints
-                                                gamma_b.clear();
-                                                gamma_b.push_back(neg_inf);
-                                                done = true;
-                                                break;
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
-                                else {
-                                    double increment = species_increment - cum_time; // find increment height - can't be any more deep coalescence, so gene increment is whatever remains of the species increment
-                                    cum_time += increment;
-                                    assert (increment > 0.0);
-                                    
-                                    assert (gamma_b.size() > 0);
-                                    gamma_b[count] += 4*increment * nlineages *(nlineages-1) / (2*G::_ploidy);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        if (gamma_b.back() != neg_inf) {
-            assert (q_b.back() == 0.0);
-            assert (gamma_b.back() == 0);
-            
-            // calculate coalescent likelihood for the rest of the panmictic tree
-            double species_increment = species_build.back().second;
-            if (log_coalescent_likelihood != neg_inf) {
-                if (species_increment > 0.0) {
-                    double cum_time = 0.0;
-                    // calculate height of each join in the gene tree, minus the species tree height
-                    // get number of lineages at beginning of that step and then decrement with each join
-
-                    // start at _nincrements and go through heights and nodes list
-                    int panmictic_nlineages = 0;
-                    for (auto &s:_species_partition) {
-                        panmictic_nlineages += s.second.size();
-                    }
-
-                    for (unsigned i=a; i < heights_and_nodes.size(); i++) {
-                        // calculate increment (should be heights_and_nodes[i].first - species_tree_height - cum_time (no need to worry about species increment now)
-                        // calculate prob of coalescence
-                        double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
-                        q_b.back() += 1;
-                        gamma_b.back() += 4*increment * panmictic_nlineages *(panmictic_nlineages-1) / (2*G::_ploidy);
-
-                        cum_time += increment;
-                        panmictic_nlineages--;
-                    }
-                    assert (panmictic_nlineages == 1);
-                }
-            }
-            assert (gamma_b.size() == q_b.size());
-        }
-        
-        return make_pair(gamma_b, q_b);
-    }
-#endif
-
-#if !defined (FASTER_SECOND_LEVEL)
-    inline pair<vector<double>, vector<unsigned>> Forest::calcInitialCoalescentLikelihoodIntegratingOutTheta() {
-        vector<double> gamma_b; // contains gamma_b by species
-        vector<unsigned> q_b; // contains q_b by species
-        
-        gamma_b.resize(1);
-        q_b.resize(1);
-        
-        _panmictic_coalescent_likelihood = 0.0;
-        _log_coalescent_likelihood = 0.0;
-        
-        double neg_inf = -1*numeric_limits<double>::infinity();
-        vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
-        assert (heights_and_nodes.size() > 0);
-        
-        unsigned a = 0;
-        double species_tree_height = 0.0;
-        
-        assert (_taxon_map.size() > 0);
-        setUpGeneForest(_taxon_map);
-        
-        if (gamma_b.back() != neg_inf) {
-            assert (q_b.back() == 0.0);
-            assert (gamma_b.back() == 0);
-            
-        // calculate coalescent likelihood for the rest of the panmictic tree
-        double cum_time = 0.0;
-        // calculate height of each join in the gene tree, minus the species tree height
-        // get number of lineages at beginning of that step and then decrement with each join
-
-        // start at _nincrements and go through heights and nodes list
-        int panmictic_nlineages = 0;
-        for (auto &s:_species_partition) {
-            panmictic_nlineages += s.second.size();
-        }
-
-        for (unsigned i=a; i < heights_and_nodes.size(); i++) {
-            // calculate increment (should be heights_and_nodes[i].first - species_tree_height - cum_time (no need to worry about species increment now)
-            // calculate prob of coalescence
-            double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
-            q_b.back() += 1;
-            gamma_b.back() += 4*increment * panmictic_nlineages *(panmictic_nlineages-1) / (2*G::_ploidy);
-
-            cum_time += increment;
-            panmictic_nlineages--;
-        }
-        assert (panmictic_nlineages == 1);
-
-        assert (gamma_b.size() == q_b.size());
-        }
-        
-        return make_pair(gamma_b, q_b);
-    }
-#endif
-
-#if !defined (FASTER_SECOND_LEVEL)
-    inline pair<vector<double>, vector<unsigned>> Forest::calcCoalescentLikelihoodIntegratingOutTheta(vector<pair<tuple<string,string,string>, double>> species_build) { // TODO: issues when newicks read in have very small branch lengths
-         vector<double> gamma_b; // contains gamma_b by species
-        vector<unsigned> q_b; // contains q_b by species
-        
-        gamma_b.resize(G::_nspecies + species_build.size());
-        q_b.resize(G::_nspecies + species_build.size());
-        
-        _panmictic_coalescent_likelihood = 0.0;
-        _log_coalescent_likelihood = 0.0;
-        
-        double neg_inf = -1*numeric_limits<double>::infinity();
-        vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
-        assert (heights_and_nodes.size() > 0);
-        
-        double log_coalescent_likelihood = 0.0;
-        double cum_time = 0.0;
-        string species;
-        bool found = false;
-        bool coalescence = false;
-        unsigned nlineages = 0;
-        unsigned a = 0;
-        double species_tree_height = 0.0;
-        
-        unsigned count = -1;
-        
-        assert (_taxon_map.size() > 0);
-        
-        setUpGeneForest(_taxon_map);
-        
-        for (unsigned gen=0; gen < species_build.size(); gen++) {
-            count = -1;
-            tuple<string, string, string> species_joined = species_build[gen].first;
-            double species_increment = species_build[gen].second;
-            species_tree_height += species_increment;
-            
-            updateSpeciesPartition(species_joined);
-        
-            for (auto &s:_species_partition) { // TODO: how to check if gene tree violates species tree?
-                if (gamma_b.size() > 0 && gamma_b[0] != neg_inf) {
-    //                    count = _species_indices[s.first];
-                    assert (_species_indices.size() > 0);
-                    count = _species_indices.at(s.first); // TODO: need to update species indices with species merges?
-                    
-                    bool done = false;
-                    cum_time = 0.0;
-                    species = s.first;
-                    for (unsigned i=0; i < heights_and_nodes.size(); i++) {
-                        if (!done) {
-                            found = false;
-                            coalescence = false;
-                            Node*search_nd = heights_and_nodes[i].second->_left_child;
-                            for (auto &nd:s.second) {
-                                if (nd == search_nd) {
-                                    search_nd = nd;
-                                    nlineages = (unsigned) s.second.size();
-                                    if (heights_and_nodes[i].first < species_tree_height) {
-                                        coalescence = true;
-                                        a++;
-                                    }
-                                    else {
-                                        done = true; // stop once gene increment goes below species tree height to avoid double counting some deep coalescences
-                                    }
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (found) {
-                                if (species_increment == 0.0) {
-                                    assert (coalescence); // no deep coalescence if last step
-                                }
-                                
-                                if (coalescence) {
-                                    if (s.second.size() == 1) {
-                                        q_b.clear(); // don't push back to q_b because it is full of doubles
-                                        gamma_b.clear();
-                                        gamma_b.push_back(neg_inf);
-                                        done = true;
-                                        break;
-                                    }
-                                    
-                                    double increment = heights_and_nodes[i].first - (species_tree_height - species_increment) - cum_time; // find increment height
-                                    cum_time += increment;
-                                    assert (increment > 0.0);
-                                    assert (q_b.size() > 0);
-                                    assert (gamma_b.size() > 0);
-                                    
-                                    q_b[count] += 1;
-                                    gamma_b[count] += 4* increment * nlineages *(nlineages-1) / (2*G::_ploidy);
-                                    for (auto &s:_species_partition) {
-                                        if (s.first == species) {
-                                            bool found = (find(s.second.begin(), s.second.end(), search_nd->_right_sib) != s.second.end());
-                                            if (found ) {
-                                                updateNodeVector(s.second, search_nd, search_nd->_right_sib, search_nd->_parent); // update the species lineage
-//                                                updateNodeList(s.second, search_nd, search_nd->_right_sib, search_nd->_parent); // update the species lineage
-                                            }
-                                            else {
-                                                q_b.clear(); // don't push back to q_b because it is full of doubles
-                                                gamma_b.clear();
-                                                gamma_b.push_back(neg_inf);
-                                                done = true;
-                                                break;
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
-                                else {
-                                    double increment = species_increment - cum_time; // find increment height - can't be any more deep coalescence, so gene increment is whatever remains of the species increment
-                                    cum_time += increment;
-                                    assert (increment > 0.0);
-                                    
-                                    assert (gamma_b.size() > 0);
-                                    gamma_b[count] += 4*increment * nlineages *(nlineages-1) / (2*G::_ploidy);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        if (gamma_b.back() != neg_inf) {
-            assert (q_b.back() == 0.0);
-            assert (gamma_b.back() == 0);
-            
-            // calculate coalescent likelihood for the rest of the panmictic tree
-            double species_increment = species_build.back().second;
-            if (log_coalescent_likelihood != neg_inf) {
-                if (species_increment > 0.0) {
-                    double cum_time = 0.0;
-                    // calculate height of each join in the gene tree, minus the species tree height
-                    // get number of lineages at beginning of that step and then decrement with each join
-
-                    // start at _nincrements and go through heights and nodes list
-                    int panmictic_nlineages = 0;
-                    for (auto &s:_species_partition) {
-                        panmictic_nlineages += s.second.size();
-                    }
-
-                    for (unsigned i=a; i < heights_and_nodes.size(); i++) {
-                        // calculate increment (should be heights_and_nodes[i].first - species_tree_height - cum_time (no need to worry about species increment now)
-                        // calculate prob of coalescence
-                        double increment = heights_and_nodes[i].first - species_tree_height - cum_time;
-                        q_b.back() += 1;
-                        gamma_b.back() += 4*increment * panmictic_nlineages *(panmictic_nlineages-1) / (2*G::_ploidy);
-
-                        cum_time += increment;
-                        panmictic_nlineages--;
-                    }
-                    assert (panmictic_nlineages == 1);
-                }
-            }
-            
-            assert (gamma_b.size() == q_b.size());
-        }
-        
-        _species_partition.clear(); // avoid having to copy extra nodes by clearing this since it will be reset
-        return make_pair(gamma_b, q_b);
-    }
-#endif
-
-    #if !defined (FASTER_SECOND_LEVEL)
-    inline void Forest::resetDepthVector(tuple<string, string, string> species_joined) {
-        // this function replaces species names with new species name after a join
-        for (auto &d:_depths) {
-            bool match1 = false;
-            bool match2 = false;
-            if (d.second.first == get<0>(species_joined) || d.second.first == get<1>(species_joined)) {
-                match1 = true;
-            }
-            if (d.second.second == get<0>(species_joined) || d.second.second == get<1>(species_joined)) {
-                match2 = true;
-            }
-            if (match1) {
-                d.second.first = get<2>(species_joined);
-            }
-            if (match2) {
-                d.second.second = get<2>(species_joined);
-            }
-        }
-        
-        vector<unsigned> indices_to_erase;
-        for (int i=0; i<_depths.size(); i++) {
-            if (_depths[i].second.first == _depths[i].second.second) {
-    //                // species have already been joined in the species tree, so they are no longer a constraint
-                indices_to_erase.push_back(i);
-            }
-        }
-        
-        for (unsigned i= (unsigned) indices_to_erase.size() - 1; i != -1; i--) {
-            unsigned num = indices_to_erase[i];
-            _depths.erase(_depths.begin() + num);
-        }
-        assert (_depths.size() > 0);
-    }
-    #endif
-
-    #if !defined (FASTER_SECOND_LEVEL)
-    inline vector<pair<double, pair<string, string>>> Forest::getMinDepths() {
-        return _depths;
-    }
-    #endif
-
-    #if !defined (FASTER_SECOND_LEVEL)
-    inline void Forest::calcMinDepth() {
-        assert (_index != 0);
-        _depths.clear();
-        // walk through nodes
-        // find children of node and determine if children are in the same species
-        // if children are in different species, calculate the node height
-        vector< pair<double, Node *>> heights_and_nodes = sortPreorder();
-    // post order traversal is the reverse of pre order, now sorted by node heights
-        string spp_left_child;
-        string spp_right_child;
-        bool done = false;
-    //        while (spp_left_child == "" || spp_right_child == "") {
-        for (int i=0; i<heights_and_nodes.size(); i++) {
-            Node* nd = heights_and_nodes[i].second;
-            done = false;
-                // figure out if descendants of internal node are in the same species
-            if (nd->_left_child) {
-                while (!done) {
-                    Node* left_child = nd->_left_child;
-                    Node* right_child = nd->_left_child->_right_sib;
-                    while (spp_left_child == "" || spp_right_child == "") {
-                        for (auto &s:_species_partition) {
-                            for (auto &nd:s.second) {
-                                if (nd == left_child && spp_left_child == "") {
-                                    spp_left_child = s.first;
-                                }
-                                else if (nd == right_child && spp_right_child == "") {
-                                    spp_right_child = s.first;
-                                }
-                            }
-                            if (spp_left_child != "" && spp_right_child != "") {
-                                break;
-                            }
-                        }
-                        
-                        if (spp_left_child == "") {
-                            if (left_child->_left_child) {
-                                left_child = left_child->_left_child;
-                                // this is saying if the species of the node is not found, the parent will be dealt with later & ignore the node for now
-                                done = true;
-                            }
-                        }
-                        if (spp_right_child == "") {
-                            if (right_child->_left_child) {
-                                right_child = right_child->_left_child;
-                                done = true;
-                            }
-                        }
-                    }
-                    if (spp_left_child != "" && spp_right_child != "") {
-                        done = true;
-                    }
-                    if (spp_left_child != spp_right_child) {
-                        double height = nd->_height;
-                        _depths.push_back(make_pair(height, make_pair(spp_left_child, spp_right_child)));
-                    }
-                    spp_left_child = "";
-                    spp_right_child = "";
-                }
-            }
-        }
-        assert (_depths.size() > 0);
-    }
-    #endif
 
     inline void Forest::refreshPreorder() {
         // this only works for complete trees - otherwise, need a separate preorder vector for each subtree - use refreshAllPreorders
@@ -6124,7 +5168,6 @@ class Forest {
     }
 #endif
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline void Forest::addCoalInfoElem(const Node * nd, vector<coalinfo_t> & recipient) {
         assert(_index >= 0);
 
@@ -6142,9 +5185,7 @@ class Forest {
             )
         );
     }
-    #endif
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline void Forest::saveCoalInfoGeneForest(vector<Forest::coalinfo_t> & coalinfo_vect) const {
         // Appends to coalinfo_vect; clear before calling if desired
         // GeneForest version ignores cap argument.
@@ -6161,9 +5202,7 @@ class Forest {
         // Copy tuples stored in _coalinfo to end of coalinfo_vect
         coalinfo_vect.insert(coalinfo_vect.end(), _coalinfo.begin(), _coalinfo.end());
     }
-    #endif
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline void Forest::saveCoalInfoInitial() {
         // coalinfo_t is a tuple with these elements:
         // - height of node
@@ -6194,9 +5233,7 @@ class Forest {
                 }
             }
         }
-    #endif
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline bool Forest::subsumed(G::species_t test_species, G::species_t subtending_species) {
         bool not_equal = (test_species != subtending_species);
         bool is_subset = ((test_species & subtending_species) == test_species);
@@ -6206,9 +5243,6 @@ class Forest {
             return false;
     }
 
-    #endif
-
-    #if defined (FASTER_SECOND_LEVEL)
     inline void Forest::fixupCoalInfo(vector<coalinfo_t> & coalinfo_vect, vector<coalinfo_t> & sppinfo_vect) const {
         // No fixing up to do if there are no species tree joins
         if (sppinfo_vect.empty())
@@ -6303,9 +5337,7 @@ class Forest {
             }
         }
     }
-    #endif
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline void Forest::refreshPreorderNew(vector<Node*> & preorder) const {
         // Assumes preorder just contains the root node when this function is called
         // Also assumes that _next_node_number was initialized prior to calling this function
@@ -6324,13 +5356,10 @@ class Forest {
                 break;
         }
     }
-    #endif
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline void Forest::setTreeHeight() {
         _forest_height = _lineages.back()->_height;
     }
-    #endif
 
     inline void Forest::setNodeHeights() {
         assert (_preorder.size() > 0);
@@ -6380,7 +5409,6 @@ class Forest {
     }
 #endif
 
-    #if defined (FASTER_SECOND_LEVEL)
     inline Node * Forest::findNextPreorderNew(Node * nd) const {
         assert(nd);
         Node * next = 0;
@@ -6414,8 +5442,6 @@ class Forest {
         }
         return next;
     }
-
-    #endif
 
 #if defined(LAZY_COPYING)
     inline Node * Forest::getMostRecentAncestor() {

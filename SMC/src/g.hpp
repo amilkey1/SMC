@@ -18,10 +18,8 @@ namespace proj {
             START_MODE_SMC
         };
         
-#if defined (FASTER_SECOND_LEVEL)
         typedef unsigned long           species_t;
         static map<string, unsigned>    _taxon_to_species;
-#endif
         
 #if defined (LAZY_COPYING)
         typedef pair<unsigned, unsigned>                        uint_pair_t;
@@ -99,9 +97,6 @@ namespace proj {
         
         static bool                 _in_second_level;
         static unsigned             _generation;
-#if !defined (FASTER_SECOND_LEVEL)
-        static string               _ancestral_species_name;
-#endif
         
         // functions
         string inventName(unsigned k, bool lower_case);

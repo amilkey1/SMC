@@ -77,9 +77,6 @@ class Particle {
         double                                  getSpeciesLogWeight() const {return _log_weight;}
         void                                    setLogWeight(double w){_log_weight = w;}
         void                                    setLogSpeciesWeight(double w){_log_weight = w;}
-#if defined (UNUSED_FUNCTIONS)
-        void                                    setLogLikelihood(vector<double> forest_likelihoods);
-#endif
         void                                    setLogCoalescentLikelihood(double coalescent_like);
         void                                    operator=(const Particle & other);
         const vector<Forest> &                  getGeneForests() const {return _gene_forests;}
@@ -116,9 +113,6 @@ class Particle {
 #else
         void                                    updateThetaMapFixedTheta(string new_species_name);
 #endif
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-        void                                    resetThetaMap(Lot::SharedPtr lot, unordered_map<string, double> &theta_map);
-#endif
     
 #if defined (LAZY_COPYING)
         void                                    drawNewTheta(G::species_t new_species);
@@ -148,10 +142,6 @@ class Particle {
         vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
         double                                          getCoalescentLikelihood(unsigned g);
         void                                            clear();
-        void                                            speciesOnlyProposal();
-#if !defined (FASTER_SECOND_LEVEL)
-        void                                            speciesOnlyProposalIntegratingOutTheta();
-#endif
         void                                            drawTheta();
         void                                            fixTheta();
         void                                            clearPartials();
@@ -169,9 +159,6 @@ class Particle {
         double                                          getSpeciesTreePrior();
         double                                          getAllPriors();
         double                                          getAllPriorsFirstRound();
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-        vector<double>                                  getVectorPrior();
-#endif
         void                                            simulateData(vector<unsigned> sites_vector);
         unsigned                                        getNumDeepCoalescences() {return _num_deep_coalescences;}
         unsigned                                        getMaxDeepCoalescences(){return _max_deep_coal;}
@@ -197,15 +184,11 @@ class Particle {
         void                                            setStartingUPGMAMatrix(vector<vector<double>> starting_upgma_matrices_by_gene);
 #endif
         void                                            setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species);
-#if defined (FASTER_SECOND_LEVEL)
         void                                            saveCoalInfoInitial();
         unsigned                                        proposeSpeciationEvent();
         double                                          findHeightNextCoalescentEvent(double hstart, vector<Forest::coalinfo_t> & coalinfo_vect);
         double                                          calcLogCoalescentLikelihood(vector<Forest::coalinfo_t> & coalinfo_vect, bool integrate_out_thetas, bool verbose);
         void                                            clearGeneForests();
-#else
-        void                                            createSpeciesIndices();
-#endif
     
         void                                            setNodeHeights();
         void                                            setSortedThetaVector();
@@ -220,8 +203,7 @@ class Particle {
             void                                        threadComputePartials(unsigned first, unsigned last);
             void                                        resetAllPrevLogLikelihood();
             void                                        rebuildCoalInfo();
-            void                                        recordAllForests(vector<Forest::coalinfo_t> & coalinfo_vect) const;
-            void                                        stowPartial(unsigned gene, Node * nd);
+            void                                        buildEnsembleCoalInfo();
 #endif
     
     private:
@@ -240,6 +222,7 @@ class Particle {
         vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>> _t;
         vector<vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>>> _t_by_gene;
         vector<G::species_t>                    _sorted_species_names; // only use for simulations
+        vector<Forest::coalinfo_t>              _ensemble_coalinfo;  // second level only
 #else
         vector<pair<tuple<string, string, string>, double>> _t;
         vector<vector<pair<tuple<string, string, string>, double>>> _t_by_gene;
@@ -258,13 +241,6 @@ class Particle {
         double                                  _theta_mean;
         vector<double>                          _theta_vector;
 
-#if defined (UNUSED_FUNCTIONS)
-        vector<double>                          _starting_log_likelihoods;
-#endif
-#if !defined (FASTER_SECOND_LEVEL)
-        unsigned                                _species_branches;
-        double                                  _species_tree_height;
-#endif
         unsigned                                _group_number;
 #if defined(LAZY_COPYING)
             mutable vector<ForestExtension>     _gene_forest_extensions;
@@ -337,13 +313,6 @@ class Particle {
         _next_species_number_by_gene.clear();
         _gene_order.clear();
         _group_number = 0;
-#if !defined (FASTER_SECOND_LEVEL)
-        _species_branches = 0;
-        _species_tree_height = 0.0;
-#endif
-#if defined (UNUSED_FUNCTIONS)
-        _starting_log_likelihoods.clear();
-#endif
     }
 
     inline void Particle::showSpeciesTree() {
@@ -440,20 +409,6 @@ class Particle {
         _log_weight = _log_coalescent_likelihood;
     }
 
-#if defined (UNUSED_FUNCTIONS)
-    inline void Particle::setLogLikelihood(vector<double> forest_log_likelihoods) {
-        double total_log_likelihood = 0.0;
-        for (unsigned i=1; i<_forests.size(); i++) {
-            _forests[i]._gene_tree_log_likelihood = forest_log_likelihoods[i-1];
-            total_log_likelihood += forest_log_likelihoods[i-1];
-            _forests[i]._log_weight = forest_log_likelihoods[i-1];
-            _starting_log_likelihoods.push_back(forest_log_likelihoods[i-1]);
-        }
-        _log_likelihood = total_log_likelihood;
-        _log_weight = total_log_likelihood;
-    }
-#endif
-
     inline double Particle::getSpeciesTreeHeight() {
         return _species_forest._forest_height;
     }
@@ -547,7 +502,6 @@ class Particle {
     }
 
     inline vector<double> Particle::getGeneTreeCoalescentLikelihoods() {
-#if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         // do not have separate coalescent likelihood for each gene tree
         vector<double> gene_tree_priors;
 #if defined (LAZY_COPYING)
@@ -560,19 +514,6 @@ class Particle {
         }
 #endif
         return gene_tree_priors;
-#else
-        vector<double> gene_tree_priors;
-#if defined (LAZY_COPYING)
-        for (int i=1; i<_gene_forest_ptrs.size(); i++) {
-            gene_tree_priors.push_back(_gene_forest_ptrs[i]->_log_coalescent_likelihood);
-        }
-#else
-        for (int i=1; i<_gene_forests.size(); i++) {
-            gene_tree_priors.push_back(_gene_forests[i]._log_coalescent_likelihood);
-        }
-#endif
-        return gene_tree_priors;
-#endif
     }
 
     inline double Particle::getSpeciesTreePrior() {
@@ -607,13 +548,6 @@ class Particle {
         // no prior on theta for second round
         return total_prior;
     }
-
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-inline vector<double> Particle::getVectorPrior() {
-// this is the InverseGamma(2, psi) prior on the population sizes
-    return _forests[1]._vector_prior;
-}
-#endif
 
     inline double Particle::getLogLikelihood() {
         //retrieve likelihood for each gene tree
@@ -968,502 +902,15 @@ inline vector<double> Particle::getVectorPrior() {
          
          done = true;
         
-    _log_weight = 0.0; // log weight is always 0 for simulations
+        _log_weight = 0.0; // log weight is always 0 for simulations
     }
 
-
-//    inline void Particle::proposalSim() {
-//        unsigned next_gene = _gene_order[G::_generation];
-//
-//        bool calc_weight = false;
-        
-//        if (G::_generation == 0) {
-//            buildEntireSpeciesTree();
-//            // make a separate species tree information vector for each gene
-//#if defined (LAZY_COPYING)
-//            for (unsigned i=0; i<_gene_forest_ptrs.size(); i++) {
-//#else
-//            for (unsigned i=0; i<_gene_forests.size(); i++) {
-//#endif
-//                _t_by_gene.push_back(_t);
-//                _next_species_number_by_gene.push_back(0);
-//            }
-//        }
-//
-//#if defined (LAZY_COPYING)
-//        if (_prev_species_number_by_gene.size() == 0) {
-//            _prev_species_number_by_gene = _next_species_number_by_gene;
-//        }
-//        else {
-//            _prev_species_number_by_gene[next_gene-1] = _next_species_number_by_gene[next_gene-1];
-//        }
-//#endif
-//
-//        bool done = false;
-//
-//#if defined (LAZY_COPYING)
-//        // Create temporary gene forest extending existing forest
-//        // without touching existing forest (which may be used
-//        // by many particles)
-//        assert(_gene_forest_extensions.size() == G::_nloci);
-//        _gene_forest_extensions[next_gene-1].dockSim(_gene_forest_ptrs[next_gene-1], _lot);
-//#endif
-//
-//        while (!done) {
-//#if defined (LAZY_COPYING)
-//            vector<pair<double, unsigned long>> rates_by_species = _gene_forest_extensions[next_gene-1].calcForestRate(_lot, _theta_map);
-//#else
-//            vector<pair<double, string>> rates_by_species = _gene_forests[next_gene-1].calcForestRate(_lot, _theta_map);
-//#endif
-//            double total_rate = 0.0;
-//            double gene_increment = -1.0;
-//            if (rates_by_species.size() > 0) {
-//                for (auto &r:rates_by_species) {
-//                    total_rate += r.first;
-//                }
-//                assert (total_rate > 0.0);
-//                gene_increment = -log(1.0 - _lot->uniform())/total_rate;
-//                assert (gene_increment > 0.0);
-//            }
-//
-//            unsigned next_species_index = _next_species_number_by_gene[next_gene-1];
-//            double species_increment = _t_by_gene[next_gene-1][next_species_index].second;
-//
-//          // if total rate is 0, gene increment will be -1.0, which will be taken care of
-//
-//            if ((gene_increment < species_increment || species_increment == 0.0) && gene_increment != -1.0) { // if species increment is 0.0, choose a coalescent event because the species tree is finished
-//
-//                assert (gene_increment > 0.0);
-//
-//#if defined (LAZY_COPYING)
-//                // tell gene forest extension about gene increment
-//                _gene_forest_extensions[next_gene-1].addIncrement(gene_increment);
-//#else
-//                _gene_forests[next_gene-1].addIncrement(gene_increment);
-//#endif
-//
-//                vector<double> event_choice_rates;
-//                for (auto &r:rates_by_species) {
-//                    event_choice_rates.push_back(r.first / total_rate);
-//                }
-//
-//                unsigned index = selectEventLinearScale(event_choice_rates);
-//#if defined (LAZY_COPYING)
-//                G::species_t species_name = rates_by_species[index].second;
-//#else
-//                string species_name = rates_by_species[index].second;
-//#endif
-//
-//#if defined (LAZY_COPYING)
-//                _gene_forest_extensions[next_gene-1].coalesce(total_rate, species_name);
-//#else
-//                _gene_forests[next_gene-1].allowCoalescence(species_name, gene_increment, _lot);
-//#endif
-//
-//                if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
-//                    _t_by_gene[next_gene-1][next_species_index].second -= gene_increment; // update species tree increments
-//                }
-//                    calc_weight = true;
-//                }
-//                else {
-//                    // carry out speciation event
-//
-//                    assert (species_increment > 0.0);
-//
-//
-//#if defined (LAZY_COPYING)
-//                    // tell gene forest extension about the species increment
-//                    _gene_forest_extensions[next_gene-1].addIncrement(species_increment);
-//
-//                    // tell gene forest extension about species merged
-//                    G::species_t left_spp = get<0>(_t_by_gene[next_gene-1][next_species_index+1].first);
-//                    G::species_t right_spp = get<1>(_t_by_gene[next_gene-1][next_species_index+1].first);
-//
-//                    if (left_spp == 0) {
-//                        assert (right_spp == 0);
-//                    }
-//                    else if (right_spp == 0) {
-//                        assert (left_spp == 0);
-//                    }
-//                    _gene_forest_extensions[next_gene-1].mergeSpecies(left_spp, right_spp);
-//#else
-//                    assert (_gene_forests[next_gene-1]._species_partition.size() > 1);
-//                    _gene_forests[next_gene-1].addIncrement(species_increment);
-//                    assert (_gene_forests[next_gene-1]._species_partition.size() > 1);
-//                    _gene_forests[next_gene-1].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
-//#endif
-//
-//#if defined (LAZY_COPYING)
-//                    // TODO: write this
-//                    _num_deep_coalescences += _gene_forest_extensions[next_gene-1].getDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
-//                    _max_deep_coal += _gene_forest_extensions[next_gene-1].getMaxDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
-//#else
-//                    // need to tally up number of deep coalescences for simulations
-//                    _num_deep_coalescences += _gene_forests[next_gene-1].getDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
-//                    _max_deep_coal += _gene_forests[next_gene-1].getMaxDeepCoal(_t_by_gene[next_gene - 1][next_species_index + 1].first);
-//
-//                    _gene_forests[next_gene-1].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
-//#endif
-//
-//                    assert (next_species_index < _t_by_gene[next_gene-1].size());
-//                    _t_by_gene[next_gene-1][next_species_index].second -= species_increment; // update species tree increments
-//                    assert (_t_by_gene[next_gene-1][next_species_index].second == 0.0);
-//
-//#if defined (LAZY_COPYING)
-//                    if (_gene_forest_extensions[next_gene-1].getSpeciesPartitionSize() > 1) {
-//                        _next_species_number_by_gene[next_gene-1]++;
-//                }
-//#else
-//                    if (_gene_forests[next_gene-1]._species_partition.size() > 1) {
-//                        _next_species_number_by_gene[next_gene-1]++;
-//                }
-//#endif
-//            }
-//
-//
-//            if (calc_weight) { // calc weight just means coalescent event has been proposed
-//                done = true;
-//            }
-//        }
-//
-//         done = true;
-//
-//    _log_weight = 0.0; // log weight is always 0 for simulations
-//    }
-
-#if defined (FASTER_SECOND_LEVEL)
     struct bitless {
         bool operator()(const G::species_t a, const G::species_t b) const {
             bool returned_value = ((a & b) > 0 ? false : a < b);
             return returned_value;
         }
     };
-#endif
-
-#if !defined (FASTER_SECOND_LEVEL)
-    inline void Particle::speciesOnlyProposalIntegratingOutTheta() {
-//        if (_generation == 0) {
-        if (_species_forest._last_edge_length == 0.0) {
-            _species_branches = G::_nspecies;
-            for (int i=1; i<_forests.size(); i++) {
-                _forests[i].refreshPreorder();
-                _forests[i].calcMinDepth();
-                _forests[i]._nincrements = 0;
-
-//                if (i > 1) {
-//                    _forests[i]._theta_mean = _forests[1]._theta_mean;
-//                }
-            }
-        }
-        
-        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-        double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
-        
-#if !defined (COAL_LIKE_TEST)
-        
-            if (_species_forest._last_edge_length > 0.0) {
-            // choose species to join if past the first species generation for each forest vector
-                species_joined = _species_forest.speciesTreeProposal(_lot);
-            }
-                vector<double> max_depth_vector;
-                double max_depth = 0.0;
-
-                for (int i=1; i<_forests.size(); i++) {
-                    string species1 = get<0>(species_joined);
-                    string species2 = get<1>(species_joined);
-                        
-                    if (_species_forest._lineages.size() > 1 && species1 != "null") {
-                        // if using Jones formula, species partition update will happen in coalescent likelihood calculation
-                        _forests[i].resetDepthVector(species_joined);
-                    }
-
-                    max_depth = (_forests[i].getMinDepths())[0].first;
-                    max_depth_vector.push_back(max_depth);
-                }
-                if (_species_forest._lineages.size() > 1) {
-                    max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
-                    max_depth -= _species_forest._forest_height;
-                    // choose a species tree increment
-                }
-                
-                if (_species_forest._lineages.size() > 1) {
-#if !defined (UNCONSTRAINED_PROPOSAL)
-                    
-                    assert (max_depth > 0.0);
-                    
-                    _species_forest.chooseSpeciesIncrementOnly(_lot, max_depth);
-#else
-                    _species_forest.chooseSpeciesIncrementOnly(_lot, 0.0);
-#endif
-                    _species_tree_height += _species_forest._last_edge_length;
-                }
-                if (_species_forest._lineages.size() == 1) {
-                    _species_forest._last_edge_length = 0.0;
-                }
-        
-                _log_coalescent_likelihood = 0.0;
-        
-            assert (_log_coalescent_likelihood == 0.0);
-#endif
-
-        if (!G::_run_on_empty || G::_run_on_empty_first_level_only) {
-            _species_branches += 1;
-            _log_coalescent_likelihood = 2 * _species_branches * log(_theta_mean) - _species_branches * boost::math::lgamma(2);
-            
-            vector<double> gamma_jb;
-            vector<unsigned> q_jb;
-            
-            double neg_inf = -1*numeric_limits<double>::infinity();
-            
-            for (int i = 1; i<_forests.size(); i++) {
-                if (_log_coalescent_likelihood != neg_inf) {
-                    pair<vector<double>, vector<unsigned>> params;
-#if defined (COAL_LIKE_TEST)
-                    showParticle();
-                    Forest::_theta = 0.07;
-//                    calcInitialCoalescentLikelihood();
-                    params = _forests[i].calcInitialCoalescentLikelihoodIntegratingOutTheta();
-#else
-                    
-                    if (_species_forest._lineages.size() > 1) {
-                        params = _forests[i].calcCoalescentLikelihoodIntegratingOutTheta(_species_forest._species_build);
-                    }
-                    else {
-                        params = _forests[i].calcCoalescentLikelihoodIntegratingOutThetaLastStep(_species_forest._species_build); // not using this right now
-                    }
-#endif
-                    if (i == 1) {
-                        for (auto &g:params.first) {
-                            if (g == neg_inf) {
-                                _log_coalescent_likelihood = neg_inf;
-                                break;
-                            }
-                            gamma_jb.push_back(g);
-                        }
-                        for (auto &q:params.second) {
-                            q_jb.push_back(q);
-                        }
-                    }
-                    else {
-                        for (unsigned p=0; p<params.first.size(); p++) {
-                            gamma_jb[p] += params.first[p];
-                            if (params.first[p] == neg_inf) {
-                                _log_coalescent_likelihood = neg_inf;
-                                break;
-                            }
-                            q_jb[p] += params.second[p];
-                        }
-                    }
-                }
-            }
-                   
-//            sw.start();
-            if (_species_forest._lineages.size() > 2) {
-                for (unsigned p=0; p<gamma_jb.size(); p++) {
-                    double ploidy = 2.0;
-                    double log_rb = q_jb[p] * log((4 / ploidy));
-                    double q_b = q_jb[p];
-                    double gamma_b = gamma_jb[p];
-                    
-                    if (gamma_b == neg_inf) {
-                        _log_coalescent_likelihood = neg_inf;
-                    }
-                    
-                    if (_log_coalescent_likelihood != neg_inf) {
-                        double test = log_rb - (2+q_b)*log(_theta_mean + gamma_b) + boost::math::lgamma(2 + q_b);
-                        _log_coalescent_likelihood += log_rb - (2+q_b)*log(_theta_mean + gamma_b) + boost::math::lgamma(2 + q_b);
-                    }
-                }
-            }
-            
-            else {
-                species_joined = _species_forest.speciesTreeProposal(_lot);
-                for (unsigned p=0; p<gamma_jb.size(); p++) {
-                    double ploidy = 2.0;
-                    double log_rb = q_jb[p] * log((4 / ploidy));
-                    double q_b = q_jb[p];
-                    double gamma_b = gamma_jb[p];
-
-                    if (gamma_b == neg_inf) {
-                        _log_coalescent_likelihood = neg_inf;
-                    }
-
-                    if (_log_coalescent_likelihood != neg_inf) {
-                        _log_coalescent_likelihood += log_rb - (2+q_b)*log(_theta_mean + gamma_b) + boost::math::lgamma(2 + q_b);
-                    }
-                }
-            }
-        }
-
-#if defined (COAL_LIKE_TEST)
-        double max_depth = 0.0;
-        double constrained_factor = 0.0;
-#endif
-        
-#if !defined (COAL_LIKE_TEST)
-        double constrained_factor = 0.0;
-#if !defined (UNCONSTRAINED_PROPOSAL)
-        if (!G::_run_on_empty) {
-            assert (max_depth > 0.0);
-            double nlineages = _species_forest._lineages.size();
-            if (nlineages == 1) {
-                nlineages = 2; // for last step, constraint was before final two species were joined
-            }
-//            constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
-            constrained_factor = log(1 - exp(-1*nlineages*G::_lambda*max_depth));
-        }
-#endif
-        
-#endif
-            _log_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
-#if !defined (UNCONSTRAINED_PROPOSAL)
-            double test = 1/_log_weight;
-            assert(test != -0); // assert coalescent likelihood is not -inf
-#endif
-        
-        if (G::_run_on_empty && !G::_run_on_empty_first_level_only) {
-            assert (_log_coalescent_likelihood == 0.0);
-            assert (_log_weight == 0.0);
-        }
-//        _generation++;
-    }
-#endif
-
-    inline void Particle::speciesOnlyProposal() {
-#if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-#if !defined (FASTER_SECOND_LEVEL)
-        speciesOnlyProposalIntegratingOutTheta();
-#endif
-#else
-        
-        if (_generation == 0) {
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-            _forests[1]._vector_prior.clear();
-#endif
-            for (int i=1; i<_forests.size(); i++) {
-                _forests[i].refreshPreorder();
-                _forests[i].calcMinDepth();
-                _forests[i]._nincrements = 0;
-#if defined (DRAW_NEW_THETA)
-                _forests[i]._theta_map.clear(); // clear old thetas
-#endif
-                if (i > 1) {
-                    _forests[i]._theta_mean = _forests[1]._theta_mean;
-                    _forests[i]._species_names = _forests[1]._species_names;
-                }
-            }
-#if defined (DRAW_NEW_THETA)
-            for (int i=1; i<_forests.size(); i++) {
-                assert (_forests[i]._theta_mean > 0.0);
-            }
-            _forests[1].resetThetaMap(_lot); // reset tip thetas and ancestral pop theta
-            if (_forests.size() > 2) {
-                for (int i=2; i<_forests.size(); i++) {
-                    _forests[i]._theta_map = _forests[1]._theta_map;
-                }
-            }
-#endif
-        }
-        
-        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-        double prev_log_coalescent_likelihood = _log_coalescent_likelihood;
-        
-            if (_species_forest._last_edge_length > 0.0) {
-            // choose species to join if past the first species generation for each forest vector
-                species_joined = _species_forest.speciesTreeProposal(_lot);
-            }
-                vector<double> max_depth_vector;
-                double max_depth = 0.0;
-
-                for (int i=1; i<_forests.size(); i++) {
-                    string species1 = get<0>(species_joined);
-                    string species2 = get<1>(species_joined);
-                    
-                    if (species1 != "null") {
-                        _forests[i].updateSpeciesPartition(species_joined); // if using Jones formula, this will happen in coalescent likelihood calculation
-                    }
-                    
-                    if (_species_forest._lineages.size() > 1 && species1 != "null") {
-                        _forests[i].resetDepthVector(species_joined);
-                    }
-
-                    max_depth = (_forests[i].getMinDepths())[0].first;
-                    max_depth_vector.push_back(max_depth);
-                }
-                if (_species_forest._lineages.size() > 1) {
-                    max_depth = *min_element(max_depth_vector.begin(), max_depth_vector.end());
-                    max_depth -= _species_forest._forest_height;
-                    // choose a species tree increment
-                }
-                
-                if (_species_forest._lineages.size() > 1) {
-#if !defined (UNCONSTRAINED_PROPOSAL)
-                    assert (max_depth > 0.0);
-                    _species_forest.chooseSpeciesIncrementOnly(_lot, max_depth);
-#else
-                    _species_forest.chooseSpeciesIncrementOnly(_lot, 0.0);
-#endif
-                    _species_tree_height += _species_forest._last_edge_length;
-                }
-                if (_species_forest._lineages.size() == 1) {
-                    _species_forest._last_edge_length = 0.0;
-                }
-        
-                _t.push_back(make_pair(species_joined, _species_forest._last_edge_length));
-                
-                _log_coalescent_likelihood = 0.0;
-        
-#if defined (DRAW_NEW_THETA)
-        if (_generation > 0) {
-            _forests[1].drawNewTheta(get<2>(species_joined), _lot); // each time species are joined, draw a new theta for the new population and ancestral pop
-            if (_forests.size() > 2) {
-                for (int i=2; i<_forests.size(); i++) {
-                    _forests[i]._theta_map = _forests[1]._theta_map;
-                }
-            }
-        }
-#endif
-            assert (_log_coalescent_likelihood == 0.0);
-        
-        if (_species_forest._last_edge_length > max_depth) {
-            _log_coalescent_likelihood = -1*numeric_limits<double>::infinity();
-        }
-        else {
-            for (int i = 1; i<_forests.size(); i++) {
-                _forests[i].calcCoalescentLikelihood(_species_forest._last_edge_length, species_joined, _species_tree_height);
-                _log_coalescent_likelihood += _forests[i]._log_coalescent_likelihood + _forests[i]._panmictic_coalescent_likelihood;
-            }
-        }
-        
-        if (_species_forest._lineages.size() == 2) {
-            // join remaining species lineages, no change in coalescent likelihood, just need to add panmictic coalescent for each gene tree (to avoid total recalculation)
-            // no need to draw a new theta because we are at the ancestral population now
-            species_joined = _species_forest.speciesTreeProposal(_lot);
-            for (int i=1; i<_forests.size(); i++) {
-                _forests[i]._log_coalescent_likelihood += _forests[i]._panmictic_coalescent_likelihood;
-                _forests[i]._panmictic_coalescent_likelihood = 0.0; // for clarity, reset to 0
-            }
-        }
-        
-        double constrained_factor = 0.0;
-#if !defined (UNCONSTRAINED_PROPOSAL)
-        assert (max_depth > 0.0);
-        double nlineages = _species_forest._lineages.size();
-        constrained_factor = log(1 - exp(-1*nlineages*Forest::_lambda*max_depth));
-#endif
-        _log_weight = _log_coalescent_likelihood - prev_log_coalescent_likelihood + constrained_factor;
-#if !defined (UNCONSTRAINED_PROPOSAL)
-        double test = 1/_log_weight;
-        assert(test != -0); // assert coalescent likelihood is not -inf
-#endif
-        double neg_inf = -1*numeric_limits<double>::infinity();
-        if (_log_coalescent_likelihood == neg_inf) {
-            assert (_species_forest._last_edge_length > max_depth);
-        }
-        
-        _generation++;
-#endif
-    }
 
 #if defined (OLD_UPGMA)
     inline void Particle::calcStartingUPGMAMatrix() {
@@ -1496,57 +943,6 @@ inline vector<double> Particle::getVectorPrior() {
         for (unsigned i=1; i<_forests.size(); i++) {
             _forests[i].buildStartingRow();
         }
-    }
-#endif
-
-#if !defined (FASTER_SECOND_LEVEL)
-    inline double Particle::calcInitialCoalescentLikelihood() {
-#if defined GRAHAM_JONES_COALESCENT_LIKELIHOOD
-        unsigned nbranches = G::_nspecies*2 - 1;
-        _log_coalescent_likelihood = 2 * nbranches * log(_theta_mean) - nbranches * boost::math::lgamma(2);
-        
-        vector<double> gamma_jb;
-        vector<unsigned> q_jb;
-        
-        double neg_inf = -1*numeric_limits<double>::infinity();
-        for (int i = 1; i<_forests.size(); i++) {
-            
-            _forests[i].refreshPreorder();
-            
-            if (_log_coalescent_likelihood != neg_inf) {
-                pair<vector<double>, vector<unsigned>> params;
-                params = _forests[i].calcInitialCoalescentLikelihoodIntegratingOutTheta();
-                
-                if (i == 1) {
-                    for (auto &g:params.first) {
-                        if (g == neg_inf) {
-                            _log_coalescent_likelihood = neg_inf;
-                            break;
-                        }
-                        gamma_jb.push_back(g);
-                    }
-                    for (auto &q:params.second) {
-                        q_jb.push_back(q);
-                    }
-                }
-                else {
-                    for (unsigned p=0; p<params.first.size(); p++) {
-                        gamma_jb[p] += params.first[p];
-                        if (params.first[p] == neg_inf) {
-                            _log_coalescent_likelihood = neg_inf;
-                            break;
-                        }
-                        q_jb[p] += params.second[p];
-                    }
-                }
-            }
-        }
-        return _log_coalescent_likelihood;
-#else
-        cerr << "calling calc initial coalescent likelihood when Graham Jones coalescent likelihood integrating out theta is not defined" << endl;
-        assert (1 == 2); // only call this function when integrating out theta
-        return 0;
-#endif
     }
 #endif
 
@@ -1627,18 +1023,6 @@ inline vector<double> Particle::getVectorPrior() {
 
     inline void Particle::fixTheta() {
         createThetaMapFixedTheta();
-        
-#if !defined (FASTER_SECOND_LEVEL)
-        map<string, unsigned> species_indices = _forests[1]._species_indices;
-#endif
-        
-#if !defined (FASTER_SECOND_LEVEL)
-        if (_gene_forests.size() > 1) {
-            for (int i=1; i<_gene_forests.size(); i++) {
-                _gene_forests[i]._species_indices = species_indices;
-            }
-        }
-#endif
     }
 
     inline void Particle::drawTheta() {
@@ -1667,25 +1051,9 @@ inline vector<double> Particle::getVectorPrior() {
         else {
             createThetaMap(); // create map for particle
         }
-        
-#if !defined (FASTER_SECOND_LEVEL)
-        map<string, unsigned> species_indices = _forests[1]._species_indices;
-#endif
-        
-#if !defined (FASTER_SECOND_LEVEL)
-        if (_forests.size() > 1) {
-            for (unsigned i=1; i<_gene_forests.size(); i++) {
-                _gene_forests[i]._species_indices = species_indices;
-            }
-        }
-#endif
     }
 
     inline void Particle::createThetaMap() {
-#if !defined (FASTER_SECOND_LEVEL)
-        unsigned number = 0;
-#endif
-        
         double scale = (2.0 - 1.0) / _theta_mean;
         assert (scale > 0.0);
 #if defined (LAZY_COPYING)
@@ -1698,59 +1066,19 @@ inline vector<double> Particle::getVectorPrior() {
                 new_theta = 1 / (_lot->gamma(2.0, scale));
                 assert (new_theta > 0.0);
                 _theta_map[name] = new_theta;
-#if !defined (FASTER_SECOND_LEVEL)
-                _forests[1]._species_indices[name] = number;
-                number++;
-#endif
             }
         }
-        
-#if !defined (FASTER_SECOND_LEVEL)
-        for (int i=0; i<G::_nspecies-1; i++) {
-            string name = boost::str(boost::format("node-%d")%number);
-           _forests[1]._species_indices[name] = number - 1;
-            number++;
-        }
-        
-        if (_forests.size() > 2) {
-            for (unsigned i=2; i < _forests.size(); i++) {
-                _forests[i]._species_indices = _forests[1]._species_indices;
-            }
-        }
-#endif
         
     }
 
     inline void Particle::createThetaMapFixedTheta() {
-#if !defined (FASTER_SECOND_LEVEL)
-        unsigned number = 0;
-#endif
-        
 #if defined (LAZY_COPYING)
         for (auto &name:G::_species_names_typed) {
 #else
         for (auto &name:G::_species_names) {
 #endif
             _theta_map[name] = G::_theta;
-#if !defined (FASTER_SECOND_LEVEL)
-            _forests[1]._species_indices[name] = number;
-            number++;
-#endif
         }
-        
-#if !defined (FASTER_SECOND_LEVEL)
-        for (int i=0; i<G::_nspecies-1; i++) {
-            string name = boost::str(boost::format("node-%d")%number);
-           _forests[1]._species_indices[name] = number - 1;
-            number++;
-        }
-        
-        if (_forests.size() > 2) {
-            for (unsigned i=2; i < _forests.size(); i++) {
-                _forests[i]._species_indices = _forests[1]._species_indices;
-            }
-        }
-#endif
     }
 
 #if defined (LAZY_COPYING)
@@ -1783,53 +1111,6 @@ inline vector<double> Particle::getVectorPrior() {
 #endif
         _theta_map[new_species_name] = G::_theta;
     }
-
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-    inline void Particle::resetThetaMap(Lot::SharedPtr lot, unordered_map<string, double> &theta_map) {
-        assert (_theta_map.size() == 0);
-        // map should be 2*nspecies - 1 size
-        unsigned number = 0;
-        vector<string> species_names;
-        
-        for (auto &s:_forests[1]._species_partition) {
-            species_names.push_back(s.first);
-            number++;
-        }
-        
-        for (int i=0; i<G::_nspecies-1; i++) {
-            string name = boost::str(boost::format("node-%d")%number);
-            number++;
-            species_names.push_back(name);
-        }
-        
-        assert (species_names.size() == 2*G::_nspecies - 1);
-        
-        // draw thetas for tips of species trees and ancestral population
-        // for all other populations, theta = -1
-        
-        if (G::_theta_proposal_mean == 0.0) {
-            assert (G::_theta > 0.0);
-            G::_theta_proposal_mean = G::_theta;
-        }
-        double scale = 1 / G::_theta_proposal_mean;
-        
-        unsigned count = 0;
-        for (auto &name:species_names) {
-            if (count < G::_nspecies || count == 2*G::_nspecies-2) {
-                double new_theta = 0.0;
-                if (new_theta < G::_small_enough) {
-                    new_theta = 1 / (lot->gamma(2.0, scale));
-                    assert (new_theta > 0.0);
-                    _theta_map[name] = new_theta;
-                }
-            }
-            else {
-                _theta_map[name] = -1;
-            }
-            count++;
-        }
-    }
-#endif
 
 #if defined (LAZY_COPYING)
         inline void Particle::drawNewTheta(G::species_t new_species) {
@@ -1899,19 +1180,12 @@ inline vector<double> Particle::getVectorPrior() {
         //species tree
         _species_forest.setUpSpeciesForest();
 
-# if defined (FASTER_SECOND_LEVEL)
         if (!G::_in_second_level) {
             //gene trees
             for (unsigned i=0; i<_gene_forests.size(); i++) {
                 _gene_forests[i].setUpGeneForest(taxon_map);
             }
         }
-#else
-            //gene trees // need to reset gene forests if traversing through gene trees for coalescent likelihood
-            for (unsigned i=1; i<_forests.size(); i++) {
-                _forests[i].setUpGeneForest(taxon_map);
-            }
-#endif
     }
 
 #if defined (DEBUG_MODE)
@@ -1964,12 +1238,7 @@ inline vector<double> Particle::getVectorPrior() {
     }
 
     inline double Particle::getCoalescentLikelihood(unsigned g) {
-#if defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
         return _log_coalescent_likelihood; // can't get coalescent likelihood separately for each gene tree
-#else
-        assert (g>0); // no coalescent likelihood for species tree
-        return _forests[g]._log_coalescent_likelihood;
-#endif
     }
 
     inline void Particle::simulateData(vector<unsigned> sites_vector) {
@@ -2047,27 +1316,11 @@ inline vector<double> Particle::getVectorPrior() {
         } // otherwise, starting from complete gene trees and species tree is already set
         setLogWeight(0.0);
         _log_coalescent_likelihood = 0.0;
-#if !defined (FASTER_SECOND_LEVEL)
-        _species_tree_height = 0.0;
-        for (int i=0; i<_gene_forests.size(); i++) {
-            _gene_forests[i]._log_coalescent_likelihood = 0.0;
-            _gene_forests[i]._data = nullptr;
-            _gene_forests[i]._log_weight = 0.0;
-            // do not clear species indices - save this for use in jones coalescent likelihood calculation
-        }
-        _gene_order.clear();
-        _next_species_number_by_gene.clear();
-#if defined (UNUSED_FUNCTIONS)
-        _starting_log_likelihoods.clear();
-#endif
-#endif
         _species_forest._last_edge_length = 0.0;
         _species_forest._increments_and_priors.clear();
-//        _t.clear();  // TODO: testing - don't reset these because they will not get copied in the copy constructor
+//        _t.clear();  // don't reset these because they will not get copied in the copier
 //        _t_by_gene.clear();
-#if defined (FASTER_SECOND_LEVEL)
         _species_forest.refreshAllPreorders();
-#endif
     }
 
     inline void Particle::trimSpeciesTree() {
@@ -2178,15 +1431,6 @@ inline vector<double> Particle::getVectorPrior() {
             }
         }
     }
-
-
-#if !defined (FASTER_SECOND_LEVEL)
-    inline void Particle::createSpeciesIndices() {
-        for (unsigned i=1; i<_forests.size(); i++) {
-            _forests[i].createSpeciesIndices();
-        }
-    }
-#endif
 
     inline void Particle::rebuildSpeciesTree() {
         bool trim_to_previous_join = false;
@@ -2382,15 +1626,12 @@ inline vector<double> Particle::getVectorPrior() {
         }
     }
 
-#if defined (FASTER_SECOND_LEVEL)
     inline void Particle::saveCoalInfoInitial() {
         for (unsigned i=0; i<_gene_forests.size(); i++) {
             _gene_forests[i].saveCoalInfoInitial();
         }
     }
-#endif
 
-#if defined (FASTER_SECOND_LEVEL)
     inline unsigned Particle::proposeSpeciationEvent() {
         double prev_log_coal_like = _log_coalescent_likelihood;
         
@@ -2420,24 +1661,20 @@ inline vector<double> Particle::getVectorPrior() {
         // limits for species tree increments
         
 #if defined(LAZY_COPYING)
-        for (unsigned g = 0; g < G::_nloci; g++) {
-            Forest::SharedPtr gfp = _gene_forest_ptrs[g];
-            gfp->saveCoalInfoGeneForest(coalinfo_vect);
-        }
+        assert (_ensemble_coalinfo.size() > 0);
+        coalinfo_vect = _ensemble_coalinfo;
 #else
         for (unsigned f=0; f<_gene_forests.size(); f++) {
             _gene_forests[f].saveCoalInfoGeneForest(coalinfo_vect);
         }
 #endif
         
-        // Sort coalinfo_vect from smallest to largest height
-        sort(coalinfo_vect.begin(), coalinfo_vect.end());
+        // coalinfo_vect should already be sorted
         
         // Get maximum height of any gene tree
         double max_height = get<0>((*coalinfo_vect.rbegin()));
         
-//        if (G::_generation > 0) {
-        if (_species_forest._last_edge_length != 0.0) {
+        if (_species_forest._last_edge_length != 0.0) { // don't draw a speciation event for first step
 
             // Create speciation event
             _species_forest.speciesTreeProposal(_lot);
@@ -2474,7 +1711,7 @@ inline vector<double> Particle::getVectorPrior() {
         
         // Add species tree joins to sppinfo_vect. Cap with ancestral species
         // in order to compute complete coalescent likelihood.
-        sppinfo_vect.clear();
+        sppinfo_vect.clear(); // TODO: try overwriting this and not clearing?
         _species_forest.buildCoalInfoVect();
         _species_forest.saveCoalInfoSpeciesTree(sppinfo_vect, /*cap*/true);
 
@@ -2494,9 +1731,26 @@ inline vector<double> Particle::getVectorPrior() {
 
         return num_species_tree_lineages;
     }
+           
+#if defined(LAZY_COPYING)
+    inline void Particle::buildEnsembleCoalInfo() {
+        // Store a tuple (height, gene + 1, vector of species)
+        // for each join in any gene tree in _ensemble_coalinfo.
+        // To get 0-offset gene index,
+        // subtract 1 from 2nd element of tuple (if 2nd element
+        // is 0, then tuple represents a species tree join)
+        _ensemble_coalinfo.clear();
+
+        // Add gene tree joins to _ensemble_coalinfo_vect
+        for (unsigned g = 0; g < G::_nloci; g++) {
+            Forest::SharedPtr gfp = _gene_forest_ptrs[g];
+            gfp->saveCoalInfoGeneForest(_ensemble_coalinfo);
+        }
+        
+        sort(_ensemble_coalinfo.begin(), _ensemble_coalinfo.end());
+    }
 #endif
 
-#if defined (FASTER_SECOND_LEVEL)
     double Particle::findHeightNextCoalescentEvent(double hstart, vector<Forest::coalinfo_t> & coalinfo_vect) {
         double min_height = G::_infinity;
         for (auto & ci : coalinfo_vect) {
@@ -2515,9 +1769,7 @@ inline vector<double> Particle::getVectorPrior() {
         assert(min_height < G::_infinity);
         return min_height;
     }
-#endif
 
-#if defined (FASTER_SECOND_LEVEL)
     inline double Particle::calcLogCoalescentLikelihood(vector<Forest::coalinfo_t> & coalinfo_vect, bool integrate_out_thetas, bool verbose) {
         assert (G::_taxon_names.size() > 0);
         // This function assumes gene forests are complete gene trees (not partial states) and
@@ -2735,7 +1987,6 @@ inline vector<double> Particle::getVectorPrior() {
         _log_coalescent_likelihood = log_likelihood;
         return log_likelihood;
     }
-#endif
 
     inline void Particle::setNodeHeights() {
         for (unsigned f=0; f<_gene_forests.size(); f++) {
@@ -2743,35 +1994,31 @@ inline vector<double> Particle::getVectorPrior() {
         }
     }
 
-#if defined (FASTER_SECOND_LEVEL)
     inline void Particle::clearGeneForests() {
 #if defined (LAZY_COPYING)
         for (unsigned i=0; i<_gene_forest_ptrs.size(); i++) {
             _gene_forest_ptrs[i]->saveCoalInfoInitial();
             _gene_forest_ptrs[i]->setTreeHeight(); // TODO: only need to do these things once per pointer
-//            _gene_forest_ptrs[i]->_data = nullptr; // don't need to clear these because they will not get copied in the copy constructor
+//            _gene_forest_ptrs[i]->_data = nullptr; // don't need to clear these because they will not get copied in the copier
 //            _gene_forest_ptrs[i]->_nodes.clear();
-//            _gene_forest_ptrs[i]->_lineages.clear(); // don't need clear these because they will not get copied in the copy constructor
+//            _gene_forest_ptrs[i]->_lineages.clear(); // don't need clear these because they will not get copied in the copier
             _gene_forest_ptrs[i]->_preorder.clear();
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-            _gene_forest_ptrs[i]->_vector_prior.clear();
-#endif
             
 #else
         for (unsigned i=0; i<_gene_forests.size(); i++) {
             _gene_forests[i].saveCoalInfoInitial();
             _gene_forests[i].setTreeHeight();
-//            _gene_forests[i]._data = nullptr; // don't need to clear these because they will not get copied in the copy constructor
+//            _gene_forests[i]._data = nullptr; // don't need to clear these because they will not get copied in the copier
             _gene_forests[i]._nodes.clear();
-//            _gene_forests[i]._lineages.clear(); // don't need clear these because they will not get copied in the copy constructor
+//            _gene_forests[i]._lineages.clear(); // don't need clear these because they will not get copied in the copier
             _gene_forests[i]._preorder.clear();
-#if !defined (GRAHAM_JONES_COALESCENT_LIKELIHOOD)
-            _gene_forests[i]._vector_prior.clear();
-#endif
 #endif
         }
-    }
+            
+#if defined (LAZY_COPYING)
+            buildEnsembleCoalInfo();
 #endif
+        }
 
 #if defined (USING_MPI)
     inline void Particle::initSpeciesForest(string newick) {
@@ -2896,42 +2143,6 @@ inline void Particle::rebuildCoalInfo() {
 }
 #endif
 
-#if defined (LAZY_COPYING)
-    inline void Particle::recordAllForests(vector<Forest::coalinfo_t> & coalinfo_vect) const {
-        // Record gene trees
-        for (unsigned g = 0; g < G::_nloci; g++) {
-            Forest::SharedPtr gfp = _gene_forest_ptrs[g];
-            assert(gfp->_lineages.size() == 1);
-            gfp->saveCoalInfoGeneForest(coalinfo_vect);
-        }
-        sort(coalinfo_vect.begin(), coalinfo_vect.end());
-
-        // Record species tree
-        vector<Forest::coalinfo_t> sppinfo_vect;
-        _species_forest.saveCoalInfo(sppinfo_vect, /*cap*/true);
-        sort(sppinfo_vect.begin(), sppinfo_vect.end());
-        
-        // Modify coalescent elements according to species tree
-        _species_forest.fixupCoalInfo(coalinfo_vect, sppinfo_vect);
-        
-        coalinfo_vect.insert(coalinfo_vect.begin(), sppinfo_vect.begin(), sppinfo_vect.end());
-        sort(coalinfo_vect.begin(), coalinfo_vect.end());
-    }
-#endif
-
-#if defined(LAZY_COPYING)
-    inline void Particle::stowPartial(unsigned gene, Node * nd) {
-        lock_guard<mutex> guard(mutex);
-        assert(gene < _gene_forest_ptrs.size());
-        assert(nd);
-        assert(nd->_partial);
-        ps.putPartial(gene, nd->_partial);
-        
-        // Decrement shared pointer reference count
-        nd->_partial.reset();
-    }
-#endif
-
 #if defined(LAZY_COPYING)
     inline void Particle::finalizeLatestJoin(int locus, unsigned index, map<const void *, list<unsigned> > & nonzero_map) {
         // Makes join closest to leaf-level in _gene_forest_extensions[locus]
@@ -2983,7 +2194,7 @@ inline void Particle::rebuildCoalInfo() {
         assert(incr > 0.0);
         
         gfp->addIncrAndJoin(incr, lsplit, rsplit, gfx);
-                        
+
         // Can now get rid of extension
         _gene_forest_extensions[locus].undock();
     }
@@ -3011,13 +2222,13 @@ inline void Particle::rebuildCoalInfo() {
     }
 
     inline void Particle::operator=(const Particle & other) {
-        if (!G::_in_second_level) { // TODO: testing
+        if (!G::_in_second_level) {
             _log_likelihood = other._log_likelihood;
             _t_by_gene = other._t_by_gene;
             _t = other._t;
             _next_species_number_by_gene = other._next_species_number_by_gene;
             _gene_order = other._gene_order;
-            _theta_map = other._theta_map; // TODO: is this slow to copy?
+            _theta_map = other._theta_map;
         }
         
         
@@ -3026,6 +2237,7 @@ inline void Particle::rebuildCoalInfo() {
         _gene_forest_ptrs = other._gene_forest_ptrs;
         _gene_forest_extensions = other._gene_forest_extensions;
         _prev_species_number_by_gene = other._prev_species_number_by_gene;
+        _ensemble_coalinfo = other._ensemble_coalinfo;
 #endif
         
         _log_weight     = other._log_weight;
@@ -3034,7 +2246,6 @@ inline void Particle::rebuildCoalInfo() {
         _gene_forests = other._gene_forests;
 #endif
         _psuffix = other._psuffix;
-        _group_number = other._group_number;
         _theta_mean = other._theta_mean;
         _theta_vector = other._theta_vector;
 
@@ -3044,15 +2255,8 @@ inline void Particle::rebuildCoalInfo() {
 
         if (G::_in_second_level) {
             _log_coalescent_likelihood = other._log_coalescent_likelihood;
-#if !defined (FASTER_SECOND_LEVEL)
-        _species_branches = other._species_branches;
-        _species_tree_height = other._species_tree_height;
-#endif
+            _group_number = other._group_number;
         }
-        
-#if defined (UNUSED_FUNCTIONS)
-        _starting_log_likelihoods = other._starting_log_likelihoods;
-#endif
     };
 }
 
