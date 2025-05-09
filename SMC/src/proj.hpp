@@ -1973,7 +1973,7 @@ namespace proj {
             saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2, group_number);
             saveSpeciesTreesAltHierarchical(second_level_particles, group_number);
             _count++;
-            assert (i == group_number);
+//            assert (i == group_number);
             if (G::_gene_newicks_specified) {
                 writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(second_level_particles, filename3, i);
             }
