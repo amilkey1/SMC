@@ -1901,9 +1901,16 @@ namespace proj {
         
         for (unsigned i=first; i<last; i++){
             vector<Particle> second_level_particles;
-            Particle p = particles[i];
             
-            unsigned group_number = p.getGroupNumber();
+            unsigned particle_number = rng.randint(0, G::_nparticles - 1);
+            assert (particle_number < particles.size());
+            Particle p = particles[particle_number];
+            
+//            Particle p = particles[i];
+            
+//            unsigned group_number = p.getGroupNumber();
+            unsigned group_number = i;
+            
 
             // initialize particles
 #if !defined (LAZY_COPYING)
@@ -1941,14 +1948,8 @@ namespace proj {
                 filterSpeciesParticles(s, second_level_particles);
                 G::_generation++;
             }
-
-            for (auto &p:second_level_particles) {
-                p.calcSpeciesTreeLength();
-            }
             
-//            unsigned group_number = second_level_particles[0].getGroupNumber();
-            
-            if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
+//            if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
                 unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
                 if (sample_size == 0) {
                     cout << "\n";
@@ -1957,37 +1958,21 @@ namespace proj {
                     sample_size = G::_particle_increase;
                 }
 
-//                    unsigned group_number = second_level_particles[0].getGroupNumber();
                 unsigned group_seed = _group_rng[group_number]->getSeed();
-                
-//                    unsigned nparticles_to_keep = round(double (G::_particle_increase) / double (G::_save_every) );
-                
-//                    _second_level_indices_to_keep.reserve(nparticles_to_keep);
-//                    assert (_second_level_indices_to_keep.size() == 0);
-                
-//                    std::uniform_int_distribution<> distrib(0, nparticles_to_keep);
                 
 
                 unsigned count = 0;
                 for (unsigned p = 0; p < G::_particle_increase; p++) {
                     _second_level_indices_to_keep[group_number].push_back(count);
-//                        unsigned i = _group_rng[group_number]->randint(0, G::_particle_increase - 1);
-//                        _second_level_indices_to_keep[group_number].push_back(i); // TODO: no repeats
                     count++;
                 }
                 
                 std::shuffle(_second_level_indices_to_keep[group_number].begin(), _second_level_indices_to_keep[group_number].end(), std::default_random_engine(group_seed)); // shuffle particles using group seed
                 
-//                    std::shuffle(second_level_particles.begin(), second_level_particles.end(), std::default_random_engine(seed)); // shuffle particles using group seed
-                
                 // delete first (1-_thin) % of indices to keep
                 _second_level_indices_to_keep[group_number].erase(next(_second_level_indices_to_keep[group_number].begin(), 0), next(_second_level_indices_to_keep[group_number].begin(), (G::_particle_increase-sample_size)));
                 assert (_second_level_indices_to_keep[group_number].size() == sample_size);
-
-//                    second_level_particles.erase(next(second_level_particles.begin(), 0), next(second_level_particles.begin(), (G::_particle_increase-sample_size)));
-//                     assert (second_level_particles.size() == sample_size);
-//            }
-        }
+//        }
 
             mtx.lock();
             saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2, group_number);
@@ -2375,18 +2360,19 @@ namespace proj {
             cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
         }
         
-        unsigned seed = rng.getSeed(); // TODO: don't shuffle this - make 1 particle index for each group and choose the particle that corresponds to that index?
+        unsigned seed = rng.getSeed();
                 
-        std::shuffle(particles.begin(), particles.end(), std::default_random_engine(seed));
+//        std::shuffle(particles.begin(), particles.end(), std::default_random_engine(seed));
+//
+//        unsigned number_of_particles_to_delete = particles.size() - G::_thin*particles.size();
+//
+//        // erase number_of_particles_to_delete
+//        particles.erase(particles.end() - number_of_particles_to_delete, particles.end());
+//        // TODO: multinomial resampling
+//
+//        assert(particles.size() == ngroups);
 
-        unsigned number_of_particles_to_delete = particles.size() - G::_thin*particles.size();
-        
-        // erase number_of_particles_to_delete
-        particles.erase(particles.end() - number_of_particles_to_delete, particles.end());
-
-        assert(particles.size() == ngroups);
-
-        G::_nparticles = G::_particle_increase;
+//        G::_nparticles = G::_particle_increase;
                 
         unsigned group_number = 0;
         for (auto &p:particles) {
@@ -2415,10 +2401,16 @@ namespace proj {
         _second_level_indices_to_keep.resize(ngroups);
         
         if (G::_nthreads == 1) {
+            cout << "starting proposals second level" << endl;
             for (unsigned g=0; g<ngroups; g++) { // propose and filter for each particle saved from first round
 
                 unsigned group_number = g;
-                Particle p = particles[g];
+                
+                // grab a random index of a new particle
+                unsigned i = rng.randint(0, G::_nparticles - 1);
+                Particle p = particles[i];
+                
+//                Particle p = particles[g];
                 vector<Particle > second_level_particles;
             
                 // initialize particles
@@ -2457,11 +2449,7 @@ namespace proj {
                 
                 }
                 
-                for (auto &p:second_level_particles) {
-                    p.calcSpeciesTreeLength(); // TODO: only calc this in params output file
-                }
-                
-                if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
+//                if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
                     unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
                     if (sample_size == 0) {
                         cout << "\n";
@@ -2470,36 +2458,20 @@ namespace proj {
                         sample_size = G::_particle_increase;
                     }
 
-//                    unsigned group_number = second_level_particles[0].getGroupNumber();
                     unsigned group_seed = _group_rng[group_number]->getSeed();
-                    
-//                    unsigned nparticles_to_keep = round(double (G::_particle_increase) / double (G::_save_every) );
-                    
-//                    _second_level_indices_to_keep.reserve(nparticles_to_keep);
-//                    assert (_second_level_indices_to_keep.size() == 0);
-                    
-//                    std::uniform_int_distribution<> distrib(0, nparticles_to_keep);
-                    
 
                     unsigned count = 0;
                     for (unsigned p = 0; p < G::_particle_increase; p++) {
                         _second_level_indices_to_keep[group_number].push_back(count);
-//                        unsigned i = _group_rng[group_number]->randint(0, G::_particle_increase - 1);
-//                        _second_level_indices_to_keep[group_number].push_back(i); // TODO: no repeats
                         count++;
                     }
                     
                     std::shuffle(_second_level_indices_to_keep[group_number].begin(), _second_level_indices_to_keep[group_number].end(), std::default_random_engine(group_seed)); // shuffle particles using group seed
                     
-//                    std::shuffle(second_level_particles.begin(), second_level_particles.end(), std::default_random_engine(seed)); // shuffle particles using group seed
-                    
                     // delete first (1-_thin) % of indices to keep
                     _second_level_indices_to_keep[group_number].erase(next(_second_level_indices_to_keep[group_number].begin(), 0), next(_second_level_indices_to_keep[group_number].begin(), (G::_particle_increase-sample_size)));
                     assert (_second_level_indices_to_keep[group_number].size() == sample_size);
-
-//                    second_level_particles.erase(next(second_level_particles.begin(), 0), next(second_level_particles.begin(), (G::_particle_increase-sample_size)));
-//                     assert (second_level_particles.size() == sample_size);
-                }
+//                }
                 
                 saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2, group_number);
                 saveSpeciesTreesAltHierarchical(second_level_particles, group_number);

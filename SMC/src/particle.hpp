@@ -451,10 +451,16 @@ class Particle {
         vector<double> gene_tree_heights;
 #if defined (LAZY_COPYING)
         for (int i=0; i<_gene_forest_ptrs.size(); i++) {
+            if (_gene_forest_ptrs[i]->_forest_length == 0) {
+                _gene_forest_ptrs[i]->calcTreeLength();
+            }
             gene_tree_heights.push_back(_gene_forest_ptrs[i]->getTreeLength());
         }
 #else
         for (int i=0; i<_gene_forests.size(); i++) {
+            if (_gene_forests[i]._forest_length == 0) {
+                _gene_forests[i].calcForestLength();
+            }
             gene_tree_heights.push_back(_gene_forests[i].getTreeLength());
         }
 #endif
@@ -2234,8 +2240,21 @@ inline void Particle::rebuildCoalInfo() {
         
 #if defined (LAZY_COPYING)
         _prev_log_likelihoods = other._prev_log_likelihoods;
+        
+        // Ensure that _gene_forest_extensions is allocated
+        if (_gene_forest_extensions.size() == 0) {
+            _gene_forest_extensions.resize(G::_nloci);
+        }
+        else {
+            assert(_gene_forest_extensions.size() == G::_nloci);
+            
+            // Undock all gene forest extensions
+            for_each(_gene_forest_extensions.begin(), _gene_forest_extensions.end(),
+                [](ForestExtension & f){f.undock();});
+        }
+        
         _gene_forest_ptrs = other._gene_forest_ptrs;
-        _gene_forest_extensions = other._gene_forest_extensions;
+//        _gene_forest_extensions = other._gene_forest_extensions;
         _prev_species_number_by_gene = other._prev_species_number_by_gene;
         _ensemble_coalinfo = other._ensemble_coalinfo;
 #endif
