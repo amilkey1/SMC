@@ -134,6 +134,7 @@ namespace proj {
             double                      _starting_log_likelihood;
             vector<Lot::SharedPtr>      _group_rng;
             vector<vector<unsigned>>    _second_level_indices_to_keep; // particles to write to output files after second level
+            vector<unsigned>            _particle_indices_to_thin;
         
 #if defined(USING_MPI)
             void mpiSetSchedule();
@@ -1902,16 +1903,10 @@ namespace proj {
         for (unsigned i=first; i<last; i++){
             vector<Particle> second_level_particles;
             
-            unsigned particle_number = rng.randint(0, G::_nparticles - 1);
-            assert (particle_number < particles.size());
-            Particle p = particles[particle_number];
-            
-//            Particle p = particles[i];
-            
-//            unsigned group_number = p.getGroupNumber();
-            unsigned group_number = i;
-            
+            unsigned group_number = _particle_indices_to_thin[i];
 
+            Particle p = particles[group_number];
+            
             // initialize particles
 #if !defined (LAZY_COPYING)
             p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
@@ -2359,20 +2354,6 @@ namespace proj {
             ngroups = 1;
             cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
         }
-        
-        unsigned seed = rng.getSeed();
-                
-//        std::shuffle(particles.begin(), particles.end(), std::default_random_engine(seed));
-//
-//        unsigned number_of_particles_to_delete = particles.size() - G::_thin*particles.size();
-//
-//        // erase number_of_particles_to_delete
-//        particles.erase(particles.end() - number_of_particles_to_delete, particles.end());
-//        // TODO: multinomial resampling
-//
-//        assert(particles.size() == ngroups);
-
-//        G::_nparticles = G::_particle_increase;
                 
         unsigned group_number = 0;
         for (auto &p:particles) {
@@ -2400,15 +2381,23 @@ namespace proj {
         
         _second_level_indices_to_keep.resize(ngroups);
         
+        for (unsigned i=0; i<ngroups; i++) {
+            unsigned n = rng.randint(0, ngroups - 1);
+            _particle_indices_to_thin.push_back(n);
+        }
+        
+        assert (_second_level_indices_to_keep.size() == ngroups);
+        
         if (G::_nthreads == 1) {
             cout << "starting proposals second level" << endl;
             for (unsigned g=0; g<ngroups; g++) { // propose and filter for each particle saved from first round
 
-                unsigned group_number = g;
+//                unsigned group_number = g;
+                unsigned group_number = _particle_indices_to_thin[g];
                 
                 // grab a random index of a new particle
-                unsigned i = rng.randint(0, G::_nparticles - 1);
-                Particle p = particles[i];
+//                unsigned i = rng.randint(0, G::_nparticles - 1);
+                Particle p = particles[group_number];
                 
 //                Particle p = particles[g];
                 vector<Particle > second_level_particles;
