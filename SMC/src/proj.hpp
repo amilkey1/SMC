@@ -665,7 +665,10 @@ namespace proj {
             std::ofstream treef;
 
             treef.open(filename1, std::ios_base::app);
-            for (auto &p:v) {
+//            for (auto &p:v) {
+        for (unsigned i=0; i<_second_level_indices_to_keep[group_number].size(); i++) {
+//            for (auto &p:v) {
+            Particle p = v[_second_level_indices_to_keep[group_number][i]];
                 treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
                 count++;
             }
@@ -2455,7 +2458,7 @@ namespace proj {
                 }
                 
                 for (auto &p:second_level_particles) {
-                    p.calcSpeciesTreeLength();
+                    p.calcSpeciesTreeLength(); // TODO: only calc this in params output file
                 }
                 
                 if (G::_save_every > 1.0) { // thin sample for output by taking a random sample
