@@ -84,7 +84,7 @@ namespace proj {
             void                filterParticlesThreading(vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices);
             void                filterParticlesRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices);
             unsigned            multinomialDraw(const vector<double> & probs);
-            double              filterSpeciesParticles(unsigned step, vector<Particle> & particles);
+            double              filterSpeciesParticles(unsigned step, vector<Particle> & particles, unsigned id_number);
             double              computeEffectiveSampleSize(const vector<double> & probs) const;
             void                saveSpeciesTreesAltHierarchical(vector<Particle> &v, unsigned group_number) const;
         
@@ -1524,7 +1524,7 @@ namespace proj {
         // Throw _nparticles darts
       for (unsigned i=start; i<end+1; i++) {
           unsigned group_number = start / G::_nparticles;
-          double u = _group_rng[group_number]->uniform();
+          double u = _group_rng[id_nuber]->uniform();
           auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
           assert(it != probs.end());
           unsigned which = (unsigned)std::distance(probs.begin(), it);
@@ -1614,7 +1614,7 @@ namespace proj {
     }
 #endif
 
-    inline double Proj::filterSpeciesParticles(unsigned step, vector<Particle> & particles) {
+    inline double Proj::filterSpeciesParticles(unsigned step, vector<Particle> & particles, unsigned id_number) {
         unsigned nparticles = (unsigned) particles.size();
         assert (nparticles == G::_particle_increase);
         // Copy log weights for all bundles to prob vector
@@ -1652,8 +1652,8 @@ namespace proj {
 
         double cump = probs[0];
 
-        unsigned group_number = particles[0].getGroupNumber();
-        double delta = _group_rng[group_number]->uniform() / G::_particle_increase;
+//        unsigned group_number = particles[0].getGroupNumber();
+        double delta = _group_rng[id_number]->uniform() / G::_particle_increase;
 
         unsigned c = (unsigned)(floor(1.0 + G::_particle_increase*(cump - delta)));
         if (c > 0) {
@@ -1726,10 +1726,10 @@ namespace proj {
         vector<unsigned> counts (nparticles, 0);
 
         // Throw _nparticles darts
-        unsigned group_number = particles[0].getGroupNumber();
+//        unsigned group_number = particles[0].getGroupNumber();
         
         for (unsigned i=0; i<nparticles; i++) {
-            double u = _group_rng[group_number]->uniform();
+            double u = _group_rng[id_number]->uniform();
             auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
             assert(it != probs.end());
             unsigned which = (unsigned)std::distance(probs.begin(), it);
@@ -1904,6 +1904,7 @@ namespace proj {
             vector<Particle> second_level_particles;
             
             unsigned group_number = _particle_indices_to_thin[i];
+            unsigned id_number = i; // use for random seed, _second_level_particles_to_keep
 
             Particle p = particles[group_number];
             
@@ -1929,10 +1930,10 @@ namespace proj {
                 }
                 
                 // set particle random number seeds
-                unsigned group_number = p.getGroupNumber();
+//                unsigned group_number = p.getGroupNumber();
                 unsigned psuffix = 1;
                 for (auto &p:second_level_particles) {
-                    p.setSeed(_group_rng[group_number]->randint(1,9999) + psuffix);
+                    p.setSeed(_group_rng[id_number]->randint(1,9999) + psuffix);
                     psuffix += 2;
                 }
                 
@@ -1940,7 +1941,7 @@ namespace proj {
                     p.proposeSpeciationEvent();
                 }
                 
-                filterSpeciesParticles(s, second_level_particles);
+                filterSpeciesParticles(s, second_level_particles, id_number);
                 G::_generation++;
             }
             
@@ -1953,32 +1954,32 @@ namespace proj {
                     sample_size = G::_particle_increase;
                 }
 
-                unsigned group_seed = _group_rng[group_number]->getSeed();
+                unsigned group_seed = _group_rng[id_number]->getSeed();
                 
 
                 unsigned count = 0;
                 for (unsigned p = 0; p < G::_particle_increase; p++) {
-                    _second_level_indices_to_keep[group_number].push_back(count);
+                    _second_level_indices_to_keep[id_number].push_back(count);
                     count++;
                 }
                 
-                std::shuffle(_second_level_indices_to_keep[group_number].begin(), _second_level_indices_to_keep[group_number].end(), std::default_random_engine(group_seed)); // shuffle particles using group seed
+                std::shuffle(_second_level_indices_to_keep[id_number].begin(), _second_level_indices_to_keep[id_number].end(), std::default_random_engine(group_seed)); // shuffle particles using group seed
                 
                 // delete first (1-_thin) % of indices to keep
-                _second_level_indices_to_keep[group_number].erase(next(_second_level_indices_to_keep[group_number].begin(), 0), next(_second_level_indices_to_keep[group_number].begin(), (G::_particle_increase-sample_size)));
-                assert (_second_level_indices_to_keep[group_number].size() == sample_size);
+                _second_level_indices_to_keep[id_number].erase(next(_second_level_indices_to_keep[id_number].begin(), 0), next(_second_level_indices_to_keep[id_number].begin(), (G::_particle_increase-sample_size)));
+                assert (_second_level_indices_to_keep[id_number].size() == sample_size);
 //        }
 
             mtx.lock();
-            saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2, group_number);
-            saveSpeciesTreesAltHierarchical(second_level_particles, group_number);
+            saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2, id_number);
+            saveSpeciesTreesAltHierarchical(second_level_particles, id_number);
             _count++;
 //            assert (i == group_number);
             if (G::_gene_newicks_specified) {
-                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(second_level_particles, filename3, i);
+                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(second_level_particles, filename3, id_number);
             }
             else {
-                writeParamsFileForBeastComparisonAfterSpeciesFiltering(second_level_particles, filename3, i);
+                writeParamsFileForBeastComparisonAfterSpeciesFiltering(second_level_particles, filename3, id_number);
             }
             mtx.unlock();
         }
@@ -2357,7 +2358,7 @@ namespace proj {
                 
         unsigned group_number = 0;
         for (auto &p:particles) {
-            p.setGroupNumber(group_number);
+//            p.setGroupNumber(group_number);
             p.setSortedThetaVector();
             group_number++;
         }
@@ -2394,6 +2395,7 @@ namespace proj {
 
 //                unsigned group_number = g;
                 unsigned group_number = _particle_indices_to_thin[g];
+                unsigned id_number = g; // use for random seeds and in _second_level_indices_to_keep
                 
                 // grab a random index of a new particle
 //                unsigned i = rng.randint(0, G::_nparticles - 1);
@@ -2422,9 +2424,8 @@ namespace proj {
                     
                     // set particle random number seeds
                     psuffix = 1;
-                    unsigned group_number = particles[g].getGroupNumber();
                     for (auto &p:second_level_particles) {
-                        p.setSeed(_group_rng[group_number]->randint(1,9999) + psuffix);
+                        p.setSeed(_group_rng[id_number]->randint(1,9999) + psuffix);
                         psuffix += 2;
                     }
                     
@@ -2432,7 +2433,7 @@ namespace proj {
                         p.proposeSpeciationEvent();
                     }
                     
-                    filterSpeciesParticles(s, second_level_particles);
+                    filterSpeciesParticles(s, second_level_particles, id_number);
                     
                     G::_generation++;
                 
@@ -2447,24 +2448,24 @@ namespace proj {
                         sample_size = G::_particle_increase;
                     }
 
-                    unsigned group_seed = _group_rng[group_number]->getSeed();
+                    unsigned group_seed = _group_rng[id_number]->getSeed();
 
                     unsigned count = 0;
                     for (unsigned p = 0; p < G::_particle_increase; p++) {
-                        _second_level_indices_to_keep[group_number].push_back(count);
+                        _second_level_indices_to_keep[id_number].push_back(count);
                         count++;
                     }
                     
-                    std::shuffle(_second_level_indices_to_keep[group_number].begin(), _second_level_indices_to_keep[group_number].end(), std::default_random_engine(group_seed)); // shuffle particles using group seed
+                    std::shuffle(_second_level_indices_to_keep[id_number].begin(), _second_level_indices_to_keep[id_number].end(), std::default_random_engine(group_seed)); // shuffle particles using group seed
                     
                     // delete first (1-_thin) % of indices to keep
-                    _second_level_indices_to_keep[group_number].erase(next(_second_level_indices_to_keep[group_number].begin(), 0), next(_second_level_indices_to_keep[group_number].begin(), (G::_particle_increase-sample_size)));
-                    assert (_second_level_indices_to_keep[group_number].size() == sample_size);
+                    _second_level_indices_to_keep[id_number].erase(next(_second_level_indices_to_keep[id_number].begin(), 0), next(_second_level_indices_to_keep[id_number].begin(), (G::_particle_increase-sample_size)));
+                    assert (_second_level_indices_to_keep[id_number].size() == sample_size);
 //                }
                 
-                saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2, group_number);
-                saveSpeciesTreesAltHierarchical(second_level_particles, group_number);
-                writeParamsFileForBeastComparisonAfterSpeciesFiltering(second_level_particles, filename3, g);
+                saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2, id_number);
+                saveSpeciesTreesAltHierarchical(second_level_particles, id_number);
+                writeParamsFileForBeastComparisonAfterSpeciesFiltering(second_level_particles, filename3, id_number);
             }
 
             ofstream altfname_end;
