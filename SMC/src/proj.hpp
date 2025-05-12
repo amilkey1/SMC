@@ -2355,13 +2355,6 @@ namespace proj {
             ngroups = 1;
             cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
         }
-                
-        unsigned group_number = 0;
-        for (auto &p:particles) {
-//            p.setGroupNumber(group_number);
-            p.setSortedThetaVector();
-            group_number++;
-        }
         
         // set group rng
         unsigned psuffix = 1;
@@ -3464,6 +3457,10 @@ namespace proj {
                 }
                 
                 writePartialCountFile(my_vec);
+                
+                for (auto &p:my_vec) {
+                    p.setSortedThetaVector();
+                }
                 
 #if !defined (HIERARCHICAL_FILTERING)
                 writeParamsFileForBeastComparison(my_vec);
