@@ -256,8 +256,13 @@ namespace proj {
         _proposed_anc._split += _proposed_lchild->_split;
         _proposed_anc._split += _proposed_rchild->_split;
 
-        // Compute partial likelihood array of ancestral node
-        _log_weight = _docked_gene_forest->calcPartialArrayJC(&_proposed_anc, _proposed_lchild, _proposed_rchild);
+        if (G::_run_on_empty) {
+            _log_weight = 0.0;
+        }
+        else {
+            // Compute partial likelihood array of ancestral node
+            _log_weight = _docked_gene_forest->calcPartialArrayJC(&_proposed_anc, _proposed_lchild, _proposed_rchild);
+        }
 
         assert(!isnan(_log_weight));
         assert(!isinf(_log_weight));
