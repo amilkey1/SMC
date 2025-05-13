@@ -3367,9 +3367,9 @@ namespace proj {
 
                 bool filter = true;
 
-                if (G::_run_on_empty) {
-                    filter = false;
-                }
+//                if (G::_run_on_empty) {
+//                    filter = false;
+//                }
                 
                 if (filter) {
                         
@@ -3388,6 +3388,7 @@ namespace proj {
 #else
                     filterParticlesThreading(my_vec, g, particle_indices);
 #endif
+                }
                                         
                     // only shuffle groups after all particles have coalesced each locus once, then reset gene order
                     if ((g+1)%G::_nloci == 0 && g != nsteps-1) {
@@ -3433,7 +3434,7 @@ namespace proj {
                             group_count++;
                         }
                     }
-                        }
+//                        }
                 G::_generation++;
                 
 #if defined (VALGRIND)

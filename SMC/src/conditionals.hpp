@@ -7,7 +7,7 @@
 
 #define USE_TOTAL_RATE
 
-//#define HIERARCHICAL_FILTERING
+#define HIERARCHICAL_FILTERING
 
 #define DRAW_NEW_THETA // TODO: FOR NOW, TURN THIS OFF IF MPI or LAZY COPYING TURNED ON
 
@@ -32,7 +32,5 @@
 #define LAZY_COPYING // TODO: only works with JC model
 
 //#define UPGMA // turn on UPGMA in conf file but turn this off to avoid creating any members associated with UPGMA
-
-//#define VALGRIND
 
 #define SPECIES_IN_CONF
