@@ -459,7 +459,7 @@ class Particle {
 #else
         for (int i=0; i<_gene_forests.size(); i++) {
             if (_gene_forests[i]._forest_length == 0) {
-                _gene_forests[i].calcForestLength();
+                _gene_forests[i].calcTreeLength();
             }
             gene_tree_heights.push_back(_gene_forests[i].getTreeLength());
         }
@@ -1311,11 +1311,19 @@ class Particle {
     }
 
     inline void Particle::processGeneNewicks(vector<string> newicks) {
+#if defined (LAZY_COPYING)
+        for (int i=0; i<_gene_forest_ptrs.size(); i++) {
+            _gene_forest_ptrs[i]->buildFromNewick(newicks[i], true, false); // newicks starts at 0
+            _gene_forest_ptrs[i]->refreshPreorder();
+            _gene_forest_ptrs[i]->setNodeHeights();
+        }
+        _theta_mean = G::_theta; // for now, set theta mean equal to whatever theta user specifies
+#else
+#endif
         for (int i=0; i<_gene_forests.size(); i++) {
-//            _forests[i]._nodes.clear();
-            _gene_forests[i].buildFromNewick(newicks[i-1], true, false); // newicks starts at 0
+            _gene_forests[i].buildFromNewick(newicks[i], true, false); // newicks starts at 0
             _gene_forests[i].refreshPreorder();
-//            _forests[i]._theta_mean = G::_theta; // for now, set theta mean equal to whatever theta user specifies
+            _gene_forests[i].setNodeHeights();
         }
         _theta_mean = G::_theta; // for now, set theta mean equal to whatever theta user specifies
     }

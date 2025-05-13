@@ -1136,6 +1136,12 @@ namespace proj {
             summarizeData(_data);
         }
         createSpeciesMap(_data);
+        G::_nspecies = (unsigned) G::_species_names.size();
+        assert (G::_nspecies > 0);
+        
+#if defined (LAZY_COPYING)
+                createSpeciesMapTyped();
+#endif
 
         // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
         if (G::_outgroup != "none") {
@@ -1148,7 +1154,6 @@ namespace proj {
 #if defined (LAZY_COPYING)
         assert (G::_species_names_typed.size() > 0);
 #endif
-        G::_nspecies = (unsigned) G::_species_names.size();
         G::_nloci = _data->getNumSubsets();
         rng.setSeed(_random_seed);
         
@@ -2027,6 +2032,10 @@ namespace proj {
         if (G::_gene_newicks_specified) {
             partials = false;
             G::_save_memory = true;
+        }
+        
+        if (G::_save_memory) {
+            partials = false; // no partials needed for running on empty
         }
         
         particle.setData(_data, _taxon_map, partials);
