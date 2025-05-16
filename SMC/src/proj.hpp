@@ -342,7 +342,9 @@ namespace proj {
             sample_size = G::_particle_increase;
         }
         
-        for (auto &p:v) {
+        for (unsigned i=0; i<_second_level_indices_to_keep[group_number].size(); i++) {
+            Particle p = v[_second_level_indices_to_keep[group_number][i]];
+//        for (auto &p:v) {
             double log_coalescent_likelihood = 0.0;
             log_coalescent_likelihood += p.getCoalescentLikelihood(1);
 
@@ -3108,12 +3110,10 @@ namespace proj {
                 createSpeciesMap(true);
 #endif
                 
-//                G::_nspecies = (unsigned) G::_species_names.size();
+                G::_nspecies = (unsigned) G::_species_names.size();
 #if defined (LAZY_COPYING)
                 createSpeciesMapTyped();
 #endif
-
-                G::_nspecies = (unsigned) G::_species_names.size();
 
                 // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
                 if (G::_outgroup != "none") {
