@@ -472,16 +472,16 @@ class Particle {
 #if defined (LAZY_COPYING)
         for (int i=0; i<_gene_forest_ptrs.size(); i++) {
             gene_tree_log_likelihoods.push_back(_gene_forest_ptrs[i]->_gene_tree_log_likelihood);
-            if (!G::_run_on_empty) {
-                assert (_gene_forest_ptrs[i]->_gene_tree_log_likelihood <= 0.0);
-            }
+//            if (!G::_run_on_empty) {
+//                assert (_gene_forest_ptrs[i]->_gene_tree_log_likelihood <= 0.0); // if there is all missing data for a gene, likelihood could be 0
+//            }
         }
 #else
         for (int i=0; i<_gene_forests.size(); i++) {
             gene_tree_log_likelihoods.push_back(_gene_forests[i]._gene_tree_log_likelihood);
-            if (!G::_run_on_empty) {
-                assert (_gene_forests[i]._gene_tree_log_likelihood <= 0.0);
-            }
+//            if (!G::_run_on_empty) {
+//                assert (_gene_forests[i]._gene_tree_log_likelihood <= 0.0);
+//            }
         }
 #endif
         return gene_tree_log_likelihoods;

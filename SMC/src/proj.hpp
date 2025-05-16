@@ -60,7 +60,7 @@ namespace proj {
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering(vector<Particle> &v, string filename, unsigned group_number);
             void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(vector<Particle> &v, string filename, unsigned group_number);
             void                writePartialCountFile(vector<Particle> &particles);
-            void                createSpeciesMap(Data::SharedPtr);
+            void                createSpeciesMap(bool data);
 #if defined (LAZY_COPYING)
             void                createSpeciesMapTyped();
 #endif
@@ -131,7 +131,7 @@ namespace proj {
             double                      _small_enough;
             bool                        _first_line;
             unsigned                    _count; // counter for params output file
-            double                      _starting_log_likelihood;
+            vector<double>              _starting_log_likelihoods;
             vector<Lot::SharedPtr>      _group_rng;
             vector<vector<unsigned>>    _second_level_indices_to_keep; // particles to write to output files after second level
             vector<unsigned>            _particle_indices_to_thin;
@@ -1135,12 +1135,12 @@ namespace proj {
         if (G::_verbose > 0) {
             summarizeData(_data);
         }
-        createSpeciesMap(_data);
+        createSpeciesMap(true); // use data
         G::_nspecies = (unsigned) G::_species_names.size();
         assert (G::_nspecies > 0);
         
 #if defined (LAZY_COPYING)
-                createSpeciesMapTyped();
+                createSpeciesMapTyped(); // use data
 #endif
 
         // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
@@ -1413,9 +1413,9 @@ namespace proj {
         // Compute component of the log marginal likelihood due to this step
         _log_marginal_likelihood += log_sum_weights - log(G::_nparticles);
         
-        if (step == 0) {
-            _log_marginal_likelihood += _starting_log_likelihood;
-        }
+//        if (step < G::_nloci) {
+//            _log_marginal_likelihood += _starting_log_likelihood;
+//        }
 
         double ess = 0.0;
         if (G::_verbose > 1) {
@@ -1848,21 +1848,45 @@ namespace proj {
         }
     }
 
-    inline void Proj::createSpeciesMap(Data::SharedPtr d) {
+    inline void Proj::createSpeciesMap(bool use_data) {
         // this only works if names are in taxon^species format (no _)
-        G::_taxon_names = d->getTaxonNames();
-        for (auto &name:G::_taxon_names) {
-            regex re(".+\\^(.+)");
-            smatch match_obj;
-            bool matched=regex_match(name, match_obj, re); //search name for regular expression, store result in match_obj
-            cout << "taxon name: " << name << endl;
-            if (matched) {
-                string species_name = match_obj[1];
-                string taxon_name = name;
-                if (find(G::_species_names.begin(), G::_species_names.end(), species_name) == G::_species_names.end()) {
-                    G::_species_names.push_back(species_name);
+        if (use_data) {
+            G::_taxon_names = _data->getTaxonNames();
+            for (auto &name:G::_taxon_names) {
+                regex re(".+\\^(.+)");
+                smatch match_obj;
+                bool matched=regex_match(name, match_obj, re); //search name for regular expression, store result in match_obj
+                cout << "taxon name: " << name << endl;
+                if (matched) {
+                    string species_name = match_obj[1];
+                    string taxon_name = name;
+                    if (find(G::_species_names.begin(), G::_species_names.end(), species_name) == G::_species_names.end()) {
+                        G::_species_names.push_back(species_name);
+                    }
+                    _taxon_map[taxon_name]=species_name;
                 }
-                _taxon_map[taxon_name]=species_name;
+            }
+        }
+        else {
+            string prev_name = "";
+            G::_taxon_names = _data->getTaxonNames();
+            unsigned count = 0;
+            for (auto &name:G::_taxon_names) {
+                regex re(".+\\^(.+)");
+                smatch match_obj;
+                bool matched=regex_match(name, match_obj, re); //search name for regular expression, store result in match_obj
+                cout << "taxon name: " << name << endl;
+                if (matched) {
+                    string species_name = match_obj[1];
+                    string taxon_name = name;
+                    _taxon_map[taxon_name]=G::_species_names[count];
+                }
+                if (count > 0) {
+                    prev_name = G::_species_names[count-1];
+                }
+                if (prev_name != G::_species_names[count]) {
+                    count++;
+                }
             }
         }
     }
@@ -2256,7 +2280,7 @@ namespace proj {
 #endif
         
 #if defined (LAZY_COPYING)
-        createSpeciesMapTyped();
+        createSpeciesMapTyped(); // use data
 #endif
 
         vector<string> taxpartition;
@@ -3077,12 +3101,19 @@ namespace proj {
                 if (G::_verbose > 0) {
                     summarizeData(_data);
                 }
-                createSpeciesMap(_data);
                 
-                G::_nspecies = (unsigned) G::_species_names.size();
+#if defined (SPECIES_IN_CONF)
+//                createSpeciesMap(false);
+#else
+                createSpeciesMap(true);
+#endif
+                
+//                G::_nspecies = (unsigned) G::_species_names.size();
 #if defined (LAZY_COPYING)
                 createSpeciesMapTyped();
 #endif
+
+                G::_nspecies = (unsigned) G::_species_names.size();
 
                 // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
                 if (G::_outgroup != "none") {
@@ -3098,6 +3129,8 @@ namespace proj {
                 
                 // set some global variables
                 G::_ntaxa = _data->getNumTaxa();
+//                buildSpeciesMap(false);
+                _data->copyTaxonNames(G::_taxon_names);
                 assert (G::_species_names.size() > 0);
                 
                 assert (G::_ntaxa > 0);
@@ -3111,7 +3144,7 @@ namespace proj {
                 // Save species names to global variable _species_names
                 // and create global _taxon_to_species map that provides
                 // the species index for each taxon name
-                buildSpeciesMap(/*taxa_from_data*/true);
+//                buildSpeciesMap(/*taxa_from_data*/true);
                 G::_nspecies = (unsigned) G::_species_names.size();
                 assert (G::_nspecies > 0);
             }
@@ -3135,7 +3168,12 @@ namespace proj {
                 rng.setSeed(_random_seed);
 
                 if (!G::_gene_newicks_specified) {
+#if defined (SPECIES_IN_CONF)
+//                    buildSpeciesMap(/*taxa_from_data*/false);
+
+#else
                     buildSpeciesMap(/*taxa_from_data*/true);
+#endif
                 }
                 
 #if defined (UPGMA)
@@ -3153,7 +3191,11 @@ namespace proj {
                 // reset marginal likelihood
                 _log_marginal_likelihood = 0.0;
                 
-                _starting_log_likelihood = 0.0;
+                _starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
+                
+                for (unsigned i=0; i<G::_nloci; i++) {
+                    _log_marginal_likelihood += _starting_log_likelihoods[i];
+                }
                 
                 vector<Particle> my_vec;
                 my_vec.resize(G::_nparticles * G::_ngroups, p);
@@ -3462,7 +3504,7 @@ namespace proj {
                 }
                 if (G::_verbose > 0) {
                     cout << "\n";
-//                    cout << "marginal likelihood after combined filtering: " << _log_marginal_likelihood << endl;
+                    cout << "marginal likelihood after combined filtering: " << _log_marginal_likelihood << endl;
                     cout << "\n";
                 }
                 
