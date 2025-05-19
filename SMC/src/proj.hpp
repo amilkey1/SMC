@@ -680,7 +680,7 @@ namespace proj {
 
     inline void Proj::saveSpeciesTreesAfterFirstRound(vector<Particle> &v) const {
         // save only unique species trees
-        if (!G::_run_on_empty) {
+        if (G::_run_on_empty) {
             vector<vector<pair<double, double>>> unique_increments_and_priors;
 
             ofstream unique_treef("unique_species_trees_after_first_round.trees");
