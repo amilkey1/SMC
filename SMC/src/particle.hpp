@@ -116,6 +116,7 @@ class Particle {
     
 #if defined (LAZY_COPYING)
         void                                    drawNewTheta(G::species_t new_species);
+        void                                    resetSubgroupPointers(vector<Forest::SharedPtr> gene_forest_copies);
 #else
         void                                    drawNewTheta(string new_species);
 #endif
@@ -2242,6 +2243,50 @@ inline void Particle::rebuildCoalInfo() {
         return _gene_forests[i-1].makeNewick(8, true);
 #endif
     }
+        
+#if defined (LAZY_COPYING)
+    inline void Particle::resetSubgroupPointers(vector<Forest::SharedPtr> gene_forest_copies) {
+//        cout << "x";
+        for (unsigned l=0; l<G::_nloci; l++) {
+            Forest::SharedPtr gfp = _gene_forest_ptrs[l];
+            Forest::SharedPtr gfcpy = gene_forest_copies[l];
+            
+            *gfcpy = *gfp;
+            _gene_forest_ptrs[l] = gfcpy;
+            
+            // Let gpf point to the copy
+            gfp = gfcpy;
+        }
+        // Makes join closest to leaf-level in _gene_forest_extensions[locus]
+//        // permanent, then undocks _gene_forest_extensions[locus]
+//
+//        // Get reference to gene forest extension for this locus
+//        ForestExtension & gfx = _gene_forest_extensions[locus];
+//        
+//        // Get pointer to gene forest for this locus
+//        Forest::SharedPtr gfp = _gene_forest_ptrs[locus];
+//
+//        // If we are not finalizing the last particle for this
+//        // gene forest object, make a copy that can be modified
+//        // without affecting other surviving particles
+//        unsigned nz = (unsigned)nonzero_map[gfp.get()].size();
+//        if (nz > 1) {
+//            // Remove the element corresponding to index
+//            list<unsigned> & v = nonzero_map[gfp.get()];
+//            auto it = find(v.begin(), v.end(), index);
+//            assert(it != v.end());
+//            v.erase(it);
+//
+//            // Make a copy of the object pointed to by gfp
+//            Forest::SharedPtr gfcpy = Forest::SharedPtr(new Forest());
+//            *gfcpy = *gfp;
+//            _gene_forest_ptrs[locus] = gfcpy;
+//
+//            // Let gpf point to the copy
+//            gfp = gfcpy;
+//        }
+    }
+#endif
 
     inline void Particle::operator=(const Particle & other) {
         if (!G::_in_second_level) {

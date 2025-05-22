@@ -680,26 +680,38 @@ namespace proj {
 
     inline void Proj::saveSpeciesTreesAfterFirstRound(vector<Particle> &v) const {
         // save only unique species trees
-        if (G::_run_on_empty) {
-            vector<vector<pair<double, double>>> unique_increments_and_priors;
+//        if (!G::_run_on_empty) {
+//            vector<vector<pair<double, double>>> unique_increments_and_priors;
+//
+//            ofstream unique_treef("unique_species_trees_after_first_round.trees");
+//            unique_treef << "#nexus\n\n";
+//            unique_treef << "begin trees;\n";
+//            for (auto &p:v) {
+//                vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
+//                bool found = false;
+//                if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
+//                    found = true;
+//                }
+//                if (!found) {
+//                    unique_increments_and_priors.push_back(increments_and_priors);
+//                    unique_treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
+//                }
+//            }
+//            unique_treef << "end;\n";
+//            unique_treef.close();
+//        }
+//        else {
+            // save all species trees after first round
 
-            ofstream unique_treef("unique_species_trees_after_first_round.trees");
-            unique_treef << "#nexus\n\n";
-            unique_treef << "begin trees;\n";
+            ofstream treef("species_trees_after_first_round.trees");
+            treef << "#nexus\n\n";
+            treef << "begin trees;\n";
             for (auto &p:v) {
-                vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
-                bool found = false;
-                if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
-                    found = true;
-                }
-                if (!found) {
-                    unique_increments_and_priors.push_back(increments_and_priors);
-                    unique_treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
-                }
+                treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
             }
-            unique_treef << "end;\n";
-            unique_treef.close();
-        }
+            treef << "end;\n";
+            treef.close();
+//        }
     }
 
     inline void Proj::saveAllSpeciesTrees(vector<Particle> &v) const {
@@ -1503,7 +1515,12 @@ namespace proj {
             double index_survivor = nonzeros[next_nonzero];
 #if defined(LAZY_COPYING)
             unsigned index_survivor_in_particles = particle_indices[index_survivor+start];
-            particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map);
+//            for (auto &n:nonzero_map) {
+//                for (auto &s:n.second) {
+//                    cout << s << endl;
+//                }
+//            }
+            particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map); // TODO: need to reset the gene forest pointers for particles in the other group so they don't get overwritten - is it possible to just set different ones from the start?
 #endif
             unsigned ncopies = counts[index_survivor] - 1;
             for (unsigned k = 0; k < ncopies; k++) {
@@ -3193,8 +3210,10 @@ namespace proj {
                 
                 _starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
                 
-                for (unsigned i=0; i<G::_nloci; i++) {
-                    _log_marginal_likelihood += _starting_log_likelihoods[i];
+                for (unsigned g=0; g<G::_ngroups; g++) { // TODO: unsure if this is correct
+                    for (unsigned i=0; i<G::_nloci; i++) {
+                        _log_marginal_likelihood += _starting_log_likelihoods[i];
+                    }
                 }
                 
                 vector<Particle> my_vec;
@@ -3237,6 +3256,23 @@ namespace proj {
 
                 // fill particle_indices with values starting from 0
                 iota(particle_indices.begin(), particle_indices.end(), 0);
+                
+#if defined (LAZY_COPYING)
+                // if using subgroups, reset pointers so particles within a group have same gene forest pointers
+                if (G::_ngroups > 1) {
+                    for (unsigned i=0; i<G::_ngroups; i++) {
+                        unsigned start = i * G::_nparticles;
+                        unsigned end = start + (G::_nparticles) - 1;
+                        vector<Forest::SharedPtr> gfcpies;
+                        for (unsigned l=0; l<G::_nloci; l++) {
+                            gfcpies.push_back(Forest::SharedPtr(new Forest()));
+                        }
+                        for (unsigned p=start; p<end+1; p++) {
+                            my_vec[p].resetSubgroupPointers(gfcpies);
+                        }
+                    }
+                }
+#endif
                 
 #if defined (USING_MPI)
                 mpiSetSchedule(); // TODO: need to set this earlier - make sure it works
@@ -3473,7 +3509,8 @@ namespace proj {
                         unsigned seed = rng.getSeed();
                         
                         // only shuffle particle indices, not particles
-                        std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
+                        // TODO: trying - don't shuffle particle indices
+//                        std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
                         unsigned ngroup = 0;
                         unsigned group_count = 0;
                         for (unsigned p=0; p<G::_nparticles*G::_ngroups; p++) {
