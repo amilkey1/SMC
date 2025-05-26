@@ -2427,9 +2427,17 @@ namespace proj {
         
         _second_level_indices_to_keep.resize(ngroups);
         
-        for (unsigned i=0; i<ngroups; i++) {
-            unsigned n = rng.randint(0, ngroups - 1);
-            _particle_indices_to_thin.push_back(n);
+        // TODO: trying multinomial resampling within each subgroup - this means thin will apply to each subgroup, not the entire thing
+        unsigned ngroups_within_subgroup = round(G::_nparticles * G::_thin);
+        for (unsigned g=0; g<G::_ngroups; g++) {
+//            for (unsigned i=0; i<ngroups; i++) {
+            for (unsigned i=0; i<ngroups_within_subgroup; i++) {
+                unsigned start = g*G::_nparticles;
+                unsigned end = start + (G::_nparticles) - 1;
+                unsigned n = rng.randint(start, end);
+//                unsigned n = rng.randint(0, ngroups - 1);
+                _particle_indices_to_thin.push_back(n);
+            }
         }
         
         assert (_second_level_indices_to_keep.size() == ngroups);
