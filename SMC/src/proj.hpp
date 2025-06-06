@@ -2436,7 +2436,7 @@ namespace proj {
                 unsigned end = start + (G::_nparticles) - 1;
                 unsigned n = rng.randint(start, end);
 //                unsigned n = rng.randint(0, ngroups - 1);
-                _particle_indices_to_thin.push_back(n);
+                _particle_indices_to_thin.push_back(n); // TODO: if particle indices are shuffled, is this different?
             }
         }
         
@@ -3517,8 +3517,30 @@ namespace proj {
                         unsigned seed = rng.getSeed();
                         
                         // only shuffle particle indices, not particles
-                        // TODO: trying - don't shuffle particle indices
+                        // TODO: trying - don't shuffle particle indices - if shuffling, need to reset pointers for each group?
 //                        std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
+                        
+//#if defined (LAZY_COPYING)
+//                        for (unsigned i=0; i<G::_ngroups; i++) {
+//                            unsigned start = i * G::_nparticles;
+//                            unsigned end = start + (G::_nparticles) - 1;
+////                            vector<Forest::SharedPtr> gfcpies;
+////                            for (unsigned l=0; l<G::_nloci; l++) {
+////                                gfcpies.push_back(Forest::SharedPtr(new Forest()));
+////                            }
+//                            for (unsigned p=start; p<end+1; p++) {
+//                                unsigned particle_index = particle_indices[p];
+//
+//                                vector<Forest::SharedPtr> gfcpies;
+//                                for (unsigned l=0; l<G::_nloci; l++) {
+//                                    gfcpies.push_back(my_vec[particle_index].getGeneForestPtr(l));
+//                                }
+//
+//                                my_vec[particle_index].resetSubgroupPointers(gfcpies);
+//                            }
+//                        }
+//#endif
+                        
                         unsigned ngroup = 0;
                         unsigned group_count = 0;
                         for (unsigned p=0; p<G::_nparticles*G::_ngroups; p++) {
