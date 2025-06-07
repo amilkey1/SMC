@@ -70,6 +70,7 @@ namespace proj {
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
             void                proposeParticleGroupRange(unsigned first, unsigned last, vector<vector<Particle>> &particles);
             void                proposeParticles(vector<Particle> &particles);
+            void                mcmcMoves(vector<Particle> &particles);
             void                proposeParticlesSim(vector<Particle> &particles);
             void                proposeParticlesParallelizeByGroup(vector<vector<Particle>> &particles);
             void                simulateData();
@@ -1519,8 +1520,10 @@ namespace proj {
 //                for (auto &s:n.second) {
 //                    cout << s << endl;
 //                }
+//            } // TODO: don't set copies to point to the same particle until after the mcmc move
+//            if (!G::_mcmc) {
+                particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map);
 //            }
-            particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map); // TODO: need to reset the gene forest pointers for particles in the other group so they don't get overwritten - is it possible to just set different ones from the start?
 #endif
             unsigned ncopies = counts[index_survivor] - 1;
             for (unsigned k = 0; k < ncopies; k++) {
@@ -2165,6 +2168,12 @@ namespace proj {
         }
     }
 
+    inline void Proj::mcmcMoves(vector<Particle> &particles) {
+        for (auto &p:particles) {
+            p.proposeMCMCMove();
+        }
+    }
+
     inline void Proj::proposeParticles(vector<Particle> &particles) {
         assert(G::_nthreads > 0);
         if (G::_nthreads == 1) {
@@ -2429,6 +2438,9 @@ namespace proj {
         
         // TODO: trying multinomial resampling within each subgroup - this means thin will apply to each subgroup, not the entire thing
         unsigned ngroups_within_subgroup = round(G::_nparticles * G::_thin);
+        if (ngroups_within_subgroup == 0) {
+            ngroups_within_subgroup = 1;
+        }
         for (unsigned g=0; g<G::_ngroups; g++) {
 //            for (unsigned i=0; i<ngroups; i++) {
             for (unsigned i=0; i<ngroups_within_subgroup; i++) {
@@ -3212,6 +3224,8 @@ namespace proj {
                 Particle p;
                 initializeParticle(p); // initialize one particle and copy to all other particles
                                 
+                G::_mcmc = true; // TODO: set in command line
+                G::_sliding_window = 0.05; // TODO: set in command line
                 
                 // reset marginal likelihood
                 _log_marginal_likelihood = 0.0;
@@ -3264,23 +3278,6 @@ namespace proj {
 
                 // fill particle_indices with values starting from 0
                 iota(particle_indices.begin(), particle_indices.end(), 0);
-                
-#if defined (LAZY_COPYING)
-                // if using subgroups, reset pointers so particles within a group have same gene forest pointers
-                if (G::_ngroups > 1) {
-                    for (unsigned i=0; i<G::_ngroups; i++) {
-                        unsigned start = i * G::_nparticles;
-                        unsigned end = start + (G::_nparticles) - 1;
-                        vector<Forest::SharedPtr> gfcpies;
-                        for (unsigned l=0; l<G::_nloci; l++) {
-                            gfcpies.push_back(Forest::SharedPtr(new Forest()));
-                        }
-                        for (unsigned p=start; p<end+1; p++) {
-                            my_vec[p].resetSubgroupPointers(gfcpies);
-                        }
-                    }
-                }
-#endif
                 
 #if defined (USING_MPI)
                 mpiSetSchedule(); // TODO: need to set this earlier - make sure it works
@@ -3456,15 +3453,15 @@ namespace proj {
                         psuffix += 2;
                     }
                 }
-
+                
                 //taxon joining and reweighting step
                 proposeParticles(my_vec);
 
                 bool filter = true;
 
-//                if (G::_run_on_empty) {
-//                    filter = false;
-//                }
+                if (G::_run_on_empty) {
+                    filter = false;
+                }
                 
                 if (filter) {
                         
@@ -3483,6 +3480,15 @@ namespace proj {
 #else
                     filterParticlesThreading(my_vec, g, particle_indices);
 #endif
+                    
+                    if (G::_mcmc) { // TODO: make this work with multiple particles - pointer issues
+                        // TODO: make a real particle copy for each unique particle
+                        // TODO: go through each particle copy and try the mcmc move
+                        // TODO: if the move is accepted, it needs to keep pointing to a unique particle
+                        // TODO: if the move is not accepted, it can keep pointing to the original particle and the real particle copy can be deleted
+                        
+                        mcmcMoves(my_vec);
+                    }
                 }
                                         
                     // only shuffle groups after all particles have coalesced each locus once, then reset gene order
@@ -3513,33 +3519,6 @@ namespace proj {
                                     }
                                 }
                         }
-                        // shuffle new particle order
-                        unsigned seed = rng.getSeed();
-                        
-                        // only shuffle particle indices, not particles
-                        // TODO: trying - don't shuffle particle indices - if shuffling, need to reset pointers for each group?
-//                        std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
-                        
-//#if defined (LAZY_COPYING)
-//                        for (unsigned i=0; i<G::_ngroups; i++) {
-//                            unsigned start = i * G::_nparticles;
-//                            unsigned end = start + (G::_nparticles) - 1;
-////                            vector<Forest::SharedPtr> gfcpies;
-////                            for (unsigned l=0; l<G::_nloci; l++) {
-////                                gfcpies.push_back(Forest::SharedPtr(new Forest()));
-////                            }
-//                            for (unsigned p=start; p<end+1; p++) {
-//                                unsigned particle_index = particle_indices[p];
-//
-//                                vector<Forest::SharedPtr> gfcpies;
-//                                for (unsigned l=0; l<G::_nloci; l++) {
-//                                    gfcpies.push_back(my_vec[particle_index].getGeneForestPtr(l));
-//                                }
-//
-//                                my_vec[particle_index].resetSubgroupPointers(gfcpies);
-//                            }
-//                        }
-//#endif
                         
                         unsigned ngroup = 0;
                         unsigned group_count = 0;

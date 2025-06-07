@@ -79,6 +79,8 @@ namespace proj {
         static double               _ploidy;
         static double               _small_enough;
         static unsigned             _partial_count;
+        static bool                 _mcmc;
+        static double               _sliding_window;
         
         // other
         static vector<string>           _taxon_names;

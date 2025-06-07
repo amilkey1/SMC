@@ -93,8 +93,14 @@ class Forest {
         vector<double>                  reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
         int                             selectPair(vector<double> weight_vec, Lot::SharedPtr lot);
         void                            allowCoalescence(string species_name, double increment, Lot::SharedPtr lot);
+    
 #if defined (LAZY_COPYING)
-        vector<pair<double, string>>    calcForestRate(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map);
+        vector<pair<double, unsigned long>>    calcForestRate(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map);
+        void                                   coalesce(G::species_t species_name, Lot::SharedPtr lot, double prev_log_likelihood);
+        void                                   coalescePreviousJoin(pair<Node*, Node*> subtrees);
+//        G::species_t                           getPrevSpecies();
+        vector<G::species_t>                   getAllPrevSpecies();
+
 #else
         vector<pair<double, string>>    calcForestRate(Lot::SharedPtr lot, unordered_map<string, double> theta_map);
 #endif
@@ -108,6 +114,7 @@ class Forest {
     
 #if defined (LAZY_COPYING)
         void                            updateSpeciesPartitionSim(tuple<string, string, string> species_info, G::species_t new_species);
+        void                            mergeSpecies(G::species_t left_spp, G::species_t right_spp);
 #endif
     
         double                          calcTopologyPrior(unsigned nlineages);
@@ -193,6 +200,9 @@ class Forest {
         void                            mergeSpecies(G::species_t left_species, G::species_t right_species, G::species_t anc_species);
         void                            setLogLikelihood(double log_likelihood) {_gene_tree_log_likelihood = log_likelihood;}
         unsigned                        checkNumberOfUniqueSpeciesInExistence();
+        pair<Node*, Node*>              getPrevJoin();
+        void                            revertGeneForest(double prev_gene_increment, vector<G::species_t> prev_species_assignments);
+        unsigned                        getNRemainingSpecies();
     
         mutable vector<Node::ptr_vect_t> _preorders;
 #endif
@@ -3598,6 +3608,190 @@ class Forest {
         }
      }
 
+#if defined (LAZY_COPYING)
+    void Forest::mergeSpecies(G::species_t left_spp, G::species_t right_spp) {
+//        showForest();
+        // Merge species in _species_vect
+        G::species_t anc_spp = (left_spp | right_spp);
+        for (auto &nd:_lineages) {
+            if (nd->_species == left_spp || nd->_species == right_spp) {
+                nd->_species = anc_spp;
+            }
+        }
+    }
+#endif
+
+//#if defined (LAZY_COPYING)
+//    inline G::species_t Forest::getPrevSpecies() {
+//        return _lineages.back()->_species;
+//    }
+//#endif
+
+#if defined (LAZY_COPYING)
+    inline vector<G::species_t> Forest::getAllPrevSpecies() {
+        vector<G::species_t> species;
+        for (auto &nd:_nodes) {
+            species.push_back(nd._species);
+        }
+        return species;
+    }
+#endif
+
+#if defined (LAZY_COPYING)
+    inline void Forest::coalescePreviousJoin(pair<Node*, Node*> subtrees) {
+        double prev_log_likelihood = calcLogLikelihood(); // TODO: save this instead of calculating it
+        Node *subtree1 = subtrees.first;
+        Node *subtree2 = subtrees.second;
+
+        // access next unused node
+        Node * new_nd = &_nodes[G::_ntaxa + _ninternals];
+
+        assert (new_nd->_parent==0);
+        assert (new_nd->_number == -1);
+        assert (new_nd->_right_sib == 0);
+        
+        new_nd->_number=G::_ntaxa+_ninternals;
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+        new_nd->_name += to_string(new_nd->_number);
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+        
+//        // set new node species
+//        new_nd->setSpecies(species_name);
+
+        // Set new node split to union of the two child splits
+        new_nd->_split.resize(G::_ntaxa);
+        
+        new_nd->_split += subtree1->_split;
+        new_nd->_split += subtree2->_split;
+        
+        new_nd->_height = _forest_height;
+        
+        new_nd->_partial=ps.getPartial(_npatterns*4, _index);
+        
+        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+        
+        calcPartialArrayJC(new_nd, subtree1, subtree2); // TODO: add HKY
+        
+        _gene_tree_log_likelihood = calcLogLikelihood();
+        _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
+    }
+#endif
+
+#if defined (LAZY_COPYING)
+    inline void Forest::coalesce(G::species_t species_name, Lot::SharedPtr lot, double prev_log_likelihood) {
+        // create a species map
+        
+       vector<unsigned> eligible_lineages;
+        
+        for (auto &nd:_lineages) {
+            if (nd->_species == species_name) {
+                eligible_lineages.push_back(nd->_position_in_lineages);
+            }
+        }
+        
+        // choose two nodes to join
+        unsigned s = (unsigned) eligible_lineages.size();
+        assert (s > 1);
+        pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
+        
+        unsigned child1_num = eligible_lineages[t.first];
+        unsigned child2_num = eligible_lineages[t.second];
+        
+        Node *subtree1 = _lineages[child1_num];
+        Node *subtree2 = _lineages[child2_num];
+
+        // access next unused node
+        Node * new_nd = &_nodes[G::_ntaxa + _ninternals];
+
+        assert (new_nd->_parent==0);
+        assert (new_nd->_number == -1);
+        assert (new_nd->_right_sib == 0);
+        
+        new_nd->_number=G::_ntaxa+_ninternals;
+        new_nd->_edge_length=0.0;
+        _ninternals++;
+        new_nd->_name += to_string(new_nd->_number);
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+        
+        // set new node species
+        new_nd->setSpecies(species_name);
+
+        // Set new node split to union of the two child splits
+        new_nd->_split.resize(G::_ntaxa);
+        
+        new_nd->_split += subtree1->_split;
+        new_nd->_split += subtree2->_split;
+        
+        new_nd->_height = _forest_height;
+        
+        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+        
+        new_nd->_partial=ps.getPartial(_npatterns*4, _index);
+        calcPartialArrayJC(new_nd, subtree1, subtree2); // TODO: add HKY
+        
+        _gene_tree_log_likelihood = calcLogLikelihood();
+        _log_weight = _gene_tree_log_likelihood - prev_log_likelihood;
+    }
+#endif
+
+    inline pair<Node*, Node*> Forest::getPrevJoin() {
+        return make_pair(_lineages.back()->_left_child, _lineages.back()->_left_child->_right_sib);
+    }
+
+    inline unsigned Forest::getNRemainingSpecies() {
+        vector<G::species_t> existing_species;
+        for (auto &nd:_lineages) {
+            existing_species.push_back(nd->_species);
+        }
+        
+        unsigned n_unique_species = unique(existing_species.begin(), existing_species.end()) - existing_species.begin();
+        return n_unique_species;
+    }
+
+    inline void Forest::revertGeneForest(double prev_gene_increment, vector<G::species_t> prev_species_assignments) {
+        _forest_height -= prev_gene_increment;
+        Node* child1 = _lineages.back()->_left_child;
+        Node* child2 = _lineages.back()->_left_child->_right_sib;
+        
+        Node* ancestor = _lineages.back();
+        revertNodeVector(_lineages, child1, child2, ancestor);
+        
+        child1->_parent = 0;
+        child1->_right_sib = 0;
+        child2->_parent = 0;
+        child2->_right_sib = 0;
+        ancestor->_species = 0;
+        ancestor->_number = -1;
+        ancestor->_name = "";
+        
+        for (unsigned i=0; i<_nodes.size(); i++) {
+            _nodes[i]._species = prev_species_assignments[i];
+        }
+                
+        for (auto &nd:_lineages) {
+            nd->_edge_length -= prev_gene_increment;
+            if (nd->_height > 0) { // if height is 0, node is a tip and height should remain 0
+                nd->_height = getLineageHeight(nd->_left_child);
+                assert (nd->_height > 0.0);
+            }
+        }
+        
+        stowPartial(ancestor);
+        
+        _ninternals--;
+    }
+
     inline void Forest::debugForest() {
         cout << "debugging forest" << endl;
         for (auto &node : _nodes) {
@@ -3705,13 +3899,37 @@ class Forest {
     }
 
 #if defined (LAZY_COPYING)
-    inline vector<pair<double, string>> Forest::calcForestRate(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map) {
-        // TODO: write this function for simulating
-        vector<pair<double, string>> rates;
-        pair<double, string> rate_and_name;
+    inline  vector<pair<double, unsigned long>> Forest::calcForestRate(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map) {
+        vector<pair<double, unsigned long>> rates;
         
-        cout << "x";
+        map<G::species_t, unsigned> species_counts;
         
+        for (auto &nd:_lineages) {
+            if (species_counts.count(nd->_species)) {
+                species_counts[nd->_species]++;
+            }
+            else {
+                species_counts[nd->_species];
+            }
+        }
+        
+        // counts start at 0, so 0 means 1 entry
+        pair<double, unsigned long> rate_and_name;
+        
+        for (auto &s:species_counts) {
+            if (s.second > 0) { // if size == 1, no possibility of coalescence and rate is 0
+                double population_coalescence_rate = 0.0;
+    #if defined (DRAW_NEW_THETA)
+                double population_theta = theta_map[s.first];
+                population_coalescence_rate = (s.second+1)*(s.second)/population_theta;
+    #else
+                population_coalescence_rate = (s.second+1)*(s.second)/G::_theta;
+    #endif
+                G::species_t name = s.first;
+                rate_and_name = make_pair(population_coalescence_rate, name);
+                rates.push_back(rate_and_name);
+            }
+        }
         return rates;
     }
 #else
