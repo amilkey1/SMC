@@ -633,6 +633,7 @@ class Particle {
             }
 #if !defined (USING_MPI)
             else if (G::_generation % G::_nloci == 0) { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it  // TODO: for now, don't rebuild tree for MPI
+//                _species_forest.showForest();
                     trimSpeciesTree();
                 if (_species_forest._lineages.size() > 1) {
                     rebuildSpeciesTree();
@@ -2380,6 +2381,12 @@ inline void Particle::rebuildCoalInfo() {
         unsigned locus_number = _gene_order[G::_generation];
         double prev_log_likelihood = _gene_forest_ptrs[locus_number-1]->_gene_tree_log_likelihood;
         
+//        if (G::_generation == 13) {
+//            cout << "stop";
+//        }
+//        if (locus_number == 4) {
+//            cout << "stop";
+//        }
         // Get pointer to gene forest for this locus
         Forest::SharedPtr gfp = _gene_forest_ptrs[locus_number - 1];
         
@@ -2447,6 +2454,10 @@ inline void Particle::rebuildCoalInfo() {
 
                 gfcpy->coalesce(species_name, _lot, prev_log_likelihood);
 
+                if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
+                    _prev_t_by_gene[next_species_index].second -= proposed_increment; // update species tree increments
+                }
+                
 //                gfcpy->showForest();
                 calc_weight = true;
             }
@@ -2487,6 +2498,7 @@ inline void Particle::rebuildCoalInfo() {
                     _prev_next_species_number_by_gene++;
                 }
             }
+//            gfcpy->showForest();
             if (calc_weight) { // calc weight just means coalescent event has been proposed
                 done = true;
             }

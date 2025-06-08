@@ -3481,13 +3481,12 @@ namespace proj {
                     filterParticlesThreading(my_vec, g, particle_indices);
 #endif
                     
-                    if (G::_mcmc) { // TODO: make this work with multiple particles - pointer issues
-                        // TODO: make a real particle copy for each unique particle
-                        // TODO: go through each particle copy and try the mcmc move
-                        // TODO: if the move is accepted, it needs to keep pointing to a unique particle
-                        // TODO: if the move is not accepted, it can keep pointing to the original particle and the real particle copy can be deleted
+                    if (G::_mcmc) {
+                        unsigned nmcmc = 1; // TODO: if trying this, will need to reset things like next species number
                         
-                        mcmcMoves(my_vec);
+                        for (unsigned m=0; m<nmcmc; m++) {
+                            mcmcMoves(my_vec);
+                        }
                     }
                 }
                                         
