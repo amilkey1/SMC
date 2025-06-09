@@ -875,6 +875,7 @@ namespace proj {
         ("newick_path", boost::program_options::value(&G::_newick_path)->default_value("."), "path to gene newicks are if starting from gene newicks and only performing SMC on second round")
         ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(1), "number of populations")
         ("upgma", boost::program_options::value(&G::_upgma)->default_value(true), "set to false to not use UPGMA completion")
+        ("mcmc", boost::program_options::value(&G::_mcmc)->default_value(false), "use mcmc moves in analysis")
 #if defined(SPECIES_IN_CONF)
         ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
 #endif
@@ -3224,7 +3225,6 @@ namespace proj {
                 Particle p;
                 initializeParticle(p); // initialize one particle and copy to all other particles
                                 
-                G::_mcmc = true; // TODO: set in command line
                 G::_sliding_window = 0.05; // TODO: set in command line
                 
                 // reset marginal likelihood
