@@ -685,6 +685,7 @@ class Particle {
 #endif
                 
         _prev_total_to_add = 0.0;
+        _prev_increment_prior = 0.0;
         while (!done) {
 #if defined (LAZY_COPYING)
             vector<pair<double, unsigned long>> rates_by_species = _gene_forest_extensions[next_gene-1].calcForestRate(_lot, _theta_map);
@@ -696,12 +697,12 @@ class Particle {
             if (rates_by_species.size() > 0) {
                 for (auto &r:rates_by_species) {
                     total_rate += r.first;
+                    _prev_increment_prior += log(r.first) - (r.first*gene_increment);
                 }
                 assert (total_rate > 0.0);
                 
                 // Draw coalescence increment delta ~ Exponential(total_rate)
                 gene_increment = -log(1.0 - _lot->uniform())/total_rate;
-                _prev_increment_prior = log(total_rate) - (total_rate * gene_increment);
                 _prev_total_rate = total_rate;
                 assert (gene_increment > 0.0);
             }
@@ -2209,17 +2210,16 @@ class Particle {
         *gfcpy = *gfp;
 
         double u =  _lot->uniform();
-        double prev_gene_increment = _prev_gene_increment;
         double prev_total_to_add = _prev_total_to_add;
 
-        double proposed_increment = (prev_gene_increment - G::_sliding_window / 2) + (u*G::_sliding_window);
+        double proposed_increment = (prev_total_to_add - G::_sliding_window / 2) + (u*G::_sliding_window);
         if (proposed_increment < 0) {
             proposed_increment *= -1;
         }
 
-        double total_increment_added = proposed_increment;
+//        double total_increment_added = proposed_increment;
 
-        double new_increment_prior = log(_prev_total_rate) - (_prev_total_rate * proposed_increment); // TODO: does the prior change for the new increment?
+        double new_increment_prior = log(_prev_total_rate) - (_prev_total_rate * proposed_increment); // TODO: does the prior change for the new increment? - yes - keep track of delta prior for previous increment + proposed increment, then add to ratio
 
         gfcpy->revertGeneForest(prev_total_to_add, _prev_species_assignments_before_coalescence);
 
@@ -2234,6 +2234,7 @@ class Particle {
             if (rates_by_species.size() > 0) {
                 for (auto &r:rates_by_species) {
                     total_rate += r.first;
+                    new_increment_prior += log(r.first) - (r.first*proposed_increment);
                 }
             }
 
@@ -2269,7 +2270,6 @@ class Particle {
                 assert (species_increment > 0.0);
 
                 // add species increment to the gene tree
-                total_increment_added += species_increment;
                 gfcpy->addIncrement(species_increment);
 
                 // merge the species in the gene tree
@@ -2297,6 +2297,11 @@ class Particle {
                 unsigned nremaining_species = gfcpy->getNRemainingSpecies();
                 if (nremaining_species > 1) {
                     _prev_next_species_number_by_gene++;
+                }
+                proposed_increment -= species_increment;
+                
+                if (proposed_increment <= 0.0) {
+                    done = true;
                 }
             }
 
@@ -2333,7 +2338,7 @@ class Particle {
         double u2 = log(_lot->uniform());
 
         bool accept = false;
-        if (u2 < log_ratio) {
+        if (u2 < log_ratio && proposed_increment >= 0.0) {
             accept = true;
         }
 
@@ -2343,7 +2348,7 @@ class Particle {
             _prev_t_by_gene.clear();
 
             _next_species_number_by_gene[locus_number-1] = _prev_next_species_number_by_gene;
-            _log_weight = new_log_weight; // TODO: not sure about this - I don't think it matters
+            _log_weight = new_log_weight; // TODO: not sure about this - I don't think it matters - matters if keeping track of ESS
 
             _prev_log_likelihoods[locus_number-1] = gfcpy->_gene_tree_log_likelihood;
             
@@ -2355,9 +2360,9 @@ class Particle {
             
         }
         
-        // if move is not accepted, nothing changes to the existing gene forest pionter
+        // if move is not accepted, nothing changes to the existing gene forest pointer
 
-        // TODO: reset theta map?
+        // TODO: reset theta map? - don't reset theta map - keep thetas the same until the species tree gets rebuilt
 
         // TODO: need to include theta prior in posterior?
     }

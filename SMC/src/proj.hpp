@@ -1971,9 +1971,9 @@ namespace proj {
             assert(second_level_particles.size() == G::_particle_increase);
         
             for (unsigned s=0; s<G::_nspecies-1; s++) {  // skip last round of filtering because weights are always 0
-                if (G::_verbose > 1) {
-                    cout << "starting species step " << s+1 << " of " << G::_nspecies-1 << endl;
-                }
+//                if (G::_verbose > 1) {
+//                    cout << "starting species step " << s+1 << " of " << G::_nspecies-1 << endl;
+//                }
                 
                 // set particle random number seeds
 //                unsigned group_number = p.getGroupNumber();
@@ -2478,9 +2478,9 @@ namespace proj {
                 second_level_particles.resize(G::_particle_increase, p);
                                 
                 for (unsigned s=0; s<G::_nspecies-1; s++) {  // skip last round of filtering because weights are always 0
-                    if (G::_verbose > 1) {
-                        cout << "starting species step " << s+1 << " of " << G::_nspecies-1 << endl;
-                    }
+//                    if (G::_verbose > 1) {
+//                        cout << "starting species step " << s+1 << " of " << G::_nspecies-1 << endl;
+//                    }
                     
                     // set particle random number seeds
                     psuffix = 1;
@@ -3393,6 +3393,9 @@ namespace proj {
 //                    _partials_needed = k*G::_nparticles*G::_nloci*G::_ngroups;
 //                }
                 
+                if (G::_verbose > 1) {
+                    cout << "step " << "\t" << "ESS before filtering " << "\t" << "n_unique particles before MCMC" <<  "\t" << "n_unique particles after MCMC" << endl;
+                }
             for (unsigned g=0; g<nsteps; g++) {
                 if (g == 0) {
                     // reset gene order
@@ -3433,7 +3436,7 @@ namespace proj {
                         group_count++;
                     }
                 }
-                if (G::_verbose > 0) {
+                if (G::_verbose == 1) {
                     cout << "starting step " << g << " of " << nsteps-1 << endl;
                 }
 
@@ -3465,8 +3468,22 @@ namespace proj {
                                     
                         double ess = filterParticles(g, my_vec, particle_indices, start, end);
                         
+                        vector<double> weights_after_filtering(G::_nparticles);
+                        
+                        for (unsigned p=0; p<G::_nparticles; p++) {
+                            weights_after_filtering[p] = my_vec[p].getLogWeight();
+                        }
+                        
+//                        if (G::_generation == 19) {
+//                            cout << "stop";
+//                        }
+                        unsigned n_unique_particles_after_filtering = std::unique(weights_after_filtering.begin(), weights_after_filtering.end()) - weights_after_filtering.begin();
+                        
                         if (G::_verbose > 1) {
-                            cout << "   " << "ESS = " << ess << endl;
+                            cout << G::_generation  << "\t" << ess << "\t" << "\t" << "\t" << n_unique_particles_after_filtering << "\t";
+                            if (!G::_mcmc) {
+                                cout << endl;
+                            }
                         }
                     }
 #else
@@ -3479,16 +3496,16 @@ namespace proj {
                             if (filesystem::remove(filename)) {
                                 ofstream mcmcfile(filename);
                                 mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\n";
-                                if (G::_verbose > 0) {
-                                    cout << "existing file " << filename << " removed and replaced\n";
-                                }
+//                                if (G::_verbose > 0) {
+//                                    cout << "existing file " << filename << " removed and replaced\n";
+//                                }
                             }
                             else {
                                 ofstream mcmcfile(filename);
                                 mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\n";
-                                if (G::_verbose > 0) {
-                                    cout << "created new file " << filename << "\n";
-                                }
+//                                if (G::_verbose > 0) {
+//                                    cout << "created new file " << filename << "\n";
+//                                }
                             }
                         }
                         
@@ -3504,6 +3521,18 @@ namespace proj {
                         mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
                         double proportion_accepted = (double) G::_nmcmc_moves_accepted / G::_nparticles;
                         mcmcfile << G::_generation << "\t" << G::_nmcmc_moves_accepted << "\t" << proportion_accepted << "\n";
+                        
+                        vector<double> weights_after_mcmc(G::_nparticles);
+                        
+                        for (unsigned p=0; p<G::_nparticles; p++) {
+                            weights_after_mcmc[p] = my_vec[p].getLogWeight();
+                        }
+                        
+                        unsigned n_unique_particles_after_mcmc = std::unique(weights_after_mcmc.begin(), weights_after_mcmc.end()) - weights_after_mcmc.begin();
+                        
+                        if (G::_verbose > 1) {
+                            cout << "\t" << "\t" << "\t" << n_unique_particles_after_mcmc << "\n";
+                        }
                     }
                 }
                                         
