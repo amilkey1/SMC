@@ -2183,218 +2183,30 @@ class Particle {
 #endif
 
 #if defined(LAZY_COPYING)
-inline void Particle::rebuildCoalInfo() {
-    // Rebuild coal info vectors, stripping effect of previous species tree
-    for (auto gfp : _gene_forest_ptrs) {
-        // Each gene forest's _coalinfo vector stores a tuple for each internal node:
-        // <1> height
-        // <2> gene_index + 1
-        // <3> left child species
-        // <4> right child species
-        gfp->buildCoalInfoVect();
+    inline void Particle::rebuildCoalInfo() {
+        // Rebuild coal info vectors, stripping effect of previous species tree
+        for (auto gfp : _gene_forest_ptrs) {
+            // Each gene forest's _coalinfo vector stores a tuple for each internal node:
+            // <1> height
+            // <2> gene_index + 1
+            // <3> left child species
+            // <4> right child species
+            gfp->buildCoalInfoVect();
+        }
+        _species_forest.buildCoalInfoVect();
     }
-    _species_forest.buildCoalInfoVect();
-}
 #endif
-        
-//    inline void Particle::proposeMCMCMove() {
-//        unsigned locus_number = _gene_order[G::_generation];
-//        double prev_log_likelihood = _gene_forest_ptrs[locus_number-1]->_gene_tree_log_likelihood;
-//
-//        vector<G::species_t> prev_species_assignments_after_coalescence = _gene_forest_ptrs[locus_number-1]->getAllPrevSpecies();
-//
-//        double u =  _lot->uniform();
-//        double prev_gene_increment = _prev_gene_increment;
-//        double prev_total_to_add = _prev_total_to_add;
-//
-//        double proposed_increment = (prev_gene_increment - G::_sliding_window / 2) + (u*G::_sliding_window);
-//        if (proposed_increment < 0) {
-//            proposed_increment *= -1;
-//        }
-//
-//        double total_increment_added = proposed_increment;
-//
-//        double new_increment_prior = log(_prev_total_rate) - (_prev_total_rate * proposed_increment); // TODO: does the prior change for the new increment?
-//
-//        pair<Node*, Node*> subtrees = _gene_forest_ptrs[locus_number-1]->getPrevJoin();
-//
-//        _gene_forest_ptrs[locus_number-1]->showForest();
-//        _gene_forest_ptrs[locus_number-1]->revertGeneForest(prev_total_to_add, _prev_species_assignments_before_coalescence);
-//
-//        // new proposal
-//        bool done = false;
-//        bool calc_weight = false;
-//
-//        while (!done) {
-//            vector<pair<double, unsigned long>> rates_by_species = _gene_forest_ptrs[locus_number-1]->calcForestRate(_lot, _theta_map);
-//
-//            double total_rate = 0.0;
-//            if (rates_by_species.size() > 0) {
-//                for (auto &r:rates_by_species) {
-//                    total_rate += r.first;
-//                }
-//            }
-//
-//            unsigned next_species_index = _prev_next_species_number_by_gene;
-//
-//            double species_increment = _prev_t_by_gene[next_species_index].second;
-//
-//            if (proposed_increment < species_increment || species_increment == 0.0) {
-//                // propose coalescence
-//                _gene_forest_ptrs[locus_number-1]->addIncrement(proposed_increment);
-//
-//                vector<double> event_choice_rates;
-//                for (auto &r:rates_by_species) {
-//                    event_choice_rates.push_back(r.first / total_rate);
-//                }
-//
-//                unsigned index = selectEventLinearScale(event_choice_rates);
-//                G::species_t species_name = rates_by_species[index].second;
-//
-//                _gene_forest_ptrs[locus_number-1]->coalesce(species_name, _lot, prev_log_likelihood);
-//
-//                _gene_forest_ptrs[locus_number-1]->showForest();
-//                calc_weight = true;
-//            }
-//
-//            else {
-//                // carry out speciation event
-//                assert (species_increment > 0.0);
-//
-//                // add species increment to the gene tree
-//                total_increment_added += species_increment;
-//                _gene_forest_ptrs[locus_number-1]->addIncrement(species_increment);
-//
-//                // merge the species in the gene tree
-//                G::species_t left_spp = get<0>(_prev_t_by_gene[next_species_index+1].first);
-//                G::species_t right_spp = get<1>(_prev_t_by_gene[next_species_index+1].first);
-//
-//                if (left_spp == 0) {
-//                    assert (right_spp == 0);
-//                }
-//                else if (right_spp == 0) {
-//                    assert (left_spp == 0);
-//                }
-//
-//                _species_forest.showForest();
-//                _gene_forest_ptrs[locus_number-1]->mergeSpecies(left_spp, right_spp);
-//
-//#if defined (DRAW_NEW_THETA)
-//                if (!_theta_map.count(left_spp + right_spp)) {
-//                    updateThetaMap(left_spp + right_spp);
-//                }
-//#endif
-//                assert (next_species_index < _prev_t_by_gene.size());
-//                _prev_t_by_gene[next_species_index].second -= species_increment; // update species tree increments
-//                assert (_prev_t_by_gene[next_species_index].second == 0.0);
-//
-//                unsigned nremaining_species = _gene_forest_ptrs[locus_number-1]->getNRemainingSpecies();
-//                if (nremaining_species > 1) {
-//                    _prev_next_species_number_by_gene++;
-//                }
-//            }
-//            if (calc_weight) { // calc weight just means coalescent event has been proposed
-//                done = true;
-//            }
-//        }
-//
-//        // calculate weight of new proposal
-//        double inv_gamma_modifier = 0.0;
-//#if defined (INV_GAMMA_PRIOR_TWO)
-//        // turn this off when using 2.0, not 2.01, for the inverse gamma - don't include a correction in this case
-//            // include inverse gamma prior correction for every species population for every locus at every step
-//        double theta_mean = _gene_forest_ptrs[1]._theta_mean;
-//        double eps = 0.01;
-//        double a = 2.0;
-//
-//        inv_gamma_modifier = lgamma(a + eps) - lgamma(a) + a * log(a-1.0) - (a + eps) * log(a + eps - 1.0);
-//
-//        for (auto &t:_forests[locus_number-1]._theta_map) {
-//
-//            double y = t.second; // theta
-//            inv_gamma_modifier += eps * (log(y) - log(theta_mean)) + (theta_mean * eps / y);
-//        }
-//#endif
-//
-//#if defined (WEIGHT_MODIFIER)
-//        // modifier only happens on first round
-//        if (G::_generation == 0 && G::_theta_prior_mean > 0.0 && G::_theta_proposal_mean > 0.0) {
-//            if (G::_theta_prior_mean != G::_theta_proposal_mean) {
-//                // else, log weight modifier is 0
-//                double prior_rate = 1.0/G::_theta_prior_mean;
-//                double proposal_rate = 1.0/G::_theta_proposal_mean;
-//                double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_theta_mean;
-//
-//                _log_weight += log_weight_modifier;
-//            }
-//        }
-//#endif
-//
-//        _gene_forest_ptrs[locus_number-1]->showForest();
-//        double new_log_weight = _gene_forest_ptrs[locus_number-1]->_log_weight;
-//        new_log_weight += inv_gamma_modifier;
-//
-//        // accept or reject new move
-//        double prev_likelihood_x_prior = prev_log_likelihood + _prev_increment_prior;
-//        double proposed_likelihood_x_prior = _gene_forest_ptrs[locus_number-1]->_gene_tree_log_likelihood + new_increment_prior;
-//        double log_ratio = proposed_likelihood_x_prior - prev_likelihood_x_prior;
-//
-//        double u2 = log(_lot->uniform());
-//
-//        bool accept = false;
-//        if (u2 < log_ratio) {
-//            accept = true;
-//        }
-//
-//        if (accept) {
-//            _t_by_gene[locus_number-1] = _prev_t_by_gene;
-//            _prev_t_by_gene.clear();
-//
-//            _next_species_number_by_gene[locus_number-1] = _prev_next_species_number_by_gene;
-//            _log_weight = new_log_weight; // TODO: not sure about this
-//
-//            _prev_log_likelihoods[locus_number-1] = _gene_forest_ptrs[locus_number-1]->_gene_tree_log_likelihood;
-//        }
-//
-//        else {
-//            // reverse the proposed join and increment and reset to the prev one
-//            _gene_forest_ptrs[locus_number-1]->revertGeneForest(total_increment_added, prev_species_assignments_after_coalescence);
-//            _gene_forest_ptrs[locus_number-1]->addIncrement(prev_total_to_add);
-//
-//            _gene_forest_ptrs[locus_number-1]->coalescePreviousJoin(subtrees); // TODO: save partial instead of recalculating it?
-//
-//            _gene_forest_ptrs[locus_number-1]->showForest();
-//
-//            // weight has not changed, so no need to reset it
-//            // reset the partial too
-//
-//            // _t_by_gene and _next_species_number_by_gene have not changed, so no need to modify them
-//        }
-//
-//        // TODO: reset theta map?
-//
-//        // TODO: need to include theta prior in posterior?
-//        cout << "x";
-//    }
         
     inline void Particle::proposeMCMCMove() {
         unsigned locus_number = _gene_order[G::_generation];
         double prev_log_likelihood = _gene_forest_ptrs[locus_number-1]->_gene_tree_log_likelihood;
         
-//        if (G::_generation == 13) {
-//            cout << "stop";
-//        }
-//        if (locus_number == 4) {
-//            cout << "stop";
-//        }
         // Get pointer to gene forest for this locus
         Forest::SharedPtr gfp = _gene_forest_ptrs[locus_number - 1];
         
         // Make a copy of the object pointed to by gfp
         Forest::SharedPtr gfcpy = Forest::SharedPtr(new Forest());
         *gfcpy = *gfp;
-
-        vector<G::species_t> prev_species_assignments_after_coalescence = gfcpy->getAllPrevSpecies();
 
         double u =  _lot->uniform();
         double prev_gene_increment = _prev_gene_increment;
@@ -2409,20 +2221,11 @@ inline void Particle::rebuildCoalInfo() {
 
         double new_increment_prior = log(_prev_total_rate) - (_prev_total_rate * proposed_increment); // TODO: does the prior change for the new increment?
 
-        pair<Node*, Node*> subtrees = gfcpy->getPrevJoin();
-
-//        gfcpy->showForest();
         gfcpy->revertGeneForest(prev_total_to_add, _prev_species_assignments_before_coalescence);
 
         // new proposal
         bool done = false;
         bool calc_weight = false;
-        
-//        if (G::_generation == 21) {
-//            cout << "stop";
-//        }
-//        _species_forest.showForest();
-//        gfcpy->showForest();
 
         while (!done) {
             vector<pair<double, unsigned long>> rates_by_species = gfcpy->calcForestRate(_lot, _theta_map);
@@ -2438,7 +2241,7 @@ inline void Particle::rebuildCoalInfo() {
 
             double species_increment = _prev_t_by_gene[next_species_index].second;
 
-            if ((proposed_increment < species_increment || species_increment == 0.0) && ( rates_by_species.size() != 0)) { // TODO: check - why wasn't rates_by_species.size an issue before?
+            if ((proposed_increment < species_increment || species_increment == 0.0) && ( rates_by_species.size() != 0)) {
                 // propose coalescence
                 gfcpy->addIncrement(proposed_increment);
 
@@ -2458,7 +2261,6 @@ inline void Particle::rebuildCoalInfo() {
                     _prev_t_by_gene[next_species_index].second -= proposed_increment; // update species tree increments
                 }
                 
-//                gfcpy->showForest();
                 calc_weight = true;
             }
 
@@ -2481,7 +2283,6 @@ inline void Particle::rebuildCoalInfo() {
                     assert (left_spp == 0);
                 }
 
-//                _species_forest.showForest();
                 gfcpy->mergeSpecies(left_spp, right_spp);
 
 #if defined (DRAW_NEW_THETA)
@@ -2498,7 +2299,7 @@ inline void Particle::rebuildCoalInfo() {
                     _prev_next_species_number_by_gene++;
                 }
             }
-//            gfcpy->showForest();
+
             if (calc_weight) { // calc weight just means coalescent event has been proposed
                 done = true;
             }
@@ -2521,7 +2322,6 @@ inline void Particle::rebuildCoalInfo() {
         }
 #endif
 
-//        gfcpy->showForest();
         double new_log_weight = gfcpy->_log_weight;
         new_log_weight += inv_gamma_modifier;
 
@@ -2537,14 +2337,13 @@ inline void Particle::rebuildCoalInfo() {
             accept = true;
         }
 
-        // TODO: need to do this first in gene extension? then copy the changes to a brand new forest pointer
-        // TODO: what about making all these changes to a new forest copy and then accepting or deleting it?
         if (accept) {
+            G::_nmcmc_moves_accepted++;
             _t_by_gene[locus_number-1] = _prev_t_by_gene;
             _prev_t_by_gene.clear();
 
             _next_species_number_by_gene[locus_number-1] = _prev_next_species_number_by_gene;
-            _log_weight = new_log_weight; // TODO: not sure about this
+            _log_weight = new_log_weight; // TODO: not sure about this - I don't think it matters
 
             _prev_log_likelihoods[locus_number-1] = gfcpy->_gene_tree_log_likelihood;
             
@@ -2555,27 +2354,12 @@ inline void Particle::rebuildCoalInfo() {
             gfp = gfcpy;
             
         }
-
-        else {
-            // TODO: there is nothing to reverse, I think the gfcpy will go away when we leave the function
-            // reverse the proposed join and increment and reset to the prev one
-//            _gene_forest_ptrs[locus_number-1]->revertGeneForest(total_increment_added, prev_species_assignments_after_coalescence);
-//            _gene_forest_ptrs[locus_number-1]->addIncrement(prev_total_to_add);
-
-//            _gene_forest_ptrs[locus_number-1]->coalescePreviousJoin(subtrees); // TODO: save partial instead of recalculating it?
-
-            // weight has not changed, so no need to reset it
-            // reset the partial too - // TODO: can save it instead
-
-            // _t_by_gene and _next_species_number_by_gene have not changed, so no need to modify them
-        }
         
-//        _gene_forest_ptrs[locus_number-1]->showForest();
+        // if move is not accepted, nothing changes to the existing gene forest pionter
 
         // TODO: reset theta map?
 
         // TODO: need to include theta prior in posterior?
-//        cout << "x";
     }
 
 #if defined(LAZY_COPYING)

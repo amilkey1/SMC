@@ -179,9 +179,9 @@ namespace proj {
         ofstream partialf("partial_count.txt");
         partialf << "total partials needed: ";
         
-        unsigned num_partials_needed = ((G::_ntaxa - 1) * G::_nparticles * G::_nloci * G::_ngroups);
+//        unsigned num_partials_needed = ((G::_ntaxa - 1) * G::_nparticles * G::_nloci * G::_ngroups);
         
-        partialf <<  num_partials_needed << "\n";
+        partialf <<  G::_partial_count << "\n";
         
         partialf.close();
     }
@@ -1518,14 +1518,7 @@ namespace proj {
             double index_survivor = nonzeros[next_nonzero];
 #if defined(LAZY_COPYING)
             unsigned index_survivor_in_particles = particle_indices[index_survivor+start];
-//            for (auto &n:nonzero_map) {
-//                for (auto &s:n.second) {
-//                    cout << s << endl;
-//                }
-//            } // TODO: don't set copies to point to the same particle until after the mcmc move
-//            if (!G::_mcmc) {
-                particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map);
-//            }
+            particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map);
 #endif
             unsigned ncopies = counts[index_survivor] - 1;
             for (unsigned k = 0; k < ncopies; k++) {
@@ -3481,11 +3474,36 @@ namespace proj {
 #endif
                     
                     if (G::_mcmc) {
+                        if (G::_generation == 0) {
+                            string filename = "mcmc_moves_accepted.log";
+                            if (filesystem::remove(filename)) {
+                                ofstream mcmcfile(filename);
+                                mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\n";
+                                if (G::_verbose > 0) {
+                                    cout << "existing file " << filename << " removed and replaced\n";
+                                }
+                            }
+                            else {
+                                ofstream mcmcfile(filename);
+                                mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\n";
+                                if (G::_verbose > 0) {
+                                    cout << "created new file " << filename << "\n";
+                                }
+                            }
+                        }
+                        
                         unsigned nmcmc = 1; // TODO: if trying this, will need to reset things like next species number
                         
                         for (unsigned m=0; m<nmcmc; m++) {
+                            G::_nmcmc_moves_accepted = 0;
                             mcmcMoves(my_vec);
                         }
+                        
+                        std::ofstream mcmcfile;
+
+                        mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
+                        double proportion_accepted = (double) G::_nmcmc_moves_accepted / G::_nparticles;
+                        mcmcfile << G::_generation << "\t" << G::_nmcmc_moves_accepted << "\t" << proportion_accepted << "\n";
                     }
                 }
                                         
@@ -3500,22 +3518,22 @@ namespace proj {
                         }
 
                         for (unsigned n=0; n<G::_ngroups; n++) {
-                                unsigned count = 1;
-                                vector<pair<double, unsigned>> randomize;
-                                for (unsigned l=0; l<list_size; l++) {
-                                    if (count == 1) {
-                                        randomize.clear();
-                                    }
-                                    randomize.push_back(make_pair(rng.uniform(), count));
-                                    count++;
-                                    if (count > G::_nloci) {
-                                        sort(randomize.begin(), randomize.end());
-                                        for (auto &r:randomize) {
-                                            new_gene_order[n].push_back(r.second);
-                                        }
-                                        count = 1;
-                                    }
+                            unsigned count = 1;
+                            vector<pair<double, unsigned>> randomize;
+                            for (unsigned l=0; l<list_size; l++) {
+                                if (count == 1) {
+                                    randomize.clear();
                                 }
+                                randomize.push_back(make_pair(rng.uniform(), count));
+                                count++;
+                                if (count > G::_nloci) {
+                                    sort(randomize.begin(), randomize.end());
+                                    for (auto &r:randomize) {
+                                        new_gene_order[n].push_back(r.second);
+                                    }
+                                    count = 1;
+                                }
+                            }
                         }
                         
                         unsigned ngroup = 0;
@@ -3529,7 +3547,6 @@ namespace proj {
                             group_count++;
                         }
                     }
-//                        }
                 G::_generation++;
                 
 #if defined (VALGRIND)
