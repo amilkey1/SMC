@@ -149,6 +149,7 @@ class Particle {
         void                                            clearPartials();
         Lot::SharedPtr getLot() const {return _lot;}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
+        void setSeedMCMC(unsigned seed) const {_lot_mcmc->setSeed(seed);}
         double                                          getSpeciesTreeHeight();
         double                                          getSpeciesTreeLength();
         vector<double>                                  getGeneTreeHeights();
@@ -215,6 +216,7 @@ class Particle {
         double                                  _log_likelihood;
         double                                  _log_coalescent_likelihood;
         mutable Lot::SharedPtr                  _lot;
+        mutable Lot::SharedPtr                  _lot_mcmc;
         unsigned                                _num_deep_coalescences;
         unsigned                                _max_deep_coal;
         unsigned                                _psuffix;
@@ -264,6 +266,9 @@ class Particle {
 
     inline Particle::Particle() {
         _lot.reset(new Lot());
+        if (G::_mcmc) {
+            _lot_mcmc.reset(new Lot());
+        }
         clear();
     };
 
@@ -697,7 +702,6 @@ class Particle {
             if (rates_by_species.size() > 0) {
                 for (auto &r:rates_by_species) {
                     total_rate += r.first;
-                    _prev_increment_prior += log(r.first) - (r.first*gene_increment);
                 }
                 assert (total_rate > 0.0);
                 
@@ -754,6 +758,11 @@ class Particle {
                 if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
                     _t_by_gene[next_gene-1][next_species_index].second -= gene_increment; // update species tree increments
                 }
+                
+                for (auto &r:rates_by_species) {
+                    _prev_increment_prior += log(r.first) - (r.first*gene_increment);
+                }
+                
                     calc_weight = true;
                 }
                 else {
@@ -767,9 +776,6 @@ class Particle {
                     _gene_forest_extensions[next_gene-1].addIncrement(species_increment);
                     
                     // tell gene forest extension about species merged
-//                    G::species_t left_spp = get<0>(_t_by_gene[next_gene-1][next_species_index].first);
-//                    G::species_t right_spp = get<1>(_t_by_gene[next_gene-1][next_species_index].first);
-                    
                     G::species_t left_spp = get<0>(_t_by_gene[next_gene-1][next_species_index+1].first);
                     G::species_t right_spp = get<1>(_t_by_gene[next_gene-1][next_species_index+1].first);
                     
@@ -805,6 +811,12 @@ class Particle {
                     if (_gene_forests[next_gene-1]._species_partition.size() > 1) {
                         _next_species_number_by_gene[next_gene-1]++;
                 }
+                    
+                    if (rates_by_species.size() > 0) {
+                        for (auto &r:rates_by_species) {
+                            _prev_increment_prior -= (r.first*species_increment);
+                        }
+                    }
 #endif
             }
                 
@@ -1171,6 +1183,9 @@ class Particle {
 
     inline Particle::Particle(const Particle & other) {
         _lot.reset(new Lot());
+        if (G::_mcmc) {
+            _lot_mcmc.reset(new Lot());
+        }
         *this = other;
     }
 
@@ -2209,7 +2224,7 @@ class Particle {
         Forest::SharedPtr gfcpy = Forest::SharedPtr(new Forest());
         *gfcpy = *gfp;
 
-        double u =  _lot->uniform();
+        double u =  _lot_mcmc->uniform();
         double prev_total_to_add = _prev_total_to_add;
 
         double proposed_increment = (prev_total_to_add - G::_sliding_window / 2) + (u*G::_sliding_window);
@@ -2217,9 +2232,7 @@ class Particle {
             proposed_increment *= -1;
         }
 
-//        double total_increment_added = proposed_increment;
-
-        double new_increment_prior = log(_prev_total_rate) - (_prev_total_rate * proposed_increment); // TODO: does the prior change for the new increment? - yes - keep track of delta prior for previous increment + proposed increment, then add to ratio
+        double new_increment_prior = 0.0;
 
         gfcpy->revertGeneForest(prev_total_to_add, _prev_species_assignments_before_coalescence);
 
@@ -2234,7 +2247,7 @@ class Particle {
             if (rates_by_species.size() > 0) {
                 for (auto &r:rates_by_species) {
                     total_rate += r.first;
-                    new_increment_prior += log(r.first) - (r.first*proposed_increment);
+//                    new_increment_prior += log(r.first) - (r.first*proposed_increment); // TODO: proposed incr may be smaller than this
                 }
             }
 
@@ -2260,6 +2273,12 @@ class Particle {
 
                 if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
                     _prev_t_by_gene[next_species_index].second -= proposed_increment; // update species tree increments
+                }
+                
+                if (rates_by_species.size() > 0) {
+                    for (auto &r:rates_by_species) {
+                        new_increment_prior += log(r.first) - (r.first*proposed_increment); // TODO: proposed incr may be smaller than this
+                    }
                 }
                 
                 calc_weight = true;
@@ -2300,6 +2319,12 @@ class Particle {
                 }
                 proposed_increment -= species_increment;
                 
+                if (rates_by_species.size() > 0) {
+                    for (auto &r:rates_by_species) {
+                        new_increment_prior -= r.first*species_increment;
+                    }
+                }
+                
                 if (proposed_increment <= 0.0) {
                     done = true;
                 }
@@ -2334,13 +2359,19 @@ class Particle {
         double prev_likelihood_x_prior = prev_log_likelihood + _prev_increment_prior;
         double proposed_likelihood_x_prior = gfcpy->_gene_tree_log_likelihood + new_increment_prior;
         double log_ratio = proposed_likelihood_x_prior - prev_likelihood_x_prior;
+        
+//        double log_ratio = gfcpy->_gene_tree_log_likelihood - prev_log_likelihood; // TODO: be careful - testing
 
-        double u2 = log(_lot->uniform());
+        double u2 = log(_lot_mcmc->uniform());
 
         bool accept = false;
         if (u2 < log_ratio && proposed_increment >= 0.0) {
             accept = true;
         }
+        
+//        _species_forest.showForest();
+//        _gene_forest_ptrs[locus_number-1]->showForest();
+//        gfcpy->showForest();
 
         if (accept) {
             G::_nmcmc_moves_accepted++;

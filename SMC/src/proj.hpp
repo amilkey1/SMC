@@ -2164,16 +2164,26 @@ namespace proj {
     }
 
     inline void Proj::mcmcMoves(vector<Particle> &particles) {
+//        unsigned count = 0;
         for (auto &p:particles) {
+//            if (count == 13) {
+//                cout << "stop";
+//            }
             p.proposeMCMCMove();
+//            count++;
         }
     }
 
     inline void Proj::proposeParticles(vector<Particle> &particles) {
         assert(G::_nthreads > 0);
         if (G::_nthreads == 1) {
+//            unsigned count = 0;
           for (auto & p : particles) {
+//              if (count == 11) {
+//                  cout << "stop";
+//              }
               p.proposal();
+//              count++;
           }
         }
         else {
@@ -3239,6 +3249,13 @@ namespace proj {
                     psuffix += 2;
                 }
                 
+                if (G::_mcmc) {
+                    for (auto &p:my_vec) {
+                        p.setSeedMCMC(rng.randint(1,9999) + psuffix);
+                        psuffix += 2;
+                    }
+                }
+                
                 if (G::_species_newick_specified) {
                     string species_newick = handleSpeciesNewick();
                     unsigned count = 0;
@@ -3447,6 +3464,13 @@ namespace proj {
                         p.setSeed(rng.randint(1,9999) + psuffix);
                         psuffix += 2;
                     }
+                    
+                    if (G::_mcmc) {
+                        for (auto &p:my_vec) {
+                            p.setSeedMCMC(rng.randint(1,9999) + psuffix);
+                            psuffix += 2;
+                        }
+                    }
                 }
                 
                 //taxon joining and reweighting step
@@ -3490,37 +3514,50 @@ namespace proj {
                     filterParticlesThreading(my_vec, g, particle_indices);
 #endif
                     
-                    if (G::_mcmc) {
+//                    if (G::_mcmc) {
                         if (G::_generation == 0) {
                             string filename = "mcmc_moves_accepted.log";
                             if (filesystem::remove(filename)) {
                                 ofstream mcmcfile(filename);
-                                mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\n";
-//                                if (G::_verbose > 0) {
-//                                    cout << "existing file " << filename << " removed and replaced\n";
-//                                }
+                                mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\t" << "average log likelihood before mcmc" << "\t" << "average log likelihood after mcmc" << "\n";
                             }
                             else {
                                 ofstream mcmcfile(filename);
-                                mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\n";
-//                                if (G::_verbose > 0) {
-//                                    cout << "created new file " << filename << "\n";
-//                                }
+                                mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\t" << "average log likelihood before mcmc" << "\t" << "average log likelihood after mcmc" << "\n";
                             }
                         }
                         
                         unsigned nmcmc = 1; // TODO: if trying this, will need to reset things like next species number
                         
+                        vector<double> log_likelihoods_before_mcmc;
+                        for (auto &p:my_vec) {
+                            log_likelihoods_before_mcmc.push_back(p.getLogLikelihood());
+                        }
+                        double sum_log_likelihood_before_mcmc = std::accumulate(log_likelihoods_before_mcmc.begin(), log_likelihoods_before_mcmc.end(), 0);
+                        double avg_log_likelihood_before_mcmc = sum_log_likelihood_before_mcmc / G::_nparticles;
+                        
+//                        if (G::_generation == 0) {
+//                            cout << "stop";
+//                        }
+                    if (G::_mcmc) {
                         for (unsigned m=0; m<nmcmc; m++) {
                             G::_nmcmc_moves_accepted = 0;
                             mcmcMoves(my_vec);
                         }
                         
+                        
+                        vector<double> log_likelihoods_after_mcmc;
+                        for (auto &p:my_vec) {
+                            log_likelihoods_after_mcmc.push_back(p.getLogLikelihood());
+                        }
+                        double sum_log_likelihood_after_mcmc = std::accumulate(log_likelihoods_after_mcmc.begin(), log_likelihoods_after_mcmc.end(), 0);
+                        double avg_log_likelihood_after_mcmc = sum_log_likelihood_after_mcmc / G::_nparticles;
+                        
                         std::ofstream mcmcfile;
 
                         mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
                         double proportion_accepted = (double) G::_nmcmc_moves_accepted / G::_nparticles;
-                        mcmcfile << G::_generation << "\t" << G::_nmcmc_moves_accepted << "\t" << proportion_accepted << "\n";
+                        mcmcfile << G::_generation << "\t" << G::_nmcmc_moves_accepted << "\t" << proportion_accepted << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << avg_log_likelihood_after_mcmc << "\n";
                         
                         vector<double> weights_after_mcmc(G::_nparticles);
                         
@@ -3533,6 +3570,14 @@ namespace proj {
                         if (G::_verbose > 1) {
                             cout << "\t" << "\t" << "\t" << n_unique_particles_after_mcmc << "\n";
                         }
+                    }
+                    else {
+                        std::ofstream mcmcfile;
+
+                        mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
+
+                        
+                        mcmcfile << G::_generation << "\t" << "N/A" << "\t" << "N/A" << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << "N/A" << "\n";
                     }
                 }
                                         
