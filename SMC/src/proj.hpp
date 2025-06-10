@@ -33,6 +33,7 @@ using namespace boost::algorithm;
 #include "g.hpp"
 extern proj::PartialStore ps;
 extern proj::Lot rng;
+extern proj::Lot rng_mcmc;
 extern proj::StopWatch stopwatch;
 
 namespace proj {
@@ -1173,6 +1174,7 @@ namespace proj {
 #endif
         G::_nloci = _data->getNumSubsets();
         rng.setSeed(_random_seed);
+        rng_mcmc.setSeed(_random_seed + 2);
         
         buildSpeciesMap(/*taxa_from_data*/true);
 
@@ -2164,13 +2166,13 @@ namespace proj {
     }
 
     inline void Proj::mcmcMoves(vector<Particle> &particles) {
-//        unsigned count = 0;
+        unsigned count = 0;
         for (auto &p:particles) {
-//            if (count == 13) {
+//            if (count == 70) {
 //                cout << "stop";
 //            }
             p.proposeMCMCMove();
-//            count++;
+            count++;
         }
     }
 
@@ -3250,10 +3252,10 @@ namespace proj {
                 }
                 
                 if (G::_mcmc) {
-                    for (auto &p:my_vec) {
-                        p.setSeedMCMC(rng.randint(1,9999) + psuffix);
-                        psuffix += 2;
-                    }
+//                    for (auto &p:my_vec) {
+//                        p.setSeedMCMC(rng_mcmc.randint(1,9999) + psuffix);
+//                        psuffix += 2;
+//                    }
                 }
                 
                 if (G::_species_newick_specified) {
@@ -3465,16 +3467,20 @@ namespace proj {
                         psuffix += 2;
                     }
                     
-                    if (G::_mcmc) {
-                        for (auto &p:my_vec) {
-                            p.setSeedMCMC(rng.randint(1,9999) + psuffix);
-                            psuffix += 2;
-                        }
-                    }
+//                    if (G::_mcmc) {
+//                        for (auto &p:my_vec) {
+//                            p.setSeedMCMC(rng_mcmc.randint(1,9999) + psuffix);
+//                            psuffix += 2;
+//                        }
+//                    }
                 }
                 
                 //taxon joining and reweighting step
                 proposeParticles(my_vec);
+                
+//                for (auto &p:my_vec) {
+//                    p.showParticle();
+//                }
 
                 bool filter = true;
 
@@ -3491,6 +3497,10 @@ namespace proj {
                         unsigned end = start + (G::_nparticles) - 1;
                                     
                         double ess = filterParticles(g, my_vec, particle_indices, start, end);
+                        
+//                        for (auto &p:my_vec) {
+//                            p.showParticle();
+//                        }
                         
                         vector<double> weights_after_filtering(G::_nparticles);
                         
@@ -3533,6 +3543,7 @@ namespace proj {
                         for (auto &p:my_vec) {
                             log_likelihoods_before_mcmc.push_back(p.getLogLikelihood());
                         }
+                    
                         double sum_log_likelihood_before_mcmc = std::accumulate(log_likelihoods_before_mcmc.begin(), log_likelihoods_before_mcmc.end(), 0);
                         double avg_log_likelihood_before_mcmc = sum_log_likelihood_before_mcmc / G::_nparticles;
                         
@@ -3550,6 +3561,12 @@ namespace proj {
                         for (auto &p:my_vec) {
                             log_likelihoods_after_mcmc.push_back(p.getLogLikelihood());
                         }
+                        
+//                        for (unsigned l=0; l<log_likelihoods_before_mcmc.size(); l++) {
+//                            assert (log_likelihoods_before_mcmc[l] <= log_likelihoods_after_mcmc[l]);
+//                            cout << log_likelihoods_before_mcmc[l] << "\t" << "\t" << log_likelihoods_after_mcmc[l] << endl;
+//                        }
+                        
                         double sum_log_likelihood_after_mcmc = std::accumulate(log_likelihoods_after_mcmc.begin(), log_likelihoods_after_mcmc.end(), 0);
                         double avg_log_likelihood_after_mcmc = sum_log_likelihood_after_mcmc / G::_nparticles;
                         

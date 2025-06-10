@@ -10,6 +10,7 @@
 // Initialize our random number generator here so it will be a global variable
 #include "lot.hpp"
 proj::Lot rng;
+proj::Lot rng_mcmc;
 
 proj::StopWatch stopwatch;
 

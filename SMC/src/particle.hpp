@@ -149,7 +149,7 @@ class Particle {
         void                                            clearPartials();
         Lot::SharedPtr getLot() const {return _lot;}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
-        void setSeedMCMC(unsigned seed) const {_lot_mcmc->setSeed(seed);}
+//        void setSeedMCMC(unsigned seed) const {_lot_mcmc->setSeed(seed);}
         double                                          getSpeciesTreeHeight();
         double                                          getSpeciesTreeLength();
         vector<double>                                  getGeneTreeHeights();
@@ -216,7 +216,7 @@ class Particle {
         double                                  _log_likelihood;
         double                                  _log_coalescent_likelihood;
         mutable Lot::SharedPtr                  _lot;
-        mutable Lot::SharedPtr                  _lot_mcmc;
+//        mutable Lot::SharedPtr                  _lot_mcmc;
         unsigned                                _num_deep_coalescences;
         unsigned                                _max_deep_coal;
         unsigned                                _psuffix;
@@ -266,9 +266,9 @@ class Particle {
 
     inline Particle::Particle() {
         _lot.reset(new Lot());
-        if (G::_mcmc) {
-            _lot_mcmc.reset(new Lot());
-        }
+//        if (G::_mcmc) {
+//            _lot_mcmc.reset(new Lot());
+//        }
         clear();
     };
 
@@ -1183,9 +1183,9 @@ class Particle {
 
     inline Particle::Particle(const Particle & other) {
         _lot.reset(new Lot());
-        if (G::_mcmc) {
-            _lot_mcmc.reset(new Lot());
-        }
+//        if (G::_mcmc) {
+//            _lot_mcmc.reset(new Lot());
+//        }
         *this = other;
     }
 
@@ -2224,7 +2224,8 @@ class Particle {
         Forest::SharedPtr gfcpy = Forest::SharedPtr(new Forest());
         *gfcpy = *gfp;
 
-        double u =  _lot_mcmc->uniform();
+//        double u =  _lot_mcmc->uniform();
+        double u = _lot->uniform();
         double prev_total_to_add = _prev_total_to_add;
 
         double proposed_increment = (prev_total_to_add - G::_sliding_window / 2) + (u*G::_sliding_window);
@@ -2247,7 +2248,6 @@ class Particle {
             if (rates_by_species.size() > 0) {
                 for (auto &r:rates_by_species) {
                     total_rate += r.first;
-//                    new_increment_prior += log(r.first) - (r.first*proposed_increment); // TODO: proposed incr may be smaller than this
                 }
             }
 
@@ -2277,7 +2277,7 @@ class Particle {
                 
                 if (rates_by_species.size() > 0) {
                     for (auto &r:rates_by_species) {
-                        new_increment_prior += log(r.first) - (r.first*proposed_increment); // TODO: proposed incr may be smaller than this
+                        new_increment_prior += log(r.first) - (r.first*proposed_increment);
                     }
                 }
                 
@@ -2321,7 +2321,7 @@ class Particle {
                 
                 if (rates_by_species.size() > 0) {
                     for (auto &r:rates_by_species) {
-                        new_increment_prior -= r.first*species_increment;
+                        new_increment_prior -= (r.first*species_increment);
                     }
                 }
                 
@@ -2362,7 +2362,8 @@ class Particle {
         
 //        double log_ratio = gfcpy->_gene_tree_log_likelihood - prev_log_likelihood; // TODO: be careful - testing
 
-        double u2 = log(_lot_mcmc->uniform());
+//        double u2 = log(_lot_mcmc->uniform());
+        double u2 = log(_lot->uniform());
 
         bool accept = false;
         if (u2 < log_ratio && proposed_increment >= 0.0) {
@@ -2379,9 +2380,9 @@ class Particle {
             _prev_t_by_gene.clear();
 
             _next_species_number_by_gene[locus_number-1] = _prev_next_species_number_by_gene;
-            _log_weight = new_log_weight; // TODO: not sure about this - I don't think it matters - matters if keeping track of ESS
+            _log_weight = new_log_weight; // only matters for keeping track of ESS / unique particles
 
-            _prev_log_likelihoods[locus_number-1] = gfcpy->_gene_tree_log_likelihood;
+//            _prev_log_likelihoods[locus_number-1] = gfcpy->_gene_tree_log_likelihood; // TODO: this gets reset in the proposal anyways
             
             // reset gene forest
             _gene_forest_ptrs[locus_number - 1] = gfcpy;
