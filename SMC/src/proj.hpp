@@ -71,7 +71,7 @@ namespace proj {
             void                proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
             void                proposeParticleGroupRange(unsigned first, unsigned last, vector<vector<Particle>> &particles);
             void                proposeParticles(vector<Particle> &particles);
-            void                mcmcMoves(vector<Particle> &particles);
+            void                mcmcMoves(vector<Particle> &particles, bool last_round);
             void                proposeParticlesSim(vector<Particle> &particles);
             void                proposeParticlesParallelizeByGroup(vector<vector<Particle>> &particles);
             void                simulateData();
@@ -878,6 +878,7 @@ namespace proj {
         ("upgma", boost::program_options::value(&G::_upgma)->default_value(true), "set to false to not use UPGMA completion")
         ("mcmc", boost::program_options::value(&G::_mcmc)->default_value(false), "use mcmc moves in analysis")
         ("sliding_window", boost::program_options::value(&G::_sliding_window)->default_value(0.05), "size of sliding window to use in mcmc analysis")
+        ("n_mcmc_rounds", boost::program_options::value(&G::_n_mcmc_rounds)->default_value(1), "number of rounds to use for mcmc analysis")
 #if defined(SPECIES_IN_CONF)
         ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
 #endif
@@ -1531,6 +1532,13 @@ namespace proj {
                 unsigned non_survivor_index_in_particles = particle_indices[index_nonsurvivor+start];
                 
                 particles[non_survivor_index_in_particles] = particles[survivor_index_in_particles];
+                
+                if (G::_generation == 9) {
+                    double like1 = particles[survivor_index_in_particles].calcLogLikelihood();
+                    double like2 = particles[non_survivor_index_in_particles].calcLogLikelihood();
+                    
+                    assert (like1 == like2);
+                }
             }
             
             ++next_nonzero;
@@ -2165,13 +2173,38 @@ namespace proj {
         }
     }
 
-    inline void Proj::mcmcMoves(vector<Particle> &particles) {
+    inline void Proj::mcmcMoves(vector<Particle> &particles, bool last_round) {
         unsigned count = 0;
         for (auto &p:particles) {
-//            if (count == 70) {
-//                cout << "stop";
-//            }
-            p.proposeMCMCMove();
+            unsigned prev_n_mcmc = G::_nmcmc_moves_accepted;
+            
+            p.proposeMCMCMove(last_round);
+            
+            bool accepted = false;
+            if (G::_nmcmc_moves_accepted > prev_n_mcmc) {
+                accepted = true;
+            }
+            
+            bool tune = true;
+            
+            double target_acceptance = 0.1;
+            unsigned nattempts = count + 1;
+            if (tune) {
+                // tune sliding window
+                double gamma_n = 10.0/(100.0 + nattempts);
+                if (accepted) {
+                    G::_sliding_window *= 1.0 + gamma_n*(1.0 - target_acceptance)/(2.0*target_acceptance);
+                }
+                else {
+                    G::_sliding_window *= 1.0 - gamma_n*0.5;
+                }
+
+                // Prevent run-away increases in boldness for low-information marginal densities
+                if (G::_sliding_window > 1000.0) {
+                    G::_sliding_window = 1000.0;
+                }
+                // TODO: opposite problem - window gets too small?
+            }
             count++;
         }
     }
@@ -3466,22 +3499,10 @@ namespace proj {
                         p.setSeed(rng.randint(1,9999) + psuffix);
                         psuffix += 2;
                     }
-                    
-//                    if (G::_mcmc) {
-//                        for (auto &p:my_vec) {
-//                            p.setSeedMCMC(rng_mcmc.randint(1,9999) + psuffix);
-//                            psuffix += 2;
-//                        }
-//                    }
                 }
                 
                 //taxon joining and reweighting step
                 proposeParticles(my_vec);
-                
-//                for (auto &p:my_vec) {
-//                    p.showParticle();
-//                }
-
                 bool filter = true;
 
                 if (G::_run_on_empty) {
@@ -3495,12 +3516,8 @@ namespace proj {
                     for (unsigned i=0; i<G::_ngroups; i++) {
                         unsigned start = i * G::_nparticles;
                         unsigned end = start + (G::_nparticles) - 1;
-                                    
+
                         double ess = filterParticles(g, my_vec, particle_indices, start, end);
-                        
-//                        for (auto &p:my_vec) {
-//                            p.showParticle();
-//                        }
                         
                         vector<double> weights_after_filtering(G::_nparticles);
                         
@@ -3508,10 +3525,10 @@ namespace proj {
                             weights_after_filtering[p] = my_vec[p].getLogWeight();
                         }
                         
-//                        if (G::_generation == 19) {
-//                            cout << "stop";
-//                        }
-                        unsigned n_unique_particles_after_filtering = std::unique(weights_after_filtering.begin(), weights_after_filtering.end()) - weights_after_filtering.begin();
+                        std::sort(weights_after_filtering.begin(), weights_after_filtering.end());
+                        
+                        double n_unique_particles_after_filtering = std::unique(weights_after_filtering.begin(), weights_after_filtering.end()) - weights_after_filtering.begin();
+                        
                         
                         if (G::_verbose > 1) {
                             cout << G::_generation  << "\t" << ess << "\t" << "\t" << "\t" << n_unique_particles_after_filtering << "\t";
@@ -3524,48 +3541,43 @@ namespace proj {
                     filterParticlesThreading(my_vec, g, particle_indices);
 #endif
                     
-//                    if (G::_mcmc) {
-                        if (G::_generation == 0) {
-                            string filename = "mcmc_moves_accepted.log";
-                            if (filesystem::remove(filename)) {
-                                ofstream mcmcfile(filename);
-                                mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\t" << "average log likelihood before mcmc" << "\t" << "average log likelihood after mcmc" << "\n";
-                            }
-                            else {
-                                ofstream mcmcfile(filename);
-                                mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\t" << "average log likelihood before mcmc" << "\t" << "average log likelihood after mcmc" << "\n";
-                            }
+                    if (G::_generation == 0) {
+                        string filename = "mcmc_moves_accepted.log";
+                        if (filesystem::remove(filename)) {
+                            ofstream mcmcfile(filename);
+                            mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\t" << "average log likelihood before mcmc" << "\t" << "average log likelihood after mcmc" << "\t" << "sliding window" << "\n";
                         }
-                        
-                        unsigned nmcmc = 1; // TODO: if trying this, will need to reset things like next species number
-                        
-                        vector<double> log_likelihoods_before_mcmc;
-                        for (auto &p:my_vec) {
-                            log_likelihoods_before_mcmc.push_back(p.getLogLikelihood());
+                        else {
+                            ofstream mcmcfile(filename);
+                            mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\t" << "average log likelihood before mcmc" << "\t" << "average log likelihood after mcmc" << "sliding window" <<"\n";
                         }
+                    }
+                                                
+                    vector<double> log_likelihoods_before_mcmc;
+                    for (auto &p:my_vec) {
+                        log_likelihoods_before_mcmc.push_back(p.getLogLikelihood());
+                    }
+                
+                    double sum_log_likelihood_before_mcmc = std::accumulate(log_likelihoods_before_mcmc.begin(), log_likelihoods_before_mcmc.end(), 0);
+                    double avg_log_likelihood_before_mcmc = sum_log_likelihood_before_mcmc / G::_nparticles;
                     
-                        double sum_log_likelihood_before_mcmc = std::accumulate(log_likelihoods_before_mcmc.begin(), log_likelihoods_before_mcmc.end(), 0);
-                        double avg_log_likelihood_before_mcmc = sum_log_likelihood_before_mcmc / G::_nparticles;
-                        
-//                        if (G::_generation == 0) {
-//                            cout << "stop";
-//                        }
+                    if (G::_generation == 40) {
+                        cout << "stop";
+                    }
                     if (G::_mcmc) {
-                        for (unsigned m=0; m<nmcmc; m++) {
-                            G::_nmcmc_moves_accepted = 0;
-                            mcmcMoves(my_vec);
+                        G::_nmcmc_moves_accepted = 0;
+                        for (unsigned m=0; m<G::_n_mcmc_rounds; m++) {
+                            bool last_round = false;
+                            if (m == G::_n_mcmc_rounds - 1) {
+                                last_round = true;
+                            }
+                            mcmcMoves(my_vec, last_round);
                         }
-                        
                         
                         vector<double> log_likelihoods_after_mcmc;
                         for (auto &p:my_vec) {
                             log_likelihoods_after_mcmc.push_back(p.getLogLikelihood());
                         }
-                        
-//                        for (unsigned l=0; l<log_likelihoods_before_mcmc.size(); l++) {
-//                            assert (log_likelihoods_before_mcmc[l] <= log_likelihoods_after_mcmc[l]);
-//                            cout << log_likelihoods_before_mcmc[l] << "\t" << "\t" << log_likelihoods_after_mcmc[l] << endl;
-//                        }
                         
                         double sum_log_likelihood_after_mcmc = std::accumulate(log_likelihoods_after_mcmc.begin(), log_likelihoods_after_mcmc.end(), 0);
                         double avg_log_likelihood_after_mcmc = sum_log_likelihood_after_mcmc / G::_nparticles;
@@ -3573,8 +3585,8 @@ namespace proj {
                         std::ofstream mcmcfile;
 
                         mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
-                        double proportion_accepted = (double) G::_nmcmc_moves_accepted / G::_nparticles;
-                        mcmcfile << G::_generation << "\t" << G::_nmcmc_moves_accepted << "\t" << proportion_accepted << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << avg_log_likelihood_after_mcmc << "\n";
+                        double proportion_accepted = (double) G::_nmcmc_moves_accepted / (G::_nparticles * G::_n_mcmc_rounds);
+                        mcmcfile << G::_generation << "\t" << "\t" << G::_nmcmc_moves_accepted << "\t" << "\t" << proportion_accepted << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << avg_log_likelihood_after_mcmc << "\t" << "\t" << "\t" << G::_sliding_window << "\n";
                         
                         vector<double> weights_after_mcmc(G::_nparticles);
                         
@@ -3582,8 +3594,9 @@ namespace proj {
                             weights_after_mcmc[p] = my_vec[p].getLogWeight();
                         }
                         
-                        unsigned n_unique_particles_after_mcmc = std::unique(weights_after_mcmc.begin(), weights_after_mcmc.end()) - weights_after_mcmc.begin();
-                        
+                        std::sort(weights_after_mcmc.begin(), weights_after_mcmc.end());
+                        double n_unique_particles_after_mcmc = std::unique(weights_after_mcmc.begin(), weights_after_mcmc.end()) - weights_after_mcmc.begin();
+                                
                         if (G::_verbose > 1) {
                             cout << "\t" << "\t" << "\t" << n_unique_particles_after_mcmc << "\n";
                         }
@@ -3594,7 +3607,7 @@ namespace proj {
                         mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
 
                         
-                        mcmcfile << G::_generation << "\t" << "N/A" << "\t" << "N/A" << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << "N/A" << "\n";
+                        mcmcfile << G::_generation << "\t" << "\t" << "N/A" << "\t" << "N/A" << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << "N/A" << "\t" << "N/A" << "\n";
                     }
                 }
                                         

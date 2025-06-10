@@ -120,7 +120,7 @@ class Particle {
         void                                    drawNewTheta(string new_species);
 #endif
     
-        void                                    proposeMCMCMove();
+        void                                    proposeMCMCMove(bool last_round);
     
         bool operator<(const Particle::SharedPtr & other) const {
             return _log_weight<other->_log_weight;
@@ -149,7 +149,6 @@ class Particle {
         void                                            clearPartials();
         Lot::SharedPtr getLot() const {return _lot;}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
-//        void setSeedMCMC(unsigned seed) const {_lot_mcmc->setSeed(seed);}
         double                                          getSpeciesTreeHeight();
         double                                          getSpeciesTreeLength();
         vector<double>                                  getGeneTreeHeights();
@@ -216,17 +215,14 @@ class Particle {
         double                                  _log_likelihood;
         double                                  _log_coalescent_likelihood;
         mutable Lot::SharedPtr                  _lot;
-//        mutable Lot::SharedPtr                  _lot_mcmc;
         unsigned                                _num_deep_coalescences;
         unsigned                                _max_deep_coal;
         unsigned                                _psuffix;
         vector<unsigned>                        _next_species_number_by_gene;
         double                                  _prev_next_species_number_by_gene;
         double                                  _prev_increment_prior;
-        double                                  _prev_total_rate;
     
 #if defined (LAZY_COPYING)
-        vector<unsigned>                        _prev_species_number_by_gene;
         vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>> _t;
         vector<vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>>> _t_by_gene;
         vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>> _prev_t_by_gene;
@@ -266,9 +262,6 @@ class Particle {
 
     inline Particle::Particle() {
         _lot.reset(new Lot());
-//        if (G::_mcmc) {
-//            _lot_mcmc.reset(new Lot());
-//        }
         clear();
     };
 
@@ -315,7 +308,7 @@ class Particle {
 #if defined(LAZY_COPYING)
         _gene_forest_ptrs.clear();
         _prev_log_likelihoods.clear();
-        _prev_species_number_by_gene.clear();
+//        _prev_species_number_by_gene.clear();
 #else
         _gene_forests.clear();
 #endif
@@ -333,7 +326,6 @@ class Particle {
         _prev_total_to_add = 0;
         _prev_next_species_number_by_gene = 0;
         _prev_increment_prior = 0;
-        _prev_total_rate = 0;
         _prev_species_assignments_before_coalescence.clear();
     }
 
@@ -663,14 +655,16 @@ class Particle {
         }
         
 #if defined (LAZY_COPYING)
-        if (_prev_species_number_by_gene.size() == 0) { // first step
-            _prev_species_number_by_gene = _next_species_number_by_gene;
-        }
-        else {
-            _prev_species_number_by_gene[next_gene-1] = _next_species_number_by_gene[next_gene-1];
-        }
+//        if (_prev_species_number_by_gene.size() == 0) { // first step
+//            _prev_species_number_by_gene = _next_species_number_by_gene;
+//        }
+//        else {
+//            _prev_species_number_by_gene[next_gene-1] = _next_species_number_by_gene[next_gene-1];
+//        }
 #endif
         
+//        _species_forest.showForest();
+//        _gene_forest_ptrs[next_gene-1]->showForest();
         if (G::_mcmc) {
             _prev_t_by_gene = _t_by_gene[next_gene-1]; // preserve previous _t_by_gene
             
@@ -707,7 +701,6 @@ class Particle {
                 
                 // Draw coalescence increment delta ~ Exponential(total_rate)
                 gene_increment = -log(1.0 - _lot->uniform())/total_rate;
-                _prev_total_rate = total_rate;
                 assert (gene_increment > 0.0);
             }
             
@@ -1183,9 +1176,6 @@ class Particle {
 
     inline Particle::Particle(const Particle & other) {
         _lot.reset(new Lot());
-//        if (G::_mcmc) {
-//            _lot_mcmc.reset(new Lot());
-//        }
         *this = other;
     }
 
@@ -2213,8 +2203,24 @@ class Particle {
     }
 #endif
         
-    inline void Particle::proposeMCMCMove() {
+    inline void Particle::proposeMCMCMove(bool last_round) {
+//        if (G::_generation == 19) {
+//            cout << "stop";
+//        }
+        // _prev_t_by_gene represents species / gene forest before the coalescent event we are attemping to change
+        // save a copy of it to reset _prev_t_by_gene for the next mcmc round
+        vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>> unchanged_prev_t_by_gene = _prev_t_by_gene;
+        vector<G::species_t> unchanged_prev_species_assignments_before_coalescence = _prev_species_assignments_before_coalescence;
+        
+        
+        double unchanged_prev_next_species_number_by_gene = _prev_next_species_number_by_gene;
+        
         unsigned locus_number = _gene_order[G::_generation];
+//        if (locus_number - 1 == 1) {
+//            cout << "stop";
+//            _species_forest.showForest();
+//            _gene_forest_ptrs[locus_number-1]->showForest();
+//        }
         double prev_log_likelihood = _gene_forest_ptrs[locus_number-1]->_gene_tree_log_likelihood;
         
         // Get pointer to gene forest for this locus
@@ -2224,15 +2230,16 @@ class Particle {
         Forest::SharedPtr gfcpy = Forest::SharedPtr(new Forest());
         *gfcpy = *gfp;
 
-//        double u =  _lot_mcmc->uniform();
         double u = _lot->uniform();
         double prev_total_to_add = _prev_total_to_add;
 
         double proposed_increment = (prev_total_to_add - G::_sliding_window / 2) + (u*G::_sliding_window);
+        
         if (proposed_increment < 0) {
             proposed_increment *= -1;
         }
 
+        double total_proposed_increment = proposed_increment;
         double new_increment_prior = 0.0;
 
         gfcpy->revertGeneForest(prev_total_to_add, _prev_species_assignments_before_coalescence);
@@ -2359,17 +2366,14 @@ class Particle {
         double prev_likelihood_x_prior = prev_log_likelihood + _prev_increment_prior;
         double proposed_likelihood_x_prior = gfcpy->_gene_tree_log_likelihood + new_increment_prior;
         double log_ratio = proposed_likelihood_x_prior - prev_likelihood_x_prior;
-        
-//        double log_ratio = gfcpy->_gene_tree_log_likelihood - prev_log_likelihood; // TODO: be careful - testing
 
-//        double u2 = log(_lot_mcmc->uniform());
         double u2 = log(_lot->uniform());
 
         bool accept = false;
         if (u2 < log_ratio && proposed_increment >= 0.0) {
             accept = true;
         }
-        
+//
 //        _species_forest.showForest();
 //        _gene_forest_ptrs[locus_number-1]->showForest();
 //        gfcpy->showForest();
@@ -2377,7 +2381,7 @@ class Particle {
         if (accept) {
             G::_nmcmc_moves_accepted++;
             _t_by_gene[locus_number-1] = _prev_t_by_gene;
-            _prev_t_by_gene.clear();
+//            _prev_t_by_gene.clear(); // don't clear this because it may be reused if doing multiple MCMC rounds
 
             _next_species_number_by_gene[locus_number-1] = _prev_next_species_number_by_gene;
             _log_weight = new_log_weight; // only matters for keeping track of ESS / unique particles
@@ -2390,6 +2394,23 @@ class Particle {
             // Let gpf point to the copy
             gfp = gfcpy;
             
+            if (!last_round) {
+                _prev_total_to_add = total_proposed_increment;
+                _prev_increment_prior = new_increment_prior;
+            }
+        }
+        
+//        if (locus_number - 1 == 1) {
+//            cout << "stop";
+//            _species_forest.showForest();
+//            _gene_forest_ptrs[locus_number-1]->showForest();
+//        }
+        
+        // regardless of whether move is accepted, some variables need to be reset for the next round of mcmc
+        if (!last_round) {
+            _prev_species_assignments_before_coalescence = unchanged_prev_species_assignments_before_coalescence;
+            _prev_t_by_gene = unchanged_prev_t_by_gene;
+            _prev_next_species_number_by_gene = unchanged_prev_next_species_number_by_gene;
         }
         
         // if move is not accepted, nothing changes to the existing gene forest pointer
@@ -2490,7 +2511,6 @@ class Particle {
             _prev_next_species_number_by_gene = other._prev_next_species_number_by_gene;
             _prev_t_by_gene = other._prev_t_by_gene; // TODO: not sure if these need to be copied
             _prev_increment_prior = other._prev_increment_prior;
-            _prev_total_rate = other._prev_total_rate;
             _prev_species_assignments_before_coalescence = other._prev_species_assignments_before_coalescence;
         }
         
@@ -2512,7 +2532,7 @@ class Particle {
         
         _gene_forest_ptrs = other._gene_forest_ptrs;
 //        _gene_forest_extensions = other._gene_forest_extensions;
-        _prev_species_number_by_gene = other._prev_species_number_by_gene;
+//        _prev_species_number_by_gene = other._prev_species_number_by_gene;
         _ensemble_coalinfo = other._ensemble_coalinfo;
 #endif
         

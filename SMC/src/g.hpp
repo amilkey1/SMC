@@ -82,6 +82,7 @@ namespace proj {
         static bool                 _mcmc;
         static double               _sliding_window;
         static unsigned             _nmcmc_moves_accepted;
+        static unsigned             _n_mcmc_rounds;
         
         // other
         static vector<string>           _taxon_names;
