@@ -752,9 +752,15 @@ class Particle {
                     _t_by_gene[next_gene-1][next_species_index].second -= gene_increment; // update species tree increments
                 }
                 
-                for (auto &r:rates_by_species) {
-                    _prev_increment_prior += log(r.first) - (r.first*gene_increment);
-                }
+                _prev_increment_prior += log(total_rate) - (total_rate * gene_increment);
+//                for (auto &r:rates_by_species) {
+//                    if (r.second == species_name) {
+//                        _prev_increment_prior += log(r.first) - (r.first*gene_increment);
+//                    }
+//                    else {
+//                        _prev_increment_prior -= (r.first*gene_increment);
+//                    }
+//                }
                 
                     calc_weight = true;
                 }
@@ -762,6 +768,8 @@ class Particle {
                     // carry out speciation event
                     
                     assert (species_increment > 0.0);
+                
+                    _prev_increment_prior -= (total_rate * species_increment);
                     
 #if defined (LAZY_COPYING)
                     // tell gene forest extension about the species increment
@@ -804,12 +812,12 @@ class Particle {
                     if (_gene_forests[next_gene-1]._species_partition.size() > 1) {
                         _next_species_number_by_gene[next_gene-1]++;
                 }
-                    
-                    if (rates_by_species.size() > 0) {
-                        for (auto &r:rates_by_species) {
-                            _prev_increment_prior -= (r.first*species_increment);
-                        }
-                    }
+            
+//                    if (rates_by_species.size() > 0) {
+//                        for (auto &r:rates_by_species) {
+//                            _prev_increment_prior -= (r.first*species_increment);
+//                        }
+//                    }
 #endif
             }
                 
@@ -1134,14 +1142,20 @@ class Particle {
 #else
     inline void Particle::updateThetaMap(string new_species_name) {
 #endif
+        
+        double new_theta = G::_theta;
+#if defined (DRAW_NEW_THETA)
         // add a new theta for the most recently drawn species
         double scale = (2.0 - 1.0) / _theta_mean;
         assert (scale > 0.0);
-        double new_theta = 0.0;
+        new_theta = 0.0;
+#endif
         if (new_theta < G::_small_enough) {
     //            new_theta = 1 / (lot->gamma(2.01, scale));
+#if defined (DRAW_NEW_THETA)
             new_theta = 1 / (_lot->gamma(2.0, scale));
             assert (new_theta > 0.0);
+#endif
 #if defined (LAZY_COPYING)
             if (_theta_map.count(new_species_name) == 0) {
                 _theta_map[new_species_name] = new_theta; // only update theta map if the species does not already exist in the map
@@ -1649,10 +1663,6 @@ class Particle {
     }
 
     inline void Particle::buildEntireSpeciesTreeSim() {
-//        for (auto &s:G::_species_names_typed) {
-//            _sorted_species_names.push_back(s);
-//        }
-        
         double edge_len = _species_forest.chooseSpeciesIncrementOnly(_lot, 0.0).first;
 
         tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
@@ -2204,9 +2214,6 @@ class Particle {
 #endif
         
     inline void Particle::proposeMCMCMove(bool last_round) {
-//        if (G::_generation == 19) {
-//            cout << "stop";
-//        }
         // _prev_t_by_gene represents species / gene forest before the coalescent event we are attemping to change
         // save a copy of it to reset _prev_t_by_gene for the next mcmc round
         vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>> unchanged_prev_t_by_gene = _prev_t_by_gene;
@@ -2216,11 +2223,6 @@ class Particle {
         double unchanged_prev_next_species_number_by_gene = _prev_next_species_number_by_gene;
         
         unsigned locus_number = _gene_order[G::_generation];
-//        if (locus_number - 1 == 1) {
-//            cout << "stop";
-//            _species_forest.showForest();
-//            _gene_forest_ptrs[locus_number-1]->showForest();
-//        }
         double prev_log_likelihood = _gene_forest_ptrs[locus_number-1]->_gene_tree_log_likelihood;
         
         // Get pointer to gene forest for this locus
@@ -2282,11 +2284,18 @@ class Particle {
                     _prev_t_by_gene[next_species_index].second -= proposed_increment; // update species tree increments
                 }
                 
-                if (rates_by_species.size() > 0) {
-                    for (auto &r:rates_by_species) {
-                        new_increment_prior += log(r.first) - (r.first*proposed_increment);
-                    }
-                }
+//                if (rates_by_species.size() > 0) {
+                    new_increment_prior += log(total_rate) - (total_rate * proposed_increment);
+//                    for (auto &r:rates_by_species) {
+//                        if (r.second == species_name) {
+//                            // prior is different for species that has coalesced
+//                            new_increment_prior += log(r.first) - (r.first*proposed_increment); // TODO: always use total rate for the prior on delta
+//                        }
+//                        else {
+//                            new_increment_prior -= (r.first*proposed_increment);
+//                        }
+//                    }
+//                }
                 
                 calc_weight = true;
             }
@@ -2326,11 +2335,16 @@ class Particle {
                 }
                 proposed_increment -= species_increment;
                 
-                if (rates_by_species.size() > 0) {
-                    for (auto &r:rates_by_species) {
-                        new_increment_prior -= (r.first*species_increment);
-                    }
+                if (rates_by_species.size() == 0) {
+                    assert (total_rate == 0);
                 }
+                
+//                if (rates_by_species.size() > 0) {
+                    new_increment_prior -= (total_rate * species_increment);
+//                    for (auto &r:rates_by_species) {
+//                        new_increment_prior -= (r.first*species_increment);
+//                    }
+//                }
                 
                 if (proposed_increment <= 0.0) {
                     done = true;

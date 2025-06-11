@@ -2185,7 +2185,7 @@ namespace proj {
                 accepted = true;
             }
             
-            bool tune = true;
+            bool tune = false;
             
             double target_acceptance = 0.1;
             unsigned nattempts = count + 1;
@@ -2212,13 +2212,8 @@ namespace proj {
     inline void Proj::proposeParticles(vector<Particle> &particles) {
         assert(G::_nthreads > 0);
         if (G::_nthreads == 1) {
-//            unsigned count = 0;
           for (auto & p : particles) {
-//              if (count == 11) {
-//                  cout << "stop";
-//              }
               p.proposal();
-//              count++;
           }
         }
         else {
@@ -3284,13 +3279,6 @@ namespace proj {
                     psuffix += 2;
                 }
                 
-                if (G::_mcmc) {
-//                    for (auto &p:my_vec) {
-//                        p.setSeedMCMC(rng_mcmc.randint(1,9999) + psuffix);
-//                        psuffix += 2;
-//                    }
-                }
-                
                 if (G::_species_newick_specified) {
                     string species_newick = handleSpeciesNewick();
                     unsigned count = 0;
@@ -3556,14 +3544,14 @@ namespace proj {
                     vector<double> log_likelihoods_before_mcmc;
                     for (auto &p:my_vec) {
                         log_likelihoods_before_mcmc.push_back(p.getLogLikelihood());
+//                        cout << p.getLogLikelihood() << endl;
                     }
                 
+//                    cout << endl;
+                    
                     double sum_log_likelihood_before_mcmc = std::accumulate(log_likelihoods_before_mcmc.begin(), log_likelihoods_before_mcmc.end(), 0);
                     double avg_log_likelihood_before_mcmc = sum_log_likelihood_before_mcmc / G::_nparticles;
                     
-                    if (G::_generation == 40) {
-                        cout << "stop";
-                    }
                     if (G::_mcmc) {
                         G::_nmcmc_moves_accepted = 0;
                         for (unsigned m=0; m<G::_n_mcmc_rounds; m++) {
@@ -3577,7 +3565,10 @@ namespace proj {
                         vector<double> log_likelihoods_after_mcmc;
                         for (auto &p:my_vec) {
                             log_likelihoods_after_mcmc.push_back(p.getLogLikelihood());
+//                            cout << p.getLogLikelihood() << endl;
                         }
+                        
+//                        cout << endl;
                         
                         double sum_log_likelihood_after_mcmc = std::accumulate(log_likelihoods_after_mcmc.begin(), log_likelihoods_after_mcmc.end(), 0);
                         double avg_log_likelihood_after_mcmc = sum_log_likelihood_after_mcmc / G::_nparticles;
