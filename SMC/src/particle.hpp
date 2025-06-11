@@ -654,17 +654,6 @@ class Particle {
             }
         }
         
-#if defined (LAZY_COPYING)
-//        if (_prev_species_number_by_gene.size() == 0) { // first step
-//            _prev_species_number_by_gene = _next_species_number_by_gene;
-//        }
-//        else {
-//            _prev_species_number_by_gene[next_gene-1] = _next_species_number_by_gene[next_gene-1];
-//        }
-#endif
-        
-//        _species_forest.showForest();
-//        _gene_forest_ptrs[next_gene-1]->showForest();
         if (G::_mcmc) {
             _prev_t_by_gene = _t_by_gene[next_gene-1]; // preserve previous _t_by_gene
             
@@ -741,26 +730,18 @@ class Particle {
 #endif
                 
 #if defined (OLD_UPGMA)
-                if (G::_upgma) {
-                    if (!G::_run_on_empty) {
-                        _forests[next_gene].buildRestOfTreeFaster();
+                    if (G::_upgma) {
+                        if (!G::_run_on_empty) {
+                            _forests[next_gene].buildRestOfTreeFaster();
+                        }
                     }
-                }
 #endif
                     
-                if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
-                    _t_by_gene[next_gene-1][next_species_index].second -= gene_increment; // update species tree increments
-                }
+                    if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
+                        _t_by_gene[next_gene-1][next_species_index].second -= gene_increment; // update species tree increments
+                    }
                 
-                _prev_increment_prior += log(total_rate) - (total_rate * gene_increment);
-//                for (auto &r:rates_by_species) {
-//                    if (r.second == species_name) {
-//                        _prev_increment_prior += log(r.first) - (r.first*gene_increment);
-//                    }
-//                    else {
-//                        _prev_increment_prior -= (r.first*gene_increment);
-//                    }
-//                }
+                    _prev_increment_prior += log(total_rate) - (total_rate * gene_increment);
                 
                     calc_weight = true;
                 }
@@ -789,7 +770,7 @@ class Particle {
                     _gene_forest_extensions[next_gene-1].mergeSpecies(left_spp, right_spp);
                     
 #if defined (DRAW_NEW_THETA)
-                    if (!_theta_map.count(left_spp + right_spp)) { // TODO: when dealing with mcmc stuff, does theta map get overwritten if proposal not accepted?
+                    if (!_theta_map.count(left_spp + right_spp)) { // don't overwrite theta map if it already got updated in the mcmc proposal
                         updateThetaMap(left_spp + right_spp);
                     }
 #endif
@@ -812,12 +793,6 @@ class Particle {
                     if (_gene_forests[next_gene-1]._species_partition.size() > 1) {
                         _next_species_number_by_gene[next_gene-1]++;
                 }
-            
-//                    if (rates_by_species.size() > 0) {
-//                        for (auto &r:rates_by_species) {
-//                            _prev_increment_prior -= (r.first*species_increment);
-//                        }
-//                    }
 #endif
             }
                 
@@ -2218,8 +2193,7 @@ class Particle {
         // save a copy of it to reset _prev_t_by_gene for the next mcmc round
         vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>> unchanged_prev_t_by_gene = _prev_t_by_gene;
         vector<G::species_t> unchanged_prev_species_assignments_before_coalescence = _prev_species_assignments_before_coalescence;
-        
-        
+                
         double unchanged_prev_next_species_number_by_gene = _prev_next_species_number_by_gene;
         
         unsigned locus_number = _gene_order[G::_generation];
@@ -2249,6 +2223,7 @@ class Particle {
         // new proposal
         bool done = false;
         bool calc_weight = false;
+        bool impossible_increment = false;
 
         while (!done) {
             vector<pair<double, unsigned long>> rates_by_species = gfcpy->calcForestRate(_lot, _theta_map);
@@ -2284,18 +2259,7 @@ class Particle {
                     _prev_t_by_gene[next_species_index].second -= proposed_increment; // update species tree increments
                 }
                 
-//                if (rates_by_species.size() > 0) {
-                    new_increment_prior += log(total_rate) - (total_rate * proposed_increment);
-//                    for (auto &r:rates_by_species) {
-//                        if (r.second == species_name) {
-//                            // prior is different for species that has coalesced
-//                            new_increment_prior += log(r.first) - (r.first*proposed_increment); // TODO: always use total rate for the prior on delta
-//                        }
-//                        else {
-//                            new_increment_prior -= (r.first*proposed_increment);
-//                        }
-//                    }
-//                }
+                new_increment_prior += log(total_rate) - (total_rate * proposed_increment);
                 
                 calc_weight = true;
             }
@@ -2339,15 +2303,11 @@ class Particle {
                     assert (total_rate == 0);
                 }
                 
-//                if (rates_by_species.size() > 0) {
-                    new_increment_prior -= (total_rate * species_increment);
-//                    for (auto &r:rates_by_species) {
-//                        new_increment_prior -= (r.first*species_increment);
-//                    }
-//                }
+                new_increment_prior -= (total_rate * species_increment);
                 
                 if (proposed_increment <= 0.0) {
                     done = true;
+                    impossible_increment = true;
                 }
             }
 
@@ -2387,6 +2347,10 @@ class Particle {
         if (u2 < log_ratio && proposed_increment >= 0.0) {
             accept = true;
         }
+        
+        if (impossible_increment) {
+            accept = false;
+        }
 //
 //        _species_forest.showForest();
 //        _gene_forest_ptrs[locus_number-1]->showForest();
@@ -2395,12 +2359,11 @@ class Particle {
         if (accept) {
             G::_nmcmc_moves_accepted++;
             _t_by_gene[locus_number-1] = _prev_t_by_gene;
-//            _prev_t_by_gene.clear(); // don't clear this because it may be reused if doing multiple MCMC rounds
 
             _next_species_number_by_gene[locus_number-1] = _prev_next_species_number_by_gene;
             _log_weight = new_log_weight; // only matters for keeping track of ESS / unique particles
 
-//            _prev_log_likelihoods[locus_number-1] = gfcpy->_gene_tree_log_likelihood; // TODO: this gets reset in the proposal anyways
+            // _prev_log_likelihoods gets reset in the next proposal and is not used in this function
             
             // reset gene forest
             _gene_forest_ptrs[locus_number - 1] = gfcpy;
@@ -2414,12 +2377,6 @@ class Particle {
             }
         }
         
-//        if (locus_number - 1 == 1) {
-//            cout << "stop";
-//            _species_forest.showForest();
-//            _gene_forest_ptrs[locus_number-1]->showForest();
-//        }
-        
         // regardless of whether move is accepted, some variables need to be reset for the next round of mcmc
         if (!last_round) {
             _prev_species_assignments_before_coalescence = unchanged_prev_species_assignments_before_coalescence;
@@ -2428,10 +2385,8 @@ class Particle {
         }
         
         // if move is not accepted, nothing changes to the existing gene forest pointer
-
-        // TODO: reset theta map? - don't reset theta map - keep thetas the same until the species tree gets rebuilt
-
-        // TODO: need to include theta prior in posterior?
+        
+        // don't reset theta map - keep thetas the same until species tree is rebuilt
     }
 
 #if defined(LAZY_COPYING)

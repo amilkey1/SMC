@@ -2177,7 +2177,6 @@ namespace proj {
         unsigned count = 0;
         for (auto &p:particles) {
             unsigned prev_n_mcmc = G::_nmcmc_moves_accepted;
-            
             p.proposeMCMCMove(last_round);
             
             bool accepted = false;
