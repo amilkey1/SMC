@@ -72,6 +72,7 @@ namespace proj {
             void                proposeParticleGroupRange(unsigned first, unsigned last, vector<vector<Particle>> &particles);
             void                proposeParticles(vector<Particle> &particles);
             void                mcmcMoves(vector<Particle> &particles, bool last_round);
+            void                proposeMCMCMoveRange(unsigned first, unsigned last, vector<Particle> &particles, bool last_round);
             void                proposeParticlesSim(vector<Particle> &particles);
             void                proposeParticlesParallelizeByGroup(vector<vector<Particle>> &particles);
             void                simulateData();
@@ -2178,38 +2179,74 @@ namespace proj {
     }
 
     inline void Proj::mcmcMoves(vector<Particle> &particles, bool last_round) {
-        unsigned count = 0;
-        for (auto &p:particles) {
-            unsigned prev_n_mcmc = G::_nmcmc_moves_accepted;
-//            p.proposeMCMCMoveOld(last_round);
-            p.proposeMCMCMove(last_round);
-            
-            bool accepted = false;
-            if (G::_nmcmc_moves_accepted > prev_n_mcmc) {
-                accepted = true;
-            }
-            
-            bool tune = false;
-            
-            double target_acceptance = 0.1;
-            unsigned nattempts = count + 1;
-            if (tune) {
-                // tune sliding window
-                double gamma_n = 10.0/(100.0 + nattempts);
-                if (accepted) {
-                    G::_sliding_window *= 1.0 + gamma_n*(1.0 - target_acceptance)/(2.0*target_acceptance);
+        assert(G::_nthreads > 0);
+        if (G::_nthreads == 1) {
+            unsigned count = 0;
+            for (auto &p:particles) {
+                unsigned prev_n_mcmc = G::_nmcmc_moves_accepted;
+                p.proposeMCMCMove(last_round);
+                
+                bool accepted = false;
+                if (G::_nmcmc_moves_accepted > prev_n_mcmc) {
+                    accepted = true;
                 }
-                else {
-                    G::_sliding_window *= 1.0 - gamma_n*0.5;
-                }
+                
+                bool tune = false;
+                
+                double target_acceptance = 0.1;
+                unsigned nattempts = count + 1;
+                if (tune) {
+                    // tune sliding window
+                    double gamma_n = 10.0/(100.0 + nattempts);
+                    if (accepted) {
+                        G::_sliding_window *= 1.0 + gamma_n*(1.0 - target_acceptance)/(2.0*target_acceptance);
+                    }
+                    else {
+                        G::_sliding_window *= 1.0 - gamma_n*0.5;
+                    }
 
-                // Prevent run-away increases in boldness for low-information marginal densities
-                if (G::_sliding_window > 1000.0) {
-                    G::_sliding_window = 1000.0;
+                    // Prevent run-away increases in boldness for low-information marginal densities
+                    if (G::_sliding_window > 1000.0) {
+                        G::_sliding_window = 1000.0;
+                    }
+                    // TODO: opposite problem - window gets too small?
                 }
-                // TODO: opposite problem - window gets too small?
+                count++;
             }
-            count++;
+        }
+        else { // TODO: no groups
+            // divide up the particles as evenly as possible across threads
+              unsigned first = 0;
+              unsigned last = 0;
+              unsigned stride = (G::_nparticles*G::_ngroups) / G::_nthreads; // divisor
+              unsigned r = (G::_nparticles*G::_ngroups) % G::_nthreads; // remainder
+
+            // need a vector of threads because we have to wait for each one to finish
+            vector<thread> threads;
+            
+            for (unsigned i=0; i<G::_nthreads; i++) {
+                first = last;
+                last = first + stride;
+                
+                if (r > 0) {
+                    last += 1;
+                    r -= 1;
+                }
+                
+                if (last > (G::_nparticles*G::_ngroups)) {
+                    last = (G::_nparticles*G::_ngroups);
+                }
+                
+                threads.push_back(thread(&Proj::proposeMCMCMoveRange, this, first, last, std::ref(particles), last_round));
+                // TODO: no tuning if parallelizing
+            }
+
+
+          // the join function causes this loop to pause until the ith thread finishes
+          for (unsigned i = 0; i < threads.size(); i++) {
+            threads[i].join();
+          }
+
         }
     }
 
@@ -2265,6 +2302,12 @@ namespace proj {
     inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles) {
         for (unsigned i=first; i<last; i++){
             particles[i].proposal();
+        }
+    }
+
+    inline void Proj::proposeMCMCMoveRange(unsigned first, unsigned last, vector<Particle> &particles, bool last_round) {
+        for (unsigned i=first; i<last; i++){
+            particles[i].proposeMCMCMove(last_round);
         }
     }
 
