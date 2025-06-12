@@ -39,6 +39,7 @@ namespace proj {
             PartialStore::partial_t getExtensionPartial();
         
             unsigned        getSpeciesPartitionSize(){return (unsigned) _species_partition.size();}
+            double          getNRemainingSpecies();
 
         private:
         
@@ -344,6 +345,12 @@ namespace proj {
         }
     }
 
+    inline double ForestExtension::getNRemainingSpecies() {
+        vector<G::species_t> existing_species = _species_vect;
+        std::sort(existing_species.begin(), existing_species.end());
+        double n_unique_species = unique(existing_species.begin(), existing_species.end()) - existing_species.begin();
+        return n_unique_species;
+    }
 
 #if defined (LAZY_COPYING)
     inline vector<pair<double, unsigned long>> ForestExtension::calcForestRate(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map) {

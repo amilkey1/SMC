@@ -3754,7 +3754,7 @@ class Forest {
         for (auto &nd:_lineages) {
             existing_species.push_back(nd->_species);
         }
-        
+        std::sort(existing_species.begin(), existing_species.end());
         unsigned n_unique_species = unique(existing_species.begin(), existing_species.end()) - existing_species.begin();
         return n_unique_species;
     }

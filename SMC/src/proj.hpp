@@ -1521,7 +1521,11 @@ namespace proj {
             double index_survivor = nonzeros[next_nonzero];
 #if defined(LAZY_COPYING)
             unsigned index_survivor_in_particles = particle_indices[index_survivor+start];
-            particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map);
+            
+            if (!G::_mcmc) {
+                // for mcmc, wait to finalize joins
+                particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map);
+            }
 #endif
             unsigned ncopies = counts[index_survivor] - 1;
             for (unsigned k = 0; k < ncopies; k++) {
@@ -2177,6 +2181,7 @@ namespace proj {
         unsigned count = 0;
         for (auto &p:particles) {
             unsigned prev_n_mcmc = G::_nmcmc_moves_accepted;
+//            p.proposeMCMCMoveOld(last_round);
             p.proposeMCMCMove(last_round);
             
             bool accepted = false;
@@ -3539,10 +3544,12 @@ namespace proj {
                             mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\t" << "average log likelihood before mcmc" << "\t" << "average log likelihood after mcmc" << "sliding window" <<"\n";
                         }
                     }
-                                                
+                             
+                    unsigned locus = my_vec[0].getNextGene() - 1;
+                    
                     vector<double> log_likelihoods_before_mcmc;
                     for (auto &p:my_vec) {
-                        log_likelihoods_before_mcmc.push_back(p.getLogLikelihood());
+                        log_likelihoods_before_mcmc.push_back(p.calcLogLikelihoodLocus(locus, false));
 //                        cout << p.getLogLikelihood() << endl;
                     }
                 
@@ -3561,9 +3568,16 @@ namespace proj {
                             mcmcMoves(my_vec, last_round);
                         }
                         
+                        // TODO: no groups
+                        unsigned locus = my_vec[0].getNextGene() - 1; // subtract 1 because vector of gene forests starts at 0
+                        for (unsigned p=0; p<G::_nparticles; p++) {
+                            // finalize join for every particle now
+                            my_vec[p].finalizeLatestJoinMCMC(locus, p);
+                        }
+
                         vector<double> log_likelihoods_after_mcmc;
                         for (auto &p:my_vec) {
-                            log_likelihoods_after_mcmc.push_back(p.getLogLikelihood());
+                            log_likelihoods_after_mcmc.push_back(p.calcLogLikelihoodLocus(locus, true));
 //                            cout << p.getLogLikelihood() << endl;
                         }
                         

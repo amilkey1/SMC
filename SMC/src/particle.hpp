@@ -67,6 +67,7 @@ class Particle {
         void                                    saveForest(std::string treefilename);
         void                                    savePaupFile(std::string paupfilename, std::string datafilename, std::string treefilename, double expected_lnL) const;
         double                                  calcLogLikelihood();
+        double                                  calcLogLikelihoodLocus(unsigned locus, bool join_finalized);
         double                                  getLogLikelihood();
         vector<double>                          calcGeneTreeLogLikelihoods();
         double                                  calcHeight();
@@ -120,6 +121,7 @@ class Particle {
         void                                    drawNewTheta(string new_species);
 #endif
     
+        void                                    proposeMCMCMoveOld(bool last_round);
         void                                    proposeMCMCMove(bool last_round);
     
         bool operator<(const Particle::SharedPtr & other) const {
@@ -201,6 +203,7 @@ class Particle {
             Forest::SharedPtr                           getGeneForestPtr(unsigned locus);
             const Forest::SharedPtr                     getGeneForestPtrConst(unsigned locus) const;
             void                                        finalizeLatestJoin(int locus, unsigned index, map<const void *, list<unsigned> > & nonzero_map);
+            void                                        finalizeLatestJoinMCMC(int locus, unsigned index);
             void                                        resetGeneForests(bool compute_partials);
             void                                        threadComputePartials(unsigned first, unsigned last);
             void                                        resetAllPrevLogLikelihood();
@@ -358,6 +361,15 @@ class Particle {
             cout << "  _forest._npatterns:        " << _forest._npatterns          << "\n";
             cout << "  _forest._last_edge_length: " << _forest._last_edge_length   << "\n";
             cout << "  newick description:        " << _forest.makeNewick(5,false) << "\n";
+        }
+    }
+
+    inline double Particle::calcLogLikelihoodLocus(unsigned locus, bool join_finalized) {
+        if (join_finalized) {
+            return _gene_forest_ptrs[locus]->calcLogLikelihood();
+        }
+        else {
+            return _prev_log_likelihoods[locus] + _gene_forest_extensions[locus].getLogWeight();
         }
     }
 
@@ -1369,14 +1381,7 @@ class Particle {
     }
 
     inline void Particle::trimSpeciesTree() {
-        // TODO: update for lazy_copying
         unsigned spp_count = G::_nspecies*2 - 1;
-        
-#if defined (LAZY_COPYING)
-//        for (auto &f:_gene_forest_ptrs) {
-//            f->showForest();
-//        }
-#endif
 
         bool trim = true;
         vector<double> gene_tree_heights;
@@ -2188,7 +2193,202 @@ class Particle {
     }
 #endif
         
-    inline void Particle::proposeMCMCMove(bool last_round) {
+        inline void Particle::proposeMCMCMove(bool last_round) {
+            // _prev_t_by_gene represents species / gene forest before the coalescent event we are attemping to change
+            // save a copy of it to reset _prev_t_by_gene for the next mcmc round
+            vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>> unchanged_prev_t_by_gene = _prev_t_by_gene;
+            vector<G::species_t> unchanged_prev_species_assignments_before_coalescence = _prev_species_assignments_before_coalescence;
+                    
+            double unchanged_prev_next_species_number_by_gene = _prev_next_species_number_by_gene;
+            
+            unsigned locus_number = _gene_order[G::_generation];
+            
+            // create a new gene forest extension to propose on
+            ForestExtension new_gfx;
+            new_gfx.dock(_gene_forest_ptrs[locus_number-1], _gene_forest_ptrs[locus_number-1]->pullPartial(), _lot);
+
+            double u = _lot->uniform();
+            double prev_total_to_add = _prev_total_to_add;
+
+            double proposed_increment = (prev_total_to_add - G::_sliding_window / 2) + (u*G::_sliding_window);
+            
+            if (proposed_increment < 0) { // TODO: not sure if it's 0 anymore
+                proposed_increment *= -1;
+            }
+
+            double total_proposed_increment = proposed_increment;
+            double new_increment_prior = 0.0;
+
+            // new proposal
+            bool done = false;
+            bool calc_weight = false;
+            bool impossible_increment = false;
+
+            while (!done) {
+                vector<pair<double, unsigned long>> rates_by_species = new_gfx.calcForestRate(_lot, _theta_map);
+
+                double total_rate = 0.0;
+                if (rates_by_species.size() > 0) {
+                    for (auto &r:rates_by_species) {
+                        total_rate += r.first;
+                    }
+                }
+
+                unsigned next_species_index = _prev_next_species_number_by_gene;
+
+                double species_increment = _prev_t_by_gene[next_species_index].second;
+
+                if ((proposed_increment < species_increment || species_increment == 0.0) && ( rates_by_species.size() != 0)) {
+                    // propose coalescence
+                    new_gfx.addIncrement(proposed_increment);
+
+                    vector<double> event_choice_rates;
+                    for (auto &r:rates_by_species) {
+                        event_choice_rates.push_back(r.first / total_rate);
+                    }
+
+                    unsigned index = selectEventLinearScale(event_choice_rates);
+                    
+                    assert (rates_by_species.size() > 0);
+                    G::species_t species_name = rates_by_species[index].second;
+
+                    new_gfx.coalesce(total_rate, species_name);
+
+                    if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
+                        _prev_t_by_gene[next_species_index].second -= proposed_increment; // update species tree increments
+                    }
+                    
+                    new_increment_prior += log(total_rate) - (total_rate * proposed_increment);
+                    
+                    calc_weight = true;
+                }
+
+                else {
+                    // carry out speciation event
+                    assert (species_increment > 0.0);
+
+                    // add species increment to the gene tree
+                    new_gfx.addIncrement(species_increment);
+
+                    // merge the species in the gene tree
+                    G::species_t left_spp = get<0>(_prev_t_by_gene[next_species_index+1].first);
+                    G::species_t right_spp = get<1>(_prev_t_by_gene[next_species_index+1].first);
+
+                    if (left_spp == 0) {
+                        assert (right_spp == 0);
+                    }
+                    else if (right_spp == 0) {
+                        assert (left_spp == 0);
+                    }
+
+                    new_gfx.mergeSpecies(left_spp, right_spp);
+
+    #if defined (DRAW_NEW_THETA)
+                    if (!_theta_map.count(left_spp + right_spp)) {
+                        updateThetaMap(left_spp + right_spp);
+                    }
+    #endif
+                    assert (next_species_index < _prev_t_by_gene.size());
+                    _prev_t_by_gene[next_species_index].second -= species_increment; // update species tree increments
+                    assert (_prev_t_by_gene[next_species_index].second == 0.0);
+
+                    unsigned nremaining_species = new_gfx.getNRemainingSpecies();
+                    if (nremaining_species > 1) {
+                        _prev_next_species_number_by_gene++;
+                    }
+                    proposed_increment -= species_increment;
+                    
+                    if (rates_by_species.size() == 0) {
+                        assert (total_rate == 0);
+                    }
+                    
+                    new_increment_prior -= (total_rate * species_increment);
+                    
+                    if (proposed_increment <= 0.0) {
+                        done = true;
+                        impossible_increment = true;
+                    }
+                }
+
+                if (calc_weight) { // calc weight just means coalescent event has been proposed
+                    done = true;
+                }
+            }
+
+            // calculate weight of new proposal
+            double inv_gamma_modifier = 0.0;
+
+    #if defined (WEIGHT_MODIFIER)
+            // modifier only happens on first round
+            if (G::_generation == 0 && G::_theta_prior_mean > 0.0 && G::_theta_proposal_mean > 0.0) {
+                if (G::_theta_prior_mean != G::_theta_proposal_mean) {
+                    // else, log weight modifier is 0
+                    double prior_rate = 1.0/G::_theta_prior_mean;
+                    double proposal_rate = 1.0/G::_theta_proposal_mean;
+                    double log_weight_modifier = log(prior_rate) - log(proposal_rate) - (prior_rate - proposal_rate)*_theta_mean;
+
+                    _log_weight += log_weight_modifier;
+                }
+            }
+    #endif
+
+            double new_log_weight = new_gfx.getLogWeight();
+            new_log_weight += inv_gamma_modifier;
+            
+            double new_likelihood = _prev_log_likelihoods[locus_number-1]+new_gfx.getLogWeight();
+            double prev_log_likelihood = _prev_log_likelihoods[locus_number-1]+_gene_forest_extensions[locus_number-1].getLogWeight();
+
+            // accept or reject new move
+            double prev_likelihood_x_prior = prev_log_likelihood + _prev_increment_prior;
+            double proposed_likelihood_x_prior = new_likelihood + new_increment_prior;
+            double log_ratio = proposed_likelihood_x_prior - prev_likelihood_x_prior;
+
+            double u2 = log(_lot->uniform());
+
+            bool accept = false;
+            if (u2 < log_ratio && proposed_increment >= 0.0) {
+                accept = true;
+            }
+            
+            if (impossible_increment) {
+                accept = false;
+            }
+    //
+    //        _species_forest.showForest();
+    //        _gene_forest_ptrs[locus_number-1]->showForest();
+    //        gfcpy->showForest();
+
+            if (accept) {
+                G::_nmcmc_moves_accepted++;
+                _t_by_gene[locus_number-1] = _prev_t_by_gene;
+
+                _next_species_number_by_gene[locus_number-1] = _prev_next_species_number_by_gene;
+                _log_weight = new_log_weight; // only matters for keeping track of ESS / unique particles
+
+                // _prev_log_likelihoods gets reset in the next proposal and is not used in this function
+                
+                _gene_forest_extensions[locus_number - 1] = new_gfx;
+                
+                if (!last_round) {
+                    _prev_total_to_add = total_proposed_increment;
+                    _prev_increment_prior = new_increment_prior;
+                }
+                // TODO: need to finalize latest join
+            }
+            
+            // regardless of whether move is accepted, some variables need to be reset for the next round of mcmc
+            if (!last_round) {
+                _prev_species_assignments_before_coalescence = unchanged_prev_species_assignments_before_coalescence;
+                _prev_t_by_gene = unchanged_prev_t_by_gene;
+                _prev_next_species_number_by_gene = unchanged_prev_next_species_number_by_gene;
+            }
+            
+            // if move is not accepted, nothing changes to the existing gene forest pointer
+            
+            // don't reset theta map - keep thetas the same until species tree is rebuilt
+        }
+        
+    inline void Particle::proposeMCMCMoveOld(bool last_round) {
         // _prev_t_by_gene represents species / gene forest before the coalescent event we are attemping to change
         // save a copy of it to reset _prev_t_by_gene for the next mcmc round
         vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>> unchanged_prev_t_by_gene = _prev_t_by_gene;
@@ -2219,6 +2419,9 @@ class Particle {
         double new_increment_prior = 0.0;
 
         gfcpy->revertGeneForest(prev_total_to_add, _prev_species_assignments_before_coalescence);
+        
+        // likelihood before the previous join was made
+        double initial_log_likelihood = gfcpy->calcLogLikelihood();
 
         // new proposal
         bool done = false;
@@ -2253,7 +2456,7 @@ class Particle {
                 assert (rates_by_species.size() > 0);
                 G::species_t species_name = rates_by_species[index].second;
 
-                gfcpy->coalesce(species_name, _lot, prev_log_likelihood);
+                gfcpy->coalesce(species_name, _lot, initial_log_likelihood);
 
                 if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
                     _prev_t_by_gene[next_species_index].second -= proposed_increment; // update species tree increments
@@ -2445,6 +2648,57 @@ class Particle {
         _gene_forest_extensions[locus].undock();
     }
 #endif
+        
+#if defined(LAZY_COPYING)
+    inline void Particle::finalizeLatestJoinMCMC(int locus, unsigned index) {
+        // Makes join closest to leaf-level in _gene_forest_extensions[locus]
+        // permanent, then undocks _gene_forest_extensions[locus]
+        
+        // Get reference to gene forest extension for this locus
+        ForestExtension & gfx = _gene_forest_extensions[locus];
+        
+        // Get pointer to gene forest for this locus
+        Forest::SharedPtr gfp = _gene_forest_ptrs[locus];
+        
+        // If we are not finalizing the last particle for this
+        // gene forest object, make a copy that can be modified
+        // without affecting other surviving particles
+        
+        // TODO: assuming every particle is unique here
+        // Make a copy of the object pointed to by gfp
+        Forest::SharedPtr gfcpy = Forest::SharedPtr(new Forest());
+        *gfcpy = *gfp;
+        _gene_forest_ptrs[locus] = gfcpy;
+        
+        // Let gpf point to the copy
+        gfp = gfcpy;
+        
+        // Copy log likelihood
+        gfp->setLogLikelihood(_prev_log_likelihoods[locus] + gfx.getLogWeight());
+                        
+        // Get splits for children of _proposed_anc
+        const Node * anc = gfx.getProposedAnc();
+        assert(anc);
+        const Node * lchild = gfx.getProposedLChild();
+        assert(lchild);
+        const Node * rchild = gfx.getProposedRChild();
+        assert(rchild);
+        Split lsplit = lchild->_split;
+        Split rsplit = rchild->_split;
+        
+        assert(anc->_split.isEquivalent(lsplit + rsplit));
+        
+        // Recreate extension's join in the actual gene forest
+        double incr = gfx.getProposedDelta();
+        assert(incr > 0.0);
+        
+        gfp->addIncrAndJoin(incr, lsplit, rsplit, gfx);
+
+        // Can now get rid of extension
+        _gene_forest_extensions[locus].undock();
+    }
+#endif
+
 
 #if defined(LAZY_COPYING)
     inline Forest::SharedPtr Particle::getGeneForestPtr(unsigned locus) {
@@ -2482,21 +2736,25 @@ class Particle {
             _prev_increment_prior = other._prev_increment_prior;
             _prev_species_assignments_before_coalescence = other._prev_species_assignments_before_coalescence;
         }
-        
-        
+
 #if defined (LAZY_COPYING)
         _prev_log_likelihoods = other._prev_log_likelihoods;
         
-        // Ensure that _gene_forest_extensions is allocated
-        if (_gene_forest_extensions.size() == 0) {
-            _gene_forest_extensions.resize(G::_nloci);
+        if (!G::_mcmc) {
+            // Ensure that _gene_forest_extensions is allocated
+            if (_gene_forest_extensions.size() == 0) {
+                _gene_forest_extensions.resize(G::_nloci);
+            }
+            else {
+                assert(_gene_forest_extensions.size() == G::_nloci);
+                
+                // Undock all gene forest extensions
+                for_each(_gene_forest_extensions.begin(), _gene_forest_extensions.end(),
+                [](ForestExtension & f){f.undock();});
+            }
         }
         else {
-            assert(_gene_forest_extensions.size() == G::_nloci);
-            
-            // Undock all gene forest extensions
-            for_each(_gene_forest_extensions.begin(), _gene_forest_extensions.end(),
-                [](ForestExtension & f){f.undock();});
+            _gene_forest_extensions = other._gene_forest_extensions; // for mcmc proposals, forest extensions have not been docked yet
         }
         
         _gene_forest_ptrs = other._gene_forest_ptrs;
