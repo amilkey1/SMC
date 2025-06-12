@@ -1069,7 +1069,6 @@ class Forest {
 
 #if defined (LAZY_COPYING)
     inline double Forest::calcPartialArrayJC(Node * new_nd, const Node * lchild, const Node * rchild) const {
-        G::_partial_count++;
         // Computes the partial array for new_nd and returns the difference in
         // log likelihood due to the addition of new_nd
         //char base[] = {'A','C','G','T'};
@@ -1330,8 +1329,6 @@ class Forest {
     }
 #else
     inline void Forest::calcPartialArrayJC(Node * new_nd) {
-        G::_partial_count++;
-
         assert (_index > 0);
     
         if (!new_nd->_left_child) {
@@ -1543,8 +1540,6 @@ class Forest {
 
 #if !defined (LAZY_COPYING)
     inline void Forest::calcPartialArrayHKY(Node * new_nd) {
-        G::_partial_count++;
-
         assert (_index > 0);
 
         if (!new_nd->_left_child) {

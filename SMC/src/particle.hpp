@@ -208,6 +208,7 @@ class Particle {
             void                                        resetAllPrevLogLikelihood();
             void                                        rebuildCoalInfo();
             void                                        buildEnsembleCoalInfo();
+            unsigned                                    getPartialCount();
 #endif
     
     private:
@@ -223,6 +224,7 @@ class Particle {
         vector<unsigned>                        _next_species_number_by_gene;
         double                                  _prev_next_species_number_by_gene;
         double                                  _prev_increment_prior;
+        unsigned                                _total_particle_partials = 0;
     
 #if defined (LAZY_COPYING)
         vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>> _t;
@@ -739,6 +741,7 @@ class Particle {
 #else
                 _gene_forests[next_gene-1].allowCoalescence(species_name, gene_increment, _lot);
 #endif
+                _total_particle_partials++;
                 
 #if defined (OLD_UPGMA)
                     if (G::_upgma) {
@@ -2252,6 +2255,7 @@ class Particle {
                     G::species_t species_name = rates_by_species[index].second;
 
                     new_gfx.coalesce(total_rate, species_name);
+                    _total_particle_partials++;
 
                     if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
                         _prev_t_by_gene[next_species_index].second -= proposed_increment; // update species tree increments
@@ -2504,6 +2508,10 @@ class Particle {
         return _gene_forest_ptrs[locus];
     }
 #endif
+        
+    inline unsigned Particle::getPartialCount() {
+        return _total_particle_partials;
+    }
         
     inline string Particle::saveGeneNewick(unsigned i) {
 #if defined (LAZY_COPYING)

@@ -182,8 +182,11 @@ namespace proj {
         partialf << "total partials needed: ";
         
 //        unsigned num_partials_needed = ((G::_ntaxa - 1) * G::_nparticles * G::_nloci * G::_ngroups);
-        
-        partialf <<  G::_partial_count << "\n";
+        unsigned total_partials = 0;
+        for (auto &p:particles) {
+            total_partials += p.getPartialCount();
+        }
+        partialf << total_partials << "\n";
         
         partialf.close();
     }
@@ -3601,6 +3604,7 @@ namespace proj {
                     double sum_log_likelihood_before_mcmc = std::accumulate(log_likelihoods_before_mcmc.begin(), log_likelihoods_before_mcmc.end(), 0);
                     double avg_log_likelihood_before_mcmc = sum_log_likelihood_before_mcmc / G::_nparticles;
                     
+                    // TODO: check partial count for no mcmc
                     if (G::_mcmc) {
                         G::_nmcmc_moves_accepted = 0;
                         for (unsigned m=0; m<G::_n_mcmc_rounds; m++) {
