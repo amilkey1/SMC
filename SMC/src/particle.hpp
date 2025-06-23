@@ -642,9 +642,10 @@ class Particle {
 #endif
             }
 #if !defined (USING_MPI)
-            else if (G::_generation % G::_nloci == 0) { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it  // TODO: for now, don't rebuild tree for MPI
+//            else if (G::_generation % G::_nloci == 0) { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it  // TODO: for now, don't rebuild tree for MPI
 //                _species_forest.showForest();
-                    trimSpeciesTree();
+            else {
+                trimSpeciesTree(); // TODO: attempting to trim back species tree after every step
                 if (_species_forest._lineages.size() > 1) {
                     rebuildSpeciesTree();
                 }
@@ -2317,6 +2318,11 @@ class Particle {
                     done = true;
                 }
             }
+            
+//            if (impossible_increment) {
+//                // TODO: propose a new increment
+//                cout << "x";
+//            }
 
             // calculate weight of new proposal
             double inv_gamma_modifier = 0.0;

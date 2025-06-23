@@ -57,7 +57,9 @@ namespace proj {
             void                writeLoradFileAfterSpeciesFiltering(vector<Particle> &v) const;
             void                writeDeepCoalescenceFile(vector<Particle> &v);
             void                writeThetaFile(vector<Particle> &v);
-            void                writeParamsFileForBeastComparison (vector<Particle> &v) const;
+            void                writeParamsFileForBeastComparison(vector<Particle> &v) const;
+            void                writeParamsFileForBeastComparisonTestA(vector<Particle> &v, string filename) const;
+            void                writeParamsFileForBeastComparisonTestB(vector<Particle> &v, string filename) const;
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering(vector<Particle> &v, string filename, unsigned group_number);
             void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(vector<Particle> &v, string filename, unsigned group_number);
             void                writePartialCountFile(vector<Particle> &particles);
@@ -189,6 +191,246 @@ namespace proj {
         partialf << total_partials << "\n";
         
         partialf.close();
+    }
+
+    inline void Proj::writeParamsFileForBeastComparisonTestA(vector<Particle> &v, string filename) const {
+        // this function creates a params file that is comparable to output from starbeast3
+        ofstream logf(filename);
+        logf << "iter ";
+        logf << "\t" << "posterior ";
+        logf << "\t" << "likelihood ";
+        logf << "\t" << "prior ";
+        logf << "\t" << "vectorPrior "; // log joint prior on population sizes (vectorPrior)
+        logf << "\t" << "speciescoalescent ";
+        logf << "\t" << "Tree.t:Species.height ";
+        logf << "\t" << "Tree.t:Species.treeLength ";
+
+        for (int i=1; i<G::_nloci+1; i++) {
+            logf << "\t" << "Tree.t:gene" + to_string(i) + "height";
+            logf << "\t" << "Tree.t:gene" + to_string(i) + "treeLength";
+        }
+
+        logf << "\t" << "YuleModel.t:Species "; // this is the log probability of the species tree (multiply by log(3!) to get increment log prob)
+        logf << "\t" << "popMean "; // this is psi in the InverseGamma(2,psi) distribution of popSize
+
+        for (int i=0; i<(G::_nspecies*2-1); i++) {
+            logf << "\t" << "popSize." + to_string(i+1);
+        }
+
+        logf << "\t" << "speciationRate.t:Species ";
+
+        for (int i=1; i<G::_nloci+1; i++) {
+            logf << "\t" << "treeLikelihood:gene" + to_string(i);
+        }
+        for (int i=1; i<G::_nloci+1; i++) {
+            logf << "\t" << "treePrior:gene" + to_string(i);
+        }
+        logf << endl;
+
+        int iter = 0;
+        
+        for (auto &p:v) {
+                logf << iter;
+                iter++;
+
+                double vector_prior = 0.0; // no vector prior with jones coalescent likelihood
+
+                double log_coalescent_likelihood = 0.0;
+                for (unsigned g=1; g<G::_nloci+1; g++) {
+                    log_coalescent_likelihood += p.getCoalescentLikelihood(g);
+                }
+
+                unsigned locus = p.getNextGene() - 1;
+                double log_likelihood = p.calcLogLikelihoodLocus(locus, false);
+                double log_prior = p.getAllPriorsFirstRound();
+
+                double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior;
+                // no vector prior under Jones method
+
+                logf << "\t" << log_posterior;
+
+                logf << "\t" << log_likelihood;
+
+                logf << "\t" << log_prior; // starbeast3 does not include coalescent likelihood in this prior
+
+
+                logf << "\t" << vector_prior;
+
+                logf << "\t" << log_coalescent_likelihood;
+
+                double species_tree_height = p.getSpeciesTreeHeight();
+                logf << "\t" << species_tree_height;
+
+                double species_tree_length = p.getSpeciesTreeLength();
+                logf << "\t" << species_tree_length;
+
+                vector<double> gene_tree_heights = p.getGeneTreeHeights();
+                vector<double> gene_tree_lengths = p.getGeneTreeLengths();
+                assert (gene_tree_heights.size() == gene_tree_lengths.size());
+
+                for (int i=0; i<gene_tree_heights.size(); i++) {
+                    logf << "\t" << gene_tree_heights[i];
+                    logf << "\t" << gene_tree_lengths[i];
+                }
+
+                double yule_model = p.getSpeciesTreePrior();
+                logf << "\t" << yule_model;
+
+                logf << "\t" << p.getPopMean() / 4.0; // beast uses Ne * u = theta / 4
+
+                for (int i=0; i<(G::_nspecies*2-1); i++) {
+    #if defined (DRAW_NEW_THETA)
+                    vector<double> theta_vec = p.getThetaVector();
+                    
+                    if (i < theta_vec.size()) {
+                        logf << "\t" << theta_vec[i] / 4.0;
+                    }
+                    else {
+                        logf << "\t" << -1;
+                    }
+    #else
+                    logf << "\t" << G::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
+    #endif
+                }
+
+                logf << "\t" << G::_lambda; // TODO: not estimating lambda for now
+            
+                vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
+                vector<double> gene_tree_priors = p.getGeneTreePriors();
+                assert (gene_tree_log_likelihoods.size() == gene_tree_priors.size());
+
+                for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
+                    logf << "\t" << gene_tree_log_likelihoods[i];
+                }
+
+                for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
+                    logf << "\t" << gene_tree_priors[i];
+                }
+
+                logf << endl;
+            }
+
+        logf.close();
+    }
+
+    inline void Proj::writeParamsFileForBeastComparisonTestB(vector<Particle> &v, string filename) const {
+        // this function creates a params file that is comparable to output from starbeast3
+        ofstream logf(filename);
+        logf << "iter ";
+        logf << "\t" << "posterior ";
+        logf << "\t" << "likelihood ";
+        logf << "\t" << "prior ";
+        logf << "\t" << "vectorPrior "; // log joint prior on population sizes (vectorPrior)
+        logf << "\t" << "speciescoalescent ";
+        logf << "\t" << "Tree.t:Species.height ";
+        logf << "\t" << "Tree.t:Species.treeLength ";
+
+        for (int i=1; i<G::_nloci+1; i++) {
+            logf << "\t" << "Tree.t:gene" + to_string(i) + "height";
+            logf << "\t" << "Tree.t:gene" + to_string(i) + "treeLength";
+        }
+
+        logf << "\t" << "YuleModel.t:Species "; // this is the log probability of the species tree (multiply by log(3!) to get increment log prob)
+        logf << "\t" << "popMean "; // this is psi in the InverseGamma(2,psi) distribution of popSize
+
+        for (int i=0; i<(G::_nspecies*2-1); i++) {
+            logf << "\t" << "popSize." + to_string(i+1);
+        }
+
+        logf << "\t" << "speciationRate.t:Species ";
+
+        for (int i=1; i<G::_nloci+1; i++) {
+            logf << "\t" << "treeLikelihood:gene" + to_string(i);
+        }
+        for (int i=1; i<G::_nloci+1; i++) {
+            logf << "\t" << "treePrior:gene" + to_string(i);
+        }
+        logf << endl;
+
+        int iter = 0;
+        
+        for (auto &p:v) {
+                logf << iter;
+                iter++;
+
+                double vector_prior = 0.0; // no vector prior with jones coalescent likelihood
+
+                double log_coalescent_likelihood = 0.0;
+                for (unsigned g=1; g<G::_nloci+1; g++) {
+                    log_coalescent_likelihood += p.getCoalescentLikelihood(g);
+                }
+
+                unsigned locus = p.getNextGene() - 1;
+                double log_likelihood = p.calcLogLikelihoodLocus(locus, true);
+                double log_prior = p.getAllPriorsFirstRound();
+
+                double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior;
+                // no vector prior under Jones method
+
+                logf << "\t" << log_posterior;
+
+                logf << "\t" << log_likelihood;
+
+                logf << "\t" << log_prior; // starbeast3 does not include coalescent likelihood in this prior
+
+
+                logf << "\t" << vector_prior;
+
+                logf << "\t" << log_coalescent_likelihood;
+
+                double species_tree_height = p.getSpeciesTreeHeight();
+                logf << "\t" << species_tree_height;
+
+                double species_tree_length = p.getSpeciesTreeLength();
+                logf << "\t" << species_tree_length;
+
+                vector<double> gene_tree_heights = p.getGeneTreeHeights();
+                vector<double> gene_tree_lengths = p.getGeneTreeLengths();
+                assert (gene_tree_heights.size() == gene_tree_lengths.size());
+
+                for (int i=0; i<gene_tree_heights.size(); i++) {
+                    logf << "\t" << gene_tree_heights[i];
+                    logf << "\t" << gene_tree_lengths[i];
+                }
+
+                double yule_model = p.getSpeciesTreePrior();
+                logf << "\t" << yule_model;
+
+                logf << "\t" << p.getPopMean() / 4.0; // beast uses Ne * u = theta / 4
+
+                for (int i=0; i<(G::_nspecies*2-1); i++) {
+    #if defined (DRAW_NEW_THETA)
+                    vector<double> theta_vec = p.getThetaVector();
+                    
+                    if (i < theta_vec.size()) {
+                        logf << "\t" << theta_vec[i] / 4.0;
+                    }
+                    else {
+                        logf << "\t" << -1;
+                    }
+    #else
+                    logf << "\t" << G::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
+    #endif
+                }
+
+                logf << "\t" << G::_lambda; // TODO: not estimating lambda for now
+            
+                vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
+                vector<double> gene_tree_priors = p.getGeneTreePriors();
+                assert (gene_tree_log_likelihoods.size() == gene_tree_priors.size());
+
+                for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
+                    logf << "\t" << gene_tree_log_likelihoods[i];
+                }
+
+                for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
+                    logf << "\t" << gene_tree_priors[i];
+                }
+
+                logf << endl;
+            }
+
+        logf.close();
     }
 
     inline void Proj::writeParamsFileForBeastComparison(vector<Particle> &v) const {
@@ -3251,7 +3493,6 @@ namespace proj {
                 
                 // set some global variables
                 G::_ntaxa = _data->getNumTaxa();
-//                buildSpeciesMap(false);
                 _data->copyTaxonNames(G::_taxon_names);
                 assert (G::_species_names.size() > 0);
                 
@@ -3263,10 +3504,6 @@ namespace proj {
                 G::_ntaxa = _data->getNumTaxa();
                 _data->copyTaxonNames(G::_taxon_names);
                 
-                // Save species names to global variable _species_names
-                // and create global _taxon_to_species map that provides
-                // the species index for each taxon name
-//                buildSpeciesMap(/*taxa_from_data*/true);
                 G::_nspecies = (unsigned) G::_species_names.size();
                 assert (G::_nspecies > 0);
             }
@@ -3372,7 +3609,6 @@ namespace proj {
 
                 unsigned nsteps = (G::_ntaxa-1)*G::_nloci;
                 
-                
 #if defined (USING_MPI)
                 for (unsigned g=0; g<nsteps; g++){
                     unsigned gene_number = my_vec[0].getNextGene();
@@ -3474,18 +3710,10 @@ namespace proj {
         MPI_Barrier(MPI_COMM_WORLD);
 
 #else
-//                unsigned long k = G::_ntaxa - 1; // different if saving memory
-//
-//                if (G::_upgma) {
-//                    _partials_needed = (0.5*k*(k + 1)*G::_nparticles*G::_nloci)*G::_ngroups;
-//                }
-//                else {
-//                    _partials_needed = k*G::_nparticles*G::_nloci*G::_ngroups;
-//                }
+            if (G::_verbose > 1) {
+                cout << "step " << "\t" << "ESS before filtering " << "\t" << "n_unique particles before MCMC" <<  "\t" << "n_unique particles after MCMC" << endl;
+            }
                 
-                if (G::_verbose > 1) {
-                    cout << "step " << "\t" << "ESS before filtering " << "\t" << "n_unique particles before MCMC" <<  "\t" << "n_unique particles after MCMC" << endl;
-                }
             for (unsigned g=0; g<nsteps; g++) {
                 if (g == 0) {
                     // reset gene order
@@ -3578,6 +3806,8 @@ namespace proj {
 #else
                     filterParticlesThreading(my_vec, g, particle_indices);
 #endif
+                    string filenamea = "params" + to_string(G::_generation) + "a";
+//                    writeParamsFileForBeastComparisonTestA(my_vec, filenamea);
                     
                     if (G::_generation == 0) {
                         string filename = "mcmc_moves_accepted.log";
@@ -3651,6 +3881,9 @@ namespace proj {
                         if (G::_verbose > 1) {
                             cout << "\t" << "\t" << "\t" << n_unique_particles_after_mcmc << "\n";
                         }
+                        
+                        string filenameb = "params" + to_string(G::_generation) + "b";
+//                        writeParamsFileForBeastComparisonTestB(my_vec, filenameb);
                     }
                     else {
                         std::ofstream mcmcfile;
