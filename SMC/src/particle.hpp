@@ -688,6 +688,8 @@ class Particle {
                 
         _prev_total_to_add = 0.0;
         _prev_increment_prior = 0.0;
+//        _species_forest.showForest();
+        
         while (!done) {
 #if defined (LAZY_COPYING)
             vector<pair<double, unsigned long>> rates_by_species = _gene_forest_extensions[next_gene-1].calcForestRate(_lot, _theta_map);
@@ -816,6 +818,8 @@ class Particle {
                 done = true;
             }
         }
+        
+//        _species_forest.showForest();
          
          done = true;
         
@@ -2204,6 +2208,8 @@ class Particle {
                     
             double unchanged_prev_next_species_number_by_gene = _prev_next_species_number_by_gene;
             
+//            double hastings_ratio = 0.0;
+            
             unsigned locus_number = _gene_order[G::_generation];
             
             // create a new gene forest extension to propose on
@@ -2211,15 +2217,107 @@ class Particle {
             new_gfx.dock(_gene_forest_ptrs[locus_number-1], _gene_forest_ptrs[locus_number-1]->pullPartial(), _lot);
 
             double u = _lot->uniform();
-            double prev_total_to_add = _prev_total_to_add;
-
-            double proposed_increment = (prev_total_to_add - G::_sliding_window / 2) + (u*G::_sliding_window);
+//            double prev_total_to_add = _prev_total_to_add;
             
-            if (proposed_increment < 0) { // TODO: not sure if it's 0 anymore
-                proposed_increment *= -1;
+            double prev_gene_tree_height = _gene_forest_ptrs[locus_number-1]->_forest_height;
+            double prev_proposed_gene_tree_height = prev_gene_tree_height + _prev_total_to_add;
+            
+            double prev_species_tree_height = 0.0;
+            
+            for (unsigned i=0; i< _t_by_gene.size(); i++) {
+                if (_prev_t_by_gene[i].second == 0) {
+                    prev_species_tree_height += _t[i].second;
+                }
+                else if (_prev_t_by_gene[i].second != _t[i].second) {
+//                    prev_species_tree_height += _prev_t_by_gene[i].second; // include part of species tree that's been eaten into but not speciated
+                    prev_species_tree_height += _t[i].second; // TODO: not sure if this is right
+                }
+                else {
+                    break;
+                }
             }
+            
+//            _gene_forest_ptrs[locus_number-1]->showForest();
+//            _species_forest.showForest();
+            
+//            if (G::_generation == 25) {
+//                cout << "stop";
+//            }
+            double proposed_height = (prev_proposed_gene_tree_height - G::_sliding_window / 2.0) + (u*G::_sliding_window);
+            
+            if (proposed_height < 0.0) {
+                proposed_height *= -1; // reflect proposed height into the positive zone, then check if it violates the species tree
+            }
+            
+            if ((proposed_height < prev_species_tree_height) || (proposed_height < prev_gene_tree_height)) { // if the chosen height eats into the fixed part of the species tree or gene trees, reflect it back into the legal region
+                if (proposed_height < prev_species_tree_height) { // TODO: not sure if the reflection is correct
+                    double amount_to_add = 2 * (prev_species_tree_height - proposed_height);
+                    proposed_height += amount_to_add;
+                }
+                if (proposed_height < prev_gene_tree_height) {
+                    double amount_to_add = 2 * (prev_gene_tree_height - proposed_height);
+                    proposed_height += amount_to_add;
+                }
+//                proposed_height += G::_sliding_window / 2.0;
+            }
+            
+            assert (proposed_height > prev_species_tree_height);
+            
+//            double proposed_increment = 0.0;
+//            if (prev_species_tree_height > prev_gene_tree_height) {
+//                proposed_increment = proposed_height - prev_species_tree_height; // proposed increment is the remaining height afer the specie tree
+//            }
+//            else {
+                // there is some untouched gene tree after the species barrier
+            double proposed_increment = proposed_height - prev_gene_tree_height; // the total increment to be added is the remainder of the height after the previous gene tree height
+            assert (proposed_increment > 0);
+//                if (proposed_increment < 0) {
+//                    proposed_increment *= -1;
+//                }
+//            }
+            
+//            double proposed_increment = proposed_height - prev_species_tree_height; // proposed increment is the remaining height after the species tree
+            
+//            bool recalculate_increment = false;
+            
+//            double a = prev_gene_tree_height - G::_sliding_window / 2.0;
+//            double new_sliding_window = 0.0;
+//
+//            if (a < prev_species_tree_height) {
+//                a = prev_species_tree_height;
+//                recalculate_increment = true;
+//                // TODO: sliding window bounds change
+//            }
+//            double b = prev_gene_tree_height + G::_sliding_window / 2.0;
+//            assert (b > 0.0);
 
+            // b = proposed_increment + previous height of gene tree
+            // a = previous height of gene tree - proposed increment or species tree height, whichever is smaller
+            // a' to b' = window of new proposal
+            
+//            double proposed_increment = (prev_total_to_add - G::_sliding_window / 2.0) + (u*G::_sliding_window);
+//
+//            if (proposed_increment < 0) { // TODO: not sure if it's 0 anymore
+//                proposed_increment *= -1;
+//            }
+            
             double total_proposed_increment = proposed_increment;
+//            if (recalculate_increment) {
+//                // make a new sliding window centered on proposed increment to calculate hastings ratio
+//
+//                double a_prime = prev_species_tree_height + proposed_increment - G::_sliding_window / 2.0;
+//                assert (a_prime > 0.0);
+//
+//                double b_prime = prev_gene_tree_height + G::_sliding_window / 2.0;
+//                assert (b_prime > 0.0);
+//
+//                hastings_ratio = (b - a) / (b_prime - a_prime);
+//            }
+            
+//            double total_proposed_increment = proposed_increment;
+//            double total_proposed_increment = new_proposed_increment;
+            
+            
             double new_increment_prior = 0.0;
 
             // new proposal
@@ -2240,6 +2338,7 @@ class Particle {
                 unsigned next_species_index = _prev_next_species_number_by_gene;
 
                 double species_increment = _prev_t_by_gene[next_species_index].second;
+//                a += species_increment;
 
                 if ((proposed_increment < species_increment || species_increment == 0.0) && ( rates_by_species.size() != 0)) {
                     // propose coalescence
@@ -2319,8 +2418,19 @@ class Particle {
                 }
             }
             
+            assert (!impossible_increment);
+            
+//            double hastings_ratio = 0;
 //            if (impossible_increment) {
 //                // TODO: propose a new increment
+//                // a is species increment total, accumulated above
+//                double b = total_proposed_increment;
+//                double a_prime = 0;
+//                double b_prime = (b - G::_sliding_window / 2) + (u*G::_sliding_window); // new proposed increment centered on old increment
+//                if (b_prime < 0) {
+//                    b_prime *= -1;
+//                }
+//                hastings_ratio = (b - a) / (b_prime - a_prime);
 //                cout << "x";
 //            }
 
