@@ -2224,25 +2224,23 @@ class Particle {
             
             double prev_species_tree_height = 0.0;
             
-            for (unsigned i=0; i< _t_by_gene.size(); i++) {
+//            _gene_forest_ptrs[locus_number-1]->showForest();
+//            _species_forest.showForest();
+            
+            for (unsigned i=0; i< _t.size(); i++) {
                 if (_prev_t_by_gene[i].second == 0) {
                     prev_species_tree_height += _t[i].second;
                 }
                 else if (_prev_t_by_gene[i].second != _t[i].second) {
 //                    prev_species_tree_height += _prev_t_by_gene[i].second; // include part of species tree that's been eaten into but not speciated
-                    prev_species_tree_height += _t[i].second; // TODO: not sure if this is right
+                    prev_species_tree_height += _t[i].second; // TODO: not sure if this is right - this is true if there is only 1 lineage per species, but if there are multiple lineages per species, you don't necessarily have to go beyond the species barrier? in that case, the boundary would be the previous coalescent event height?
                 }
                 else {
                     break;
                 }
             }
             
-//            _gene_forest_ptrs[locus_number-1]->showForest();
-//            _species_forest.showForest();
-            
-//            if (G::_generation == 25) {
-//                cout << "stop";
-//            }
+
             double proposed_height = (prev_proposed_gene_tree_height - G::_sliding_window / 2.0) + (u*G::_sliding_window);
             
             if (proposed_height < 0.0) {
