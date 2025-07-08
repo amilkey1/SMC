@@ -51,7 +51,7 @@ namespace proj {
             void                saveSpeciesTrees(vector<Particle> &v) const;
             void                saveAllSpeciesTrees(vector<Particle> &v) const;
             void                saveSpeciesTreesAfterFirstRound(vector<Particle> &v) const;
-            void                saveSpeciesTreesHierarchical(vector<Particle> &v, string filename1, string filename2, unsigned group_number) const;
+            void                saveSpeciesTreesHierarchical(vector<Particle> &v, string filename1, string filename2, unsigned group_number);
             void                saveGeneTrees(vector<Particle> &v) const;
             void                writeLoradFile(vector<Particle> &v) const;
             void                writeLoradFileAfterSpeciesFiltering(vector<Particle> &v) const;
@@ -92,6 +92,7 @@ namespace proj {
             double              filterSpeciesParticles(unsigned step, vector<Particle> & particles, unsigned id_number);
             double              computeEffectiveSampleSize(const vector<double> & probs) const;
             void                saveSpeciesTreesAltHierarchical(vector<Particle> &v, unsigned group_number) const;
+            void                calcRUV(vector<Particle> &particles);
         
 #if defined (UPGMA)
             bool                isUnambiguous(Data::state_t s0) const;
@@ -150,6 +151,7 @@ namespace proj {
             vector<string>              _starting_species_partitions;
             void                        growGeneTrees(Particle &particles, unsigned particle_number, unsigned gene_number, unsigned step);
 #endif
+            vector<pair<double, bool>>  _ranks;
 
     };
 
@@ -740,6 +742,9 @@ namespace proj {
         logf << "Maximum number of deep coalescences = " << v[0].getMaxDeepCoalescences() << endl;
         logf << "True species tree height = " << v[0].getSpeciesTreeHeight() << endl;
         
+        ofstream spptreeheight("true_species_tree_height.txt");
+        spptreeheight << v[0].getSpeciesTreeHeight() << endl;
+        
         // Expected height of species tree is (1/2 + 1/3 + ... + 1/nspecies)/lambda
         // Approximation to (1/2 + 1/3 + ... + 1/nspecies) is
         //   ln(nspecies) + 0.58 (Euler's constant)
@@ -865,6 +870,10 @@ namespace proj {
         logf.close();
     }
 
+    inline void Proj::calcRUV(vector<Particle> &particles) {
+        cout << "x";
+    }
+
     inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v, unsigned group_number) const {
         string filename1 = "alt_species_trees.trees";
     
@@ -884,7 +893,7 @@ namespace proj {
         treef.close();
     }
 
-    inline void Proj::saveSpeciesTreesHierarchical(vector<Particle> &v, string filename1, string filename2, unsigned group_number) const {
+    inline void Proj::saveSpeciesTreesHierarchical(vector<Particle> &v, string filename1, string filename2, unsigned group_number) {
         // save only unique species trees
         if (!G::_run_on_empty) {
             vector<vector<pair<double, double>>> unique_increments_and_priors;
@@ -897,6 +906,11 @@ namespace proj {
 //            for (auto &p:v) {
                 Particle p = v[_second_level_indices_to_keep[group_number][i]];
                 vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
+                if (G::_ruv) {
+                    double species_tree_height = p.getSpeciesTreeHeight();
+                    pair<double, bool> rank = make_pair(species_tree_height, false);
+                    _ranks.push_back(rank);
+                }
                 bool found = false;
                 if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
                     found = true;
@@ -1119,12 +1133,13 @@ namespace proj {
         ("simasrvshape",   boost::program_options::value(&Forest::_asrv_shape)->default_value(G::_infinity), "Shape of gamma among-site rate heterogeneity within a locus (used only if startmode is 'sim')")
         ("simcomphet",   boost::program_options::value(&Forest::_comphet)->default_value(G::_infinity), "Dirichlet parameter governing compositional heterogeneity (default value results in compositional homogeneity (used only if startmode is 'sim')")
         ("save_gene_trees_separately", boost::program_options::value(&G::_save_gene_trees_separately)->default_value(false), "for simulations, save gene trees in separate files")
-        ("newick_path", boost::program_options::value(&G::_newick_path)->default_value("."), "path to gene newicks are if starting from gene newicks and only performing SMC on second round")
+        ("newick_path", boost::program_options::value(&G::_newick_path)->default_value(""), "path to gene newicks are if starting from gene newicks and only performing SMC on second round")
         ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(1), "number of populations")
         ("upgma", boost::program_options::value(&G::_upgma)->default_value(true), "set to false to not use UPGMA completion")
         ("mcmc", boost::program_options::value(&G::_mcmc)->default_value(false), "use mcmc moves in analysis")
         ("sliding_window", boost::program_options::value(&G::_sliding_window)->default_value(0.05), "size of sliding window to use in mcmc analysis")
         ("n_mcmc_rounds", boost::program_options::value(&G::_n_mcmc_rounds)->default_value(1), "number of rounds to use for mcmc analysis")
+        ("ruv", boost::program_options::value(&G::_ruv)->default_value(false), "calculate ranks for ruv")
 #if defined(SPECIES_IN_CONF)
         ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
 #endif
@@ -2963,6 +2978,35 @@ namespace proj {
             char newfname[] = "params-beast-comparison-final.log";
             filesystem::remove(oldfname);
             std::rename(newfname, oldfname);
+        }
+        
+        if (G::_ruv) {
+            assert (_ranks.size() > 0);
+            string sim_file_name;
+            if (G::_newick_path != "") {
+                sim_file_name = G::_newick_path + "/" + "true_species_tree_height.txt";
+            }
+            else {
+                sim_file_name = "true_species_tree_height.txt";
+            }
+            string line;
+            string height_as_string;
+            ifstream infile(sim_file_name);
+            while (getline(infile, line)) {
+                height_as_string = line;
+            }
+            double true_species_tree_height = std::stod(height_as_string);
+            _ranks.push_back(make_pair(true_species_tree_height, true));
+            // sort ranks
+            std::sort(_ranks.begin(), _ranks.end());
+            
+            // find rank of truth
+            auto it = std::find_if(_ranks.begin(), _ranks.end(), [&](const pair<double, bool>& p) { return p.second == true;});
+            unsigned index_value = (unsigned) std::distance(_ranks.begin(), it);
+            
+            // write rank value to file
+            ofstream rankf("rank.txt");
+            rankf << "rank: " << index_value << endl;
         }
     }
 
