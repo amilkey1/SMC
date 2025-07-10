@@ -1704,6 +1704,8 @@ namespace proj {
             ess = computeEffectiveSampleSize(probs);
         }
         
+//        if (ess < 200.0) {
+        
 #if defined(SYSTEMATIC_FILTERING)
         vector<unsigned> zeros;
         zeros.reserve(G::_nparticles);
@@ -1778,36 +1780,37 @@ namespace proj {
         //  --------------------------------------------------------------
         unsigned next_zero = 0;
         unsigned next_nonzero = 0;
-        while (next_nonzero < nonzeros.size()) {
-            double index_survivor = nonzeros[next_nonzero];
-#if defined(LAZY_COPYING)
-            unsigned index_survivor_in_particles = particle_indices[index_survivor+start];
-            
-            if (!G::_mcmc) {
-                // for mcmc, wait to finalize joins
-                particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map);
-            }
-#endif
-            unsigned ncopies = counts[index_survivor] - 1;
-            for (unsigned k = 0; k < ncopies; k++) {
-                double index_nonsurvivor = zeros[next_zero++];
+            while (next_nonzero < nonzeros.size()) {
+                double index_survivor = nonzeros[next_nonzero];
+    #if defined(LAZY_COPYING)
+                unsigned index_survivor_in_particles = particle_indices[index_survivor+start];
                 
-                // Replace non-survivor with copy of survivor
-                unsigned survivor_index_in_particles = particle_indices[index_survivor+start];
-                unsigned non_survivor_index_in_particles = particle_indices[index_nonsurvivor+start];
-                
-                particles[non_survivor_index_in_particles] = particles[survivor_index_in_particles];
-                
-                if (G::_generation == 9) {
-                    double like1 = particles[survivor_index_in_particles].calcLogLikelihood();
-                    double like2 = particles[non_survivor_index_in_particles].calcLogLikelihood();
-                    
-                    assert (like1 == like2);
+                if (!G::_mcmc) {
+                    // for mcmc, wait to finalize joins
+                    particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map);
                 }
+    #endif
+                unsigned ncopies = counts[index_survivor] - 1;
+                for (unsigned k = 0; k < ncopies; k++) {
+                    double index_nonsurvivor = zeros[next_zero++];
+                    
+                    // Replace non-survivor with copy of survivor
+                    unsigned survivor_index_in_particles = particle_indices[index_survivor+start];
+                    unsigned non_survivor_index_in_particles = particle_indices[index_nonsurvivor+start];
+                    
+                    particles[non_survivor_index_in_particles] = particles[survivor_index_in_particles];
+                    
+                    if (G::_generation == 9) {
+                        double like1 = particles[survivor_index_in_particles].calcLogLikelihood();
+                        double like2 = particles[non_survivor_index_in_particles].calcLogLikelihood();
+                        
+                        assert (like1 == like2);
+                    }
+                }
+                
+                ++next_nonzero;
             }
-            
-            ++next_nonzero;
-        }
+//        }
         
         return ess;
 #else
@@ -3827,7 +3830,19 @@ namespace proj {
                         unsigned start = i * G::_nparticles;
                         unsigned end = start + (G::_nparticles) - 1;
 
-                        double ess = filterParticles(g, my_vec, particle_indices, start, end);
+                        double ess = -1;
+                        if (G::_generation % 2 == 0) { // TODO: trying filtering only every other generation
+                            ess = filterParticles(g, my_vec, particle_indices, start, end);
+                        }
+                        else {
+//                        if (ess > 200.0) { // then there was no filtering, and joins need to be finalized
+//                            if (!G::_mcmc) {
+                                unsigned locus = my_vec[0].getNextGene() - 1;
+                                for (unsigned p=0; p<my_vec.size(); p++) {
+                                    my_vec[p].finalizeLatestJoinMCMC(locus, p);
+                                }
+                            }
+//                        }
                         
                         vector<double> weights_after_filtering(G::_nparticles);
                         
