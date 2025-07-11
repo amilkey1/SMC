@@ -2369,13 +2369,6 @@ namespace proj {
 //            particle.processSpeciesNewick(species_newick);
 //        }
         
-#if defined (OLD_UPGMA)
-        if (G::_upgma && !G::_gene_newicks_specified) {
-            particle.calcStartingUPGMAMatrix();
-            particle.calcStartingRowCount();
-        }
-#endif
-        
         if (G::_fix_theta) {
             particle.fixTheta();
         }

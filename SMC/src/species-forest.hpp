@@ -166,10 +166,6 @@ class SpeciesForest {
         _preorder.clear();
         _forest_length = 0.0;
         _forest_height = 0.0;
-#if defined (OLD_UPGMA)
-        _starting_row.clear();
-        _nincrements = 0;
-#endif
         _coalinfo.clear();
         _preorders.clear();
     }

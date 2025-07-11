@@ -180,12 +180,6 @@ class Particle {
         void                                            setGeneOrder(vector<unsigned> gene_order) {_gene_order = gene_order;}
         void                                            resetGeneOrder(unsigned step, vector<unsigned> gene_order);
         void                                            trimSpeciesTree();
-#if defined (OLD_UPGMA)
-        void                                            calcStartingRowCount();
-        void                                            calcStartingUPGMAMatrix();
-        vector<vector<double>>                          getStartingUPGMAMatrix();
-        void                                            setStartingUPGMAMatrix(vector<vector<double>> starting_upgma_matrices_by_gene);
-#endif
         void                                            setNTaxaPerSpecies(vector<unsigned> ntaxa_per_species);
         void                                            saveCoalInfoInitial();
         unsigned                                        proposeSpeciationEvent();
@@ -746,13 +740,6 @@ class Particle {
 #endif
                 _total_particle_partials++;
                 
-#if defined (OLD_UPGMA)
-                    if (G::_upgma) {
-                        if (!G::_run_on_empty) {
-                            _forests[next_gene].buildRestOfTreeFaster();
-                        }
-                    }
-#endif
                     
                     if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
                         _t_by_gene[next_gene-1][next_species_index].second -= gene_increment; // update species tree increments
@@ -965,40 +952,6 @@ class Particle {
             return returned_value;
         }
     };
-
-#if defined (OLD_UPGMA)
-    inline void Particle::calcStartingUPGMAMatrix() {
-        for (unsigned i=1; i<_forests.size(); i++) {
-            _forests[i].buildStartingUPGMAMatrix();
-        }
-    }
-#endif
-
-#if defined (OLD_UPGMA)
-    inline vector<vector<double>> Particle::getStartingUPGMAMatrix() {
-        vector<vector<double>> starting_upgma_matrices_by_gene;
-        for (unsigned i=1; i<_forests.size(); i++) {
-            starting_upgma_matrices_by_gene.push_back(_forests[i]._starting_dij);
-        }
-        return starting_upgma_matrices_by_gene;
-    }
-#endif
-
-#if defined (OLD_UPGMA)
-    inline void Particle::setStartingUPGMAMatrix(vector<vector<double>> starting_upgma_matrices_by_gene) {
-        for (unsigned i=1; i<_forests.size(); i++) {
-            _forests[i]._starting_dij = starting_upgma_matrices_by_gene[i-1];
-        }
-    }
-#endif
-
-#if defined (OLD_UPGMA)
-    inline void Particle::calcStartingRowCount() {
-        for (unsigned i=1; i<_forests.size(); i++) {
-            _forests[i].buildStartingRow();
-        }
-    }
-#endif
 
     inline void Particle::setNewTheta(bool fix_theta) {
         // gamma mean = shape * scale
