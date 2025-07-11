@@ -873,6 +873,10 @@ class Particle {
         bool calc_weight = false;
         
         if (G::_generation == 0) {
+            _theta_map.clear();
+            for (auto &t:G::_species_names_typed) {
+                updateThetaMap(t);
+            }
             buildEntireSpeciesTreeSim();
             // make a separate species tree information vector for each gene
             for (unsigned i=0; i<_gene_forests.size(); i++) {

@@ -3831,7 +3831,7 @@ namespace proj {
                         unsigned end = start + (G::_nparticles) - 1;
 
                         double ess = -1;
-                        if (G::_generation % 2 == 0) { // TODO: trying filtering only every other generation
+                        if (G::_generation % 1 == 0) { // TODO: trying filtering only every other generation
                             ess = filterParticles(g, my_vec, particle_indices, start, end);
                         }
                         else {
