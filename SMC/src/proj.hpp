@@ -152,6 +152,7 @@ namespace proj {
             void                        growGeneTrees(Particle &particles, unsigned particle_number, unsigned gene_number, unsigned step);
 #endif
             vector<pair<double, bool>>  _ranks;
+            vector<pair<double, double>> _hpd_values;
 
     };
 
@@ -624,6 +625,8 @@ namespace proj {
             vector<double> gene_tree_heights = p.getGeneTreeHeights();
             vector<double> gene_tree_lengths = p.getGeneTreeLengths();
             assert (gene_tree_heights.size() == gene_tree_lengths.size());
+            
+            _hpd_values.push_back(make_pair(log_posterior, species_tree_height));
 
             for (int i=0; i<gene_tree_heights.size(); i++) {
                 logf << "\t" << gene_tree_heights[i];
@@ -1140,6 +1143,7 @@ namespace proj {
         ("sliding_window", boost::program_options::value(&G::_sliding_window)->default_value(0.05), "size of sliding window to use in mcmc analysis")
         ("n_mcmc_rounds", boost::program_options::value(&G::_n_mcmc_rounds)->default_value(1), "number of rounds to use for mcmc analysis")
         ("ruv", boost::program_options::value(&G::_ruv)->default_value(false), "calculate ranks for ruv")
+        ("hpd", boost::program_options::value(&G::_hpd)->default_value(false), "calculate hpd intervals for coverage")
 #if defined(SPECIES_IN_CONF)
         ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
 #endif
@@ -3004,6 +3008,28 @@ namespace proj {
             ofstream rankf("rank.txt");
             rankf << "rank: " << index_value << endl;
         }
+        
+        if (G::_hpd) {
+            ofstream hpdf("hpd.txt");
+            hpdf << "min    " << "max " << endl;
+            // TODO: make vector of species tree heights + particle posterior
+            
+            // sort hpd values largest to smallest
+            std::sort(_hpd_values.begin(), _hpd_values.end());
+            std::reverse(_hpd_values.begin(), _hpd_values.end());
+            
+            // take first 95% of values TODO: round down or up?
+            double total = size(_hpd_values);
+            double ninety_five_index = floor(0.95*total);
+            
+            double max = _hpd_values[0].second;
+            double min = _hpd_values[ninety_five_index].second;
+            
+            assert (min < max);
+            
+            // write min and max to file
+            hpdf << min << "\t" << max << endl;
+        }
     }
 
     inline void Proj::buildSpeciesMap(bool taxa_from_data) {
@@ -3834,24 +3860,24 @@ namespace proj {
                 
                 if (filter) {
                         
-                    // parallelize filtering by subgroup
+                    // TODO: can parallelize filtering by subgroup
 #if defined (LAZY_COPYING)
                     for (unsigned i=0; i<G::_ngroups; i++) {
                         unsigned start = i * G::_nparticles;
                         unsigned end = start + (G::_nparticles) - 1;
 
                         double ess = -1;
-                        if (G::_generation % 1 == 0) { // TODO: trying filtering only every other generation
+//                        if (G::_generation % 1 == 0) { // TODO: trying filtering only every other generation
                             ess = filterParticles(g, my_vec, particle_indices, start, end);
-                        }
-                        else {
+//                        }
+//                        else {
 //                        if (ess > 200.0) { // then there was no filtering, and joins need to be finalized
 //                            if (!G::_mcmc) {
-                                unsigned locus = my_vec[0].getNextGene() - 1;
-                                for (unsigned p=0; p<my_vec.size(); p++) {
-                                    my_vec[p].finalizeLatestJoinMCMC(locus, p);
-                                }
-                            }
+//                                unsigned locus = my_vec[0].getNextGene() - 1;
+//                                for (unsigned p=0; p<my_vec.size(); p++) {
+//                                    my_vec[p].finalizeLatestJoinMCMC(locus, p);
+//                                }
+//                            }
 //                        }
                         
                         vector<double> weights_after_filtering(G::_nparticles);

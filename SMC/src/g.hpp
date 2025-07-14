@@ -84,6 +84,7 @@ namespace proj {
         static unsigned             _nmcmc_moves_accepted;
         static unsigned             _n_mcmc_rounds;
         static bool                 _ruv;
+        static bool                 _hpd;
         
         // other
         static vector<string>           _taxon_names;
