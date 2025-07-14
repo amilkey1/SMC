@@ -117,6 +117,7 @@ class Particle {
     
 #if defined (LAZY_COPYING)
         void                                    drawNewTheta(G::species_t new_species);
+        void                                    resetSubgroupPointers(vector<Forest::SharedPtr> gene_forest_copies);
 #else
         void                                    drawNewTheta(string new_species);
 #endif
@@ -2596,6 +2597,21 @@ class Particle {
         return _gene_forests[i-1].makeNewick(8, true);
 #endif
     }
+        
+#if defined (LAZY_COPYING)
+    inline void Particle::resetSubgroupPointers(vector<Forest::SharedPtr> gene_forest_copies) {
+        for (unsigned l=0; l<G::_nloci; l++) {
+            Forest::SharedPtr gfp = _gene_forest_ptrs[l];
+            Forest::SharedPtr gfcpy = gene_forest_copies[l];
+            
+            *gfcpy = *gfp;
+            _gene_forest_ptrs[l] = gfcpy;
+            
+            // Let gpf point to the copy
+            gfp = gfcpy;
+        }
+    }
+#endif
 
     inline void Particle::operator=(const Particle & other) {
         if (!G::_in_second_level) {

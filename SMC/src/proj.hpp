@@ -3638,6 +3638,23 @@ namespace proj {
                 // fill particle_indices with values starting from 0
                 iota(particle_indices.begin(), particle_indices.end(), 0);
                 
+#if defined (LAZY_COPYING)
+                // if using subgroups, reset pointers so particles within a group have same gene forest pointers
+                if (G::_ngroups > 1) {
+                    for (unsigned i=0; i<G::_ngroups; i++) {
+                        unsigned start = i * G::_nparticles;
+                        unsigned end = start + (G::_nparticles) - 1;
+                        vector<Forest::SharedPtr> gfcpies;
+                        for (unsigned l=0; l<G::_nloci; l++) {
+                            gfcpies.push_back(Forest::SharedPtr(new Forest()));
+                        }
+                        for (unsigned p=start; p<end+1; p++) {
+                            my_vec[p].resetSubgroupPointers(gfcpies);
+                        }
+                    }
+                }
+#endif
+                
 #if defined (USING_MPI)
                 mpiSetSchedule(); // TODO: need to set this earlier - make sure it works
                 _starting_gene_newicks.resize(total_n_particles);
