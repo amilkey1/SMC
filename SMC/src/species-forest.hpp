@@ -1024,6 +1024,9 @@ class SpeciesForest {
 
     inline double SpeciesForest::getTreeLength() {
         // sum of all edge lengths in tree
+        if (_forest_length == 0) { // check length is actually 0
+            calcTreeLength();
+        }
         return _forest_length;
     }
 
