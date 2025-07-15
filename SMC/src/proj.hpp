@@ -1142,8 +1142,8 @@ namespace proj {
         ("mcmc", boost::program_options::value(&G::_mcmc)->default_value(false), "use mcmc moves in analysis")
         ("sliding_window", boost::program_options::value(&G::_sliding_window)->default_value(0.05), "size of sliding window to use in mcmc analysis")
         ("n_mcmc_rounds", boost::program_options::value(&G::_n_mcmc_rounds)->default_value(1), "number of rounds to use for mcmc analysis")
-        ("ruv", boost::program_options::value(&G::_ruv)->default_value(false), "calculate ranks for ruv")
-        ("hpd", boost::program_options::value(&G::_hpd)->default_value(false), "calculate hpd intervals for coverage")
+        ("ruv", boost::program_options::value(&G::_ruv)->default_value(true), "calculate ranks for ruv")
+        ("hpd", boost::program_options::value(&G::_hpd)->default_value(true), "calculate hpd intervals for coverage")
 #if defined(SPECIES_IN_CONF)
         ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
 #endif
@@ -3022,9 +3022,14 @@ namespace proj {
             double total = size(_hpd_values);
             double ninety_five_index = floor(0.95*total);
             
-            double max = _hpd_values[0].second;
-            double min = _hpd_values[ninety_five_index].second;
+            vector<double> hpd_values_in_range;
             
+            for (unsigned h=0; h<ninety_five_index; h++) {
+                hpd_values_in_range.push_back(_hpd_values[h].second);
+            }
+            
+            auto max = *std::max_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+            auto min = *std::min_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
             assert (min < max);
             
             // write min and max to file
