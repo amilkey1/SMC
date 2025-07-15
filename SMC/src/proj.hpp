@@ -3012,13 +3012,12 @@ namespace proj {
         if (G::_hpd) {
             ofstream hpdf("hpd.txt");
             hpdf << "min    " << "max " << endl;
-            // TODO: make vector of species tree heights + particle posterior
             
             // sort hpd values largest to smallest
             std::sort(_hpd_values.begin(), _hpd_values.end());
             std::reverse(_hpd_values.begin(), _hpd_values.end());
             
-            // take first 95% of values TODO: round down or up?
+            // take first 95% of values (round down to nearest integer)
             double total = size(_hpd_values);
             double ninety_five_index = floor(0.95*total);
             
@@ -3579,111 +3578,111 @@ namespace proj {
                 assert (G::_nspecies > 0);
             }
 #else
-                // set some global variables
-                G::_ntaxa = _data->getNumTaxa();
-                assert (G::_species_names.size() > 0);
+            // set some global variables
+            G::_ntaxa = _data->getNumTaxa();
+            assert (G::_species_names.size() > 0);
 #endif
-                G::_nloci = _data->getNumSubsets();
+            G::_nloci = _data->getNumSubsets();
                 
 #if defined (REUSE_PARTIALS)
-                assert (G::_nloci > 0);
-                ps.setNLoci(G::_nloci);
-                for (unsigned locus = 1; locus < G::_nloci+1; locus++) {
-                    // Set length of partials for gene g
-                    ps.setNElements(G::_nstates*_data->getNumPatternsInSubset(locus-1), locus);
-                }
+            assert (G::_nloci > 0);
+            ps.setNLoci(G::_nloci);
+            for (unsigned locus = 1; locus < G::_nloci+1; locus++) {
+                // Set length of partials for gene g
+                ps.setNElements(G::_nstates*_data->getNumPatternsInSubset(locus-1), locus);
+            }
 #endif
                 
-                // set random number seed
-                rng.setSeed(_random_seed);
+            // set random number seed
+            rng.setSeed(_random_seed);
 
-                if (!G::_gene_newicks_specified) {
+            if (!G::_gene_newicks_specified) {
 #if defined (SPECIES_IN_CONF)
 //                    buildSpeciesMap(/*taxa_from_data*/false);
 
 #else
-                    buildSpeciesMap(/*taxa_from_data*/true);
+                buildSpeciesMap(/*taxa_from_data*/true);
 #endif
-                }
+            }
                 
 #if defined (UPGMA)
-                if (G::_upgma) {
-                    if (!G::_gene_newicks_specified) {
-                        calcPairwiseDistanceMatrix();
-                    }
+            if (G::_upgma) {
+                if (!G::_gene_newicks_specified) {
+                    calcPairwiseDistanceMatrix();
                 }
+            }
 #endif
                 
-                Particle p;
-                initializeParticle(p); // initialize one particle and copy to all other particles
-                
-                // reset marginal likelihood
-                _log_marginal_likelihood = 0.0;
-                
-                _starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
-                
-                for (unsigned g=0; g<G::_ngroups; g++) { // TODO: unsure if this is correct
-                    for (unsigned i=0; i<G::_nloci; i++) {
-                        _log_marginal_likelihood += _starting_log_likelihoods[i];
-                    }
+            Particle p;
+            initializeParticle(p); // initialize one particle and copy to all other particles
+            
+            // reset marginal likelihood
+            _log_marginal_likelihood = 0.0;
+            
+            _starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
+            
+            for (unsigned g=0; g<G::_ngroups; g++) { // TODO: unsure if this is correct
+                for (unsigned i=0; i<G::_nloci; i++) {
+                    _log_marginal_likelihood += _starting_log_likelihoods[i];
                 }
-                
-                vector<Particle> my_vec;
-                my_vec.resize(G::_nparticles * G::_ngroups, p);
+            }
+            
+            vector<Particle> my_vec;
+            my_vec.resize(G::_nparticles * G::_ngroups, p);
 
-                unsigned psuffix = 1;
+            unsigned psuffix = 1;
+            for (auto &p:my_vec) {
+                p.setSeed(rng.randint(1,9999) + psuffix);
+                psuffix += 2;
+            }
+            
+            if (G::_species_newick_specified) {
+                string species_newick = handleSpeciesNewick();
+                unsigned count = 0;
                 for (auto &p:my_vec) {
-                    p.setSeed(rng.randint(1,9999) + psuffix);
-                    psuffix += 2;
+                    p.processSpeciesNewick(species_newick);
+                    count++;
                 }
-                
-                if (G::_species_newick_specified) {
-                    string species_newick = handleSpeciesNewick();
-                    unsigned count = 0;
-                    for (auto &p:my_vec) {
-                        p.processSpeciesNewick(species_newick);
-                        count++;
-                    }
-                }
-                
-                // set group rng
-                _group_rng.resize(G::_ngroups);
-                psuffix = 1;
-                for (auto &g:_group_rng) {
-                    g.reset(new Lot());
-                    g->setSeed(rng.randint(1,9999)+psuffix);
-                    psuffix += 2;
-                }
+            }
+            
+            // set group rng
+            _group_rng.resize(G::_ngroups);
+            psuffix = 1;
+            for (auto &g:_group_rng) {
+                g.reset(new Lot());
+                g->setSeed(rng.randint(1,9999)+psuffix);
+                psuffix += 2;
+            }
 
 #if defined (DRAW_NEW_THETA)
-                updateSpeciesNames();
-                for (auto &p:my_vec) {
-                    p.drawTheta();
-                }
+            updateSpeciesNames();
+            for (auto &p:my_vec) {
+                p.drawTheta();
+            }
 #endif
                 
-                // particle_indices holds the subgroup each particle is in
-                unsigned total_n_particles = G::_nparticles * G::_ngroups;
-                vector<unsigned> particle_indices(total_n_particles);
+            // particle_indices holds the subgroup each particle is in
+            unsigned total_n_particles = G::_nparticles * G::_ngroups;
+            vector<unsigned> particle_indices(total_n_particles);
 
-                // fill particle_indices with values starting from 0
-                iota(particle_indices.begin(), particle_indices.end(), 0);
+            // fill particle_indices with values starting from 0
+            iota(particle_indices.begin(), particle_indices.end(), 0);
                 
 #if defined (LAZY_COPYING)
                 // if using subgroups, reset pointers so particles within a group have same gene forest pointers
-                if (G::_ngroups > 1) {
-                    for (unsigned i=0; i<G::_ngroups; i++) {
-                        unsigned start = i * G::_nparticles;
-                        unsigned end = start + (G::_nparticles) - 1;
-                        vector<Forest::SharedPtr> gfcpies;
-                        for (unsigned l=0; l<G::_nloci; l++) {
-                            gfcpies.push_back(Forest::SharedPtr(new Forest()));
-                        }
-                        for (unsigned p=start; p<end+1; p++) {
-                            my_vec[p].resetSubgroupPointers(gfcpies);
-                        }
+            if (G::_ngroups > 1) {
+                for (unsigned i=0; i<G::_ngroups; i++) {
+                    unsigned start = i * G::_nparticles;
+                    unsigned end = start + (G::_nparticles) - 1;
+                    vector<Forest::SharedPtr> gfcpies;
+                    for (unsigned l=0; l<G::_nloci; l++) {
+                        gfcpies.push_back(Forest::SharedPtr(new Forest()));
+                    }
+                    for (unsigned p=start; p<end+1; p++) {
+                        my_vec[p].resetSubgroupPointers(gfcpies);
                     }
                 }
+            }
 #endif
                 
 #if defined (USING_MPI)
@@ -3866,46 +3865,57 @@ namespace proj {
                 if (filter) {
                         
                     // TODO: can parallelize filtering by subgroup
-#if defined (LAZY_COPYING)
-                    for (unsigned i=0; i<G::_ngroups; i++) {
-                        unsigned start = i * G::_nparticles;
-                        unsigned end = start + (G::_nparticles) - 1;
+//#if defined (LAZY_COPYING)
+                        if (G::_nthreads == 1) {
+                        for (unsigned i=0; i<G::_ngroups; i++) {
+                            unsigned start = i * G::_nparticles;
+                            unsigned end = start + (G::_nparticles) - 1;
 
-                        double ess = -1;
-//                        if (G::_generation % 1 == 0) { // TODO: trying filtering only every other generation
-                            ess = filterParticles(g, my_vec, particle_indices, start, end);
-//                        }
-//                        else {
-//                        if (ess > 200.0) { // then there was no filtering, and joins need to be finalized
-//                            if (!G::_mcmc) {
-//                                unsigned locus = my_vec[0].getNextGene() - 1;
-//                                for (unsigned p=0; p<my_vec.size(); p++) {
-//                                    my_vec[p].finalizeLatestJoinMCMC(locus, p);
-//                                }
-//                            }
-//                        }
-                        
-                        vector<double> weights_after_filtering(G::_nparticles);
-                        
-                        for (unsigned p=0; p<G::_nparticles; p++) {
-                            weights_after_filtering[p] = my_vec[p].getLogWeight();
-                        }
-                        
-                        std::sort(weights_after_filtering.begin(), weights_after_filtering.end());
-                        
-                        double n_unique_particles_after_filtering = std::unique(weights_after_filtering.begin(), weights_after_filtering.end()) - weights_after_filtering.begin();
-                        
-                        
-                        if (G::_verbose > 1) {
-                            cout << G::_generation  << "\t" << ess << "\t" << "\t" << "\t" << n_unique_particles_after_filtering << "\t";
-                            if (!G::_mcmc) {
-                                cout << endl;
+                            double ess = -1;
+    //                        if (G::_generation % 1 == 0) { // can try filtering only every other generation
+    //                        if (G::_nthreads == 1 || G::_ngroups == 1) {
+                                ess = filterParticles(g, my_vec, particle_indices, start, end);
+    //                        }
+    //                        else {
+    //                            filterParticlesThreading(my_vec, g, particle_indices);
+    //                        }
+    //                        }
+    //                        else {
+    //                        if (ess > 200.0) { // then there was no filtering, and joins need to be finalized
+    //                            if (!G::_mcmc) {
+    //                                unsigned locus = my_vec[0].getNextGene() - 1;
+    //                                for (unsigned p=0; p<my_vec.size(); p++) {
+    //                                    my_vec[p].finalizeLatestJoinMCMC(locus, p);
+    //                                }
+    //                            }
+    //                        }
+                            
+                            vector<double> weights_after_filtering(G::_nparticles);
+                            
+                            for (unsigned p=0; p<G::_nparticles; p++) {
+                                weights_after_filtering[p] = my_vec[p].getLogWeight();
+                            }
+                            
+                            std::sort(weights_after_filtering.begin(), weights_after_filtering.end());
+                            
+                            double n_unique_particles_after_filtering = std::unique(weights_after_filtering.begin(), weights_after_filtering.end()) - weights_after_filtering.begin();
+                            
+                            
+                            if (G::_verbose > 1) {
+                                cout << G::_generation  << "\t" << ess << "\t" << "\t" << "\t" << n_unique_particles_after_filtering << "\t";
+                                if (!G::_mcmc) {
+                                    cout << endl;
+                                }
                             }
                         }
                     }
-#else
-                    filterParticlesThreading(my_vec, g, particle_indices);
-#endif
+                    else {
+                        filterParticlesThreading(my_vec, g, particle_indices);
+                    }
+//#else
+//                    filterParticlesThreading(my_vec, g, particle_indices);
+//#endif
+                    
                     string filenamea = "params" + to_string(G::_generation) + "a";
 //                    writeParamsFileForBeastComparisonTestA(my_vec, filenamea);
                     
@@ -3928,13 +3938,10 @@ namespace proj {
                         log_likelihoods_before_mcmc.push_back(p.calcLogLikelihoodLocus(locus, false));
 //                        cout << p.getLogLikelihood() << endl;
                     }
-                
-//                    cout << endl;
                     
                     double sum_log_likelihood_before_mcmc = std::accumulate(log_likelihoods_before_mcmc.begin(), log_likelihoods_before_mcmc.end(), 0);
                     double avg_log_likelihood_before_mcmc = sum_log_likelihood_before_mcmc / G::_nparticles;
                     
-                    // TODO: check partial count for no mcmc
                     if (G::_mcmc) {
                         G::_nmcmc_moves_accepted = 0;
                         for (unsigned m=0; m<G::_n_mcmc_rounds; m++) {
