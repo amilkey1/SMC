@@ -153,6 +153,7 @@ namespace proj {
 #endif
             vector<pair<double, bool>>  _ranks;
             vector<pair<double, double>> _hpd_values;
+            vector<double>              _species_tree_heights;
 
     };
 
@@ -911,6 +912,7 @@ namespace proj {
                 vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
                 if (G::_ruv) {
                     double species_tree_height = p.getSpeciesTreeHeight();
+                    _species_tree_heights.push_back(species_tree_height);
                     pair<double, bool> rank = make_pair(species_tree_height, false);
                     _ranks.push_back(rank);
                 }
@@ -3033,6 +3035,15 @@ namespace proj {
             
             // write min and max to file
             hpdf << min << "\t" << max << endl;
+        }
+        
+        if (G::_hpd || G::_ruv) {
+            // write mean species tree height to output file for validation
+            double sum = accumulate(_species_tree_heights.begin(), _species_tree_heights.end(), 0.0);
+            double mean = sum / _species_tree_heights.size();
+            
+            ofstream heightf("average_species_tree_height.txt");
+            heightf << mean << endl;
         }
     }
 
