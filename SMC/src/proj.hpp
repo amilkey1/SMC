@@ -2997,7 +2997,10 @@ namespace proj {
             while (getline(infile, line)) {
                 height_as_string = line;
             }
-            double true_species_tree_height = std::stod(height_as_string);
+            double true_species_tree_height = 0.0;
+            if (height_as_string != "") {
+                true_species_tree_height = std::stod(height_as_string);
+            }
             _ranks.push_back(make_pair(true_species_tree_height, true));
             // sort ranks
             std::sort(_ranks.begin(), _ranks.end());
