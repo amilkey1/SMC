@@ -668,6 +668,17 @@ namespace proj {
         }
 
         logf.close();
+        
+        // write species tree heights to a file
+        string fname = "species_tree_heights.txt";
+        std::ofstream heightf;
+        
+        heightf.open(fname, std::ios::app);
+        
+        for (auto &p:v) {
+            double species_tree_height = p.getSpeciesTreeHeight();
+            heightf << species_tree_height << "\n";
+        }
     }
 
     inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(vector<Particle> &v, string filename, unsigned group_number) {
