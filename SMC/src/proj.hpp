@@ -733,6 +733,8 @@ namespace proj {
 
             double species_tree_height = p.getSpeciesTreeHeight();
             logf << "\t" << species_tree_height;
+            
+            _hpd_values.push_back(make_pair(log_posterior, species_tree_height));
 
             double species_tree_length = p.getSpeciesTreeLength();
             logf << "\t" << species_tree_length;
@@ -3045,7 +3047,7 @@ namespace proj {
             
             auto max = *std::max_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
             auto min = *std::min_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
-            assert (min < max);
+            assert (min < max || min == max);
             
             // write min and max to file
             hpdf << min << "\t" << max << endl;
