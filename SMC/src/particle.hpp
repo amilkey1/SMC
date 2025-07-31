@@ -207,6 +207,7 @@ class Particle {
             unsigned                                    getPartialCount();
 #endif
             double                                      calcBHVDistance();
+            double                                      calcBHVDistanceTrueTree(string true_newick);
             double                                      opCalcLeafContribution(const Split::treeid_t & Alvs, const Split::treeid_t & Blvs) const;
             double                                      opFindCommonEdges(const Split::treeid_t & A, const Split::treeid_t & B, vector<Split> & common_edges) const;
             double                                      opCalcGeodesicDist(vector<Split::treeid_pair_t> & ABpairs) const;
@@ -2625,11 +2626,89 @@ class Particle {
     }
 #endif
         
+    inline double Particle::calcBHVDistanceTrueTree(string true_newick) {
+        // Build the reference tree
+        SpeciesForest reftree;
+        
+        reftree.buildFromNewick(G::_bhv_reference, true, false);
+        
+        SpeciesForest truetree;
+        truetree.buildFromNewick(true_newick, true, false);
+
+        // Store splits from the reference tree
+        Split::treeid_t A0;
+        Split::treeid_t Alvs;
+        reftree.storeSplits(A0, Alvs);
+
+        // Only save splits with non-zero edge length
+        Split::treeid_t A;
+        for (auto & a : A0) {
+            if (a.getEdgeLen() > 0.0) {
+                A.insert(a);
+            }
+        }
+
+        // test tree is the species tree
+        // store splits from the test tree
+        Split::treeid_t B0;
+        Split::treeid_t Blvs;
+        truetree.storeSplits(B0, Blvs);
+
+        // Only save splits with non-zero edge length
+        Split::treeid_t B;
+        for (auto & b : B0) {
+            if (b.getEdgeLen() > 0.0) {
+                B.insert(b);
+            }
+        }
+
+        // Calculate the contribution of leaf edges to the geodesic
+        double leaf_contribution_squared = opCalcLeafContribution(Alvs, Blvs);
+
+        // Find common edges and calculate the contribution of common edge lengths to the geodesic
+        vector<Split> common_edges;
+        double common_edge_contribution_squared = opFindCommonEdges(A, B, common_edges);
+
+        if (!common_edges.empty()) {
+            // Remove splits representing common edge from both A and B
+            for (auto & c : common_edges) {
+                A.erase(c);
+                B.erase(c);
+            }
+        }
+        vector<pair<Split::treeid_t, Split::treeid_t> > in_pairs;
+        in_pairs.emplace_back(A,B);
+
+        unsigned pair_index = 1;
+        vector<double> geodesic_distances;
+        for (auto & inpair : in_pairs) {
+
+            vector<Split::treeid_pair_t> ABpairs;
+            ABpairs.push_back(inpair);
+
+            double L = opCalcGeodesicDist(ABpairs);
+
+            geodesic_distances.push_back(L);
+            ++pair_index;
+        }
+
+        // Calculate total geodesic distance
+        double total_geodesic_distance = 0.0;
+        for (double x : geodesic_distances) {
+            total_geodesic_distance += pow(x, 2);
+        }
+        total_geodesic_distance += leaf_contribution_squared;
+        total_geodesic_distance += common_edge_contribution_squared;
+        total_geodesic_distance = sqrt(total_geodesic_distance);
+
+        return total_geodesic_distance;
+    }
+        
     inline double Particle::calcBHVDistance() {
         // Build the reference tree
         SpeciesForest reftree;
         
-        reftree.buildFromNewick(G::_bhv_reference, true, false); // TODO: set bits based on node names, not order
+        reftree.buildFromNewick(G::_bhv_reference, true, false);
 
         // Store splits from the reference tree
         Split::treeid_t A0;

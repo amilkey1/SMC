@@ -82,6 +82,7 @@ namespace proj {
             void                initializeParticle(Particle &particle);
             void                handleGeneNewicks();
             string              handleSpeciesNewick();
+            string              readNewickFromFile(string file_name);
 #if defined(LAZY_COPYING)
             void                buildNonzeroMap(vector<Particle> & particles, unsigned locus, map<const void *, list<unsigned> > & nonzero_map, const vector<unsigned> & nonzeros, vector<unsigned> particle_indices, unsigned start, unsigned end);
 #endif
@@ -1373,6 +1374,27 @@ namespace proj {
             std::cout << "    sites:     " << _data->calcSeqLenInSubset(subset) << std::endl;
             std::cout << "    patterns:  " << _data->getNumPatternsInSubset(subset) << std::endl;
         }
+    }
+
+    inline string Proj::readNewickFromFile(string file_name) {
+        ifstream infile(file_name);
+        string newick_string;
+        string newick;
+            
+        int size_before = (int) newick.size();
+        while (getline(infile, newick)) { // file newicks must start with the word "tree" two spaces from the left margin
+            if (newick.find("tree") == 2) { // TODO: this only works if there are exactly 2 spaces before the newick - try starting at parenthesis
+                size_t pos = newick.find("("); //find location of parenthesis
+                newick.erase(0,pos); //delete everything prior to location found
+                newick_string = newick;
+                }
+            }
+            int size_after = (int) newick_string.size();
+            if (size_before == size_after) {
+                throw XProj("cannot find species newick file");
+            }
+        
+        return newick_string;
     }
 
     inline string Proj::handleSpeciesNewick() {
@@ -3025,7 +3047,39 @@ namespace proj {
             unsigned index_value = (unsigned) std::distance(_ranks.begin(), it);
             
             // write rank value to file
-            ofstream rankf("rank.txt");
+            ofstream rankf("rank_species_tree_height.txt");
+            rankf << "rank: " << index_value << endl;
+        }
+        
+        if (G::_bhv_reference != "") {
+            assert (_ranks.size() > 0);
+            string sim_file_name;
+            if (G::_newick_path != "") {
+                sim_file_name = G::_newick_path + "/" + "true-species-tree.tre";
+            }
+            else {
+                sim_file_name = "true-species-tree.tre";
+            }
+            
+            Particle p;
+            string true_newick = readNewickFromFile(sim_file_name);
+            
+            double true_bhv = p.calcBHVDistanceTrueTree(true_newick);
+            
+            // TODO: create a new particle using the true species tree as the species tree
+            // TODO: calculate the bhv distance for the true tree
+            // TODO: add that bhv distance to vector
+            
+            _bhv_distances.push_back(true_bhv);
+            // sort distances
+            std::sort(_bhv_distances.begin(), _bhv_distances.end());
+            
+            // find rank of truth
+            auto it = std::find(_bhv_distances.begin(), _bhv_distances.end(), true_bhv);
+            unsigned index_value = (unsigned) std::distance(_bhv_distances.begin(), it);
+            
+            // write rank value to file
+            ofstream rankf("rank_bhv.txt");
             rankf << "rank: " << index_value << endl;
         }
         
