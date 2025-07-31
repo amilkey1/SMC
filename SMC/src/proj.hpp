@@ -912,79 +912,58 @@ namespace proj {
         if (!G::_run_on_empty) {
             vector<vector<pair<double, double>>> unique_increments_and_priors;
 
-            std::ofstream unique_treef;
+                std::ofstream unique_treef;
 
-            unique_treef.open(filename2, std::ios_base::app);
+                unique_treef.open(filename2, std::ios_base::app);
 
-            for (unsigned i=0; i<_second_level_indices_to_keep[group_number].size(); i++) {
-                Particle p = v[_second_level_indices_to_keep[group_number][i]];
-                vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
-                
-                if (G::_ruv) {
-                    double species_tree_height = p.getSpeciesTreeHeight();
-                    _species_tree_heights.push_back(species_tree_height);
-                    pair<double, bool> rank = make_pair(species_tree_height, false);
-                    _ranks.push_back(rank);
+                for (unsigned i=0; i<_second_level_indices_to_keep[group_number].size(); i++) {
+                    Particle p = v[_second_level_indices_to_keep[group_number][i]];
+                    vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
+                    
+                    if (G::_ruv) {
+                        double species_tree_height = p.getSpeciesTreeHeight();
+                        _species_tree_heights.push_back(species_tree_height);
+                        pair<double, bool> rank = make_pair(species_tree_height, false);
+                        _ranks.push_back(rank);
+                    }
+                    
+                    if (G::_bhv_reference != "") {
+                        _bhv_distances.push_back(p.calcBHVDistance());
+                    }
+                    
+                if (G::_write_species_tree_file) {
+                    bool found = false;
+                    if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
+                        found = true;
+                    }
+                    if (!found) {
+                        unique_increments_and_priors.push_back(increments_and_priors);
+                        unique_treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
+                    }
                 }
-                
-                if (G::_bhv_reference != "") {
-                    _bhv_distances.push_back(p.calcBHVDistance());
-                }
-                
-                bool found = false;
-                if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
-                    found = true;
-                }
-                if (!found) {
-                    unique_increments_and_priors.push_back(increments_and_priors);
-                    unique_treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
-                }
+                unique_treef.close();
             }
-            unique_treef.close();
         }
 
         assert (G::_start_mode_type != G::StartModeType::START_MODE_SIM);
 
-        unsigned count = 0;
-            // save all species trees
-            std::ofstream treef;
+        if (G::_write_species_tree_file) {
+            unsigned count = 0;
+                // save all species trees
+                std::ofstream treef;
 
-            treef.open(filename1, std::ios_base::app);
-//            for (auto &p:v) {
-        for (unsigned i=0; i<_second_level_indices_to_keep[group_number].size(); i++) {
-//            for (auto &p:v) {
-            Particle p = v[_second_level_indices_to_keep[group_number][i]];
-                treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
-                count++;
-            }
-            treef.close();
+                treef.open(filename1, std::ios_base::app);
+            for (unsigned i=0; i<_second_level_indices_to_keep[group_number].size(); i++) {
+                Particle p = v[_second_level_indices_to_keep[group_number][i]];
+                    treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
+                    count++;
+                }
+                treef.close();
+        }
     }
 
     inline void Proj::saveSpeciesTreesAfterFirstRound(vector<Particle> &v) const {
-        // save only unique species trees
-//        if (!G::_run_on_empty) {
-//            vector<vector<pair<double, double>>> unique_increments_and_priors;
-//
-//            ofstream unique_treef("unique_species_trees_after_first_round.trees");
-//            unique_treef << "#nexus\n\n";
-//            unique_treef << "begin trees;\n";
-//            for (auto &p:v) {
-//                vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
-//                bool found = false;
-//                if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
-//                    found = true;
-//                }
-//                if (!found) {
-//                    unique_increments_and_priors.push_back(increments_and_priors);
-//                    unique_treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
-//                }
-//            }
-//            unique_treef << "end;\n";
-//            unique_treef.close();
-//        }
-//        else {
-            // save all species trees after first round
-
+        if (G::_write_species_tree_file) {
             ofstream treef("species_trees_after_first_round.trees");
             treef << "#nexus\n\n";
             treef << "begin trees;\n";
@@ -993,7 +972,7 @@ namespace proj {
             }
             treef << "end;\n";
             treef.close();
-//        }
+        }
     }
 
     inline void Proj::saveAllSpeciesTrees(vector<Particle> &v) const {
@@ -1159,9 +1138,10 @@ namespace proj {
         ("mcmc", boost::program_options::value(&G::_mcmc)->default_value(false), "use mcmc moves in analysis")
         ("sliding_window", boost::program_options::value(&G::_sliding_window)->default_value(0.05), "size of sliding window to use in mcmc analysis")
         ("n_mcmc_rounds", boost::program_options::value(&G::_n_mcmc_rounds)->default_value(1), "number of rounds to use for mcmc analysis")
-        ("ruv", boost::program_options::value(&G::_ruv)->default_value(true), "calculate ranks for ruv")
-        ("hpd", boost::program_options::value(&G::_hpd)->default_value(true), "calculate hpd intervals for coverage")
+        ("ruv", boost::program_options::value(&G::_ruv)->default_value(false), "calculate ranks for ruv")
+        ("hpd", boost::program_options::value(&G::_hpd)->default_value(false), "calculate hpd intervals for coverage")
         ("bhv_reference", boost::program_options::value(&G::_bhv_reference)->default_value(""), "newick string to use for BHV distance reference")
+        ("write_species_tree_file", boost::program_options::value(&G::_write_species_tree_file)->default_value(true), "set to false to not write species tree newicks to a file - only use this option to turn on for RUV calculations when lots of trees will be saved")
 #if defined(SPECIES_IN_CONF)
         ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
 #endif
@@ -2788,7 +2768,7 @@ namespace proj {
         string filename1 = "species_trees.trees";
         string filename2 = "unique_species_trees.trees";
         string filename3 = "params-beast-comparison.log";
-        string altfname = "alt_species_trees.trees";
+//        string altfname = "alt_species_trees.trees";
 
         cout << "\n";
 
@@ -2913,11 +2893,11 @@ namespace proj {
 //                saveSpeciesTreesAltHierarchical(second_level_particles, id_number);
                 writeParamsFileForBeastComparisonAfterSpeciesFiltering(second_level_particles, filename3, id_number);
             }
-
-            ofstream altfname_end;
-            altfname_end.open("alt_species_trees.trees", std::ios::app);
-            altfname_end << "end;" << endl;
-            altfname_end.close();
+//
+//            ofstream altfname_end;
+//            altfname_end.open("alt_species_trees.trees", std::ios::app);
+//            altfname_end << "end;" << endl;
+//            altfname_end.close();
             
             ofstream strees;
             strees.open("species_trees.trees", std::ios::app);
@@ -2968,10 +2948,10 @@ namespace proj {
             
             proposeSpeciesGroupsFaster(particles, ngroups, filename1, filename2, filename3);
             
-            ofstream altfname;
-            altfname.open("alt_species_trees.trees", std::ios::app);
-            altfname << "end;" << endl;
-            altfname.close();
+//            ofstream altfname;
+//            altfname.open("alt_species_trees.trees", std::ios::app);
+//            altfname << "end;" << endl;
+//            altfname.close();
             
             ofstream strees;
             strees.open("species_trees.trees", std::ios::app);
@@ -3052,7 +3032,7 @@ namespace proj {
         }
         
         if (G::_bhv_reference != "") {
-            assert (_ranks.size() > 0);
+            assert (_bhv_distances.size() > 0);
             string sim_file_name;
             if (G::_newick_path != "") {
                 sim_file_name = G::_newick_path + "/" + "true-species-tree.tre";
@@ -3065,10 +3045,6 @@ namespace proj {
             string true_newick = readNewickFromFile(sim_file_name);
             
             double true_bhv = p.calcBHVDistanceTrueTree(true_newick);
-            
-            // TODO: create a new particle using the true species tree as the species tree
-            // TODO: calculate the bhv distance for the true tree
-            // TODO: add that bhv distance to vector
             
             _bhv_distances.push_back(true_bhv);
             // sort distances
@@ -4218,32 +4194,32 @@ namespace proj {
                     }
                 }
                 
-                string altfname = "alt_species_trees.trees";
-                if (filesystem::remove(altfname)) {
-                    
-                    if (G::_verbose > 0) {
-                       cout << "existing file " << altfname << " removed and replaced\n";
-                    }
-                    
-                    ofstream alttrf(altfname);
-
-                    alttrf << "#nexus\n\n";
-                    alttrf << "Begin trees;" << endl;
-                    string translate_block = my_vec[0].getTranslateBlock();
-                    alttrf << translate_block << endl;
-                }
-                else {
-                    ofstream alttrf(altfname);
-
-                    alttrf << "#nexus\n\n";
-                    alttrf << "Begin trees;" << endl;
-                    string translate_block = my_vec[0].getTranslateBlock();
-                    alttrf << translate_block << endl;
-                    
-                    if (G::_verbose > 0) {
-                        cout << "created new file " << altfname << "\n";
-                    }
-                }
+//                string altfname = "alt_species_trees.trees";
+//                if (filesystem::remove(altfname)) {
+//
+//                    if (G::_verbose > 0) {
+//                       cout << "existing file " << altfname << " removed and replaced\n";
+//                    }
+//
+//                    ofstream alttrf(altfname);
+//
+//                    alttrf << "#nexus\n\n";
+//                    alttrf << "Begin trees;" << endl;
+//                    string translate_block = my_vec[0].getTranslateBlock();
+//                    alttrf << translate_block << endl;
+//                }
+//                else {
+//                    ofstream alttrf(altfname);
+//
+//                    alttrf << "#nexus\n\n";
+//                    alttrf << "Begin trees;" << endl;
+//                    string translate_block = my_vec[0].getTranslateBlock();
+//                    alttrf << translate_block << endl;
+//
+//                    if (G::_verbose > 0) {
+//                        cout << "created new file " << altfname << "\n";
+//                    }
+//                }
                 cout << "\n";
 
                 unsigned ngroups = round(G::_nparticles * G::_ngroups * G::_thin);
