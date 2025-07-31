@@ -149,7 +149,7 @@ namespace proj {
         unsigned unit_index = leaf_index/_bits_per_unit;
         unsigned bit_index = leaf_index - unit_index*_bits_per_unit;
         split_unit_t unity = 1;
-        split_unit_t bit_to_set = unity << bit_index;
+        split_unit_t bit_to_set = (split_unit_t)unity << bit_index;
         return (bool)(_bits[unit_index] & bit_to_set);
     }
 
