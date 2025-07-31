@@ -8,6 +8,7 @@
 #include "boost/math/special_functions/gamma.hpp"
 #include <mutex>
 #include <unordered_map>
+#include "opvertex.hpp"
 
 using namespace std;
 using namespace boost;
@@ -205,6 +206,13 @@ class Particle {
             void                                        buildEnsembleCoalInfo();
             unsigned                                    getPartialCount();
 #endif
+            double                                      calcBHVDistance();
+            double                                      opCalcLeafContribution(const Split::treeid_t & Alvs, const Split::treeid_t & Blvs) const;
+            double                                      opFindCommonEdges(const Split::treeid_t & A, const Split::treeid_t & B, vector<Split> & common_edges) const;
+            double                                      opCalcGeodesicDist(vector<Split::treeid_pair_t> & ABpairs) const;
+            bool                                        opRefineSupport(const Split::treeid_pair_t & AB, Split::treeid_pair_t & AB1, Split::treeid_pair_t & AB2) const;
+            static double                               opCalcTreeIDLength(const Split::treeid_t & splits);
+            static void                                 opEdmondsKarp(op::OPVertex & source, op::OPVertex & sink, vector<op::OPVertex> & avect, vector<op::OPVertex> & bvect, Split::treeid_t & C1, Split::treeid_t & C2, Split::treeid_t & D1, Split::treeid_t & D2);
     
     private:
         SpeciesForest                           _species_forest;
@@ -1968,6 +1976,10 @@ class Particle {
 
         double log_likelihood = 0.0;
         
+#if !defined (DRAW_NEW_THETA)
+        integrate_out_thetas = false;
+#endif
+        
         if (integrate_out_thetas) {
             double alpha = 2.0; // G::_invgamma_shape;
 #if defined (DRAW_NEW_THETA)
@@ -2612,6 +2624,567 @@ class Particle {
         }
     }
 #endif
+        
+    inline double Particle::calcBHVDistance() {
+        // Build the reference tree
+        SpeciesForest reftree;
+        
+        reftree.buildFromNewick(G::_bhv_reference, true, false); // TODO: set bits based on node names, not order
+
+        // Store splits from the reference tree
+        Split::treeid_t A0;
+        Split::treeid_t Alvs;
+        reftree.storeSplits(A0, Alvs);
+
+        // Only save splits with non-zero edge length
+        Split::treeid_t A;
+        for (auto & a : A0) {
+            if (a.getEdgeLen() > 0.0) {
+                A.insert(a);
+            }
+        }
+
+        // test tree is the species tree
+        // store splits from the test tree
+        Split::treeid_t B0;
+        Split::treeid_t Blvs;
+        _species_forest.storeSplits(B0, Blvs);
+
+        // Only save splits with non-zero edge length
+        Split::treeid_t B;
+        for (auto & b : B0) {
+            if (b.getEdgeLen() > 0.0) {
+                B.insert(b);
+            }
+        }
+
+        // Calculate the contribution of leaf edges to the geodesic
+        double leaf_contribution_squared = opCalcLeafContribution(Alvs, Blvs);
+
+        // Find common edges and calculate the contribution of common edge lengths to the geodesic
+        vector<Split> common_edges;
+        double common_edge_contribution_squared = opFindCommonEdges(A, B, common_edges);
+
+        if (!common_edges.empty()) {
+            // Remove splits representing common edge from both A and B
+            for (auto & c : common_edges) {
+                A.erase(c);
+                B.erase(c);
+            }
+        }
+        vector<pair<Split::treeid_t, Split::treeid_t> > in_pairs;
+        in_pairs.emplace_back(A,B);
+
+        unsigned pair_index = 1;
+        vector<double> geodesic_distances;
+        for (auto & inpair : in_pairs) {
+
+            vector<Split::treeid_pair_t> ABpairs;
+            ABpairs.push_back(inpair);
+
+            double L = opCalcGeodesicDist(ABpairs);
+
+            geodesic_distances.push_back(L);
+            ++pair_index;
+        }
+
+        // Calculate total geodesic distance
+        double total_geodesic_distance = 0.0;
+        for (double x : geodesic_distances) {
+            total_geodesic_distance += pow(x, 2);
+        }
+        total_geodesic_distance += leaf_contribution_squared;
+        total_geodesic_distance += common_edge_contribution_squared;
+        total_geodesic_distance = sqrt(total_geodesic_distance);
+
+        return total_geodesic_distance;
+    }
+        
+    inline double Particle::opCalcLeafContribution(const Split::treeid_t & Alvs, const Split::treeid_t & Blvs) const {
+        // Compute leaf contribution
+        double leaf_contribution_squared = 0.0;
+        for (auto & b : Blvs) {
+            auto it = find(Alvs.begin(), Alvs.end(), b);
+            assert(it != Alvs.end());
+            double leafa = it->getEdgeLen();
+            double leafb = b.getEdgeLen();
+            leaf_contribution_squared += pow(leafa-leafb, 2);
+        }
+
+        return leaf_contribution_squared;
+    }
+        
+    inline double Particle::opFindCommonEdges(const Split::treeid_t & A, const Split::treeid_t & B, vector<Split> & common_edges) const {
+        // Find splits in the intersection of A and B
+        set_intersection(
+            A.begin(), A.end(),
+            B.begin(), B.end(),
+            back_inserter(common_edges)
+        );
+
+        double common_edge_contribution_squared = 0.0;
+        for (auto & s : common_edges) {
+            auto itA = find(A.begin(), A.end(), s);
+            double edgeA = itA->getEdgeLen();
+            auto itB = find(B.begin(), B.end(), s);
+            double edgeB = itB->getEdgeLen();
+            common_edge_contribution_squared += pow(edgeA-edgeB, 2);
+        }
+
+        // Count the number of splits in B compatible with each split in A (and vice versa)
+        map<const Split *, unsigned> acompatibilities;
+        map<const Split *, unsigned> bcompatibilities;
+        for (auto & a : A) {
+            for (auto & b : B) {
+                if (a.compatibleWith(b)) {
+                    acompatibilities[&a]++;
+                    bcompatibilities[&b]++;
+                }
+            }
+        }
+
+        // Add splits in A that are compatible with all splits in B to common_edges
+        for (auto & apair : acompatibilities) {
+            if (apair.second == B.size()) {
+                // This split is compatible with every split in the other tree, so add it to the vector
+                // of common edges if it is not already in the vector of common edges
+                if (find(common_edges.begin(), common_edges.end(), *apair.first) == common_edges.end()) {
+                    common_edges.push_back(*apair.first);
+                    common_edge_contribution_squared += pow(apair.first->getEdgeLen(), 2);
+                }
+            }
+        }
+
+        // Add splits in B that are compatible with all splits in A to common_edges
+        for (auto & bpair : bcompatibilities) {
+            if (bpair.second == A.size()) {
+                // This split is compatible with every split in the other tree, so add it to the vector
+                // of common edges if it is not already in the vector of common edges
+                if (find(common_edges.begin(), common_edges.end(), *bpair.first) == common_edges.end()) {
+                    common_edges.push_back(*bpair.first);
+                    common_edge_contribution_squared += pow(bpair.first->getEdgeLen(), 2);
+                }
+            }
+        }
+
+        return common_edge_contribution_squared;
+    }
+        
+    inline double Particle::opCalcGeodesicDist(vector<Split::treeid_pair_t> & ABpairs) const {
+        // Assumes a_splits and b_splits have no common edges
+        vector<Split::treeid_pair_t> support;
+        bool done = false;
+        while (!done) {
+            unsigned nrefinements = 0;
+            for (auto & ABpair : ABpairs) {
+                Split::treeid_pair_t AB1;
+                Split::treeid_pair_t AB2;
+                bool success = opRefineSupport(ABpair, AB1, AB2);
+                if (success) {
+                    // ABpair was successfully refined, so add AB1 and AB2 to support
+                    support.push_back(AB1);
+                    support.push_back(AB2);
+                    nrefinements++;
+                }
+                else {
+                    // ABpair was not successfully refined, so add ABpair to support
+                    support.push_back(ABpair);
+                }
+            }
+            done = (nrefinements == 0);
+            if (!done) {
+                ABpairs = support;
+                support.clear();
+            }
+        }
+
+        // Calculate geodesic distance
+        unsigned ratio_index = 1;
+        double geodesic_distance = 0.0;
+        for (auto & AB : support) {
+            double dropped_length = opCalcTreeIDLength(AB.first);
+            double added_length   = opCalcTreeIDLength(AB.second);
+            double ratio = dropped_length/added_length;
+            geodesic_distance += pow(dropped_length + added_length, 2);
+
+            ++ratio_index;
+        }
+        geodesic_distance = sqrt(geodesic_distance);
+        return geodesic_distance;
+    }
+        
+    inline bool Particle::opRefineSupport(const Split::treeid_pair_t & AB, Split::treeid_pair_t & AB1, Split::treeid_pair_t & AB2) const {
+        // Create a vector of incompatibility graph vertices
+        vector<op::OPVertex> avect(AB.first.size());
+        vector<op::OPVertex> bvect(AB.second.size());
+
+        //                                      23  123  456  123456
+        //vector<unsigned> a_splits_in_order = { 6,   7,  56,     63};
+
+        // Calculate weights for the "A" vertices.
+        // For example, if A = {a1,a2,a3}, then the weight of a1 is
+        // weight a1 = a1^2 / (a1^2 + a2^2 + a3^2)
+        unsigned aindex = 0;
+        double asum = 0.0;
+        for (auto & a : AB.first) {
+            asum += pow(a.getEdgeLen(),2);
+        }
+        for (auto & a : AB.first) {
+            avect[aindex]._split = &a;
+            avect[aindex]._weight = pow(a.getEdgeLen(),2)/asum;
+            aindex++;
+        }
+
+        // Calculate weights for the "B" vertices.
+        // For example, if B = {b1,b2,b3}, then the weight of b1 is
+        // weight b1 = b1^2 / (b1^2 + b2^2 + b3^2)
+        unsigned bindex = 0;
+        double bsum = 0.0;
+        for (auto & b : AB.second) {
+            bsum += pow(b.getEdgeLen(),2);
+        }
+        
+        for (auto & b : AB.second) {
+            bvect[bindex]._split = &b;
+            bvect[bindex]._weight = pow(b.getEdgeLen(),2)/bsum;
+            bindex++;
+        }
+
+        // Create the incompatibility graph
+        // A vertices go on the left, B vertices go on the right, and edges connect an A vertex
+        // to a B vertex only if the two vertices are incompatible.
+        vector<op::OPEdge> all_edges;
+        all_edges.reserve(avect.size() * bvect.size() + avect.size() + bvect.size());
+        unsigned nincompatibilities = 0;
+        auto asize = static_cast<unsigned>(avect.size());
+        auto bsize = static_cast<unsigned>(bvect.size());
+
+        // Create edges from source to the A-vertices
+        op::OPVertex source;
+        source._name = "source";
+        for (unsigned i = 0; i < asize; i++) {
+            // Assign a name to avect[i]
+            avect[i]._name = str(format("a%d") % i);
+
+            // //temporary!
+            // cerr << "avect[" << i << "] split: \n";
+            // for (auto v : avect[i]._split->getBits()) {
+            //     cerr << " " << v << endl;
+            // }
+
+            // Create the forward edge
+            all_edges.emplace_back();
+            op::OPEdge & source_forward_edge = all_edges.back();
+            source_forward_edge._from = &source;
+            source_forward_edge._to = &avect[i];
+            source_forward_edge._capacity = avect[i]._weight;
+            source_forward_edge._flow = 0.0;
+            source_forward_edge._reverse_flow = 0.0;
+            source_forward_edge._open = true;
+            source._edges.push_back(&source_forward_edge);
+        }
+
+        // Create edges from A-vertices to B-vertices
+        for (unsigned i = 0; i < asize; i++) {
+            // Get split associated with avect[i]
+            const Split * a = avect[i]._split;
+            assert(a);
+            for (unsigned j = 0; j < bsize; j++) {
+                // Get split associated with bvect[j]
+                const Split * b = bvect[j]._split;
+                assert(b);
+                if (!a->compatibleWith(*b)) {
+                    nincompatibilities++;
+
+                    // Create a forward edge in the incompatibility graph
+                    all_edges.emplace_back();
+                    op::OPEdge & forward_edge = all_edges.back();
+                    forward_edge._from = &avect[i];
+                    forward_edge._to = &bvect[j];
+                    forward_edge._capacity = 1.0;
+                    forward_edge._flow = 0.0;
+                    forward_edge._reverse_flow = 0.0;
+                    forward_edge._open = true;
+                    avect[i]._edges.emplace_back(&forward_edge);
+                }
+            }
+        }
+
+        // Create edges from the B-vertices to the sink
+        op::OPVertex sink;
+        sink._name = "sink";
+        for (unsigned j = 0; j < bsize; j++) {
+            // Assign a name to bvect[j]
+            bvect[j]._name = str(format("b%d") % j);
+
+            // //temporary!
+            // cerr << "bvect[" << j << "] split: \n";
+            // for (auto v : bvect[j]._split->getBits()) {
+            //     cerr << " " << v << endl;
+            // }
+
+            // Create the forward edge
+            all_edges.emplace_back();
+            op::OPEdge & sink_forward_edge = all_edges.back();
+            sink_forward_edge._from = &bvect[j];
+            sink_forward_edge._to = &sink;
+            sink_forward_edge._capacity = bvect[j]._weight;
+            sink_forward_edge._flow = 0.0;
+            sink_forward_edge._reverse_flow = 0.0;
+            sink_forward_edge._open = true;
+            bvect[j]._edges.emplace_back(&sink_forward_edge);
+        }
+
+        bool success = false;
+        if (nincompatibilities < asize*bsize) {
+            // At least one independent pair of vertices exists
+            // Carry out Edmonds-Karp algorithm to find min-weight vertex cover (identifies max weight independent set)
+            // In Owens-Provan terminology,
+            //   C1 = A's contribution to vertex cover     (equals AB1.first)
+            //   C2 = A's contribution to independent set  (equals AB2.first)
+            //   D1 = B's contribution to independent set  (equals AB1.second)
+            //   D2 = B's contribution to vertex cover     (equals AB2.second)
+            // A1 and A2 must represent a non-trivial partition of A
+            // B1 and B2 must represent a non-trivial partition of B
+            // C2 and D1 (AB2.first and AB1.second) are compatible sets of splits
+            // C1 and D2 (AB1.first and AB2.second) compose the minimum weight vertex cover
+            // ||C1||/||D1|| < ||C2||/||D2|| must be true
+            // If all of the above conditions hold, then the support can be refined:
+            // A = (A1,A2) and B = (B1,B2)
+            // where A1 = C1, A2 = C2, B1 = D1, and B2 = D2
+            // Length of this segment of the geodesic is
+            //   L = sqrt{ (||A1|| + ||B1||)^2 +  (||A2|| + ||B2||)^2 }
+            // Orthants crossed:
+            //   start:        A1, A2
+            //      edges in A1 decreasing, edges in B1 increasing
+            //   intermediate: B1, A2
+            //      edges in A2 decreasing, edges in B2 increasing
+            //   finish:       B1, B2
+            // The point at which A1 edges become 0 is
+            //   ||A1||/(||A1|| + ||B1||)
+            // The point at which A2 edges become 0 is
+            //   ||A2||/(||A2|| + ||B2||)
+            opEdmondsKarp(source, sink, avect, bvect, AB1.first, AB2.first, AB1.second, AB2.second);
+
+            // Check conditions for successful refinement
+            bool A_is_trivial = (AB1.first.empty()) || (AB2.first.empty());
+            bool B_is_trivial = (AB1.second.empty())|| (AB2.second.empty());
+            double C1len = opCalcTreeIDLength(AB1.first);
+            double C2len = opCalcTreeIDLength(AB2.first);
+            double D1len = opCalcTreeIDLength(AB1.second);
+            double D2len = opCalcTreeIDLength(AB2.second);
+            bool P2 = C1len/D1len < C2len/D2len;
+            success = !A_is_trivial && !B_is_trivial && P2;
+        }
+        return success;
+    }
+        
+    inline double Particle::opCalcTreeIDLength(const Split::treeid_t & splits) {
+        double length = 0.0;
+        for (auto & split : splits) {
+            length += pow(split.getEdgeLen(),2);
+        }
+        return sqrt(length);
+    }
+        
+    inline void Particle::opEdmondsKarp(
+                                        op::OPVertex & source,
+                                        op::OPVertex & sink,
+                                        vector<op::OPVertex> & avect,
+                                        vector<op::OPVertex> & bvect,
+                                        Split::treeid_t & C1,
+                                        Split::treeid_t & C2,
+                                        Split::treeid_t & D1,
+                                        Split::treeid_t & D2) {
+
+                double cumulative_flow = 0.0;
+                bool done_augmenting_path = false;
+                while (!done_augmenting_path) {
+                    vector<op::OPVertex *> route;
+
+                    // All vertices begin as unvisited, have residual capacity 0, and all "A" to "B" edges begin as non-reversed
+                    source._parent_edge = nullptr;
+                    for (auto & a : avect) {
+                        a._parent_edge = nullptr;
+                        a._residual_capacity = 0.0;
+                        for (auto & a_edge : a._edges) {
+                            a_edge->_edge_is_reversed = false;
+                        }
+                    }
+                    for (auto & b : bvect) {
+                        b._parent_edge = nullptr;
+                    }
+                    sink._parent_edge = nullptr;
+
+                    // Add the source to the route
+                    route.push_back(&source);
+                    unsigned route_cursor = 0;
+
+                    // Find the next augmenting route
+                    bool sink_found = false;
+                    while (!sink_found) {
+                        op::OPVertex * current = route[route_cursor];
+                        for (auto & edge : current->_edges) {
+                            // //temporary!
+                            // cout << "checking " << edge->_from->_name << " -> " << edge->_to->_name << endl;
+                            if (edge->_capacity > 0.0 && edge->_to->_parent_edge == nullptr) {
+                                edge->_to->_parent_edge = edge;
+
+                                // //temporary!
+                                // cout << "  adding edge to route" << endl;
+
+                                route.push_back(edge->_to);
+                                if (edge->_to == &sink) {
+                                    sink_found = true;
+                                    break;
+                                }
+                            }
+                            else {
+                                bool already_visited = edge->_to->_parent_edge != nullptr;
+                                bool capacity_zero = edge->_capacity == 0.0;
+                                if (already_visited && capacity_zero) {
+                                    // //temporary!
+                                    // cout << "  rejected edge because capacity is zero and to-vertex already visited" << endl;
+                                }
+                                else if (already_visited) {
+                                    // //temporary!
+                                    // cout << "  rejected edge because to-vertex already visited" << endl;
+                                }
+                                else {
+                                    // //temporary!
+                                    // cout << "  rejected edge because capacity is zero" << endl;
+
+                                    // If it is a "B" vertex that has zero capacity, then the route cannot
+                                    // go from thix "B" vertex to the sink but it may be able to go back to
+                                    // an "A" vertex if that "A" vertex was not accessible from the source
+                                    // and there is residual flow on the edge
+                                    if (edge->_to == &sink) {
+                                        op::OPVertex * B_vertex = edge->_from;
+                                        for (unsigned j = 0; j < source._edges.size(); j++) {
+                                            op::OPEdge * s_to_A_edge = source._edges[j];  // edge from source to an "A" vertex
+                                            if (s_to_A_edge->_capacity == 0) {
+                                                // See if any of the "A" vertex edges lead to the "B" vertex in question
+                                                op::OPVertex * A_vertex = s_to_A_edge->_to;
+                                                for (unsigned k = 0; k < A_vertex->_edges.size(); k++) {
+                                                    op::OPEdge * A_to_B_edge = A_vertex->_edges[k];  // edge from "A" to a "B" vertex
+                                                    if (A_vertex->_parent_edge == nullptr && A_to_B_edge->_to == B_vertex && A_to_B_edge->_reverse_flow > 0.0) {
+                                                        // If we are here, we know that:
+                                                        // 1. the "A" vertex has not been visited
+                                                        // 2. the "A" vertex is joined to the "B" vertex in question
+                                                        // 3. the "A" vertex is not accessible from the source, and
+                                                        // 4. there is residual flow on the A_to_B_edge
+
+                                                        // //temporary!
+                                                        // cout << "  adding REVERSE edge to route (" << B_vertex->_name << " -> " << A_vertex->_name << ")" << endl;
+
+                                                        // //temporary!
+                                                        // if (A_to_B_edge->_from->_name == "a2" && A_to_B_edge->_to->_name == "b4") {
+                                                        //     cerr << "*** debug breakpoint ***" << endl;
+                                                        // }
+
+                                                        A_vertex->_parent_edge = A_to_B_edge;
+                                                        A_to_B_edge->_edge_is_reversed = true;
+                                                        A_vertex->_residual_capacity = A_to_B_edge->_reverse_flow;
+                                                        route.push_back(A_vertex);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        route_cursor++;
+                        if (route_cursor >= route.size()) {
+                            // Not able to reach sink, so all augmenting routes have been found
+                            done_augmenting_path = true;
+                            break;
+                        }
+                    }
+
+                    if (!done_augmenting_path) {
+                        // Follow _from pointers from sink back to source to identify
+                        // the bottleneck and determine flow through this route
+                        double min_capacity = 1.0;
+                        op::OPVertex * current = &sink;
+                        while (current != &source) {
+                            // //temporary!
+                            //cerr << "current = " << current->_name << endl;
+                            op::OPEdge * edge = current->_parent_edge;
+                            if (edge->_edge_is_reversed) {
+                                if (edge->_reverse_flow < min_capacity) {
+                                    min_capacity = edge->_reverse_flow;
+                                }
+                                current = edge->_to;
+                            }
+                            else {
+                                if (edge->_capacity < min_capacity) {
+                                    min_capacity = edge->_capacity;
+                                }
+                                current = edge->_from;
+                            }
+                        }
+
+                        // Adjust capacities and flows along the route
+                        cumulative_flow += min_capacity;
+                        current = &sink;
+                        while (current != &source) {
+                            op::OPEdge * edge = current->_parent_edge;
+                            if (edge->_edge_is_reversed) {
+                                edge->_reverse_flow -= min_capacity;
+                                if (fabs(edge->_reverse_flow) < 1e-10)
+                                    edge->_reverse_flow = 0.0;
+                                edge->_capacity += min_capacity;
+                                current = edge->_to;
+                            }
+                            else {
+                                edge->_capacity -= min_capacity;
+                                if (fabs(edge->_capacity) < 1e-10)
+                                    edge->_capacity = 0.0;
+                                edge->_reverse_flow += min_capacity;
+                                current = edge->_from;
+                            }
+                        }
+                    }
+                }   // while (!done_augmenting_path)
+
+            // Identify C1, C2, D1, and D2
+            // C1 and D2 compose the min weight vertex cover
+            // C2 and D` compose the independent set
+            for (auto & source_edge : source._edges) {
+                op::OPVertex * avertex = source_edge->_to;
+                if (source_edge->_capacity > 0.0 || avertex->_residual_capacity > 0.0) {
+                    // Because this source edge has remaining capacity, its distal vertex is part of the independent set
+                    C2.insert(*(avertex->_split));
+
+                    // This A vertex allows access to the B side, so any connected B vertices with
+                    // zero capacity are part of the vertex cover
+                    for (const auto central_edge : avertex->_edges) {
+                        op::OPVertex * bvertex = central_edge->_to;
+                        assert(bvertex->_edges.size() == 1);
+                        op::OPEdge * sink_edge = bvertex->_edges[0];
+                        if (sink_edge->_capacity == 0.0) {
+                            D2.insert(*(bvertex->_split));
+                        }
+                    }
+                }
+                else {
+                    // Because this A-vertex has zero capacity, it is part of the vertex cover
+                    C1.insert(*(avertex->_split));
+
+                    // No need to consider connected B vertices because this A-vertex already
+                    // covers all connected edges
+                }
+            }
+
+            // D1 includes every split not in D2
+            D1.clear();
+            for (auto & b : bvect) {
+                if (D2.count(*(b._split)) == 0) {
+                    D1.insert(*(b._split));
+                }
+            }
+        }
 
     inline void Particle::operator=(const Particle & other) {
         if (!G::_in_second_level) {

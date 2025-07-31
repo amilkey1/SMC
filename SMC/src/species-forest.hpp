@@ -101,6 +101,7 @@ class SpeciesForest {
         Node *                          findNextPreorderNew(Node * nd) const;
         pair<double,double>             chooseSpeciesIncrementOnlySecondLevel(Lot::SharedPtr lot, double max_depth);
         void                            setTreeHeight();
+        void                            storeSplits(set<Split> & internal_splits, set<Split> & leaf_splits);
     
 
         vector<coalinfo_t>                  _coalinfo;
@@ -1796,6 +1797,50 @@ class SpeciesForest {
              [this](Node& lhs, Node& rhs) {
                  return getLineageHeight(lhs._left_child) < getLineageHeight(rhs._left_child); } );
         
+        // first G::_nspecies nodes will be tips because the height will be 0
+        // sort these nodes alphabetically so bit settings will be consistent
+        
+        // Extract the first G::_nspecies elements into a vector
+//        list<Node> tip_nodes;
+//        for (unsigned i = 0; i < G::_nspecies; ++i) {
+//            auto it = test_nodes.begin();
+//            std::advance(it, i);
+//            tip_nodes.push_back(*it);
+//        }
+        
+//        for (auto &nd:tip_nodes) {
+//            if (nd._parent) {
+//                Node parent = *nd._parent;
+//                for (auto &nd_t:test_nodes) {
+//                    if (nd_t._edge_length == parent._edge_length) {
+//                        nd._parent = &nd_t;
+//                    }
+//                }
+//            }
+//            if (nd._right_sib) {
+//                Node sib = *nd._right_sib;
+//                for (auto &nd_t:test_nodes) {
+//                    if (nd_t._edge_length == sib._edge_length) {
+//                        nd._right_sib = &nd_t;
+//                    }
+//                }
+//            }
+//        }
+        
+//        tip_nodes.sort(
+//             [this](Node& lhs, Node& rhs) {
+//                 return lhs._name < rhs._name; } );
+        
+//        for (unsigned i=0; i<G::_nspecies; i++) {
+//            auto it1 = test_nodes.begin();
+//            auto it2 = tip_nodes.begin();
+//            std::advance(it1, i);
+//            std::advance(it2, i);
+//            *it1 = *it2;
+//        }
+        
+// //        test_nodes.splice(test_nodes.begin(), tip_nodes);
+        
         _nodes.clear();
         
         _nodes.assign(test_nodes.begin(), test_nodes.end());
@@ -1824,6 +1869,7 @@ class SpeciesForest {
             _nodes.back()._edge_length = 0.0;
         }
                 
+        // TODO: make sure tips are at front of list and have correct number associated with name
         unsigned number = 0;
         for (auto &nd:test_nodes) {
             nd._number = number;
@@ -2623,9 +2669,9 @@ class SpeciesForest {
             return;
         
         for (auto & nd : _lineages) {
-            if (nd->_left_child) {
-                nd->_number = _next_node_number++;
-            }
+//            if (nd->_left_child) {
+//                nd->_number = _next_node_number++;
+//            }
             
             // lineage is a Node::ptr_vect_t (i.e. vector<Node *>)
             // lineage[0] is the first node pointer in the preorder sequence for this lineage
@@ -2635,6 +2681,12 @@ class SpeciesForest {
             // Now add the nodes above the root in preorder sequence
             Node::ptr_vect_t & preorder_vector = *_preorders.rbegin();
             refreshPreorderNew(preorder_vector);
+        }
+        
+        unsigned number = 0;
+        for (auto nd:_nodes) {
+            nd._number = number;
+            number++;
         }
     }
 
@@ -2648,8 +2700,8 @@ class SpeciesForest {
             nd = findNextPreorderNew(nd);
             if (nd) {
                 preorder.push_back(nd);
-                if (nd->_left_child)
-                    nd->_number = _next_node_number++;
+//                if (nd->_left_child)
+//                    nd->_number = _next_node_number++;
             }
             else
                 break;
@@ -2668,6 +2720,49 @@ class SpeciesForest {
             }
             else {
                 nd._height = getLineageHeight(nd._left_child);
+            }
+        }
+    }
+
+    inline void SpeciesForest::storeSplits(set<Split> & internal_splits, set<Split> & leaf_splits) {
+        // Start by clearing and resizing all splits
+        
+        // TODO: only works for 26 characters?
+        unsigned count = 0;
+        map<char, unsigned> names_and_bits;
+        for (char letter = 'A'; letter < 'A' + G::_nspecies; letter++) {
+            names_and_bits[letter] = count;
+            count++;
+         }
+        
+        refreshPreorder();
+        for (auto & nd : _nodes) {
+            nd._split.resize(G::_ntaxa);
+        }
+
+        // Now do a postorder traversal and add the bit corresponding
+        // to the current node in its parent node's split
+        for (auto nd : adaptors::reverse(_preorder)) {
+            // Set split's edge length
+            nd->_split.setEdgeLen(nd->_edge_length);
+
+            if (nd->_left_child) {
+                if (nd->_edge_length > 0.0) {// don't include root
+                    // add this internal node's split to splitset
+                    internal_splits.insert(nd->_split); // TODO: inserting based on bits - mine are different from paul's program? why does it matter?
+                }
+            }
+            else {
+                // set bit corresponding to this leaf node's number
+                // TODO: set bit based on node name, not number
+                nd->_split.setBitAt(names_and_bits[nd->_name[0]]);
+//                nd->_split.setBitAt(nd->_number);
+                leaf_splits.insert(nd->_split);
+            }
+
+            if (nd->_parent) {
+                // parent's bits are the union of the bits set in all its children
+                nd->_parent->_split.addSplit(nd->_split);
             }
         }
     }

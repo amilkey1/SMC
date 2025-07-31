@@ -85,6 +85,7 @@ namespace proj {
         static unsigned             _n_mcmc_rounds;
         static bool                 _ruv;
         static bool                 _hpd;
+        static string               _bhv_reference;
         
         // other
         static vector<string>           _taxon_names;

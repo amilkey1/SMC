@@ -107,6 +107,7 @@ map<string, unsigned>    G::_taxon_to_species;
 unsigned    G::_nstates = 4;
 double      G::_ploidy = 2.0;
 double      G::_small_enough = 0.0000001;
+string      G::_bhv_reference = "";
 
 vector<vector<double> > G::_dmatrix;
 vector<Split>           G::_dmatrix_rows;

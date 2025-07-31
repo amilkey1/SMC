@@ -20,14 +20,15 @@ namespace proj {
             bool                                                operator<(const Split & other) const;
             Split &                                             operator+=(const Split & other);
 
+            typedef set<Split>                                  treeid_t;
+            typedef pair<treeid_t, treeid_t>                    treeid_pair_t;
             void                                                clear();
             void                                                resize(unsigned nleaves);
 
             typedef unsigned long                               split_unit_t;
-            typedef std::vector<split_unit_t>                   split_t;
-            typedef std::set<Split>                             treeid_t;
-            typedef std::map< treeid_t, std::vector<unsigned> > treemap_t;
-            typedef std::tuple<unsigned,unsigned,unsigned>      split_metrics_t;
+            typedef vector<split_unit_t>                        split_t;
+            typedef map< treeid_t, std::vector<unsigned> >      treemap_t;
+            typedef tuple<unsigned,unsigned,unsigned>           split_metrics_t;
 
             split_unit_t                                        getBits(unsigned unit_index) const;
             bool                                                getBitAt(unsigned leaf_index) const;
@@ -40,13 +41,18 @@ namespace proj {
 
             std::string                                         createPatternRepresentation() const;
             split_metrics_t                                     getSplitMetrics() const;
+        
+            void                                                setEdgeLen(double v);
+            double                                              getEdgeLen() const;
+            bool                                                compatibleWith(const Split & other) const;
 
         private:
         
-            split_unit_t                                        _mask;
+            double                                              _edgelen;
             split_t                                             _bits;
             unsigned                                            _bits_per_unit;
             unsigned                                            _nleaves;
+            split_unit_t                                        _mask;
 
         public:
         
@@ -68,10 +74,11 @@ namespace proj {
     }
 
     inline Split::Split(const Split & other) {
-        _mask = other._mask;
-        _nleaves = other._nleaves;
+        _edgelen = other._edgelen;
         _bits_per_unit = (CHAR_BIT)*sizeof(Split::split_unit_t);
         _bits = other._bits;
+        _nleaves = other._nleaves;
+        _mask = other._mask;
         //std::cout << "Constructing a Split by copying an existing split" << std::endl;
     }
 
@@ -95,6 +102,7 @@ namespace proj {
         _bits = other._bits;
         _mask = other._mask;
         _bits_per_unit = other._bits_per_unit;
+        _edgelen = other._edgelen;
         
         return *this;
     }
@@ -227,6 +235,33 @@ namespace proj {
 
         // None of the units were incompatible, so that means the splits are compatible
         return true;
+    }
+
+    inline void Split::setEdgeLen(double edgelen) {
+        _edgelen = edgelen;
+    }
+
+    inline double Split::getEdgeLen() const {
+        return _edgelen;
+    }
+
+    inline bool Split::compatibleWith(const Split & other) const {
+        const split_t & other_bits = other._bits;
+        assert(_bits.size() == other_bits.size());
+        bool is_compatible = true;
+        for (unsigned i = 0; i < _bits.size(); ++i) {
+            split_unit_t a       = _bits[i];
+            split_unit_t b       = other_bits[i];
+            split_unit_t a_and_b = (a & b);
+            bool equals_a   = (a_and_b == a);
+            bool equals_b   = (a_and_b == b);
+            if (a_and_b && !(equals_a || equals_b)) {
+                // A failure of any unit to be compatible makes the entire split incompatible
+                is_compatible = false;
+                break;
+            }
+        }
+        return is_compatible;
     }
 
     inline bool Split::conflictsWith(const Split & other) const {

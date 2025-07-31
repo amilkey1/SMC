@@ -92,7 +92,6 @@ namespace proj {
             double              filterSpeciesParticles(unsigned step, vector<Particle> & particles, unsigned id_number);
             double              computeEffectiveSampleSize(const vector<double> & probs) const;
             void                saveSpeciesTreesAltHierarchical(vector<Particle> &v, unsigned group_number) const;
-            void                calcRUV(vector<Particle> &particles);
         
 #if defined (UPGMA)
             bool                isUnambiguous(Data::state_t s0) const;
@@ -154,6 +153,7 @@ namespace proj {
             vector<pair<double, bool>>  _ranks;
             vector<pair<double, double>> _hpd_values;
             vector<double>              _species_tree_heights;
+            vector<double>              _bhv_distances;
 
     };
 
@@ -887,10 +887,6 @@ namespace proj {
         logf.close();
     }
 
-    inline void Proj::calcRUV(vector<Particle> &particles) {
-        cout << "x";
-    }
-
     inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v, unsigned group_number) const {
         string filename1 = "alt_species_trees.trees";
     
@@ -920,15 +916,20 @@ namespace proj {
             unique_treef.open(filename2, std::ios_base::app);
 
             for (unsigned i=0; i<_second_level_indices_to_keep[group_number].size(); i++) {
-//            for (auto &p:v) {
                 Particle p = v[_second_level_indices_to_keep[group_number][i]];
                 vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
+                
                 if (G::_ruv) {
                     double species_tree_height = p.getSpeciesTreeHeight();
                     _species_tree_heights.push_back(species_tree_height);
                     pair<double, bool> rank = make_pair(species_tree_height, false);
                     _ranks.push_back(rank);
                 }
+                
+                if (G::_bhv_reference != "") {
+                    _bhv_distances.push_back(p.calcBHVDistance());
+                }
+                
                 bool found = false;
                 if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
                     found = true;
@@ -1159,6 +1160,7 @@ namespace proj {
         ("n_mcmc_rounds", boost::program_options::value(&G::_n_mcmc_rounds)->default_value(1), "number of rounds to use for mcmc analysis")
         ("ruv", boost::program_options::value(&G::_ruv)->default_value(true), "calculate ranks for ruv")
         ("hpd", boost::program_options::value(&G::_hpd)->default_value(true), "calculate hpd intervals for coverage")
+        ("bhv_reference", boost::program_options::value(&G::_bhv_reference)->default_value(""), "newick string to use for BHV distance reference")
 #if defined(SPECIES_IN_CONF)
         ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
 #endif
@@ -2315,7 +2317,7 @@ namespace proj {
 
             mtx.lock();
             saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2, id_number);
-            saveSpeciesTreesAltHierarchical(second_level_particles, id_number);
+//            saveSpeciesTreesAltHierarchical(second_level_particles, id_number);
             _count++;
 //            assert (i == group_number);
             if (G::_gene_newicks_specified) {
@@ -2886,7 +2888,7 @@ namespace proj {
 //                }
                 
                 saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2, id_number);
-                saveSpeciesTreesAltHierarchical(second_level_particles, id_number);
+//                saveSpeciesTreesAltHierarchical(second_level_particles, id_number);
                 writeParamsFileForBeastComparisonAfterSpeciesFiltering(second_level_particles, filename3, id_number);
             }
 
@@ -3038,6 +3040,10 @@ namespace proj {
             // take first 95% of values (round down to nearest integer)
             double total = size(_hpd_values);
             double ninety_five_index = floor(0.95*total);
+            
+            if (ninety_five_index == 0) {
+                ninety_five_index = 1;
+            }
             
             vector<double> hpd_values_in_range;
             

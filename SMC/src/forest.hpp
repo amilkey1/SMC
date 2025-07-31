@@ -164,6 +164,7 @@ class Forest {
         void                            refreshPreorderNew(vector<Node*> & preorder) const;
         Node *                          findNextPreorderNew(Node * nd) const;
         void                            setTreeHeight();
+        void                            storeSplits(set<Split> & internal_splits, set<Split> & leaf_splits);
     
 
         vector<coalinfo_t>                  _coalinfo;
@@ -5446,35 +5447,6 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
         return _gene_tree_log_likelihood;
     }
 
-//#if defined(LAZY_COPYING)
-//    inline void Forest::computeAllPartials() {
-//        // Assumes _leaf_partials have been computed but that every node in the tree
-//        // has _partial equal to nullptr.
-//        assert(_data);
-//        assert(_gene_index >= 0);
-//
-//        if (_preorders.size() == 0) {
-//            refreshAllPreorders();
-//        }
-//
-//        for (auto & preorder : _preorders) {
-//            // Visit nodes in the subtree rooted at preorder in post-order sequence
-//            for (auto nd : boost::adaptors::reverse(preorder)) {
-//                assert(nd->_partial == nullptr);
-//                if (nd->_left_child) {
-//                    assert(nd->_left_child->_partial != nullptr);
-//                    assert(nd->_left_child->_right_sib->_partial != nullptr);
-//                    nd->_partial = pullPartial();
-//                    calcPartialArrayJC(nd, nd->_left_child, nd->_left_child->_right_sib);
-//                }
-//                else {
-//                    nd->_partial = _leaf_partials[_index][nd->_number];
-//                }
-//            }
-//        }
-//    }
-//#endif
-
 #if defined(LAZY_COPYING)
     inline PartialStore::partial_t Forest::pullPartial() {
     #if defined(USING_MULTITHREADING)
@@ -5488,6 +5460,38 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
         return ptr;
     }
 #endif
+        
+    inline void Forest::storeSplits(set<Split> & internal_splits, set<Split> & leaf_splits) {
+        // Start by clearing and resizing all splits
+        refreshPreorder();
+        for (auto & nd : _nodes) {
+            nd._split.resize(G::_ntaxa);
+        }
+
+        // Now do a postorder traversal and add the bit corresponding
+        // to the current node in its parent node's split
+        for (auto nd : adaptors::reverse(_preorder)) {
+            // Set split's edge length
+            nd->_split.setEdgeLen(nd->_edge_length);
+
+            if (nd->_left_child) {
+                if (nd->_edge_length > 0.0) {// don't include root
+                    // add this internal node's split to splitset
+                    internal_splits.insert(nd->_split);
+                }
+            }
+            else {
+                // set bit corresponding to this leaf node's number
+                nd->_split.setBitAt(nd->_number);
+                leaf_splits.insert(nd->_split);
+            }
+
+            if (nd->_parent) {
+                // parent's bits are the union of the bits set in all its children
+                nd->_parent->_split.addSplit(nd->_split);
+            }
+        }
+    }
 
 #if defined (LAZY_COPYING)
     inline void Forest::joinLineagePair(Node * new_nd, Node * subtree1, Node * subtree2) {
