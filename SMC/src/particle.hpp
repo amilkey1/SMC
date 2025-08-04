@@ -1105,6 +1105,12 @@ class Particle {
 #endif
         
         double new_theta = G::_theta;
+        if (G::_start_mode_type == G::StartModeType::START_MODE_SIM && G::_fix_theta_for_simulations) {
+            if (_theta_map.count(new_species_name) == 0) {
+                _theta_map[new_species_name] = G::_theta; // only update theta map if the species does not already exist in the map
+            }
+        }
+        else {
 #if defined (DRAW_NEW_THETA)
         // add a new theta for the most recently drawn species
         double scale = (2.0 - 1.0) / _theta_mean;
@@ -1124,6 +1130,7 @@ class Particle {
 #else
             _theta_map[new_species_name] = new_theta;
 #endif
+        }
         }
     }
 
