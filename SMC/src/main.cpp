@@ -109,6 +109,7 @@ double      G::_ploidy = 2.0;
 double      G::_small_enough = 0.0000001;
 string      G::_bhv_reference = "";
 bool        G::_write_species_tree_file = true;
+bool        G::_second_level = true;
 
 vector<vector<double> > G::_dmatrix;
 vector<Split>           G::_dmatrix_rows;

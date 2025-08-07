@@ -57,7 +57,7 @@ namespace proj {
             void                writeLoradFileAfterSpeciesFiltering(vector<Particle> &v) const;
             void                writeDeepCoalescenceFile(vector<Particle> &v);
             void                writeThetaFile(vector<Particle> &v);
-            void                writeParamsFileForBeastComparison(vector<Particle> &v) const;
+            void                writeParamsFileForBeastComparison(vector<Particle> &v);
             void                writeParamsFileForBeastComparisonTestA(vector<Particle> &v, string filename) const;
             void                writeParamsFileForBeastComparisonTestB(vector<Particle> &v, string filename) const;
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering(vector<Particle> &v, string filename, unsigned group_number);
@@ -152,9 +152,13 @@ namespace proj {
             void                        growGeneTrees(Particle &particles, unsigned particle_number, unsigned gene_number, unsigned step);
 #endif
             vector<pair<double, bool>>  _ranks;
+            vector<vector<pair<double, bool>>> _gene_tree_ranks;
             vector<pair<double, double>> _hpd_values;
+            vector<vector<pair<double, double>>> _hpd_values_genes;
             vector<double>              _species_tree_heights;
+            vector<vector<double>>      _gene_tree_heights;
             vector<double>              _bhv_distances;
+            vector<vector<double>>      _bhv_distances_genes;
 
     };
 
@@ -438,7 +442,7 @@ namespace proj {
         logf.close();
     }
 
-    inline void Proj::writeParamsFileForBeastComparison(vector<Particle> &v) const {
+    inline void Proj::writeParamsFileForBeastComparison(vector<Particle> &v) {
         // this function creates a params file that is comparable to output from starbeast3
         ofstream logf("params-beast-comparison.log");
         logf << "iter ";
@@ -471,82 +475,119 @@ namespace proj {
             logf << "\t" << "treePrior:gene" + to_string(i);
         }
         logf << endl;
-
-        int iter = 0;
         
+        if (_gene_tree_ranks.size() == 0) {
+            _gene_tree_ranks.resize(G::_nloci);
+        }
+        
+        if (_bhv_distances_genes.size() == 0) {
+            _bhv_distances_genes.resize(G::_nloci);
+        }
+        
+        if (_gene_tree_heights.size() == 0) {
+            _gene_tree_heights.resize(G::_nloci);
+        }
+        
+        int iter = 0;
         for (auto &p:v) {
-                logf << iter;
-                iter++;
-
-                double vector_prior = 0.0; // no vector prior with jones coalescent likelihood
-
-                double log_coalescent_likelihood = 0.0;
-                for (unsigned g=1; g<G::_nloci+1; g++) {
-                    log_coalescent_likelihood += p.getCoalescentLikelihood(g);
-                }
-
-                double log_likelihood = p.getLogLikelihood();
-                double log_prior = p.getAllPriorsFirstRound();
-
-                double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior;
-                // no vector prior under Jones method
-
-                logf << "\t" << log_posterior;
-
-                logf << "\t" << log_likelihood;
-
-                logf << "\t" << log_prior; // starbeast3 does not include coalescent likelihood in this prior
-
-
-                logf << "\t" << vector_prior;
-
-                logf << "\t" << log_coalescent_likelihood;
-
-                double species_tree_height = p.getSpeciesTreeHeight();
-                logf << "\t" << species_tree_height;
-
-                double species_tree_length = p.getSpeciesTreeLength();
-                logf << "\t" << species_tree_length;
-
-                vector<double> gene_tree_heights = p.getGeneTreeHeights();
-                vector<double> gene_tree_lengths = p.getGeneTreeLengths();
-                assert (gene_tree_heights.size() == gene_tree_lengths.size());
-
-                for (int i=0; i<gene_tree_heights.size(); i++) {
-                    logf << "\t" << gene_tree_heights[i];
-                    logf << "\t" << gene_tree_lengths[i];
-                }
-
-                double yule_model = p.getSpeciesTreePrior();
-                logf << "\t" << yule_model;
-
-                logf << "\t" << p.getPopMean() / 4.0; // beast uses Ne * u = theta / 4
-
-                for (int i=0; i<(G::_nspecies*2-1); i++) {
-    #if defined (DRAW_NEW_THETA)
-                    vector<double> theta_vec = p.getThetaVector();
-                    logf << "\t" << theta_vec[i] / 4.0;
-    #else
-                    logf << "\t" << G::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
-    #endif
-                }
-
-                logf << "\t" << G::_lambda; // TODO: not estimating lambda for now
-            
-                vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
-                vector<double> gene_tree_priors = p.getGeneTreePriors();
-                assert (gene_tree_log_likelihoods.size() == gene_tree_priors.size());
-
-                for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
-                    logf << "\t" << gene_tree_log_likelihoods[i];
-                }
-
-                for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
-                    logf << "\t" << gene_tree_priors[i];
-                }
-
-                logf << endl;
+            vector<double> gene_tree_heights;
+            if (G::_ruv || G::_hpd) {
+                gene_tree_heights = p.getGeneTreeHeights();
             }
+            
+            if (G::_ruv) {
+                for (unsigned l=0; l<G::_nloci; l++) {
+                    _gene_tree_ranks[l].push_back(make_pair(gene_tree_heights[l], false));
+                    _gene_tree_heights[l].push_back(gene_tree_heights[l]);
+                }
+            }
+            
+            if (G::_bhv_reference != "") {
+                vector<double> bhv_dists = p.calcBHVDistanceGeneTrees();
+                for (unsigned l=0; l<G::_nloci; l++) {
+                    _bhv_distances_genes[l].push_back(bhv_dists[l]);
+                }
+            }
+            
+            logf << iter;
+            iter++;
+
+            double vector_prior = 0.0; // no vector prior with jones coalescent likelihood
+
+            double log_coalescent_likelihood = 0.0;
+            for (unsigned g=1; g<G::_nloci+1; g++) {
+                log_coalescent_likelihood += p.getCoalescentLikelihood(g);
+            }
+
+            double log_likelihood = p.getLogLikelihood();
+            double log_prior = p.getAllPriorsFirstRound();
+
+            double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior;
+            
+            if (G::_hpd) {
+                _hpd_values_genes.resize(G::_nloci);
+                for (unsigned l=0; l<G::_nloci; l++) {
+                    _hpd_values_genes[l].push_back(make_pair(log_posterior, gene_tree_heights[l]));
+                }
+            }
+            // no vector prior under Jones method
+
+            logf << "\t" << log_posterior;
+
+            logf << "\t" << log_likelihood;
+
+            logf << "\t" << log_prior; // starbeast3 does not include coalescent likelihood in this prior
+
+
+            logf << "\t" << vector_prior;
+
+            logf << "\t" << log_coalescent_likelihood;
+
+            double species_tree_height = p.getSpeciesTreeHeight();
+            logf << "\t" << species_tree_height;
+
+            double species_tree_length = p.getSpeciesTreeLength();
+            logf << "\t" << species_tree_length;
+
+//            vector<double> gene_tree_heights = p.getGeneTreeHeights();
+            vector<double> gene_tree_lengths = p.getGeneTreeLengths();
+            assert (gene_tree_heights.size() == gene_tree_lengths.size());
+
+            for (int i=0; i<gene_tree_heights.size(); i++) {
+                logf << "\t" << gene_tree_heights[i];
+                logf << "\t" << gene_tree_lengths[i];
+            }
+
+            double yule_model = p.getSpeciesTreePrior();
+            logf << "\t" << yule_model;
+
+            logf << "\t" << p.getPopMean() / 4.0; // beast uses Ne * u = theta / 4
+
+            for (int i=0; i<(G::_nspecies*2-1); i++) {
+#if defined (DRAW_NEW_THETA)
+                vector<double> theta_vec = p.getThetaVector();
+                logf << "\t" << theta_vec[i] / 4.0;
+#else
+                logf << "\t" << G::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
+#endif
+            }
+
+            logf << "\t" << G::_lambda; // TODO: not estimating lambda for now
+        
+            vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
+            vector<double> gene_tree_priors = p.getGeneTreePriors();
+            assert (gene_tree_log_likelihoods.size() == gene_tree_priors.size());
+
+            for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
+                logf << "\t" << gene_tree_log_likelihoods[i];
+            }
+
+            for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
+                logf << "\t" << gene_tree_priors[i];
+            }
+
+            logf << endl;
+        }
 
         logf.close();
     }
@@ -762,6 +803,12 @@ namespace proj {
         
         ofstream spptreeheight("true_species_tree_height.txt");
         spptreeheight << v[0].getSpeciesTreeHeight() << endl;
+        
+        vector<double> gene_tree_heights = v[0].getGeneTreeHeights();
+        for (unsigned l=0; l<G::_nloci; l++) {
+            ofstream spptreeheight("true_gene_tree_height" + to_string(l+1) + ".txt");
+            spptreeheight << gene_tree_heights[l] << endl;
+        }
         
         // Expected height of species tree is (1/2 + 1/3 + ... + 1/nspecies)/lambda
         // Approximation to (1/2 + 1/3 + ... + 1/nspecies) is
@@ -1142,6 +1189,7 @@ namespace proj {
         ("hpd", boost::program_options::value(&G::_hpd)->default_value(false), "calculate hpd intervals for coverage")
         ("bhv_reference", boost::program_options::value(&G::_bhv_reference)->default_value(""), "newick string to use for BHV distance reference")
         ("write_species_tree_file", boost::program_options::value(&G::_write_species_tree_file)->default_value(true), "set to false to not write species tree newicks to a file - only use this option to turn on for RUV calculations when lots of trees will be saved")
+        ("second_level", boost::program_options::value(&G::_second_level)->default_value(true), "set to false to not run second level")
 #if defined(SPECIES_IN_CONF)
         ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
 #endif
@@ -2948,11 +2996,6 @@ namespace proj {
             
             proposeSpeciesGroupsFaster(particles, ngroups, filename1, filename2, filename3);
             
-//            ofstream altfname;
-//            altfname.open("alt_species_trees.trees", std::ios::app);
-//            altfname << "end;" << endl;
-//            altfname.close();
-            
             ofstream strees;
             strees.open("species_trees.trees", std::ios::app);
             strees << "end;" << endl;
@@ -3090,12 +3133,14 @@ namespace proj {
         }
         
         if (G::_hpd || G::_ruv) {
-            // write mean species tree height to output file for validation
-            double sum = accumulate(_species_tree_heights.begin(), _species_tree_heights.end(), 0.0);
-            double mean = sum / _species_tree_heights.size();
-            
-            ofstream heightf("average_species_tree_height.txt");
-            heightf << mean << endl;
+            // write mean gene tree heights to output file for validation
+            for (unsigned l=0; l<G::_nloci; l++) {
+                double sum = accumulate(_gene_tree_heights[l].begin(), _gene_tree_heights[l].end(), 0.0);
+                double mean = sum / _gene_tree_heights[l].size();
+                
+                ofstream heightf("average_gene_tree_height" + to_string(l+1) + ".txt");
+                heightf << mean << endl;
+            }
         }
     }
 
@@ -4133,103 +4178,177 @@ namespace proj {
                     p.setSortedThetaVector();
                 }
                 
-#if !defined (HIERARCHICAL_FILTERING)
-                writeParamsFileForBeastComparison(my_vec);
+                if (!G::_second_level) {
+                    writeParamsFileForBeastComparison(my_vec);
                 
-                saveAllSpeciesTrees(my_vec);
-#endif
+                    if (G::_write_species_tree_file) {
+                        saveAllSpeciesTrees(my_vec);
+                    }
+                    
+                    if (G::_ruv) { // validation for gene trees only
+                        assert (_gene_tree_ranks.size() == G::_nloci);
+                        
+                        for (unsigned l=0; l<G::_nloci; l++) {
+                            string sim_file_name;
+                            assert(G::_newick_path != "");
+                            sim_file_name = G::_newick_path + "/" + "true_gene_tree_height" + to_string(l+1) + ".txt";
+                            string line;
+                            string height_as_string;
+                            ifstream infile(sim_file_name);
+                            while (getline(infile, line)) {
+                                height_as_string = line;
+                            }
+                            double true_gene_tree_height = 0.0;
+                            assert (height_as_string != "");
+                            true_gene_tree_height = std::stod(height_as_string);
+                            _gene_tree_ranks[l].push_back(make_pair(true_gene_tree_height, true));
+                            // sort ranks
+                            std::sort(_gene_tree_ranks[l].begin(), _gene_tree_ranks[l].end());
+                            
+                            // find rank of truth
+                            auto it = std::find_if(_gene_tree_ranks[l].begin(), _gene_tree_ranks[l].end(), [&](const pair<double, bool>& p) { return p.second == true;});
+                            unsigned index_value = (unsigned) std::distance(_gene_tree_ranks[l].begin(), it);
+                            
+                            // write rank value to file
+                            ofstream rankf("rank_gene_tree_height" + to_string(l+1) + ".txt");
+                            rankf << "rank: " << index_value << endl;
+                        }
+                    }
+                    if (G::_bhv_reference != "") {
+                        assert (_bhv_distances_genes.size() > 0);
+                        for (unsigned l=0; l<G::_nloci; l++) {
+                            string sim_file_name;
+                            assert (G::_newick_path != "");
+                            sim_file_name = G::_newick_path + "/" + "gene" + to_string(l+1) + ".trees";
+                             
+                             Particle p;
+                             string true_newick = readNewickFromFile(sim_file_name);
+                             
+                             double true_bhv = p.calcBHVDistanceTrueTreeGene(true_newick);
+                             
+                            _bhv_distances_genes[l].push_back(true_bhv);
+//                             // sort distances
+                             std::sort(_bhv_distances_genes[l].begin(), _bhv_distances_genes[l].end());
+//
+//                             // find rank of truth
+                             auto it = std::find(_bhv_distances_genes[l].begin(), _bhv_distances_genes[l].end(), true_bhv);
+                             unsigned index_value = (unsigned) std::distance(_bhv_distances_genes[l].begin(), it);
 
+                             // write rank value to file
+                             ofstream rankf("rank_bhv" + to_string(l+1) + ".txt");
+                             rankf << "rank: " << index_value << endl;
+                         }
+                    }
+                    
+                    if (G::_hpd) {
+                        assert (_hpd_values_genes.size() > 0);
+                        for (unsigned l=0; l<G::_nloci; l++) {
+                             ofstream hpdf("hpd" + to_string(l+1) + ".txt");
+                             hpdf << "min    " << "max " << endl;
+                             
+                             // sort hpd values largest to smallest
+                             std::sort(_hpd_values_genes[l].begin(), _hpd_values_genes[l].end());
+                             std::reverse(_hpd_values_genes[l].begin(), _hpd_values_genes[l].end());
+                             
+                             // take first 95% of values (round down to nearest integer)
+                             double total = size(_hpd_values_genes[l]);
+                             double ninety_five_index = floor(0.95*total);
+                             
+                             if (ninety_five_index == 0) {
+                                 ninety_five_index = 1;
+                             }
+                             
+                             vector<double> hpd_values_in_range;
+                             
+                             for (unsigned h=0; h<ninety_five_index; h++) {
+                                 hpd_values_in_range.push_back(_hpd_values_genes[l][h].second);
+                             }
+                             
+                             auto max = *std::max_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                             auto min = *std::min_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                             assert (min < max || min == max);
+                             
+                             // write min and max to file
+                             hpdf << min << "\t" << max << endl;
+                        }
+                     }
+                    
+                    if (G::_hpd || G::_ruv) {
+                        // write mean species tree height to output file for validation
+                        double sum = accumulate(_species_tree_heights.begin(), _species_tree_heights.end(), 0.0);
+                        double mean = sum / _species_tree_heights.size();
+                        
+                        ofstream heightf("average_species_tree_height.txt");
+                        heightf << mean << endl;
+                    }
+                }
+
+                else {
 #if defined (HIERARCHICAL_FILTERING)
-                saveSpeciesTreesAfterFirstRound(my_vec);
-                
-                G::_in_second_level = true;
-                
-                cout << "\n";
-                string filename1 = "species_trees.trees";
-                string filename2 = "unique_species_trees.trees";
-                string filename3 = "params-beast-comparison.log";
-                if (filesystem::remove(filename1)) {
-                    ofstream speciestrf(filename1);
-                    speciestrf << "#nexus\n\n";
-                    speciestrf << "begin trees;\n";
-                    if (G::_verbose > 0) {
-                        cout << "existing file " << filename1 << " removed and replaced\n";
+                    saveSpeciesTreesAfterFirstRound(my_vec);
+                    
+                    G::_in_second_level = true;
+                    
+                    cout << "\n";
+                    string filename1 = "species_trees.trees";
+                    string filename2 = "unique_species_trees.trees";
+                    string filename3 = "params-beast-comparison.log";
+                    if (filesystem::remove(filename1)) {
+                        ofstream speciestrf(filename1);
+                        speciestrf << "#nexus\n\n";
+                        speciestrf << "begin trees;\n";
+                        if (G::_verbose > 0) {
+                            cout << "existing file " << filename1 << " removed and replaced\n";
+                        }
                     }
-                }
-                else {
-                    ofstream speciestrf(filename1);
-                    speciestrf << "#nexus\n\n";
-                    speciestrf << "begin trees;\n";
-                    if (G::_verbose > 0) {
-                        cout << "created new file " << filename1 << "\n";
+                    else {
+                        ofstream speciestrf(filename1);
+                        speciestrf << "#nexus\n\n";
+                        speciestrf << "begin trees;\n";
+                        if (G::_verbose > 0) {
+                            cout << "created new file " << filename1 << "\n";
+                        }
                     }
-                }
-                if (filesystem::remove(filename2)) {
-                    ofstream uniquespeciestrf(filename2);
-                    uniquespeciestrf << "#nexus\n\n";
-                    uniquespeciestrf << "begin trees;\n";
-                    if (G::_verbose > 0) {
-                        cout << "existing file " << filename2 << " removed and replaced\n";
+                    if (filesystem::remove(filename2)) {
+                        ofstream uniquespeciestrf(filename2);
+                        uniquespeciestrf << "#nexus\n\n";
+                        uniquespeciestrf << "begin trees;\n";
+                        if (G::_verbose > 0) {
+                            cout << "existing file " << filename2 << " removed and replaced\n";
+                        }
                     }
-                }
-                else {
-                    ofstream uniquespeciestrf(filename2);
-                    uniquespeciestrf << "#nexus\n\n";
-                    uniquespeciestrf << "begin trees;\n";
-                    if (G::_verbose > 0) {
-                        cout << "created new file " << filename2 << "\n";
+                    else {
+                        ofstream uniquespeciestrf(filename2);
+                        uniquespeciestrf << "#nexus\n\n";
+                        uniquespeciestrf << "begin trees;\n";
+                        if (G::_verbose > 0) {
+                            cout << "created new file " << filename2 << "\n";
+                        }
                     }
-                }
-                
-                if (filesystem::remove(filename3)) {
-                    ofstream paramsf(filename3);
-                    if (G::_verbose > 0) {
-                       cout << "existing file " << filename3 << " removed and replaced\n";
+                    
+                    if (filesystem::remove(filename3)) {
+                        ofstream paramsf(filename3);
+                        if (G::_verbose > 0) {
+                           cout << "existing file " << filename3 << " removed and replaced\n";
+                        }
                     }
-                }
-                else {
-                    ofstream paramsf(filename3);
-                    if (G::_verbose > 0) {
-                        cout << "created new file " << filename3 << "\n";
+                    else {
+                        ofstream paramsf(filename3);
+                        if (G::_verbose > 0) {
+                            cout << "created new file " << filename3 << "\n";
+                        }
                     }
-                }
-                
-//                string altfname = "alt_species_trees.trees";
-//                if (filesystem::remove(altfname)) {
-//
-//                    if (G::_verbose > 0) {
-//                       cout << "existing file " << altfname << " removed and replaced\n";
-//                    }
-//
-//                    ofstream alttrf(altfname);
-//
-//                    alttrf << "#nexus\n\n";
-//                    alttrf << "Begin trees;" << endl;
-//                    string translate_block = my_vec[0].getTranslateBlock();
-//                    alttrf << translate_block << endl;
-//                }
-//                else {
-//                    ofstream alttrf(altfname);
-//
-//                    alttrf << "#nexus\n\n";
-//                    alttrf << "Begin trees;" << endl;
-//                    string translate_block = my_vec[0].getTranslateBlock();
-//                    alttrf << translate_block << endl;
-//
-//                    if (G::_verbose > 0) {
-//                        cout << "created new file " << altfname << "\n";
-//                    }
-//                }
-                cout << "\n";
+                    cout << "\n";
 
-                unsigned ngroups = round(G::_nparticles * G::_ngroups * G::_thin);
-                if (ngroups == 0) {
-                    ngroups = 1;
-                    cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
-                }
-                
-                secondLevel(my_vec);
+                    unsigned ngroups = round(G::_nparticles * G::_ngroups * G::_thin);
+                    if (ngroups == 0) {
+                        ngroups = 1;
+                        cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
+                    }
+                    
+                    secondLevel(my_vec);
 #endif
+                }
             }
 
         catch (XProj & x) {

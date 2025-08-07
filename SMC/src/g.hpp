@@ -87,6 +87,7 @@ namespace proj {
         static bool                 _hpd;
         static string               _bhv_reference;
         static bool                 _write_species_tree_file;
+        static bool                 _second_level;
         
         // other
         static vector<string>           _taxon_names;
