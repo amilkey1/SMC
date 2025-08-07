@@ -2876,7 +2876,7 @@ class Particle {
         Forest reftree;
         
         reftree.buildFromNewick(G::_bhv_reference, true, false);
-
+        
         // Store splits from the reference tree
         Split::treeid_t A0;
         Split::treeid_t Alvs;
@@ -2897,7 +2897,7 @@ class Particle {
             // store splits from the test tree
             Split::treeid_t B0;
             Split::treeid_t Blvs;
-            _species_forest.storeSplits(B0, Blvs);
+            _gene_forest_ptrs[l]->storeSplits(B0, Blvs);
 
             // Only save splits with non-zero edge length
             Split::treeid_t B;

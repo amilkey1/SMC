@@ -2749,12 +2749,11 @@ class SpeciesForest {
             if (nd->_left_child) {
                 if (nd->_edge_length > 0.0) {// don't include root
                     // add this internal node's split to splitset
-                    internal_splits.insert(nd->_split); // TODO: inserting based on bits - mine are different from paul's program? why does it matter?
+                    internal_splits.insert(nd->_split);
                 }
             }
             else {
                 // set bit corresponding to this leaf node's number
-                // TODO: set bit based on node name, not number
                 nd->_split.setBitAt(names_and_bits[nd->_name[0]]);
 //                nd->_split.setBitAt(nd->_number);
                 leaf_splits.insert(nd->_split);

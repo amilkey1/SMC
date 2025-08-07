@@ -5463,6 +5463,23 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
         
     inline void Forest::storeSplits(set<Split> & internal_splits, set<Split> & leaf_splits) {
         // Start by clearing and resizing all splits
+        
+        // TODO: only works for 26 characters?
+        unsigned count = 0;
+        map<char, unsigned> names_and_bits;
+        vector<string> names;
+        for (unsigned a=0; a<G::_ntaxa; a++) {
+            names.push_back(_nodes[a]._name);
+        }
+        
+        std::sort(names.begin(), names.end());
+        
+        for (unsigned n=0; n<names.size(); n++) {
+            const char* name = names[n].c_str();
+            names_and_bits[*name] = count;
+            count++;
+         }
+        
         refreshPreorder();
         for (auto & nd : _nodes) {
             nd._split.resize(G::_ntaxa);
@@ -5475,14 +5492,15 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
             nd->_split.setEdgeLen(nd->_edge_length);
 
             if (nd->_left_child) {
-                if (nd->_edge_length > 0.0) {// don't include root
+                if (nd->_edge_length > G::_small_enough) {// don't include root
                     // add this internal node's split to splitset
                     internal_splits.insert(nd->_split);
                 }
             }
             else {
                 // set bit corresponding to this leaf node's number
-                nd->_split.setBitAt(nd->_number);
+                nd->_split.setBitAt(names_and_bits[nd->_name[0]]);
+//                nd->_split.setBitAt(nd->_number);
                 leaf_splits.insert(nd->_split);
             }
 
