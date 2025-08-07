@@ -108,6 +108,7 @@ unsigned    G::_nstates = 4;
 double      G::_ploidy = 2.0;
 double      G::_small_enough = 0.0000001;
 string      G::_bhv_reference = "";
+string      G::_bhv_reference_path = ".";
 bool        G::_write_species_tree_file = true;
 bool        G::_second_level = true;
 

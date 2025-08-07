@@ -86,6 +86,7 @@ namespace proj {
         static bool                 _ruv;
         static bool                 _hpd;
         static string               _bhv_reference;
+        static string               _bhv_reference_path;
         static bool                 _write_species_tree_file;
         static bool                 _second_level;
         

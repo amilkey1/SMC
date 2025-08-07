@@ -502,7 +502,10 @@ namespace proj {
                 }
             }
             
-            if (G::_bhv_reference != "") {
+            if (G::_bhv_reference != "" || G::_bhv_reference_path != ".") {
+                if (G::_bhv_reference_path != ".") {
+                    G::_bhv_reference = readNewickFromFile(G::_bhv_reference_path);
+                }
                 vector<double> bhv_dists = p.calcBHVDistanceGeneTrees();
                 for (unsigned l=0; l<G::_nloci; l++) {
                     _bhv_distances_genes[l].push_back(bhv_dists[l]);
@@ -974,7 +977,10 @@ namespace proj {
                         _ranks.push_back(rank);
                     }
                     
-                    if (G::_bhv_reference != "") {
+                    if (G::_bhv_reference != "" || G::_bhv_reference_path != ".") {
+                        if (G::_bhv_reference_path != ".") {
+                            G::_bhv_reference = readNewickFromFile(G::_bhv_reference_path);
+                        }
                         _bhv_distances.push_back(p.calcBHVDistance());
                     }
                     
@@ -1188,6 +1194,7 @@ namespace proj {
         ("ruv", boost::program_options::value(&G::_ruv)->default_value(false), "calculate ranks for ruv")
         ("hpd", boost::program_options::value(&G::_hpd)->default_value(false), "calculate hpd intervals for coverage")
         ("bhv_reference", boost::program_options::value(&G::_bhv_reference)->default_value(""), "newick string to use for BHV distance reference")
+        ("bhv_reference_path", boost::program_options::value(&G::_bhv_reference_path)->default_value("."), "path to use for BHV distance reference; can specify either bhv_reference or bhv_reference_path; bhv_reference string will take priority")
         ("write_species_tree_file", boost::program_options::value(&G::_write_species_tree_file)->default_value(true), "set to false to not write species tree newicks to a file - only use this option to turn on for RUV calculations when lots of trees will be saved")
         ("second_level", boost::program_options::value(&G::_second_level)->default_value(true), "set to false to not run second level")
 #if defined(SPECIES_IN_CONF)
@@ -1456,7 +1463,13 @@ namespace proj {
         for (int i=1; i<G::_ngenes_provided+1; i++) {
             vector<string> current_gene_newicks;
 
-            string file_name = G::_newick_path + "/" + "gene" + to_string(i) + ".trees"; // file must be named gene1.trees, gene2.trees, etc.
+            string file_name = "";
+            if (G::_newick_path != ".") {
+                file_name = G::_newick_path + "/" + "gene" + to_string(i) + ".trees"; // file must be named gene1.trees, gene2.trees, etc.
+            }
+            else {
+                file_name = "gene" + to_string(i) + ".trees";
+            }
             ifstream infile (file_name);
             string newick;
             unsigned size_before = (unsigned) current_gene_newicks.size();
@@ -3074,7 +3087,7 @@ namespace proj {
             rankf << "rank: " << index_value << endl;
         }
         
-        if (G::_bhv_reference != "") {
+        if (G::_bhv_reference != "" || G::_bhv_reference_path != ".") {
             assert (_bhv_distances.size() > 0);
             string sim_file_name;
             if (G::_newick_path != "") {
@@ -4212,7 +4225,7 @@ namespace proj {
                             rankf << "rank: " << index_value << endl;
                         }
                     }
-                    if (G::_bhv_reference != "") {
+                    if (G::_bhv_reference != "" || G::_bhv_reference_path != ".") {
                         assert (_bhv_distances_genes.size() > 0);
                         for (unsigned l=0; l<G::_nloci; l++) {
                             string sim_file_name;
