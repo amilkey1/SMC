@@ -3133,14 +3133,12 @@ namespace proj {
         }
         
         if (G::_hpd || G::_ruv) {
-            // write mean gene tree heights to output file for validation
-            for (unsigned l=0; l<G::_nloci; l++) {
-                double sum = accumulate(_gene_tree_heights[l].begin(), _gene_tree_heights[l].end(), 0.0);
-                double mean = sum / _gene_tree_heights[l].size();
-                
-                ofstream heightf("average_gene_tree_height" + to_string(l+1) + ".txt");
-                heightf << mean << endl;
-            }
+            // write mean species tree height to output file for validation
+             double sum = accumulate(_species_tree_heights.begin(), _species_tree_heights.end(), 0.0);
+             double mean = sum / _species_tree_heights.size();
+             
+             ofstream heightf("average_species_tree_height.txt");
+             heightf << mean << endl;
         }
     }
 
@@ -4274,12 +4272,14 @@ namespace proj {
                      }
                     
                     if (G::_hpd || G::_ruv) {
-                        // write mean species tree height to output file for validation
-                        double sum = accumulate(_species_tree_heights.begin(), _species_tree_heights.end(), 0.0);
-                        double mean = sum / _species_tree_heights.size();
-                        
-                        ofstream heightf("average_species_tree_height.txt");
-                        heightf << mean << endl;
+                        // write mean gene tree heights to output file for validation
+                        for (unsigned l=0; l<G::_nloci; l++) {
+                            double sum = accumulate(_gene_tree_heights[l].begin(), _gene_tree_heights[l].end(), 0.0);
+                            double mean = sum / _gene_tree_heights[l].size();
+                            
+                            ofstream heightf("average_gene_tree_height" + to_string(l+1) + ".txt");
+                            heightf << mean << endl;
+                        }
                     }
                 }
 
