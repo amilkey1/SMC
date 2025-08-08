@@ -4230,7 +4230,12 @@ namespace proj {
                         for (unsigned l=0; l<G::_nloci; l++) {
                             string sim_file_name;
                             assert (G::_newick_path != "");
-                            sim_file_name = G::_newick_path + "/" + "gene" + to_string(l+1) + ".trees";
+                            if (G::_newick_path == ".") {
+                                sim_file_name = "gene" + to_string(l+1) + ".trees";
+                            }
+                            else {
+                                sim_file_name = G::_newick_path + "/" + "gene" + to_string(l+1) + ".trees";
+                            }
                              
                              Particle p;
                              string true_newick = readNewickFromFile(sim_file_name);

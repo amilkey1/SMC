@@ -2872,27 +2872,28 @@ class Particle {
     }
         
     inline vector<double> Particle::calcBHVDistanceGeneTrees() {
-        // Build the reference tree
-        Forest reftree;
-        
-        reftree.buildFromNewick(G::_bhv_reference, true, false);
-        
-        // Store splits from the reference tree
-        Split::treeid_t A0;
-        Split::treeid_t Alvs;
-        reftree.storeSplits(A0, Alvs);
-
-        // Only save splits with non-zero edge length
-        Split::treeid_t A;
-        for (auto & a : A0) {
-            if (a.getEdgeLen() > 0.0) {
-                A.insert(a);
-            }
-        }
-
         vector<double> gene_tree_distances;
         
         for (unsigned l=0; l<G::_nloci; l++) {
+            // build the reference tree - rebuild each time to avoid issues with modifying A
+            
+            Forest reftree;
+            
+            reftree.buildFromNewick(G::_bhv_reference, true, false);
+            
+            // Store splits from the reference tree
+            Split::treeid_t A0;
+            Split::treeid_t Alvs;
+            reftree.storeSplits(A0, Alvs);
+
+            // Only save splits with non-zero edge length
+            Split::treeid_t A;
+            for (auto & a : A0) {
+                if (a.getEdgeLen() > G::_small_enough) {
+                    A.insert(a);
+                }
+            }
+            
             // test tree is the gene tree
             // store splits from the test tree
             Split::treeid_t B0;
