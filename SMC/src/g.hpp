@@ -89,6 +89,7 @@ namespace proj {
         static string               _bhv_reference_path;
         static bool                 _write_species_tree_file;
         static bool                 _second_level;
+        static bool                 _calc_bhv_distances_to_true_tree;
         
         // other
         static vector<string>           _taxon_names;

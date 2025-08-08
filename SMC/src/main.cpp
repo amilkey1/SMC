@@ -111,6 +111,7 @@ string      G::_bhv_reference = "";
 string      G::_bhv_reference_path = ".";
 bool        G::_write_species_tree_file = true;
 bool        G::_second_level = true;
+bool        G::_calc_bhv_distances_to_true_tree = false;
 
 vector<vector<double> > G::_dmatrix;
 vector<Split>           G::_dmatrix_rows;

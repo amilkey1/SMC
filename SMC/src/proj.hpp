@@ -708,6 +708,13 @@ namespace proj {
             for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
                 logf << "\t" << gene_tree_priors[i];
             }
+            
+            if (G::_calc_bhv_distances_to_true_tree) {
+                string fname = "bhvdists.txt";
+                ofstream speciestrbhvf(fname, std::ios::app);
+                double bhvdist = p.calcBHVDistance();
+                speciestrbhvf << bhvdist << endl;
+            }
 
             logf << endl;
         }
@@ -1197,6 +1204,7 @@ namespace proj {
         ("bhv_reference_path", boost::program_options::value(&G::_bhv_reference_path)->default_value("."), "path to use for BHV distance reference; can specify either bhv_reference or bhv_reference_path; bhv_reference string will take priority")
         ("write_species_tree_file", boost::program_options::value(&G::_write_species_tree_file)->default_value(true), "set to false to not write species tree newicks to a file - only use this option to turn on for RUV calculations when lots of trees will be saved")
         ("second_level", boost::program_options::value(&G::_second_level)->default_value(true), "set to false to not run second level")
+        ("calc_bhv_distances_to_true_tree", boost::program_options::value(&G::_calc_bhv_distances_to_true_tree)->default_value(false), "set to true to calculate bhv distances between every sampled tree and the true tree")
 #if defined(SPECIES_IN_CONF)
         ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
 #endif
@@ -3581,6 +3589,20 @@ namespace proj {
 
     inline void Proj::run() {
         G::_in_second_level = false;
+        
+        if (G::_calc_bhv_distances_to_true_tree) {
+            assert (G::_newick_path != "");
+            string true_spp_tree_file_name = "";
+            if (G::_newick_path != ".") {
+                true_spp_tree_file_name = G::_newick_path + "/" + "true-species-tree.tre";
+            }
+            else {
+                true_spp_tree_file_name = "true-species-tree.tre";
+            }
+            
+            string true_newick = readNewickFromFile(true_spp_tree_file_name);
+            G::_bhv_reference = true_newick;
+        }
 #if defined(USING_MPI)
         output("Starting MPI parallel version...\n");
         output(str(format("No. processors: %d\n") % ntasks));
