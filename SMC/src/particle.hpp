@@ -1130,6 +1130,9 @@ class Particle {
             new_theta = 1 / (_lot->gamma(2.0, scale));
             assert (new_theta > 0.0);
 #endif
+            if (G::_fix_theta) {
+                new_theta = G::_theta;
+            }
 #if defined (LAZY_COPYING)
             if (_theta_map.count(new_species_name) == 0) {
                 _theta_map[new_species_name] = new_theta; // only update theta map if the species does not already exist in the map
