@@ -366,6 +366,16 @@ class Forest {
             taxon_names.push_back(t.first);
         }
         
+        // sort taxon names by species name
+        sort(taxon_names.begin(), taxon_names.end(), [](const std::string& a, const std::string& b) {
+            // Ensure strings are not empty before accessing the last character
+            if (a.empty() && b.empty()) return false; // Treat as equal for sorting
+            if (a.empty()) return true; // Empty string 'a' comes before non-empty 'b'
+            if (b.empty()) return false; // Non-empty 'a' comes after empty 'b'
+
+            return a.back() < b.back();
+        });
+        
 //#if defined (LAZY_COPYING)
 //        G::species_t curr_species = 1;
 //#endif

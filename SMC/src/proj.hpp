@@ -2233,7 +2233,7 @@ namespace proj {
                 count++;
             }
             G::_species_names.push_back(species_name);
-        }
+        } // TODO: if > 26 taxa, these wont' be grouped by species which will affect splits
     }
 
     inline void Proj::createSpeciesMap(bool use_data) {
