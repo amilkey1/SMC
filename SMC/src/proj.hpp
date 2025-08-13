@@ -3602,7 +3602,8 @@ namespace proj {
             }
             
             string true_newick = readNewickFromFile(true_spp_tree_file_name);
-            G::_bhv_reference = true_newick;
+            
+//            G::_bhv_reference = true_newick;
         }
 #if defined(USING_MPI)
         output("Starting MPI parallel version...\n");
