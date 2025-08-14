@@ -969,41 +969,54 @@ namespace proj {
         if (!G::_run_on_empty) {
             vector<vector<pair<double, double>>> unique_increments_and_priors;
 
-                std::ofstream unique_treef;
+            std::ofstream unique_treef;
 
-                unique_treef.open(filename2, std::ios_base::app);
-
-                for (unsigned i=0; i<_second_level_indices_to_keep[group_number].size(); i++) {
-                    Particle p = v[_second_level_indices_to_keep[group_number][i]];
-                    vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
-                    
-                    if (G::_ruv) {
-                        double species_tree_height = p.getSpeciesTreeHeight();
-                        _species_tree_heights.push_back(species_tree_height);
-                        pair<double, bool> rank = make_pair(species_tree_height, false);
-                        _ranks.push_back(rank);
-                    }
-                    
-                    if (G::_bhv_reference != "" || G::_bhv_reference_path != ".") {
-                        if (G::_bhv_reference_path != ".") {
-                            G::_bhv_reference = readNewickFromFile(G::_bhv_reference_path);
-                        }
-                        _bhv_distances.push_back(p.calcBHVDistance());
-                    }
-                    
-                if (G::_write_species_tree_file) {
-                    bool found = false;
-                    if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
-                        found = true;
-                    }
-                    if (!found) {
-                        unique_increments_and_priors.push_back(increments_and_priors);
-                        unique_treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
-                    }
-                }
-                unique_treef.close();
+            unique_treef.open(filename2, std::ios_base::app);
+            
+            std::ofstream bhv_logf;
+            if (G::_hpd) {
+                bhv_logf.open("bhv_log.txt", std::ios_base::app);
             }
+
+            for (unsigned i=0; i<_second_level_indices_to_keep[group_number].size(); i++) {
+                Particle p = v[_second_level_indices_to_keep[group_number][i]];
+                vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
+                
+                if (G::_ruv) {
+                    double species_tree_height = p.getSpeciesTreeHeight();
+                    _species_tree_heights.push_back(species_tree_height);
+                    pair<double, bool> rank = make_pair(species_tree_height, false);
+                    _ranks.push_back(rank);
+                }
+                
+                if (G::_bhv_reference != "" || G::_bhv_reference_path != ".") {
+                    if (G::_bhv_reference_path != ".") {
+                        G::_bhv_reference = readNewickFromFile(G::_bhv_reference_path);
+                    }
+                    _bhv_distances.push_back(p.calcBHVDistance());
+                }
+                
+                if (G::_hpd) {
+                    double freq = 1;
+                    bhv_logf << freq << "\t" << p.getCoalescentLikelihood(1) << "\t" << p.getAllPriors() << "\t" << p.saveForestNewick() << endl;
+                }
+                
+            if (G::_write_species_tree_file) {
+                bool found = false;
+                if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
+                    found = true;
+                }
+                if (!found) {
+                    unique_increments_and_priors.push_back(increments_and_priors);
+                    unique_treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
+                }
+            }
+            unique_treef.close();
         }
+            if (G::_hpd) {
+                bhv_logf.close();
+            }
+    }
 
         assert (G::_start_mode_type != G::StartModeType::START_MODE_SIM);
 
@@ -1645,6 +1658,26 @@ namespace proj {
         unsigned ngroups = round(G::_nparticles * G::_thin);
         
         assert(my_vec.size() == ngroups);
+        
+        if (G::_hpd) {
+            ofstream bhv_logf;
+            if (filesystem::remove("bhv_log.txt")) {
+                ofstream bhv_logf("bhv_log.txt");
+                if (G::_verbose > 0) {
+                   cout << "existing file " << "bhv_log.txt" << " removed and replaced\n";
+                }
+                bhv_logf << "freq" << "\t" << "log-coal-like" << "\t" << "log-coal-prior" << "\t" << "newick" << endl;
+
+            }
+            else {
+                ofstream bhv_logf("bhv_log.txt");
+                if (G::_verbose > 0) {
+                    cout << "created new file " << "bhv_log.txt" << "\n";
+                }
+                bhv_logf << "freq" << "\t" << "log-coal-like" << "\t" << "log-coal-prior" << "\t" << "newick" << endl;
+
+            }
+        }
         
         secondLevel(my_vec);
         if (G::_save_gene_trees) {
@@ -3125,7 +3158,8 @@ namespace proj {
         }
         
         if (G::_hpd) {
-            ofstream hpdf("hpd.txt");
+           // species tree heights
+            ofstream hpdf("hpd_heights.txt");
             hpdf << "min    " << "max " << endl;
             
             // sort hpd values largest to smallest
@@ -4386,6 +4420,23 @@ namespace proj {
                     if (ngroups == 0) {
                         ngroups = 1;
                         cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
+                    }
+                    
+                    if (G::_hpd) {
+                        ofstream bhv_logf;
+                        if (filesystem::remove("bhv_log.txt")) {
+                            ofstream bhv_logf("bhv_log.txt");
+                            if (G::_verbose > 0) {
+                               cout << "existing file " << "bhv_log.txt" << " removed and replaced\n";
+                            }
+                        }
+                        else {
+                            ofstream bhv_logf("bhv_log.txt");
+                            if (G::_verbose > 0) {
+                                cout << "created new file " << "bhv_log.txt" << "\n";
+                            }
+                        }
+                        bhv_logf << "freq" << "\t" << "log-coal-like" << "\t" << "log-coal-prior" << "\t" << "newick" << endl;
                     }
                     
                     secondLevel(my_vec);
