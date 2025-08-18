@@ -1998,6 +1998,10 @@ class Particle {
         integrate_out_thetas = false;
 #endif
         
+        if (G::_fix_theta) {
+            integrate_out_thetas = true;
+        }
+        
         if (integrate_out_thetas) {
             double alpha = 2.0; // G::_invgamma_shape;
 #if defined (DRAW_NEW_THETA)

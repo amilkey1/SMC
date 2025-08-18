@@ -1925,13 +1925,6 @@ namespace proj {
                     unsigned non_survivor_index_in_particles = particle_indices[index_nonsurvivor+start];
                     
                     particles[non_survivor_index_in_particles] = particles[survivor_index_in_particles];
-                    
-                    if (G::_generation == 9) {
-                        double like1 = particles[survivor_index_in_particles].calcLogLikelihood();
-                        double like2 = particles[non_survivor_index_in_particles].calcLogLikelihood();
-                        
-                        assert (like1 == like2);
-                    }
                 }
                 
                 ++next_nonzero;
