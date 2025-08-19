@@ -1369,6 +1369,7 @@ class Particle {
 //        _t.clear();  // don't reset these because they will not get copied in the copier
 //        _t_by_gene.clear();
         _species_forest.refreshAllPreorders();
+        _species_forest._log_joining_prob = 0.0;
     }
 
     inline void Particle::trimSpeciesTree() {

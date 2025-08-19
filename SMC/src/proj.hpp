@@ -3162,7 +3162,7 @@ namespace proj {
             // take first 95% of values (round down to nearest integer)
             double total = size(_hpd_values);
             double ninety_five_index = floor(0.95*total);
-            
+            // TODO: double check this - should there be a log joining prob as part fo the species tree?
             if (ninety_five_index == 0) {
                 ninety_five_index = 1;
             }

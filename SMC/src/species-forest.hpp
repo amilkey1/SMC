@@ -476,9 +476,9 @@ class SpeciesForest {
         _forest_height = other._forest_height;
             
         // the following data members apply only to the first round
-        if (!G::_in_second_level) {
+//        if (!G::_in_second_level) {
             _log_joining_prob = other._log_joining_prob;
-        }
+//        }
         
 //        if (G::_in_second_level) {
 //            _coalinfo = other._coalinfo; // TODO: don't copy this because it gets reset - but maybe it's faster to copy it?
