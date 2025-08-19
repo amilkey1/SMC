@@ -1999,7 +1999,7 @@ class Particle {
 #endif
         
         if (G::_fix_theta) {
-            integrate_out_thetas = true;
+            integrate_out_thetas = false;
         }
         
         if (integrate_out_thetas) {
