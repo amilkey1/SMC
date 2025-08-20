@@ -1550,7 +1550,7 @@ namespace proj {
         initializeParticle(p); // initialize one particle and copy to all other particles
         
         vector<Particle> my_vec;
-        my_vec.resize(G::_nparticles, p);
+        my_vec.resize(G::_nparticles * G::_ngroups, p);
 
         unsigned psuffix = 1;
         for (auto &p:my_vec) {
@@ -1654,30 +1654,10 @@ namespace proj {
             }
         }
 
-        assert (G::_thin == 1.0);
-        unsigned ngroups = round(G::_nparticles * G::_thin);
-        
-        assert(my_vec.size() == ngroups);
-        
-//        if (G::_hpd) {
-//            ofstream bhv_logf;
-//            if (filesystem::remove("bhv_log.txt")) {
-//                ofstream bhv_logf("bhv_log.txt");
-//                if (G::_verbose > 0) {
-//                   cout << "existing file " << "bhv_log.txt" << " removed and replaced\n";
-//                }
-//                bhv_logf << "freq" << "\t" << "log-coal-like" << "\t" << "log-coal-prior" << "\t" << "newick" << endl;
+//        assert (G::_thin == 1.0);
+//        unsigned ngroups = round(G::_nparticles * G::_ngroups * G::_thin);
 //
-//            }
-//            else {
-//                ofstream bhv_logf("bhv_log.txt");
-//                if (G::_verbose > 0) {
-//                    cout << "created new file " << "bhv_log.txt" << "\n";
-//                }
-//                bhv_logf << "freq" << "\t" << "log-coal-like" << "\t" << "log-coal-prior" << "\t" << "newick" << endl;
-//
-//            }
-//        }
+//        assert(my_vec.size() == ngroups);
         
         secondLevel(my_vec);
         if (G::_save_gene_trees) {
@@ -3158,6 +3138,16 @@ namespace proj {
             // sort hpd values largest to smallest
             std::sort(_hpd_values.begin(), _hpd_values.end());
             std::reverse(_hpd_values.begin(), _hpd_values.end());
+//
+//            for (auto &h:_hpd_values) {
+//                cout << h.first << ", ";
+//            }
+//            cout << endl;
+//
+//            for (auto &h:_hpd_values) {
+//                cout << h.second << ", ";
+//            }
+//            cout << endl;
             
             // take first 95% of values (round down to nearest integer)
             double total = size(_hpd_values);
@@ -3648,10 +3638,10 @@ namespace proj {
                     cout << "thin setting will be set to 1.0 for gene newick start " << endl;
                     G::_thin = 1.0;
                 }
-                if (G::_ngroups > 1) {
-                    cout << "ngroups will be set to 1.0 for gene newick start " << endl;
-                    G::_ngroups = 1.0;
-                }
+//                if (G::_ngroups > 1) {
+//                    cout << "ngroups will be set to 1.0 for gene newick start " << endl;
+//                    G::_ngroups = 1.0;
+//                }
                 handleGeneNewicks();
             }
             catch (XProj & x) {
