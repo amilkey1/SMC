@@ -690,6 +690,9 @@ namespace proj {
                     vector<double> theta_vec = p.getThetaVector();
                     logf << "\t" << theta_vec[i] / 4.0;
                 }
+                else {
+                    logf << "\t" << G::_theta / 4.0;
+                }
 #else
                 logf << "\t" << G::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
 #endif
@@ -717,6 +720,10 @@ namespace proj {
             }
 
             logf << endl;
+            
+            ofstream heightf;
+            heightf.open("species_tree_heights.txt", std::ios::app);
+            heightf << p.getSpeciesTreeHeight() << endl;
         }
 
         logf.close();
@@ -726,7 +733,7 @@ namespace proj {
 //        std::ofstream heightf;
 //
 //        heightf.open(fname, std::ios::app);
-        
+//
 //        for (auto &p:v) {
 //            double species_tree_height = p.getSpeciesTreeHeight();
 //            heightf << species_tree_height << "\n";
@@ -799,6 +806,10 @@ namespace proj {
             logf << "\t" << G::_lambda; // TODO: for now, not using estimate lambda option
 
             logf << endl;
+            
+            ofstream heightf;
+            heightf.open("species_tree_heights.txt", std::ios::app);
+            heightf << p.getSpeciesTreeHeight() << endl;
         }
 
         logf.close();
@@ -3138,16 +3149,6 @@ namespace proj {
             // sort hpd values largest to smallest
             std::sort(_hpd_values.begin(), _hpd_values.end());
             std::reverse(_hpd_values.begin(), _hpd_values.end());
-//
-//            for (auto &h:_hpd_values) {
-//                cout << h.first << ", ";
-//            }
-//            cout << endl;
-//
-//            for (auto &h:_hpd_values) {
-//                cout << h.second << ", ";
-//            }
-//            cout << endl;
             
             // take first 95% of values (round down to nearest integer)
             double total = size(_hpd_values);
@@ -4404,6 +4405,22 @@ namespace proj {
                         ngroups = 1;
                         cout << "thin setting would result in 0 species groups; setting species groups to 1" << endl;
                     }
+                    
+                    ofstream heightf;
+                    if (filesystem::remove("species_heights.txt")) {
+                        ofstream heightf("species_heights.txt");
+                        if (G::_verbose > 0) {
+                           cout << "existing file " << "species_heights.txt" << " removed and replaced\n";
+                        }
+                    }
+                    else {
+                        ofstream heightf("species_heights.txt");
+                        if (G::_verbose > 0) {
+                            cout << "created new file " << "species_heights.txt" << "\n";
+                        }
+                    }
+                    
+                    heightf << "species_tree_height" << endl;
                     
 //                    if (G::_hpd) {
 //                        ofstream bhv_logf;
