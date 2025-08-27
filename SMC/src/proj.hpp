@@ -493,6 +493,13 @@ namespace proj {
             vector<double> gene_tree_heights;
             if (G::_ruv || G::_hpd) {
                 gene_tree_heights = p.getGeneTreeHeights();
+                
+                for (unsigned i=0; i<G::_nloci; i++) {
+                    ofstream heightf;
+                    string filename = "gene_tree_heights" + to_string(i+1) + ".txt";
+                    heightf.open(filename, std::ios::app);
+                    heightf << gene_tree_heights[i] << endl;
+                }
             }
             
             if (G::_ruv) {
@@ -4232,6 +4239,23 @@ namespace proj {
                 }
                 
                 if (!G::_second_level) {
+                    for (unsigned i=0; i<G::_nloci; i++) {
+                        ofstream heightf;
+                        string filename = "gene_tree_heights" + to_string(i+1) + ".txt";
+                        if (filesystem::remove(filename)) {
+                            ofstream heightf(filename);
+                            if (G::_verbose > 0) {
+                               cout << "existing file " << filename << " removed and replaced\n";
+                            }
+                        }
+                        else {
+                            ofstream heightf(filename);
+                            if (G::_verbose > 0) {
+                                cout << "created new file " << filename << "\n";
+                            }
+                        }
+                    }
+                    
                     writeParamsFileForBeastComparison(my_vec);
                 
                     if (G::_write_species_tree_file) {
