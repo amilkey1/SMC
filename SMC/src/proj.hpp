@@ -52,6 +52,7 @@ namespace proj {
             void                saveAllSpeciesTrees(vector<Particle> &v) const;
             void                saveSpeciesTreesAfterFirstRound(vector<Particle> &v) const;
             void                saveSpeciesTreesHierarchical(vector<Particle> &v, string filename1, string filename2, unsigned group_number);
+            void                saveSpeciesTreesAltHierarchical(vector<Particle> &v, unsigned group_number);
             void                saveGeneTrees(vector<Particle> &v) const;
             void                writeLoradFile(vector<Particle> &v) const;
             void                writeLoradFileAfterSpeciesFiltering(vector<Particle> &v) const;
@@ -92,7 +93,6 @@ namespace proj {
             unsigned            multinomialDraw(const vector<double> & probs);
             double              filterSpeciesParticles(unsigned step, vector<Particle> & particles, unsigned id_number);
             double              computeEffectiveSampleSize(const vector<double> & probs) const;
-            void                saveSpeciesTreesAltHierarchical(vector<Particle> &v, unsigned group_number) const;
         
 #if defined (UPGMA)
             bool                isUnambiguous(Data::state_t s0) const;
@@ -963,9 +963,9 @@ namespace proj {
         logf.close();
     }
 
-    inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v, unsigned group_number) const {
+    inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v, unsigned group_number)  {
         string filename1 = "alt_species_trees.trees";
-    
+
         assert (G::_start_mode_type != G::StartModeType::START_MODE_SIM);
 
         unsigned count = 0;
@@ -975,7 +975,6 @@ namespace proj {
         treef.open(filename1, std::ios_base::app);
         for (unsigned i=0; i<_second_level_indices_to_keep[group_number].size(); i++) {
             Particle p = v[_second_level_indices_to_keep[group_number][i]];
-//            for (auto &p:v) {
             treef << "  tree test = [&R] " << p.saveForestNewickAlt()  << ";\n";
             count++;
         }
@@ -2413,7 +2412,7 @@ namespace proj {
 
             mtx.lock();
             saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2, id_number);
-//            saveSpeciesTreesAltHierarchical(second_level_particles, id_number);
+            saveSpeciesTreesAltHierarchical(second_level_particles, id_number);
             _count++;
 //            assert (i == group_number);
             if (G::_gene_newicks_specified) {
@@ -2984,7 +2983,7 @@ namespace proj {
 //                }
                 
                 saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2, id_number);
-//                saveSpeciesTreesAltHierarchical(second_level_particles, id_number);
+                saveSpeciesTreesAltHierarchical(second_level_particles, id_number);
                 writeParamsFileForBeastComparisonAfterSpeciesFiltering(second_level_particles, filename3, id_number);
             }
 //
