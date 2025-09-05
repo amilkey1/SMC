@@ -2861,7 +2861,7 @@ namespace proj {
         string filename1 = "species_trees.trees";
         string filename2 = "unique_species_trees.trees";
         string filename3 = "params-beast-comparison.log";
-//        string altfname = "alt_species_trees.trees";
+        string altfname = "alt_species_trees.trees";
 
         cout << "\n";
 
@@ -2987,10 +2987,10 @@ namespace proj {
                 writeParamsFileForBeastComparisonAfterSpeciesFiltering(second_level_particles, filename3, id_number);
             }
 //
-//            ofstream altfname_end;
-//            altfname_end.open("alt_species_trees.trees", std::ios::app);
-//            altfname_end << "end;" << endl;
-//            altfname_end.close();
+            ofstream altfname_end;
+            altfname_end.open("alt_species_trees.trees", std::ios::app);
+            altfname_end << "end;" << endl;
+            altfname_end.close();
             
             ofstream strees;
             strees.open("species_trees.trees", std::ios::app);
@@ -4443,24 +4443,36 @@ namespace proj {
                         }
                     }
                     
-                    heightf << "species_tree_height" << endl;
+                    string altfname = "alt_species_trees.trees";
+                    if (filesystem::remove(altfname)) {
+                        
+                        if (G::_verbose > 0) {
+                           cout << "existing file " << altfname << " removed and replaced\n";
+                        }
+                        
+                        ofstream alttrf(altfname);
+
+                        alttrf << "#nexus\n\n";
+                        alttrf << "Begin trees;" << endl;
+                        string translate_block = my_vec[0].getTranslateBlock();
+                        alttrf << translate_block << endl;
+                    }
+                    else {
+                        ofstream alttrf(altfname);
+
+                        alttrf << "#nexus\n\n";
+                        alttrf << "Begin trees;" << endl;
+                        string translate_block = my_vec[0].getTranslateBlock();
+                        alttrf << translate_block << endl;
+                        
+                        if (G::_verbose > 0) {
+                            cout << "created new file " << altfname << "\n";
+                        }
+                    }
+                    cout << "\n";
                     
-//                    if (G::_hpd) {
-//                        ofstream bhv_logf;
-//                        if (filesystem::remove("bhv_log.txt")) {
-//                            ofstream bhv_logf("bhv_log.txt");
-//                            if (G::_verbose > 0) {
-//                               cout << "existing file " << "bhv_log.txt" << " removed and replaced\n";
-//                            }
-//                        }
-//                        else {
-//                            ofstream bhv_logf("bhv_log.txt");
-//                            if (G::_verbose > 0) {
-//                                cout << "created new file " << "bhv_log.txt" << "\n";
-//                            }
-//                        }
-//                        bhv_logf << "freq" << "\t" << "log-coal-like" << "\t" << "log-coal-prior" << "\t" << "newick" << endl;
-//                    }
+                    
+                    heightf << "species_tree_height" << endl;
                     
                     secondLevel(my_vec);
 #endif
