@@ -1767,9 +1767,9 @@ class Particle {
         calcLogCoalescentLikelihood(coalinfo_vect, /*integrate_out_thetas*/true, /*verbose*/false);
         _log_weight = _log_coalescent_likelihood - prev_log_coal_like + log_weight_factor;
         
-//        if (G::_run_on_empty) {
-//            _log_weight = 0.0;
-//        }
+        if (G::_run_on_empty) {
+            _log_weight = 0.0;
+        }
 
         return num_species_tree_lineages;
     }

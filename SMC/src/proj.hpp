@@ -4024,38 +4024,17 @@ namespace proj {
                 //taxon joining and reweighting step
                 proposeParticles(my_vec);
                 bool filter = true;
-
-                if (G::_run_on_empty) {
-                    filter = false;
-                }
                 
                 if (filter) {
                         
                     // TODO: can parallelize filtering by subgroup
-//#if defined (LAZY_COPYING)
                         if (G::_nthreads == 1) {
                         for (unsigned i=0; i<G::_ngroups; i++) {
                             unsigned start = i * G::_nparticles;
                             unsigned end = start + (G::_nparticles) - 1;
 
                             double ess = -1;
-    //                        if (G::_generation % 1 == 0) { // can try filtering only every other generation
-    //                        if (G::_nthreads == 1 || G::_ngroups == 1) {
-                                ess = filterParticles(g, my_vec, particle_indices, start, end);
-    //                        }
-    //                        else {
-    //                            filterParticlesThreading(my_vec, g, particle_indices);
-    //                        }
-    //                        }
-    //                        else {
-    //                        if (ess > 200.0) { // then there was no filtering, and joins need to be finalized
-    //                            if (!G::_mcmc) {
-    //                                unsigned locus = my_vec[0].getNextGene() - 1;
-    //                                for (unsigned p=0; p<my_vec.size(); p++) {
-    //                                    my_vec[p].finalizeLatestJoinMCMC(locus, p);
-    //                                }
-    //                            }
-    //                        }
+                            ess = filterParticles(g, my_vec, particle_indices, start, end);
                             
                             vector<double> weights_after_filtering(G::_nparticles);
                             
