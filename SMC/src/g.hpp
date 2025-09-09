@@ -90,6 +90,7 @@ namespace proj {
         static bool                 _write_species_tree_file;
         static bool                 _second_level;
         static bool                 _calc_bhv_distances_to_true_tree;
+        static bool                 _sample_from_prior;
         
         // other
         static vector<string>           _taxon_names;
