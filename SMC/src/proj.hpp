@@ -1054,15 +1054,29 @@ namespace proj {
     }
 
     inline void Proj::saveSpeciesTreesAfterFirstRound(vector<Particle> &v) const {
-        if (G::_write_species_tree_file) {
-            ofstream treef("species_trees_after_first_round.trees");
-            treef << "#nexus\n\n";
-            treef << "begin trees;\n";
-            for (auto &p:v) {
-                treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
+        if (G::_sample_from_prior) {
+            if (G::_write_species_tree_file) {
+                ofstream treef("species_trees.trees");
+                treef << "#nexus\n\n";
+                treef << "begin trees;\n";
+                for (auto &p:v) {
+                    treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
+                }
+                treef << "end;\n";
+                treef.close();
             }
-            treef << "end;\n";
-            treef.close();
+        }
+        else {
+            if (G::_write_species_tree_file) {
+                ofstream treef("species_trees_after_first_round.trees");
+                treef << "#nexus\n\n";
+                treef << "begin trees;\n";
+                for (auto &p:v) {
+                    treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
+                }
+                treef << "end;\n";
+                treef.close();
+            }
         }
     }
 
@@ -3801,6 +3815,11 @@ namespace proj {
                 
             if (G::_sample_from_prior) {
                 for (auto &p:my_vec) {
+                    unsigned psuffix = 1;
+                    for (auto &p:my_vec) {
+                        p.setSeed(rng.randint(1,9999) + psuffix);
+                        psuffix += 2;
+                    }
                     p.buildEntireSpeciesTree();
                 }
                 
