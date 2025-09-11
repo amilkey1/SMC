@@ -3816,14 +3816,14 @@ namespace proj {
             if (G::_sample_from_prior) {
                 for (auto &p:my_vec) {
                     unsigned psuffix = 1;
-                    for (auto &p:my_vec) {
                         p.setSeed(rng.randint(1,9999) + psuffix);
                         psuffix += 2;
                     }
-                    p.buildEntireSpeciesTree();
-                }
-                
+                    for (auto &p:my_vec) {
+                        p.buildEntireSpeciesTree();
+                    }
                 saveSpeciesTreesAfterFirstRound(my_vec);
+                
             }
 
             else {
