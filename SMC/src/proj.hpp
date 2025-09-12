@@ -1152,6 +1152,7 @@ namespace proj {
                 for (auto &p:v) {
                     treef << "tree gene" << i << " = [&R] " << p.saveGeneNewick(i)  << ";\n";
                 }
+                treef << "end;\n";
             }
         }
 
