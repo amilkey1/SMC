@@ -492,8 +492,9 @@ namespace proj {
         int iter = 0;
         for (auto &p:v) {
             vector<double> gene_tree_heights;
+            gene_tree_heights = p.getGeneTreeHeights();
+            
             if (G::_ruv || G::_hpd) {
-                gene_tree_heights = p.getGeneTreeHeights();
                 
                 for (unsigned i=0; i<G::_nloci; i++) {
                     ofstream heightf;
