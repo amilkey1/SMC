@@ -1254,6 +1254,7 @@ namespace proj {
         ("second_level", boost::program_options::value(&G::_second_level)->default_value(true), "set to false to not run second level")
         ("calc_bhv_distances_to_true_tree", boost::program_options::value(&G::_calc_bhv_distances_to_true_tree)->default_value(false), "set to true to calculate bhv distances between every sampled tree and the true tree")
         ("sample_from_prior", boost::program_options::value(&G::_sample_from_prior)->default_value(false), "sample species trees from prior")
+        ("nloci_slow_rate", boost::program_options::value(&G::_nloci_slow_rate)->default_value(0), "for simulations - number of loci to simulate at slower rate")
 #if defined(SPECIES_IN_CONF)
         ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
 #endif
@@ -1447,6 +1448,13 @@ namespace proj {
             for (auto &i:temp) {
                 double f = stof(i);
                 G::_double_relative_rates.push_back(f);
+            }
+        }
+        
+        if (G::_start_mode == "sim" && G::_nloci_slow_rate != 0) {
+            // take first n loci and decrease relative rates
+            for (unsigned n=0; n < G::_nloci_slow_rate; n++) {
+                G::_double_relative_rates[n] *= 0.01;
             }
         }
     }
