@@ -32,3 +32,5 @@
 //#define UPGMA // turn on UPGMA in conf file but turn this off to avoid creating any members associated with UPGMA
 
 //#define SPECIES_IN_CONF
+
+# define INFO_TEST

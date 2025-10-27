@@ -1453,9 +1453,39 @@ namespace proj {
         
         if (G::_start_mode == "sim" && G::_nloci_slow_rate != 0) {
             // take first n loci and decrease relative rates
+#if defined (INFO_TEST)
+            // TODO: assuming 100 loci total
+            for (unsigned n=0; n<100; n++) {
+                if (n < 10) {
+                    G::_double_relative_rates[n] *= 0.001;
+                }
+                else if (n < 20) {
+                    G::_double_relative_rates[n] *= 0.01;
+                }
+                else if (n < 30) {
+                    G::_double_relative_rates[n] *= 0.1;
+                }
+                else if (n < 60) {
+                    G::_double_relative_rates[n] *= 1.0;
+                }
+                else if (n < 70) {
+                    G::_double_relative_rates[n] *= 1.1;
+                }
+                else if (n < 80) {
+                    G::_double_relative_rates[n] *= 5.0;
+                }
+                else if (n < 90) {
+                    G::_double_relative_rates[n] *= 10.0;
+                }
+                else {
+                    G::_double_relative_rates[n] *= 100;
+                }
+            }
+#else
             for (unsigned n=0; n < G::_nloci_slow_rate; n++) {
                 G::_double_relative_rates[n] *= 0.01;
             }
+#endif
         }
     }
 
