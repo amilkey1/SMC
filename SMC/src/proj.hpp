@@ -1457,28 +1457,31 @@ namespace proj {
             // TODO: assuming 100 loci total
             for (unsigned n=0; n<100; n++) {
                 if (n < 10) {
-                    G::_double_relative_rates[n] *= 0.001;
+                    G::_double_relative_rates[n] *= 0.0000842; // 0.001 unnormalized rate
                 }
                 else if (n < 20) {
-                    G::_double_relative_rates[n] *= 0.01;
+                    G::_double_relative_rates[n] *= 0.000842; // 0.01 rate
                 }
                 else if (n < 30) {
-                    G::_double_relative_rates[n] *= 0.1;
+                    G::_double_relative_rates[n] *= 0.00842; // 0.1
+                }
+                else if (n < 40) {
+                    G::_double_relative_rates[n] *= 0.0421; // 0.5
                 }
                 else if (n < 60) {
-                    G::_double_relative_rates[n] *= 1.0;
+                    G::_double_relative_rates[n] *= 0.0842; // 1.0
                 }
                 else if (n < 70) {
-                    G::_double_relative_rates[n] *= 1.1;
+                    G::_double_relative_rates[n] *= 0.09262; // 1.1
                 }
                 else if (n < 80) {
-                    G::_double_relative_rates[n] *= 5.0;
+                    G::_double_relative_rates[n] *= 0.421; // 5.0
                 }
                 else if (n < 90) {
-                    G::_double_relative_rates[n] *= 10.0;
+                    G::_double_relative_rates[n] *= 0.842; // 10.0
                 }
                 else {
-                    G::_double_relative_rates[n] *= 100;
+                    G::_double_relative_rates[n] *= 8.42; // 10.0
                 }
             }
 #else
