@@ -1470,7 +1470,7 @@ namespace proj {
                 }
                 else if (n < 40) {
 //                    G::_double_relative_rates[n] *= 0.0421; // 0.5
-                    G::_double_relative_rates[n] *= 0.9;
+                    G::_double_relative_rates[n] *= 0.5;
                 }
                 else if (n < 60) {
 //                    G::_double_relative_rates[n] *= 0.0842; // 1.0
@@ -1490,7 +1490,7 @@ namespace proj {
                 }
                 else {
 //                    G::_double_relative_rates[n] *= 8.42; // 100.0
-                    G::_double_relative_rates[n] *= 2.5; 
+                    G::_double_relative_rates[n] *= 2.9; 
                 }
             }
 #else
