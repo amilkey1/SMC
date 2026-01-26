@@ -80,6 +80,7 @@ class Forest {
         pair<unsigned, unsigned>        chooseTaxaToJoin(double s, Lot::SharedPtr lot);
 #if defined (LAZY_COPYING)
         double                          calcPartialArrayJC(Node * new_nd, const Node * lchild, const Node * rchild) const;
+        double                          calcPartialArrayHKY(Node * new_nd, const Node * lchild, const Node * rchild) const;
 #else
         void                            calcPartialArrayJC(Node* new_nd);
         void                            calcPartialArrayHKY(Node* new_nd);
@@ -249,7 +250,7 @@ class Forest {
         void                            showSpeciesJoined();
 #endif
         double                          calcTransitionProbabilityJC(double s, double s_child, double edge_length) const;
-        double                          calcTransitionProbabilityHKY(double s, double s_child, double edge_length);
+        double                          calcTransitionProbabilityHKY(double s, double s_child, double edge_length) const;
         double                          calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length);
         double                          getTreeLength();
         void                            calcTreeLength();
@@ -1612,6 +1613,84 @@ class Forest {
             }   // pattern loop
         }   // child loop
     }
+#else
+    inline double Forest::calcPartialArrayHKY(Node * new_nd, const Node * lchild, const Node * rchild) const {
+        // Computes the partial array for new_nd and returns the difference in
+        // log likelihood due to the addition of new_nd
+        //char base[] = {'A','C','G','T'};
+        
+        // Get pattern counts
+        auto counts = _data->getPatternCounts();
+
+        // Get the first and last pattern index for this gene's data
+        Data::begin_end_pair_t be = _data->getSubsetBeginEnd(_index - 1);
+        unsigned first_pattern = be.first;
+                
+        auto & parent_partial_array = new_nd->_partial->_v;
+        unsigned npatterns = _data->getNumPatternsInSubset(_index - 1);
+        
+        // Determine if there is an edge length extension (this would be the
+        // case if new_nd comes from a gene forest extension)
+        double lchild_stem_height = lchild->_height + lchild->_edge_length;
+        double rchild_stem_height = rchild->_height + rchild->_edge_length;
+        assert(fabs(lchild_stem_height - rchild_stem_height) < G::_small_enough);
+        
+        // Calculate the edge length extension
+        double edgelen_extension = new_nd->_height - lchild_stem_height;
+        
+        // Edge length extension may be slightly negative due to roundoff
+        assert(edgelen_extension >= -G::_small_enough);
+        if (edgelen_extension < 0.0)
+            edgelen_extension = 0.0;
+            
+        for (const Node * child : {lchild, rchild})  {
+            assert(child->_partial);
+            auto & child_partial_array = child->_partial->_v;
+            for (unsigned p = 0; p < npatterns; p++) {
+                unsigned pxnstates = p*G::_nstates;
+                //unsigned pp = first_pattern + p;
+                for (unsigned s = 0; s < G::_nstates; s++) {
+                    double sum_over_child_states = 0.0;
+                    for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
+                        double child_transition_prob = calcTransitionProbabilityHKY(s, s_child, child->_edge_length + edgelen_extension);
+                        double child_partial = child_partial_array[pxnstates + s_child];
+                                                
+                        sum_over_child_states += child_transition_prob * child_partial;
+                    }   // child state loop
+                    
+                    parent_partial_array[pxnstates + s] *= sum_over_child_states;
+                }   // parent state loop
+            }   // pattern loop
+        }
+
+        // Compute the ratio of after to before likelihoods
+        //TODO: make more efficient
+        double prev_loglike = 0.0;
+        double curr_loglike = 0.0;
+        auto & newnd_partial_array = new_nd->_partial->_v;
+        auto & lchild_partial_array = lchild->_partial->_v;
+        auto & rchild_partial_array = rchild->_partial->_v;
+        for (unsigned p = 0; p < npatterns; p++) {
+            unsigned pxnstates = p*G::_nstates;
+            
+            unsigned pp = first_pattern + p;
+            //unsigned count = counts[pp];
+            double left_sitelike = 0.0;
+            double right_sitelike = 0.0;
+            double newnd_sitelike = 0.0;
+            for (unsigned s = 0; s < G::_nstates; s++) {
+                // TODO: not sure about G::_base_frequencies[s]
+                left_sitelike += G::_base_frequencies[s]*lchild_partial_array[pxnstates + s];
+                right_sitelike += G::_base_frequencies[s]*rchild_partial_array[pxnstates + s];
+                newnd_sitelike += G::_base_frequencies[s]*newnd_partial_array[pxnstates + s];
+            }
+            prev_loglike += log(left_sitelike)*counts[pp];
+            prev_loglike += log(right_sitelike)*counts[pp];
+            curr_loglike += log(newnd_sitelike)*counts[pp];
+        }
+        
+        return curr_loglike - prev_loglike;
+    }
 #endif
 
     inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length) {
@@ -1669,22 +1748,50 @@ class Forest {
             return child_transition_prob;
     }
 
-    inline double Forest::calcTransitionProbabilityHKY(double s, double s_child, double edge_length) {
+    inline double Forest::calcTransitionProbabilityHKY(double s, double s_child, double edge_length) const {
         double relative_rate = G::_double_relative_rates[_index-1];
         assert (relative_rate > 0.0);
-        
+
         double child_transition_prob = 0.0;
-    
+
         double pi_A = G::_base_frequencies[0];
         double pi_C = G::_base_frequencies[1];
         double pi_G = G::_base_frequencies[2];
         double pi_T = G::_base_frequencies[3];
-
+//
         double pi_j = 0.0;
         double PI_J = 0.0;
-
+//
+//        double Pi[] = {pi_A + pi_G, pi_C+ pi_T, pi_A + pi_G, pi_C + pi_T};
         double phi = (pi_A+pi_G)*(pi_C+pi_T)+_kappa*(pi_A*pi_G+pi_C*pi_T);
         double beta_t = 0.5*(edge_length * relative_rate )/phi;
+//        double betat = 0.5*relative_rate*edge_length/((pi_A + pi_G)*(pi_C + pi_T) + _kappa*(pi_A*pi_G + pi_C*pi_T));
+//
+//        bool is_transition = (s == 0 && s_child == 2) || (s == 1 && s_child == 3) || (s == 2 && s_child == 0) || (s == 3 && s_child == 1);
+//        bool is_same = (s == 0 && s_child == 0) || (s == 1 && s_child == 1) | (s == 2 && s_child == 2) | (s == 3 && s_child == 3);
+//        bool is_transversion = !(is_same || is_transition);
+//
+//        double transition_prob = 0.0;
+//
+//        if (is_transition) {
+//            double pi_j = G::_base_frequencies[s_child];
+//            unsigned to = (unsigned) s_child;
+//            double Pi_j = Pi[to];
+//            transition_prob = pi_j*(1.0 + (1.0 - Pi_j)*exp(-betat)/Pi_j - exp(-betat*(_kappa*Pi_j + 1.0 - Pi_j))/Pi_j);
+//        }
+//        else if (is_transversion) {
+//            double pi_j = G::_base_frequencies[s_child];
+//            transition_prob = pi_j*(1.0 - exp(-betat));
+//        }
+//        else {
+//            double pi_j = G::_base_frequencies[s_child];
+//            unsigned to = (unsigned) s_child;
+//            double Pi_j = Pi[to];
+//            transition_prob = pi_j*(1.0 + (1.0 - Pi_j)*exp(-betat)/Pi_j) + (Pi_j - pi_j)*exp(-betat*(_kappa*Pi_j + 1.0 - Pi_j))/Pi_j;
+//        }
+//
+//        assert (transition_prob > 0.0);
+//        return transition_prob;
 
         // transition prob depends only on ending state
         if (s_child == 0) {
@@ -1711,6 +1818,12 @@ class Forest {
         while (true) {
             if (s == s_child) {
                 // no transition or transversion
+//                double inner_term_one = (pi_C + pi_T) * exp(-1 * beta_t);
+//                double first_term = pi_A * (pi_A + pi_G + inner_term_one);
+//                double inner_term_two = -1 * (1 + (pi_A + pi_G) * (_kappa - 1.0));
+//                double second_term = pi_G * exp(inner_term_two);
+//                child_transition_prob = first_term + second_term;
+                
                 double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
                 double second_term = (PI_J-pi_j)/PI_J*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
                 child_transition_prob = pi_j*first_term+second_term;
@@ -1719,6 +1832,12 @@ class Forest {
 
             else if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
                 // transition
+//                double inner_term_one = (pi_C + pi_T) * exp(-1 * beta_t);
+//                double first_term = pi_G * (pi_A + pi_G + inner_term_one);
+//                double inner_term_two = -1 * (1 + (pi_A + pi_G) * (_kappa - 1.0));
+//                double second_term = pi_G * exp(inner_term_two);
+//                child_transition_prob = first_term - second_term;
+                
                 double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
                 double second_term = (1/PI_J)*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
                 child_transition_prob = pi_j*(first_term-second_term);
@@ -1727,6 +1846,8 @@ class Forest {
 
             else {
                 // transversion
+//                child_transition_prob = pi_T * (1 - exp(-1 * beta_t));
+                
                 child_transition_prob = pi_j*(1-exp(-beta_t));
                 break;
             }
@@ -1748,89 +1869,112 @@ class Forest {
         }
 #endif
 
+        if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
 #if defined (UNROLL_LOOPS)
-        for (auto &nd:_lineages) {
-            double log_like = 0.0;
-            for (unsigned p=0; p<_npatterns; p++) {
-                double site_like = 0.0;
-                unsigned pxnstates = p*G::_nstates;
-                
-                // loop 1
-                unsigned s = 0;
-#if defined (REUSE_PARTIALS)
-                double partial = (nd->_partial->_v)[pxnstates+s];
-#else
-                double partial = (*nd->_partial)[pxnstates+s];
-#endif
-                site_like += 0.25*partial;
-                
-                // loop 2
-                s = 1;
-#if defined (REUSE_PARTIALS)
-                partial = (nd->_partial->_v)[pxnstates+s];
-#else
-                partial = (*nd->_partial)[pxnstates+s];
-#endif
-                site_like += 0.25*partial;
-                
-                // loop 3
-                s = 2;
-#if defined (REUSE_PARTIALS)
-                partial = (nd->_partial->_v)[pxnstates+s];
-#else
-                partial = (*nd->_partial)[pxnstates+s];
-#endif
-                site_like += 0.25*partial;
-                
-                // loop 4
-                s = 3;
-#if defined (REUSE_PARTIALS)
-                partial = (nd->_partial->_v)[pxnstates+s];
-#else
-                partial = (*nd->_partial)[pxnstates+s];
-#endif
-                site_like += 0.25*partial;
-            
-                
-                assert(site_like>0);
-                log_like += log(site_like)*counts[_first_pattern+p];
-            }
-
-            _gene_tree_log_likelihood += log_like;
-            
-//            debugLogLikelihood(nd, log_like);
-        }
-#else
-        for (auto &nd:_lineages) {
-            double log_like = 0.0;
-            for (unsigned p=0; p<_npatterns; p++) {
-                double site_like = 0.0;
-                for (unsigned s=0; s<G::_nstates; s++) {
-#if defined (REUSE_PARTIALS)
-                    double partial = (nd->_partial->_v)[p*G::_nstates+s];
-#else
-                    double partial = (*nd->_partial)[p*G::_nstates+s];
-#endif
+            for (auto &nd:_lineages) {
+                double log_like = 0.0;
+                for (unsigned p=0; p<_npatterns; p++) {
+                    double site_like = 0.0;
+                    unsigned pxnstates = p*G::_nstates;
+                    
+                    // loop 1
+                    unsigned s = 0;
+    #if defined (REUSE_PARTIALS)
+                    double partial = (nd->_partial->_v)[pxnstates+s];
+    #else
+                    double partial = (*nd->_partial)[pxnstates+s];
+    #endif
                     site_like += 0.25*partial;
+                    
+                    // loop 2
+                    s = 1;
+    #if defined (REUSE_PARTIALS)
+                    partial = (nd->_partial->_v)[pxnstates+s];
+    #else
+                    partial = (*nd->_partial)[pxnstates+s];
+    #endif
+                    site_like += 0.25*partial;
+                    
+                    // loop 3
+                    s = 2;
+    #if defined (REUSE_PARTIALS)
+                    partial = (nd->_partial->_v)[pxnstates+s];
+    #else
+                    partial = (*nd->_partial)[pxnstates+s];
+    #endif
+                    site_like += 0.25*partial;
+                    
+                    // loop 4
+                    s = 3;
+    #if defined (REUSE_PARTIALS)
+                    partial = (nd->_partial->_v)[pxnstates+s];
+    #else
+                    partial = (*nd->_partial)[pxnstates+s];
+    #endif
+                    site_like += 0.25*partial;
+                
+                    
+                    assert(site_like>0);
+                    log_like += log(site_like)*counts[_first_pattern+p];
                 }
-                assert(site_like>0);
-                log_like += log(site_like)*counts[_first_pattern+p];
-            }
 
-            _gene_tree_log_likelihood += log_like;
+                _gene_tree_log_likelihood += log_like;
+                
+    //            debugLogLikelihood(nd, log_like);
+            }
+    #else
+            for (auto &nd:_lineages) {
+                double log_like = 0.0;
+                for (unsigned p=0; p<_npatterns; p++) {
+                    double site_like = 0.0;
+                    for (unsigned s=0; s<G::_nstates; s++) {
+    #if defined (REUSE_PARTIALS)
+                        double partial = (nd->_partial->_v)[p*G::_nstates+s];
+    #else
+                        double partial = (*nd->_partial)[p*G::_nstates+s];
+    #endif
+                        site_like += 0.25*partial;
+                    }
+                    assert(site_like>0);
+                    log_like += log(site_like)*counts[_first_pattern+p];
+                }
+
+                _gene_tree_log_likelihood += log_like;
+                
+    //            debugLogLikelihood(nd, log_like);
+            }
+    #endif
             
-//            debugLogLikelihood(nd, log_like);
-        }
+    #if defined (UPGMA)
+            if (G::_upgma) {
+                if (_forest_height) {
+                    destroyUPGMA();
+                }
+            }
 #endif
-        
-#if defined (UPGMA)
-        if (G::_upgma) {
-            if (_forest_height) {
-                destroyUPGMA();
+        }
+        else {
+            for (auto &nd:_lineages) {
+                double log_like = 0.0;
+                for (unsigned p=0; p<_npatterns; p++) {
+                    double site_like = 0.0;
+                    for (unsigned s=0; s<G::_nstates; s++) {
+    #if defined (REUSE_PARTIALS)
+                        double partial = (nd->_partial->_v)[p*G::_nstates+s];
+    #else
+                        double partial = (*nd->_partial)[p*G::_nstates+s];
+    #endif
+                        site_like += G::_base_frequencies[s]*partial;
+                    }
+                    assert(site_like>0);
+                    log_like += log(site_like)*counts[_first_pattern+p];
+                }
+
+                _gene_tree_log_likelihood += log_like;
+                
+    //            debugLogLikelihood(nd, log_like);
             }
         }
-#endif
-        
         return _gene_tree_log_likelihood;
     }
 
@@ -3219,10 +3363,13 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
     }
 #endif
 
+#if defined (LAZY_COPYING)
     inline pair<Node*, Node*> Forest::getPrevJoin() {
         return make_pair(_lineages.back()->_left_child, _lineages.back()->_left_child->_right_sib);
     }
+#endif
 
+#if defined (LAZY_COPYING)
     inline unsigned Forest::getNRemainingSpecies() {
         vector<G::species_t> existing_species;
         for (auto &nd:_lineages) {
@@ -3232,7 +3379,9 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
         unsigned n_unique_species = unique(existing_species.begin(), existing_species.end()) - existing_species.begin();
         return n_unique_species;
     }
+#endif
 
+#if defined (LAZY_COPYING)
     inline void Forest::revertGeneForest(double prev_gene_increment, vector<G::species_t> prev_species_assignments) {
         _forest_height -= prev_gene_increment;
         Node* child1 = _lineages.back()->_left_child;
@@ -3265,6 +3414,7 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
         
         _ninternals--;
     }
+#endif
 
     inline void Forest::debugForest() {
         cout << "debugging forest" << endl;

@@ -123,7 +123,9 @@ class Particle {
         void                                    drawNewTheta(string new_species);
 #endif
     
+#if defined (LAZY_COPYING)
         void                                    proposeMCMCMove(bool last_round);
+#endif
     
         bool operator<(const Particle::SharedPtr & other) const {
             return _log_weight<other->_log_weight;
@@ -2193,6 +2195,7 @@ class Particle {
     }
 #endif
         
+#if defined (LAZY_COPYING)
         inline void Particle::proposeMCMCMove(bool last_round) {
             // _prev_t_by_gene represents species / gene forest before the coalescent event we are attemping to change
             // save a copy of it to reset _prev_t_by_gene for the next mcmc round
@@ -2499,6 +2502,7 @@ class Particle {
             
             // don't reset theta map - keep thetas the same until species tree is rebuilt
         }
+#endif
 
 #if defined(LAZY_COPYING)
     inline void Particle::finalizeLatestJoin(int locus, unsigned index, map<const void *, list<unsigned> > & nonzero_map) {
