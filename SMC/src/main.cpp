@@ -114,6 +114,9 @@ bool        G::_second_level = true;
 bool        G::_calc_bhv_distances_to_true_tree = false;
 bool        G::_sample_from_prior = false;
 unsigned    G::_nloci_slow_rate = 0;
+bool        G::_plus_G = false;
+double      G::_alpha = 1000;
+vector<double>  G::_gamma_rate_cat;
 
 vector<vector<double> > G::_dmatrix;
 vector<Split>           G::_dmatrix_rows;

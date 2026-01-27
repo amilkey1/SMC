@@ -1679,7 +1679,6 @@ class Forest {
             double right_sitelike = 0.0;
             double newnd_sitelike = 0.0;
             for (unsigned s = 0; s < G::_nstates; s++) {
-                // TODO: not sure about G::_base_frequencies[s]
                 left_sitelike += G::_base_frequencies[s]*lchild_partial_array[pxnstates + s];
                 right_sitelike += G::_base_frequencies[s]*rchild_partial_array[pxnstates + s];
                 newnd_sitelike += G::_base_frequencies[s]*newnd_partial_array[pxnstates + s];
@@ -1712,7 +1711,8 @@ class Forest {
         //    = 2*betat*(AC + AT + CG + GT + kappa(AG + CT))
         //    = 2*betat*((A + G)*(C + T) + kappa(AG + CT))
         //  betat = v/[2*( (A + G)(C + T) + kappa*(AG + CT) )]
-        double kappa = 1.0;
+//        double kappa = 1.0;
+        double kappa = _kappa;
         double betat = 0.5*relative_rate*edge_length/((pi[0] + pi[2])*(pi[1] + pi[3]) + kappa*(pi[0]*pi[2] + pi[1]*pi[3]));
         
         if (is_transition) {
@@ -1758,40 +1758,12 @@ class Forest {
         double pi_C = G::_base_frequencies[1];
         double pi_G = G::_base_frequencies[2];
         double pi_T = G::_base_frequencies[3];
-//
+
         double pi_j = 0.0;
         double PI_J = 0.0;
-//
-//        double Pi[] = {pi_A + pi_G, pi_C+ pi_T, pi_A + pi_G, pi_C + pi_T};
+
         double phi = (pi_A+pi_G)*(pi_C+pi_T)+_kappa*(pi_A*pi_G+pi_C*pi_T);
         double beta_t = 0.5*(edge_length * relative_rate )/phi;
-//        double betat = 0.5*relative_rate*edge_length/((pi_A + pi_G)*(pi_C + pi_T) + _kappa*(pi_A*pi_G + pi_C*pi_T));
-//
-//        bool is_transition = (s == 0 && s_child == 2) || (s == 1 && s_child == 3) || (s == 2 && s_child == 0) || (s == 3 && s_child == 1);
-//        bool is_same = (s == 0 && s_child == 0) || (s == 1 && s_child == 1) | (s == 2 && s_child == 2) | (s == 3 && s_child == 3);
-//        bool is_transversion = !(is_same || is_transition);
-//
-//        double transition_prob = 0.0;
-//
-//        if (is_transition) {
-//            double pi_j = G::_base_frequencies[s_child];
-//            unsigned to = (unsigned) s_child;
-//            double Pi_j = Pi[to];
-//            transition_prob = pi_j*(1.0 + (1.0 - Pi_j)*exp(-betat)/Pi_j - exp(-betat*(_kappa*Pi_j + 1.0 - Pi_j))/Pi_j);
-//        }
-//        else if (is_transversion) {
-//            double pi_j = G::_base_frequencies[s_child];
-//            transition_prob = pi_j*(1.0 - exp(-betat));
-//        }
-//        else {
-//            double pi_j = G::_base_frequencies[s_child];
-//            unsigned to = (unsigned) s_child;
-//            double Pi_j = Pi[to];
-//            transition_prob = pi_j*(1.0 + (1.0 - Pi_j)*exp(-betat)/Pi_j) + (Pi_j - pi_j)*exp(-betat*(_kappa*Pi_j + 1.0 - Pi_j))/Pi_j;
-//        }
-//
-//        assert (transition_prob > 0.0);
-//        return transition_prob;
 
         // transition prob depends only on ending state
         if (s_child == 0) {
@@ -1818,12 +1790,6 @@ class Forest {
         while (true) {
             if (s == s_child) {
                 // no transition or transversion
-//                double inner_term_one = (pi_C + pi_T) * exp(-1 * beta_t);
-//                double first_term = pi_A * (pi_A + pi_G + inner_term_one);
-//                double inner_term_two = -1 * (1 + (pi_A + pi_G) * (_kappa - 1.0));
-//                double second_term = pi_G * exp(inner_term_two);
-//                child_transition_prob = first_term + second_term;
-                
                 double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
                 double second_term = (PI_J-pi_j)/PI_J*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
                 child_transition_prob = pi_j*first_term+second_term;
@@ -1832,12 +1798,6 @@ class Forest {
 
             else if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
                 // transition
-//                double inner_term_one = (pi_C + pi_T) * exp(-1 * beta_t);
-//                double first_term = pi_G * (pi_A + pi_G + inner_term_one);
-//                double inner_term_two = -1 * (1 + (pi_A + pi_G) * (_kappa - 1.0));
-//                double second_term = pi_G * exp(inner_term_two);
-//                child_transition_prob = first_term - second_term;
-                
                 double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
                 double second_term = (1/PI_J)*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
                 child_transition_prob = pi_j*(first_term-second_term);
@@ -1846,8 +1806,6 @@ class Forest {
 
             else {
                 // transversion
-//                child_transition_prob = pi_T * (1 - exp(-1 * beta_t));
-                
                 child_transition_prob = pi_j*(1-exp(-beta_t));
                 break;
             }
@@ -3711,9 +3669,9 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
     }
 
     inline void Forest::simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites) {
-        if (G::_model != "JC") {
-            throw XProj("must use JC model for data simulations");
-        }
+//        if (G::_model != "JC") {
+//            throw XProj("must use JC model for data simulations");
+//        }
         
         // Create vector of states for each node in the tree
         unsigned nnodes = (unsigned)_nodes.size();
@@ -3735,19 +3693,20 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
         
         // Draw equilibrium base frequencies from Dirichlet
         // having parameter G::_comphet
-        vector<double> basefreq = {0.25, 0.25, 0.25, 0.25};
-        if (Forest::_comphet != G::_infinity) {
-            // Draw 4 Gamma(G::_comphet, 1) variates
-            double A = lot->gamma(Forest::_comphet, 1.0);
-            double C = lot->gamma(Forest::_comphet, 1.0);
-            double G = lot->gamma(Forest::_comphet, 1.0);
-            double T = lot->gamma(Forest::_comphet, 1.0);
-            double total = A + C + G + T;
-            basefreq[0] = A/total;
-            basefreq[1] = C/total;
-            basefreq[2] = G/total;
-            basefreq[3] = T/total;
-        }
+        vector<double> basefreq = G::_base_frequencies;
+//        vector<double> basefreq = {0.25, 0.25, 0.25, 0.25};
+//        if (Forest::_comphet != G::_infinity) {
+//            // Draw 4 Gamma(G::_comphet, 1) variates
+//            double A = lot->gamma(Forest::_comphet, 1.0);
+//            double C = lot->gamma(Forest::_comphet, 1.0);
+//            double G = lot->gamma(Forest::_comphet, 1.0);
+//            double T = lot->gamma(Forest::_comphet, 1.0);
+//            double total = A + C + G + T;
+//            basefreq[0] = A/total;
+//            basefreq[1] = C/total;
+//            basefreq[2] = G/total;
+//            basefreq[3] = T/total;
+//        }
         
         // Simulate starting sequence at the root node
 

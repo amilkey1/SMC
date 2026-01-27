@@ -92,6 +92,9 @@ namespace proj {
         static bool                 _calc_bhv_distances_to_true_tree;
         static bool                 _sample_from_prior;
         static unsigned             _nloci_slow_rate;
+        static bool                 _plus_G;
+        static double               _alpha;
+        static vector<double>       _gamma_rate_cat;
         
         // other
         static vector<string>           _taxon_names;

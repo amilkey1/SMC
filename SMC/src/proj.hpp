@@ -1255,6 +1255,8 @@ namespace proj {
         ("calc_bhv_distances_to_true_tree", boost::program_options::value(&G::_calc_bhv_distances_to_true_tree)->default_value(false), "set to true to calculate bhv distances between every sampled tree and the true tree")
         ("sample_from_prior", boost::program_options::value(&G::_sample_from_prior)->default_value(false), "sample species trees from prior")
         ("nloci_slow_rate", boost::program_options::value(&G::_nloci_slow_rate)->default_value(0), "for simulations - number of loci to simulate at slower rate")
+        ("plus_G", boost::program_options::value(&G::_plus_G)->default_value(false), "+G rate het")
+        ("alpha", boost::program_options::value(&G::_alpha)->default_value(1000), "alpha value for +G rate het")
 #if defined(SPECIES_IN_CONF)
         ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
 #endif
@@ -2555,6 +2557,19 @@ namespace proj {
         
         if (G::_fix_theta) {
             particle.fixTheta();
+        }
+        
+        if (G::_plus_G) {
+            // Draw 4 Gamma(G::_alpha, 1) categories
+            double cat_1 = rng.gamma(G::_alpha, 1.0);
+            double cat_2 = rng.gamma(G::_alpha, 1.0);
+            double cat_3 = rng.gamma(G::_alpha, 1.0);
+            double cat_4 = rng.gamma(G::_alpha, 1.0);
+            
+            G::_gamma_rate_cat.push_back(cat_1);
+            G::_gamma_rate_cat.push_back(cat_2);
+            G::_gamma_rate_cat.push_back(cat_3);
+            G::_gamma_rate_cat.push_back(cat_4);
         }
         
 #if defined (UPGMA)
