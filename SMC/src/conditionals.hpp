@@ -18,8 +18,6 @@
 
 #define SYSTEMATIC_FILTERING
 
-#define REUSE_PARTIALS
-
 //#define UNROLL_LOOPS
 
 //#define SPECIES_IN_CONF

@@ -117,9 +117,7 @@ class Forest {
         void                            debugShowDistanceMatrix(const vector<double> & d) const;
         vector<pair<tuple<string, string, string>, double>> resetT();
     
-#if defined (REUSE_PARTIALS)
         void                            stowPartial(Node *nd);
-#endif
     
         void                            saveCoalInfoInitial();
         void                            saveCoalInfoGeneForest(vector<Forest::coalinfo_t> & coalinfo_vect) const;
@@ -342,13 +340,9 @@ class Forest {
             if (!nd->_left_child) {
 
                 if (!G::_save_memory || (G::_save_memory && partials)) { // if save memory setting, don't set tip partials yet
-#if defined (REUSE_PARTIALS)
                     mtx.lock();
                     nd->_partial=ps.getPartial(_npatterns*4*G::_gamma_rate_cat.size(), _index);
                     mtx.unlock();
-#else
-                    nd->_partial=ps.getPartial(_npatterns*4*G::_gamma_rate_cat.size());
-#endif
                     for (unsigned step = 0; step < G::_gamma_rate_cat.size(); step++) {
                         for (unsigned p=0; p<_npatterns; p++) {
                             unsigned pp = _first_pattern+p;
@@ -361,45 +355,28 @@ class Forest {
                                 Data::state_t state = (Data::state_t)1 << s;
                                 Data::state_t d = data_matrix[nd->_number][pp];
                                 double result = state & d;
-        #if defined (REUSE_PARTIALS)
                                 (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-        #else
-                                (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-        #endif
                                 
                                 // loop 2
                                 s = 1;
                                 state = (Data::state_t)1 << s;
                                 d = data_matrix[nd->_number][pp];
                                 result = state & d;
-        #if defined (REUSE_PARTIALS)
                                 (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-        #else
-                                (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-        #endif
                                 
                                 // loop 3
                                 s = 2;
                                 state = (Data::state_t)1 << s;
                                 d = data_matrix[nd->_number][pp];
                                 result = state & d;
-        #if defined (REUSE_PARTIALS)
                                 (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-        #else
-                                (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-        #endif
                                 
                                 // loop 4
                                 s = 3;
                                 state = (Data::state_t)1 << s;
                                 d = data_matrix[nd->_number][pp];
                                 result = state & d;
-        #if defined (REUSE_PARTIALS)
                                 (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-        #else
-                                (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-        #endif
-                                
         #else
                             
     #if defined (UNROLL_LOOPS)
@@ -408,44 +385,28 @@ class Forest {
                             Data::state_t state = (Data::state_t)1 << s;
                             Data::state_t d = data_matrix[nd->_number][pp];
                             double result = state & d;
-    #if defined (REUSE_PARTIALS)
                             (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #else
-                            (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #endif
                             
                             // loop 2
                             s = 1;
                             state = (Data::state_t)1 << s;
                             d = data_matrix[nd->_number][pp];
                             result = state & d;
-    #if defined (REUSE_PARTIALS)
                             (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #else
-                            (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #endif
                             
                             // loop 3
                             s = 2;
                             state = (Data::state_t)1 << s;
                             d = data_matrix[nd->_number][pp];
                             result = state & d;
-    #if defined (REUSE_PARTIALS)
                             (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #else
-                            (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #endif
                             
                             // loop 4
                             s = 3;
                             state = (Data::state_t)1 << s;
                             d = data_matrix[nd->_number][pp];
                             result = state & d;
-    #if defined (REUSE_PARTIALS)
                             (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #else
-                            (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #endif
     #else
     #if defined (UNROLL_LOOPS)
                             assert (1 == 2);
@@ -455,44 +416,28 @@ class Forest {
                             Data::state_t state = (Data::state_t)1 << s;
                             Data::state_t d = data_matrix[nd->_number][pp];
                             double result = state & d;
-    #if defined (REUSE_PARTIALS)
                             (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #else
-                            (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #endif
                             
                             // loop 2
                             s = 1;
                             state = (Data::state_t)1 << s;
                             d = data_matrix[nd->_number][pp];
                             result = state & d;
-    #if defined (REUSE_PARTIALS)
                             (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #else
-                            (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #endif
                             
                             // loop 3
                             s = 2;
                             state = (Data::state_t)1 << s;
                             d = data_matrix[nd->_number][pp];
                             result = state & d;
-    #if defined (REUSE_PARTIALS)
                             (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #else
-                            (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #endif
                             
                             // loop 4
                             s = 3;
                             state = (Data::state_t)1 << s;
                             d = data_matrix[nd->_number][pp];
                             result = state & d;
-    #if defined (REUSE_PARTIALS)
                             (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #else
-                            (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-    #endif
 //                            }
 
     #else
@@ -501,11 +446,7 @@ class Forest {
                                     Data::state_t state = (Data::state_t)1 << s;
                                     Data::state_t d = data_matrix[nd->_number][pp];
                                     double result = state & d;
-        #if defined (REUSE_PARTIALS)
                                     (nd->_partial->_v)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-        #else
-                                    (*nd->_partial)[pxnstates+s]= (result == 0.0 ? 0.0:1.0);
-        #endif
                             }
     #endif
     #endif
@@ -1468,38 +1409,22 @@ class Forest {
                     
                     // loop 1
                     unsigned s = 0;
-    #if defined (REUSE_PARTIALS)
                     double partial = (nd->_partial->_v)[pxnstates+s];
-    #else
-                    double partial = (*nd->_partial)[pxnstates+s];
-    #endif
                     site_like += 0.25*partial;
                     
                     // loop 2
                     s = 1;
-    #if defined (REUSE_PARTIALS)
                     partial = (nd->_partial->_v)[pxnstates+s];
-    #else
-                    partial = (*nd->_partial)[pxnstates+s];
-    #endif
                     site_like += 0.25*partial;
                     
                     // loop 3
                     s = 2;
-    #if defined (REUSE_PARTIALS)
                     partial = (nd->_partial->_v)[pxnstates+s];
-    #else
-                    partial = (*nd->_partial)[pxnstates+s];
-    #endif
                     site_like += 0.25*partial;
                     
                     // loop 4
                     s = 3;
-    #if defined (REUSE_PARTIALS)
                     partial = (nd->_partial->_v)[pxnstates+s];
-    #else
-                    partial = (*nd->_partial)[pxnstates+s];
-    #endif
                     site_like += 0.25*partial;
                 
                     
@@ -1517,11 +1442,7 @@ class Forest {
                 for (unsigned p=0; p<_npatterns; p++) {
                     double site_like = 0.0;
                     for (unsigned s=0; s<G::_nstates; s++) {
-    #if defined (REUSE_PARTIALS)
                         double partial = (nd->_partial->_v)[p*G::_nstates+s];
-    #else
-                        double partial = (*nd->_partial)[p*G::_nstates+s];
-    #endif
                         site_like += 0.25*partial;
                     }
                     assert(site_like>0);
@@ -1540,11 +1461,7 @@ class Forest {
                 for (unsigned p=0; p<_npatterns; p++) {
                     double site_like = 0.0;
                     for (unsigned s=0; s<G::_nstates; s++) {
-    #if defined (REUSE_PARTIALS)
                         double partial = (nd->_partial->_v)[p*G::_nstates+s];
-    #else
-                        double partial = (*nd->_partial)[p*G::_nstates+s];
-    #endif
                         site_like += G::_base_frequencies[s]*partial;
                     }
                     assert(site_like>0);
@@ -1942,7 +1859,6 @@ class Forest {
         }
     }
 
-#if defined (REUSE_PARTIALS)
     inline void Forest::stowPartial(Node * nd) {
         if (nd && nd->_left_child && nd->_partial) {
             // Nothing to do if nd or nd->_partial is null
@@ -1958,7 +1874,6 @@ class Forest {
             nd->_partial.reset();
         }
     }
-#endif
         
 inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
     // d is a 1-dimensional vector that stores the lower triangle of a square matrix
@@ -2145,13 +2060,9 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
 
          //always calculating partials now
          assert (new_nd->_partial == nullptr);
-#if defined (REUSE_PARTIALS)
         mtx.lock();
         new_nd->_partial=ps.getPartial(_npatterns*4*G::_gamma_rate_cat.size(), _index);
         mtx.unlock();
-#else
-         new_nd->_partial=ps.getPartial(_npatterns*4G::_gamma_rate_cat.size());
-#endif
          assert(new_nd->_left_child->_right_sib);
         calcPartialArrayJC(new_nd, new_nd->_left_child, new_nd->_left_child->_right_sib);
         new_nd->_height = _forest_height;
@@ -2184,13 +2095,9 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
              if (G::_save_memory) {
                  for (auto &nd:_lineages) {
                      if (nd->_partial == nullptr) {
-#if defined (REUSE_PARTIALS)
                          mtx.lock();
                          nd->_partial = ps.getPartial(_npatterns*4*G::_gamma_rate_cat.size(), _index);
                          mtx.unlock();
-#else
-                         nd->_partial = ps.getPartial(_npatterns*4G::_gamma_rate_cat.size());
-#endif
                          calcPartialArrayJC(nd, nd->_left_child, nd->_left_child->_right_sib);
                      }
                  }
@@ -2237,25 +2144,17 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
          if (!G::_run_on_empty) {
              //always calculating partials now
              assert (new_nd->_partial == nullptr);
-#if defined (REUSE_PARTIALS)
              mtx.lock();
              new_nd->_partial=ps.getPartial(_npatterns*4*G::_gamma_rate_cat.size(), _index);
              mtx.unlock();
-#else
-             new_nd->_partial=ps.getPartial(_npatterns*4G::_gamma_rate_cat.size());
-#endif
              assert(new_nd->_left_child->_right_sib);
 
              if (G::_save_memory) {
                  for (auto &nd:_lineages) {
                      if (nd->_partial == nullptr) {
-#if defined (REUSE_PARTIALS)
                          mtx.lock();
                          nd->_partial = ps.getPartial(_npatterns*4*G::_gamma_rate_cat.size(), _index);
                          mtx.unlock();
-#else
-                         nd->_partial = ps.getPartial(_npatterns*4G::_gamma_rate_cat.size());
-#endif
                          calcPartialArrayJC(nd, nd->_left_child, nd->_left_child->_right_sib);
                      }
                  }

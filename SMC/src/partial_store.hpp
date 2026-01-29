@@ -2,39 +2,28 @@
 
 namespace proj {
 
-#if defined (REUSE_PARTIALS)
     struct Partial {
         Partial(unsigned g, unsigned n);
         ~Partial();
         unsigned        _g; // the locus
         vector<double>  _v; // the partial array: length = _nstates*<no. patterns>
     };
-#endif
 
-#if defined (REUSE_PARTIALS)
     inline Partial::Partial(unsigned g, unsigned n) {
         _g = g;
         _v.resize(n);
         _v.assign(n, 1.0);
     }
-#endif
 
-#if defined (REUSE_PARTIALS)
     inline Partial::~Partial() {
     }
-#endif
 
     class PartialStore {
         public:
             PartialStore();
             ~PartialStore();
-#if defined (REUSE_PARTIALS)
         typedef std::shared_ptr<Partial>          partial_t;
-#else
-        typedef std::shared_ptr <vector<double>>   partial_t;
-#endif
         
-#if defined (REUSE_PARTIALS)
         void            setNLoci(unsigned nloci);
         partial_t       getPartial(unsigned locus);
         void            putPartial(unsigned locus, partial_t partial);
@@ -50,49 +39,29 @@ namespace proj {
         unsigned         _total_elements_created;
         unsigned         _total_partials_reused;
         unsigned         _total_elements_reused;
-#endif
         
-#if defined (REUSE_PARTIALS)
         PartialStore::partial_t getPartial(unsigned nelements, unsigned locus);
-#else
-        partial_t getPartial(unsigned nelements);
-#endif
-        
-#if !defined (REUSE_PARTIALS)
-        void setnelements(unsigned nelements) {_nelements = nelements;}
-#endif
         
         void resetPartial();
         private:
-#if defined (REUSE_PARTIALS)
             storage_t        _storage;
             vector<unsigned> _nelements;
-#else
-        unsigned _nelements;
-#endif
     };
 
     inline PartialStore::PartialStore() {
         //std::cout << "Constructing a partial store" << std::endl;
-#if defined (REUSE_PARTIALS)
         _total_partials_created = 0;
         _total_elements_created = 0;
         _total_partials_reused = 0;
         _total_elements_reused = 0;
-#else
-        _nelements=0;
-#endif
     }
 
     inline PartialStore::~PartialStore() {
         //std::cout << "Destroying a partial store" << std::endl;
-#if defined (REUSE_PARTIALS)
         _nelements.clear();
         _storage.clear();
-#endif
     }
 
-#if defined (REUSE_PARTIALS)
     inline void PartialStore::setNLoci(unsigned nloci) {
         // Should be called before any partials are stored
         assert(_nelements.empty());
@@ -102,21 +71,13 @@ namespace proj {
         _nelements.resize(nloci);
         _storage.resize(nloci);
     }
-#endif
 
-#if defined (REUSE_PARTIALS)
     inline void PartialStore::setNElements(unsigned nelements, unsigned locus) {
         assert(_nelements.size() > locus-1);
         _nelements[locus-1] = nelements;
     }
-#endif
 
-#if defined (REUSE_PARTIALS)
     inline PartialStore::partial_t PartialStore::getPartial(unsigned nelements, unsigned locus) {
-#else
-    inline PartialStore::partial_t PartialStore::getPartial(unsigned nelements) {
-#endif
-#if defined(REUSE_PARTIALS)
         // Check to make sure supplied value of locus is valid
         assert(_nelements.size() > locus-1);
         assert(_nelements[locus-1] > 0);
@@ -137,14 +98,8 @@ namespace proj {
         }
         
         return partial;
-#else
-        // allocate a new partial
-        assert(nelements>0);
-        return partial_t(new std::vector<double> (nelements));
-#endif
     }
         
-#if defined(REUSE_PARTIALS)
     inline void PartialStore::putPartial(unsigned locus, partial_t partial) {
         // Check to make sure supplied value of locus is valid
         assert(_nelements.size() > locus-1);
@@ -155,5 +110,4 @@ namespace proj {
         partial->_v.assign(_nelements[locus-1], 1.0);
         _storage[locus-1].push_back(partial);
     }
-#endif
 }
