@@ -633,7 +633,7 @@ class Particle {
         unsigned next_gene = _gene_order[G::_generation];
         
 #if defined(LAZY_COPYING)
-        _prev_log_likelihoods[next_gene-1] = _gene_forest_ptrs[next_gene-1]->getLogLikelihood();
+//        _prev_log_likelihoods[next_gene-1] = _gene_forest_ptrs[next_gene-1]->getLogLikelihood();
 #endif
 
         bool calc_weight = false;
@@ -2536,7 +2536,7 @@ class Particle {
         }
         
         // Copy log likelihood
-        gfp->setLogLikelihood(_prev_log_likelihoods[locus] + gfx.getLogWeight());
+//        gfp->setLogLikelihood(_prev_log_likelihoods[locus] + gfx.getLogWeight());
                         
         // Get splits for children of _proposed_anc
         const Node * anc = gfx.getProposedAnc();

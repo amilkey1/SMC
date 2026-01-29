@@ -217,7 +217,7 @@ class Forest {
         unsigned                        _first_pattern = 0;
         unsigned                        _index; // gene indices start at 1, not 0
         map<string, vector<Node*> >     _species_partition;
-        double                          _gene_tree_log_likelihood;
+        double mutable                  _gene_tree_log_likelihood;
         double                          _log_joining_prob;
         vector<pair<double, double>>    _increments_and_priors;
     
@@ -469,14 +469,9 @@ class Forest {
 #endif
                     for (unsigned step = 0; step < G::_gamma_rate_cat.size(); step++) {
                         for (unsigned p=0; p<_npatterns; p++) {
-//                            unsigned first_pattern = _first_pattern + step * G::_gamma_rate_cat.size();
-                            // TODO: _first_pattern needs to start at a multiple of 4?
                             unsigned pp = _first_pattern+p;
                             unsigned start = step * G::_gamma_rate_cat.size() * (_npatterns);
                             unsigned pxnstates = p*G::_nstates + start;
-//                            unsigned pxnstates = p*G::_nstates + step * G::_gamma_rate_cat.size();
-                            
-//                            for (unsigned step = 0; step < G::_gamma_rate_cat.size(); step++) {
         #if defined (UNROLL_LOOPS)
                                 
                                 // loop 1
@@ -1749,10 +1744,12 @@ class Forest {
             }
              if (!G::_plus_G) {
                 weight = curr_loglike - prev_loglike;
+                _gene_tree_log_likelihood = curr_loglike;
+                cout << curr_loglike << endl;
             }
             else {
                  log_likelihoods.push_back(curr_loglike);
-//                            cout << curr_loglike << endl;
+                            cout << curr_loglike << endl;
                  prev_loglikelihoods.push_back(prev_loglike);
                  }
              }
@@ -1762,9 +1759,9 @@ class Forest {
                    double curr_sum = getRunningSumChoices(log_likelihoods);
                    double prev_sum = getRunningSumChoices(prev_loglikelihoods);
                    weight = curr_sum - prev_sum;
+                   _gene_tree_log_likelihood = curr_sum;
              }
           return weight;
-//        return curr_loglike - prev_loglike;
     }
 #endif
 

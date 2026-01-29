@@ -657,7 +657,12 @@ namespace proj {
 
             double vector_prior = 0.0;
 
-            double log_likelihood = p.getLogLikelihood();
+//            double log_likelihood = p.getLogLikelihood();
+            double log_likelihood = 0.0;
+            vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
+            for (auto &g:gene_tree_log_likelihoods) {
+                log_likelihood += g;
+            }
             double log_prior = p.getAllPriors();
 
             double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior;
@@ -710,7 +715,7 @@ namespace proj {
 
             logf << "\t" << G::_lambda; // TODO: not estimating lambda for now
 
-            vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
+//            vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
             vector<double> gene_tree_priors = p.getGeneTreeCoalescentLikelihoods();
 
 
