@@ -1354,6 +1354,7 @@ class Forest {
                 log_likelihoods.push_back(curr_loglike);
 //                cout << curr_loglike << endl;
                 prev_loglikelihoods.push_back(prev_loglike);
+                _gene_tree_log_likelihood = curr_loglike;
             }
         }
         if (G::_plus_G) {
@@ -1362,6 +1363,7 @@ class Forest {
             double curr_sum = getRunningSumChoices(log_likelihoods);
             double prev_sum = getRunningSumChoices(prev_loglikelihoods);
             weight = curr_sum - prev_sum;
+            _gene_tree_log_likelihood = curr_sum;
         }
 //        return curr_loglike - prev_loglike;
         return weight;
