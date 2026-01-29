@@ -1745,11 +1745,11 @@ class Forest {
              if (!G::_plus_G) {
                 weight = curr_loglike - prev_loglike;
                 _gene_tree_log_likelihood = curr_loglike;
-                cout << curr_loglike << endl;
+//                cout << curr_loglike << endl;
             }
             else {
                  log_likelihoods.push_back(curr_loglike);
-                            cout << curr_loglike << endl;
+//                            cout << curr_loglike << endl;
                  prev_loglikelihoods.push_back(prev_loglike);
                  }
              }
