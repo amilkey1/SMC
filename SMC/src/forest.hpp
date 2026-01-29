@@ -79,8 +79,6 @@ class Forest {
         void                            updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
         void                            revertNodeVector(vector<Node *> & node_vector, Node * addnode1, Node * addnode2, Node * delnode1);
         double                          getRunningSumChoices(vector<double> &log_weight_choices) const;
-        vector<double>                  reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
-        int                             selectPair(vector<double> weight_vec, Lot::SharedPtr lot);
         void                            allowCoalescence(string species_name, double increment, Lot::SharedPtr lot);
     
         vector<pair<double, unsigned long>>    calcForestRate(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map);
@@ -111,10 +109,6 @@ class Forest {
         void                            renumberInternals();
         bool                            canHaveSibling(Node * nd, bool rooted, bool allow_polytomies);
         vector<tuple<string, string, string>>              buildFromNewickTopology(const string newick);
-        pair<Node*, Node*>              chooseAllPairs(vector<Node*> &nodes, double increment, string species, Lot::SharedPtr lot);
-        tuple<Node*, Node*, Node*>      createNewSubtree(pair<unsigned, unsigned> t, vector<Node*> node_list, double increment, string species);
-        pair<Node*, Node*>              getSubtreeAt(pair<unsigned, unsigned> t, vector<Node*> node_list);
-        void                            debugShowDistanceMatrix(const vector<double> & d) const;
         vector<pair<tuple<string, string, string>, double>> resetT();
     
         void                            stowPartial(Node *nd);
@@ -140,7 +134,6 @@ class Forest {
         PartialStore::partial_t         pullPartial();
         void                            buildCoalInfoVect();
         virtual pair<double, double>    getBoundaryExtension() const;
-        void                            joinLineagePair(Node * new_nd, Node * subtree1, Node * subtree2);
         Node *                          getMostRecentAncestor();
         void                            refreshAllPreorders() const;
         void                            advanceAllLineagesBy(double increment);
@@ -178,8 +171,6 @@ class Forest {
         vector<Node*>                   _preorder;
     
         double                          _log_weight;
-        vector<pair<Node*, Node*>>      _node_choices;
-        vector<double>                  _log_likelihood_choices;
     
         vector<pair<string, unsigned>>  _lineages_per_species;
         double                          _forest_height;
@@ -1476,32 +1467,6 @@ class Forest {
         return _gene_tree_log_likelihood;
     }
 
-    inline int Forest::selectPair(vector<double> weight_vec, Lot::SharedPtr lot) {
-        // choose a random number [0,1]
-        assert (lot != nullptr);
-        double u = lot->uniform();
-        
-        double cum_prob = 0.0;
-        int index = 0.0;
-        for (int i=0; i < (int) weight_vec.size(); i++) {
-            cum_prob += exp(weight_vec[i]);
-            if (u <= cum_prob) {
-                index = i;
-                break;
-            }
-        }
-        // return index of choice
-        return index;
-    }
-
-    inline vector<double> Forest::reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood) {
-        vector<double> weight_vec;
-        for (int a = 0; a < (int) likelihood_vec.size(); a++) {
-            weight_vec.push_back(likelihood_vec[a]-prev_log_likelihood);
-        }
-        return weight_vec;
-    }
-
     inline double Forest::getRunningSumChoices(vector<double> &log_weight_choices) const {
         double running_sum = 0.0;
         double log_weight_choices_sum = 0.0;
@@ -1653,10 +1618,6 @@ class Forest {
         
         // the following data members apply only when simulating and do not need to be copied because simulating data only deals with one particle at a time
 //        _lineages_per_species = other._lineages_per_species;
-        
-        // the following data members get reset if using prior-post and do not need to be copied
-//       _node_choices = other._node_choices;
-//       _log_likelihood_choices = other._log_likelihood_choices;
         
         
         // the following data members apply only to the second level
@@ -1874,204 +1835,6 @@ class Forest {
             nd->_partial.reset();
         }
     }
-        
-inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
-    // d is a 1-dimensional vector that stores the lower triangle of a square matrix
-    // (not including diagonals) in row order
-    //
-    // For example, for a 4x4 matrix (- means non-applicable):
-    //
-    //       0  1  2  3
-    //     +-----------
-    //  0  | -  -  -  -
-    //  1  | 0  -  -  -
-    //  2  | 1  2  -  -
-    //  3  | 3  4  5  -
-    //
-    // For this example, d = {0, 1, 2, 3, 4 ,5}
-    //
-    // See this explanation for how to index d:
-    //   https://math.stackexchange.com/questions/646117/how-to-find-a-function-mapping-matrix-indices
-    //
-    // In short, d[k] is the (i,j)th element, where k = i(i-1)/2 + j
-    //       i   j   k = i*(i-1)/2 + j
-    //       1   0   0 = 1*0/2 + 0
-    //       2   0   1 = 2*1/2 + 0
-    //       2   1   2 = 2*1/2 + 1
-    //       3   0   3 = 3*2/2 + 0
-    //       3   1   4 = 3*2/2 + 1
-    //       3   2   5 = 3*2/2 + 2
-    //
-    // Number of elements in d is n(n-1)/2
-    // Solving for n, and letting x = d.size(),
-    //  x = n(n-1)/2
-    //  2x = n^2 - n
-    //  0 = a n^2 + b n + c, where a = 1, b = -1, c = -2x
-    //  n = (-b += sqrt(b^2 - 4ac))/(2a)
-    //    = (1 + sqrt(1 + 8x))/2
-    double x = (double)d.size();
-    double dbln = (1.0 + sqrt(1.0 + 8.0*x))/2.0;
-    unsigned n = (unsigned)dbln;
-    
-    cout << format("\nDistance matrix (%d x %d):\n") % n % n;
-
-    // Column headers
-    cout << format("%12d") % " ";
-    for (unsigned j = 0; j < n; j++) {
-        cout << format("%12d") % j;
-    }
-    cout << "\n";
-    
-    unsigned k = 0;
-    for (unsigned i = 0; i < n; i++) {
-        cout << format("%12d") % i;
-        for (unsigned j = 0; j < n; j++) {
-            if (j < i) {
-                double v = d[k++];
-                if (v == G::_infinity)
-                    cout << "         inf";
-                else
-                    cout << format("%12.5f") % v;
-            }
-            else {
-                cout << "         inf";
-            }
-        }
-        cout << "\n";
-    }
-    cout << "\n";
-}
-
-    inline pair<Node*, Node*> Forest::chooseAllPairs(vector<Node*> &node_list, double increment, string species, Lot::SharedPtr lot) {
-          double prev_log_likelihood = _gene_tree_log_likelihood;
-    //         _node_choices.clear();
-          assert (_node_choices.size() == 0);
-    //         _log_likelihood_choices.clear();
-          assert (_log_likelihood_choices.size() == 0);
-           _log_weight = 0.0;
-          
-           // choose pair of nodes to try
-           for (unsigned i = 0; i < node_list.size()-1; i++) {
-               for (unsigned j = i+1; j < node_list.size(); j++) {
-                   // createNewSubtree returns subtree1, subtree2, new_nd
-                   
-                   tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j), node_list, increment, species);
-                   
-                   _log_likelihood_choices.push_back(calcLogLikelihood());
-                   // gene tree log coalescent likelihood is the same for every possible join
-
-                   // revert _lineages if > 1 choice
-                   revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
-
-                   //reset siblings and parents of original nodes back to 0
-                   get<0>(t)->resetNode(); //subtree1
-                   get<1>(t)->resetNode(); //subtree2
-
-                   // clear new node from _nodes
-                   //clear new node that was just created
-                   get<2>(t)->clear(); //new_nd
-    //                 _nodes.pop_back();
-               }
-           }
-           
-           // reweight each choice of pairs
-          vector<double> log_weight_choices = reweightChoices(_log_likelihood_choices, prev_log_likelihood);
-
-
-           // sum unnormalized weights before choosing the pair
-           // must include the likelihoods of all pairs in the final particle weight
-           double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
-           _log_weight = log_weight_choices_sum;
-           for (unsigned b=0; b < log_weight_choices.size(); b++) {
-               log_weight_choices[b] -= log_weight_choices_sum;
-           }
-          
-           // randomly select a pair
-           unsigned index_of_choice = selectPair(log_weight_choices, lot);
-
-           // find nodes to join in node_list
-           Node* subtree1 = _node_choices[index_of_choice].first;
-           Node* subtree2 = _node_choices[index_of_choice].second;
-       
-           _gene_tree_log_likelihood = _log_likelihood_choices[index_of_choice]; // reset the log likelihood
-          
-           // erase extra nodes created from node list
-           for (unsigned i = 0; i < _node_choices.size(); i++) {
-               _nodes.pop_back();
-           }
-          
-          _node_choices.clear();
-          _log_likelihood_choices.clear();
-           return make_pair(subtree1, subtree2);
-       }
-
-    inline pair<Node*, Node*> Forest::getSubtreeAt(pair<unsigned, unsigned> t, vector<Node*> node_list) {
-          Node *subtree1 = nullptr;
-          Node *subtree2 = nullptr;
-
-          unsigned a = 0; // TODO: can make this fater because node_list is actually a vector now
-          for (auto iter=node_list.begin(); iter != node_list.end(); iter++){
-              if (a==t.first) {
-                  subtree1 = *iter;
-              }
-              else if (a==t.second) {
-                  subtree2 = *iter;
-              }
-              if (subtree1 && subtree2) {
-                  break;
-              }
-              a++;
-          }
-
-          pair<Node*, Node*> s = make_pair(subtree1, subtree2);
-          _node_choices.push_back(make_pair(subtree1, subtree2));
-
-          return s;
-      }
-
-
-    inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsigned> t, vector<Node*> node_list, double increment, string species) {
-         pair<Node*, Node*> p = getSubtreeAt(t, node_list);
-
-         Node* subtree1 = p.first;
-         Node* subtree2 = p.second;
-
-    //        new node is always needed
-//         Node nd;
-//         _nodes.push_back(nd);
-//         Node* new_nd = &_nodes.back();
-        
-        Node * new_nd = &_nodes[G::_ntaxa + _ninternals];
-        
-        assert (new_nd->_parent==0);
-       assert (new_nd->_number == -1);
-       assert (new_nd->_right_sib == 0);
-        
-//         new_nd->_parent=0;
-         new_nd->_number=G::_ntaxa+_ninternals;
-         new_nd->_edge_length=0.0;
-//         new_nd->_right_sib=0;
-
-         new_nd->_left_child=subtree1;
-         subtree1->_right_sib=subtree2;
-
-         subtree1->_parent=new_nd;
-         subtree2->_parent=new_nd;
-
-         //always calculating partials now
-         assert (new_nd->_partial == nullptr);
-        mtx.lock();
-        new_nd->_partial=ps.getPartial(_npatterns*4*G::_gamma_rate_cat.size(), _index);
-        mtx.unlock();
-         assert(new_nd->_left_child->_right_sib);
-        calcPartialArrayJC(new_nd, new_nd->_left_child, new_nd->_left_child->_right_sib);
-        new_nd->_height = _forest_height;
-
-         // don't update the species list
-         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-                  
-         return make_tuple(subtree1, subtree2, new_nd);
-     }
 
     inline void Forest::allowCoalescence(string species_name, double increment, Lot::SharedPtr lot) {
          double prev_log_likelihood = _gene_tree_log_likelihood;
@@ -2091,25 +1854,6 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
              one_choice = true;
          }
 
-         if (!G::_prior_prior && (!one_choice)) {
-             if (G::_save_memory) {
-                 for (auto &nd:_lineages) {
-                     if (nd->_partial == nullptr) {
-                         mtx.lock();
-                         nd->_partial = ps.getPartial(_npatterns*4*G::_gamma_rate_cat.size(), _index);
-                         mtx.unlock();
-                         calcPartialArrayJC(nd, nd->_left_child, nd->_left_child->_right_sib);
-                     }
-                 }
-             }
-             
-             pair<Node*, Node*> t = chooseAllPairs(nodes, increment, species_name, lot);
-             
-             subtree1 = t.first;
-             subtree2 = t.second;
-         }
-         
-         else {
              assert (G::_prior_prior || one_choice);
              // prior-prior proposal
              pair<unsigned, unsigned> t = chooseTaxaToJoin(s, lot);
@@ -2120,7 +1864,6 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
              assert (t.second < nodes.size());
 
              assert (subtree1 != subtree2);
-         }
 
          // access next unused node
         
@@ -3901,35 +3644,6 @@ inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
                 nd->_parent->_split.addSplit(nd->_split);
             }
         }
-    }
-
-    inline void Forest::joinLineagePair(Node * new_nd, Node * subtree1, Node * subtree2) {
-        // Assumes pullNode has been called to obtain new_nd before calling this function
-        // and that new_nd already has correct _height, _edge_length, and _species.
-        
-        // Perform sanity checks
-        assert(new_nd);
-        assert(subtree1);
-        assert(subtree2);
-        assert(new_nd->_number > -1);
-        assert(new_nd->_edge_length == 0.0);
-        assert(new_nd->_species == (subtree1->_species | subtree2->_species));
-
-        // Check whether the left and right subtrees imply the same ancestral node height
-        double h1 = subtree1->_height + subtree1->_edge_length;
-        double h2 = subtree2->_height + subtree2->_edge_length;
-        assert(fabs(h1 - h2) < G::_small_enough);
-
-        // Check whether height of the new node is consistent with average of h1 and h2
-        double havg = (h1 + h2)/2.0;
-        assert(fabs(havg - new_nd->_height) < G::_small_enough);
-
-        new_nd->_name = "anc-" + to_string(new_nd->_number);
-        new_nd->_left_child  = subtree1;
-                
-        subtree1->_right_sib = subtree2;
-        subtree1->_parent    = new_nd;
-        subtree2->_parent    = new_nd;
     }
 
 }
