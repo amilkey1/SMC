@@ -6,6 +6,7 @@
 #include "stopwatch.hpp"
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/math/distributions/gamma.hpp>
 #include "xproj.hpp"
 #include "particle.hpp"
 #include <vector>
@@ -2533,6 +2534,46 @@ namespace proj {
         // set partials for first particle under save_memory setting for initial marginal likelihood calculation
         assert (G::_nthreads > 0);
         
+        if (G::_plus_G) {
+            double alpha = 1 / G::_alpha;
+            double beta = 2.0;
+            double num_categ = 4;
+            double mean_rate_variable_sites = 1.0;
+            double equal_prob = 1 / num_categ;
+            
+            boost::math::gamma_distribution<> my_gamma(alpha, beta);
+            boost::math::gamma_distribution<> my_gamma_plus(alpha + 1.0, beta);
+
+              double cum_upper        = 0.0;
+              double cum_upper_plus   = 0.0;
+              double upper            = 0.0;
+              double cum_prob         = 0.0;
+              for (unsigned i = 1; i <= num_categ; ++i) {
+                  double cum_lower_plus       = cum_upper_plus;
+                  double cum_lower            = cum_upper;
+                  cum_prob                    += equal_prob;
+
+                  if (i < num_categ) {
+                      upper                   = boost::math::quantile(my_gamma, cum_prob);
+                      cum_upper_plus          = boost::math::cdf(my_gamma_plus, upper);
+                      cum_upper               = boost::math::cdf(my_gamma, upper);
+                  }
+                  else {
+                      cum_upper_plus          = 1.0;
+                      cum_upper               = 1.0;
+                  }
+
+                  double numer                = cum_upper_plus - cum_lower_plus;
+                  double denom                = cum_upper - cum_lower;
+                  double r_mean               = (denom > 0.0 ? (alpha*beta*numer/denom) : 0.0);
+                  G::_gamma_rate_cat.push_back(r_mean * mean_rate_variable_sites);
+//                  G::_gamma_rate_cat.push_back(1.0);
+              }
+        }
+        else {
+            G::_gamma_rate_cat.push_back(1.0);
+        }
+        
         bool partials = true;
         if (G::_gene_newicks_specified) {
             partials = false;
@@ -2557,19 +2598,6 @@ namespace proj {
         
         if (G::_fix_theta) {
             particle.fixTheta();
-        }
-        
-        if (G::_plus_G) {
-            // Draw 4 Gamma(G::_alpha, 1) categories
-            double cat_1 = rng.gamma(G::_alpha, 1.0);
-            double cat_2 = rng.gamma(G::_alpha, 1.0);
-            double cat_3 = rng.gamma(G::_alpha, 1.0);
-            double cat_4 = rng.gamma(G::_alpha, 1.0);
-            
-            G::_gamma_rate_cat.push_back(cat_1);
-            G::_gamma_rate_cat.push_back(cat_2);
-            G::_gamma_rate_cat.push_back(cat_3);
-            G::_gamma_rate_cat.push_back(cat_4);
         }
         
 #if defined (UPGMA)
@@ -3839,7 +3867,11 @@ namespace proj {
             ps.setNLoci(G::_nloci);
             for (unsigned locus = 1; locus < G::_nloci+1; locus++) {
                 // Set length of partials for gene g
-                ps.setNElements(G::_nstates*_data->getNumPatternsInSubset(locus-1), locus);
+                unsigned ncat = 1;
+                if (G::_plus_G) {
+                    ncat = 4; // TODO: don't hard code this
+                }
+                ps.setNElements(G::_nstates*_data->getNumPatternsInSubset(locus-1) * ncat, locus);
             }
 #endif
                 

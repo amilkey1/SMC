@@ -2621,6 +2621,9 @@ class Particle {
 #endif
         
     inline unsigned Particle::getPartialCount() {
+        if (G::_plus_G) {
+            _total_particle_partials *= G::_gamma_rate_cat.size();
+        }
         return _total_particle_partials;
     }
         

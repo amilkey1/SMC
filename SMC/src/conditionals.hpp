@@ -25,7 +25,7 @@
 
 #define REUSE_PARTIALS
 
-#define UNROLL_LOOPS
+//#define UNROLL_LOOPS
 
 #define LAZY_COPYING // TODO: only works with JC model
 

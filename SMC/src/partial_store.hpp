@@ -15,7 +15,7 @@ namespace proj {
     inline Partial::Partial(unsigned g, unsigned n) {
         _g = g;
         _v.resize(n);
-        _v.assign(n, 1.0); // TODO: be careful - check this works for HKY too
+        _v.assign(n, 1.0);
     }
 #endif
 
