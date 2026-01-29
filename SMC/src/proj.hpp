@@ -20,9 +20,6 @@
 #include <random>
 
 extern int my_rank;
-#if defined(USING_MPI)
-extern int ntasks;
-#endif
 
 extern void output(string msg);
 
@@ -66,9 +63,7 @@ namespace proj {
             void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(vector<Particle> &v, string filename, unsigned group_number);
             void                writePartialCountFile(vector<Particle> &particles);
             void                createSpeciesMap(bool data);
-#if defined (LAZY_COPYING)
             void                createSpeciesMapTyped();
-#endif
             void                simSpeciesMap();
             string              inventName(unsigned k, bool lower_case);
             void                showFinal(vector<Particle> my_vec);
@@ -86,20 +81,13 @@ namespace proj {
             void                handleGeneNewicks();
             string              handleSpeciesNewick();
             string              readNewickFromFile(string file_name);
-#if defined(LAZY_COPYING)
             void                buildNonzeroMap(vector<Particle> & particles, unsigned locus, map<const void *, list<unsigned> > & nonzero_map, const vector<unsigned> & nonzeros, vector<unsigned> particle_indices, unsigned start, unsigned end);
-#endif
             double              filterParticles(unsigned step, vector<Particle> & particles, vector<unsigned> &particle_indices, unsigned start, unsigned end);
             void                filterParticlesThreading(vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices);
             void                filterParticlesRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices);
             unsigned            multinomialDraw(const vector<double> & probs);
             double              filterSpeciesParticles(unsigned step, vector<Particle> & particles, unsigned id_number);
             double              computeEffectiveSampleSize(const vector<double> & probs) const;
-        
-#if defined (UPGMA)
-            bool                isUnambiguous(Data::state_t s0) const;
-            void                calcPairwiseDistanceMatrix();
-#endif
         
 #if defined (DRAW_NEW_THETA)
             void                updateSpeciesNames();
@@ -143,16 +131,7 @@ namespace proj {
             vector<Lot::SharedPtr>      _group_rng;
             vector<vector<unsigned>>    _second_level_indices_to_keep; // particles to write to output files after second level
             vector<unsigned>            _particle_indices_to_thin;
-        
-#if defined(USING_MPI)
-            void mpiSetSchedule();
-            vector<unsigned>            _mpi_first_particle;
-            vector<unsigned>            _mpi_last_particle;
-            vector<string>              _starting_gene_newicks;
-            vector<string>              _starting_species_newicks;
-            vector<string>              _starting_species_partitions;
-            void                        growGeneTrees(Particle &particles, unsigned particle_number, unsigned gene_number, unsigned step);
-#endif
+    
             vector<pair<double, bool>>  _ranks;
             vector<vector<pair<double, bool>>> _gene_tree_ranks;
             vector<pair<double, double>> _hpd_values;
@@ -1248,7 +1227,6 @@ namespace proj {
         ("save_gene_trees_separately", boost::program_options::value(&G::_save_gene_trees_separately)->default_value(false), "for simulations, save gene trees in separate files")
         ("newick_path", boost::program_options::value(&G::_newick_path)->default_value(""), "path to gene newicks are if starting from gene newicks and only performing SMC on second round")
         ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(1), "number of populations")
-        ("upgma", boost::program_options::value(&G::_upgma)->default_value(false), "set to false to not use UPGMA completion")
         ("mcmc", boost::program_options::value(&G::_mcmc)->default_value(false), "use mcmc moves in analysis")
         ("sliding_window", boost::program_options::value(&G::_sliding_window)->default_value(0.05), "size of sliding window to use in mcmc analysis")
         ("n_mcmc_rounds", boost::program_options::value(&G::_n_mcmc_rounds)->default_value(1), "number of rounds to use for mcmc analysis")
@@ -1618,9 +1596,7 @@ namespace proj {
         G::_nspecies = (unsigned) G::_species_names.size();
         assert (G::_nspecies > 0);
         
-#if defined (LAZY_COPYING)
-                createSpeciesMapTyped(); // use data
-#endif
+        createSpeciesMapTyped(); // use data
 
         // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
         if (G::_outgroup != "none") {
@@ -1630,9 +1606,7 @@ namespace proj {
         //set number of species to number in data file
         G::_ntaxa = _data->getNumTaxa();
         assert (G::_species_names.size() > 0);
-#if defined (LAZY_COPYING)
         assert (G::_species_names_typed.size() > 0);
-#endif
         G::_nloci = _data->getNumSubsets();
         rng.setSeed(_random_seed);
         rng_mcmc.setSeed(_random_seed + 2);
@@ -1944,7 +1918,6 @@ namespace proj {
             prev_cum_count = cum_count;
         }
         
-#if defined(LAZY_COPYING)
         unsigned locus = particles[particle_indices[start]].getNextGene() - 1; // subtract 1 because vector of gene forests starts at 0
         assert (locus == particles[particle_indices[end]].getNextGene() - 1);
         // Create map (nonzero_map) in which the key for an element
@@ -1956,7 +1929,6 @@ namespace proj {
         // modified in place).
         map<const void *, list<unsigned> > nonzero_map;
         buildNonzeroMap(particles, locus, nonzero_map, nonzeros, particle_indices, start, end);
-#endif
         
         // Example of following code that replaces dead
         // particles with copies of surviving particles:
@@ -1981,14 +1953,12 @@ namespace proj {
         unsigned next_nonzero = 0;
             while (next_nonzero < nonzeros.size()) {
                 double index_survivor = nonzeros[next_nonzero];
-    #if defined(LAZY_COPYING)
                 unsigned index_survivor_in_particles = particle_indices[index_survivor+start];
                 
                 if (!G::_mcmc) {
                     // for mcmc, wait to finalize joins
                     particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map);
                 }
-    #endif
                 unsigned ncopies = counts[index_survivor] - 1;
                 for (unsigned k = 0; k < ncopies; k++) {
                     double index_nonsurvivor = zeros[next_zero++];
@@ -2002,7 +1972,6 @@ namespace proj {
                 
                 ++next_nonzero;
             }
-//        }
         
         return ess;
 #else
@@ -2086,25 +2055,20 @@ namespace proj {
 
     }
 
-#if defined(LAZY_COPYING)
     inline void Proj::buildNonzeroMap(vector<Particle> &particles, unsigned locus, map<const void *, list<unsigned> > & nonzero_map, const vector<unsigned> & nonzeros, vector<unsigned> particle_indices, unsigned start, unsigned end) {
         
         for (auto i : nonzeros) {
             unsigned particle_index = particle_indices[start + i];
             void * ptr = particles[particle_index].getGeneForestPtr(locus).get();
 
-//            void * ptr = particles[i].getGeneForestPtr(locus).get();
             if (nonzero_map.count(ptr) > 0) {
-//                nonzero_map[ptr].push_back(i);
                 nonzero_map[ptr].push_back(particle_index);
             }
             else {
-//                nonzero_map[ptr] = {i};
                 nonzero_map[ptr] = {particle_index};
             }
         }
     }
-#endif
 
     inline double Proj::filterSpeciesParticles(unsigned step, vector<Particle> & particles, unsigned id_number) {
         unsigned nparticles = (unsigned) particles.size();
@@ -2378,7 +2342,6 @@ namespace proj {
         }
     }
 
-#if defined (LAZY_COPYING)
     inline void Proj::createSpeciesMapTyped() {
         assert (G::_nspecies > 0);
         G::species_t species_name = 1;
@@ -2389,7 +2352,6 @@ namespace proj {
             species_name = prev_species_name + species_name;
         }
     }
-#endif
 
     inline void Proj::showFinal(vector<Particle> my_vec) {
         for (auto &p:my_vec){
@@ -2423,11 +2385,6 @@ namespace proj {
             unsigned id_number = i; // use for random seed, _second_level_particles_to_keep
 
             Particle p = particles[group_number];
-            
-            // initialize particles
-#if !defined (LAZY_COPYING)
-            p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full
-#endif
 
             
             if (!G::_gene_newicks_specified) { // if starting from gene newicks, this is already built
@@ -2441,12 +2398,8 @@ namespace proj {
             assert(second_level_particles.size() == G::_particle_increase);
         
             for (unsigned s=0; s<G::_nspecies-1; s++) {  // skip last round of filtering because weights are always 0
-//                if (G::_verbose > 1) {
-//                    cout << "starting species step " << s+1 << " of " << G::_nspecies-1 << endl;
-//                }
                 
                 // set particle random number seeds
-//                unsigned group_number = p.getGroupNumber();
                 unsigned psuffix = 1;
                 for (auto &p:second_level_particles) {
                     p.setSeed(_group_rng[id_number]->randint(1,9999) + psuffix);
@@ -2604,14 +2557,6 @@ namespace proj {
         if (G::_fix_theta) {
             particle.fixTheta();
         }
-        
-#if defined (UPGMA)
-        if (G::_upgma) {
-            if (!G::_gene_newicks_specified) {
-                particle.setGeneUPGMAMatrices();
-            }
-        }
-#endif
     }
 
     inline void Proj::proposeParticlesParallelizeByGroup(vector<vector<Particle>> &particles) {
@@ -2877,9 +2822,7 @@ namespace proj {
         updateSpeciesNames();
 #endif
         
-#if defined (LAZY_COPYING)
         createSpeciesMapTyped(); // use data
-#endif
 
         vector<string> taxpartition;
         for (auto &t:_taxon_map) {
@@ -2998,11 +2941,9 @@ namespace proj {
         }
         
         // save coal info for all existing gene pointers before starting any work to avoid timing issues
-#if defined (LAZY_COPYING)
         for (auto &p:particles) {
             p.clearGeneForests();
         }
-#endif
         
         _second_level_indices_to_keep.resize(ngroups);
         
@@ -3038,11 +2979,6 @@ namespace proj {
                 
 //                Particle p = particles[g];
                 vector<Particle > second_level_particles;
-            
-                // initialize particles
-#if !defined (LAZY_COPYING)
-                p.clearGeneForests(); // gene forests are no longer needed for second level as long as coal info vect is full, but lazy copying needs to get coalescent info first
-#endif
                 
                 if (!G::_gene_newicks_specified) { // if starting from gene newicks, this is already built
                     G::_generation = 0;
@@ -3053,10 +2989,6 @@ namespace proj {
                 second_level_particles.resize(G::_particle_increase, p);
                                 
                 for (unsigned s=0; s<G::_nspecies-1; s++) {  // skip last round of filtering because weights are always 0
-//                    if (G::_verbose > 1) {
-//                        cout << "starting species step " << s+1 << " of " << G::_nspecies-1 << endl;
-//                    }
-                    
                     // set particle random number seeds
                     psuffix = 1;
                     for (auto &p:second_level_particles) {
@@ -3392,258 +3324,6 @@ namespace proj {
         }
     }
 
-#if defined(USING_MPI)
-    inline void Proj::mpiSetSchedule() {
-       // Determine which particles will be handled by this processor: e.g.
-       // 20 = number of particles
-       //  3 = number of processors
-       //  6 = 20 / 3
-       //  2 = 20 % 3
-       //  rank 0 gets 6, rank 1 gets 7, rank 2 gets 7
-        unsigned total_n_particles = G::_nparticles * G::_ngroups;
-       vector<unsigned> particles_per_task(ntasks, total_n_particles  / ntasks);
-
-       unsigned particle_remainder = total_n_particles % ntasks;
-
-       // Each rank > 0 gets an extra job if there is any remainder
-       for (unsigned rank = 1; rank < ntasks; ++rank) {
-           if (particle_remainder > 0) {
-               particles_per_task[rank] += 1;
-               --particle_remainder;
-           }
-       }
-
-       _mpi_first_particle.resize(ntasks);
-       _mpi_last_particle.resize(ntasks);
-       unsigned particle_cum = 0;
-       output("\nParticle schedule:\n");
-       output(str(format("%12s %25s %25s\n") % "rank" % "first particle" % "last particle"));
-       for (unsigned rank = 0; rank < ntasks; ++rank) {
-           _mpi_first_particle[rank] = particle_cum;
-           _mpi_last_particle[rank]  = particle_cum + particles_per_task[rank];
-           particle_cum += particles_per_task[rank];
-           
-           output(str(format("%12d %25d %25d\n") % rank % (_mpi_first_particle[rank] + 1) % _mpi_last_particle[rank]));
-       }
-    }
-#endif
-
-#if defined(USING_MPI)
-    inline void Proj::growGeneTrees(Particle &particle, unsigned particle_number, unsigned gene_number, unsigned step) {
-        cout << "GROWING GENE TREES MPI for step " << step << endl;
-        //taxon joining and reweighting step
-        if (step > 0) { // initialize forest for the gene that was just modified so everything is up to date
-            particle.initGeneForest(_starting_gene_newicks[particle_number]); // TODO: need to also update update species partition, t, t by gene
-            particle.initGeneForestSpeciesPartition(_starting_species_partitions[particle_number]);
-            if (step % G::_nloci == 0) { // otherwise, species tree remains the same and does not need to be reset
-                particle.initSpeciesForest(_starting_species_newicks[particle_number]);
-            }
-        }
-        if (step == 3) {
-            cout << "ON STEP 3 " << endl;
-            particle.showParticle();
-        }
-        particle.proposal();
-        
-#if !defined (USING_MPI)
-        if (step == 0) {
-            _starting_gene_newicks.resize(G::_nparticles);
-            _starting_species_newicks.resize(G::_nparticles);
-            _starting_species_partitions.resize(G::_nparticles);
-        }
-#endif
-        assert(_starting_gene_newicks.size() == G::_nparticles);
-        assert (_starting_species_newicks.size() == G::_nparticles);
-        assert (_starting_species_partitions.size() == G::_nparticles);
-        
-#if !defined (USING_MPI)
-        if (my_rank == 0) {
-            string gene_newick = particle.saveChangedForest();
-            string species_newick = particle.saveForestNewick();
-            string species_partition = particle.saveForestSpeciesPartition();
-            // Copy selected gene tree to _starting_gene_newicks
-            _starting_gene_newicks[particle_number] = gene_newick;
-            _starting_species_newicks[particle_number] = species_newick;
-            _starting_species_partitions[particle_number] = species_partition;
-            
-//            string partition_for_message = "|";
-//            for (auto &m:partition) {
-//                partition_for_message.push_back("spp " + m);
-//                for (auto &nd:m) {
-//                    partition_for_message.push_back("nd " + nd);
-//                }
-//            }
-        }
-#endif
-
-#if defined(USING_MPI)
-        if (my_rank == 0) {
-            string gene_newick = particle.saveChangedForest();
-            string species_newick = particle.saveForestNewick();
-            map<string, vector<string>> species_partition = particle.saveForestSpeciesPartition();
-            // Copy selected gene tree, species tree, and species partition to _starting_gene_newicks
-            _starting_gene_newicks[particle_number] = gene_newick;
-            _starting_species_newicks[particle_number] = species_newick;
-            _starting_species_partitions[particle_number] = species_partition;
-        }
-        
-        else {
-            string gene_newick = to_string(gene_number) + "|" + particle.saveChangedForest(); // genes start at 0
-            string species_newick = to_string(-1) + "|" + particle.saveForestNewick(); // -1 indicates species tree
-//            map<string, vector<string>> partition = particle.saveForestSpeciesPartition();
-            string partition_for_message = "|" + particle.saveForestSpeciesPartition();
-//            string partition_for_message = "|";
-//            for (auto &m:partition) {
-//                partition_for_message.push_back("spp " + m);
-//                for (auto &nd:m) {
-//                    partition_for_message.push_back("nd " + nd);
-//                }
-//            }
-            
-            // send the newick string to the coordinator
-            int msglen_gene = 1 + gene_newick.size();
-            int msglen_species = 1 + species_newick.size();
-            int msglen_partition = 1 + partition_for_message.size();
-            int msglen = msglen_gene + msglen_species + msglen_partition;
-            
-            gene_newick.resize(msglen_gene);      // Adds \0 character to the end
-            species_newick.resize(msglen_species);  // Adds \0 character to the end
-            msglen_partition.resize(msglen_partition); // Adds \0 character to the end
-            string newick = gene_newick + species_newick + msglen_partition;
-            
-            MPI_Send(&newick[0],        // void* data
-                     msglen,           // int count
-                     MPI_CHAR,               // MPI_Datatype datatype,
-                     0,                      // int destination,
-                     (int) particle_number,            // int tag,
-                     MPI_COMM_WORLD);        // MPI_Comm communicator)
-        }
-#endif
-    }
-#endif
-
-#if defined (UPGMA)
-    inline void Proj::calcPairwiseDistanceMatrix() {
-        // Get number of data subsets
-//        unsigned nsubsets = _data->getNumSubsets();
-        
-        // nsubsets should equal the number of loci
-//        assert(nsubsets == G::_nloci);
-                
-        // Allocate a distance matrix for each locus
-        G::_dmatrix.resize(G::_nloci);
-        
-        // Get number of taxa (i.e. number of leaves in a trivial gene forest
-        unsigned n = G::_ntaxa;
-        unsigned n_choose_2 = n*(n-1)/2;
-        
-        // Populate a vector of species to identify rows and columns of _dmatrix
-        assert(n == G::_taxon_names.size());
-        G::_dmatrix_rows.resize(n);
-        for (unsigned i = 0; i < n; i++) {
-            G::_dmatrix_rows[i].resize(G::_ntaxa);
-            G::_dmatrix_rows[i].setBitAt(i);
-        }
-        
-        // Get references to data matrix and counts
-        const Data::pattern_counts_t & counts = _data->getPatternCounts();
-        const Data::data_matrix_t & data_matrix = _data->getDataMatrix();
-        
-        // Loop through all data subsets (i.e. loci)
-        for (unsigned subset = 0; subset < G::_nloci; subset++) {
-            // Create working space to keep track of
-            // pairwise differences and similarities
-            vector<unsigned> diffs(n_choose_2, 0);
-            vector<unsigned> sames(n_choose_2, 0);
-            
-            // Loop through all patterns in subset
-            unsigned npatterns = _data->getNumPatternsInSubset(subset);
-            Data::begin_end_pair_t pattern_range = _data->getSubsetBeginEnd(subset);
-            unsigned first_pattern = pattern_range.first;
-            for (unsigned p = 0; p < npatterns; p++) {
-                unsigned pp = first_pattern + p;
-                unsigned count = counts[pp];
-
-                // Loop through all elements of _dmatrix and update diffs and totals
-                for (unsigned i = 1; i < n; i++) {
-                    Data::state_t di = data_matrix[i][pp];
-                    //TODO: excluding patterns that show ambiguity
-                    bool ok_i = isUnambiguous(di);
-                    for (unsigned j = 0; j < i; j++) {
-                        unsigned k = i*(i-1)/2 + j;
-                        Data::state_t dj = data_matrix[j][pp];
-                        bool ok_j = isUnambiguous(dj);
-                        if (ok_i && ok_j) {
-                            if (di == dj)
-                                sames[k] += (double)count;
-                            else
-                                diffs[k] += (double)count;
-                        }
-                    }   // j loop
-                }   // i loop
-            }   // p loop
-            
-            // Compute JC distances and store in _dmatrix[subset]
-            //TODO: assuming JC for the UPGMA part
-            G::_dmatrix[subset].resize(n_choose_2);
-            for (unsigned k = 0; k < n_choose_2; k++) {
-                unsigned nsites = sames[k] + diffs[k];
-                assert(nsites > 0);
-                double pdist = 1.0*diffs[k]/nsites;
-                if (pdist >= 0.75)
-                    pdist = 0.74986667; // value used by PAUP*
-                    
-                double jcdist = -0.75*log(1 - 4.0*pdist/3.0);
-                
-                if (jcdist <= 0.0)
-                    jcdist = 0.0;
-                    
-                G::_dmatrix[subset][k] = jcdist;
-            }
-            
-            //G::debugShowDistanceMatrix(G::_dmatrix_rows, G::_dmatrix[subset], subset);
-            
-        }   // subset loop
-    }
-#endif
-
-#if defined (UPGMA)
-    inline bool Proj::isUnambiguous(Data::state_t s0) const {
-        // Case 1: s0 is ambiguous (AG)
-        //    s0     s   s & s0   s & s0 == s0
-        //  0101  0001     0001          false
-        //  0101  0010     0000          false
-        //  0101  0100     0100          false
-        //  0101  1000     0000          false
-        //
-        // Case 2: s0 is unambiguous (T)
-        //    s0     s   s & s0   s & s0 == s0
-        //  1000  0001     0000          false
-        //  1000  0010     0000          false
-        //  1000  0100     0000          false
-        //  1000  1000     1000          true
-        //
-        // Case 3: s0 is unambiguous (A)
-        //    s0     s   s & s0   s & s0 == s0
-        //  0001  0001     0001          true
-        //  0001  0010     0000          false
-        //  0001  0100     0000          false
-        //  0001  1000     0000          false
-        //
-        // Bottom line, if s & s0 is ever equal to s0, then
-        // state s0 is unambiguous
-        bool is_unambiguous = false;
-        for (unsigned i = 0; i < G::_nstates; i++) {
-            Data::state_t s = (Data::state_t)1 << i;
-            if ( (s & s0) == s0) {
-                is_unambiguous = true;
-                break;
-            }
-        }
-        return is_unambiguous;
-    }
-#endif
-
 #if defined (DRAW_NEW_THETA)
     inline void Proj::updateSpeciesNames() {
         unsigned number = G::_nspecies;
@@ -3742,16 +3422,8 @@ namespace proj {
             }
             
             string true_newick = readNewickFromFile(true_spp_tree_file_name);
-            
-//            G::_bhv_reference = true_newick;
         }
-#if defined(USING_MPI)
-        output("Starting MPI parallel version...\n");
-        output(str(format("No. processors: %d\n") % ntasks));
-        G::_save_memory = true; // set save memory because partials will need to be recalculated
-#else
         output("Starting serial version...\n");
-#endif
         if (G::_gene_newicks_specified) {
             if (G::_start_mode_type == G::StartModeType::START_MODE_SIM) {
                 throw XProj("cannot specify gene newicks and simulations");
@@ -3761,10 +3433,6 @@ namespace proj {
                     cout << "thin setting will be set to 1.0 for gene newick start " << endl;
                     G::_thin = 1.0;
                 }
-//                if (G::_ngroups > 1) {
-//                    cout << "ngroups will be set to 1.0 for gene newick start " << endl;
-//                    G::_ngroups = 1.0;
-//                }
                 handleGeneNewicks();
             }
             catch (XProj & x) {
@@ -3778,7 +3446,6 @@ namespace proj {
             }
             
             _first_line = true;
-            G::_upgma = false;
             
             try {
                 simulateData();
@@ -3792,7 +3459,6 @@ namespace proj {
             if (G::_verbose > 0) {
                 cout << "Starting..." << endl;
                 cout << "Current working directory: " << filesystem::current_path() << endl;
-//                cout << "Current working directory: " << boost::filesystem::current_path() << endl;
                 cout << "Random seed: " << _random_seed << endl;
 #if defined (DRAW_NEW_THETA)
                 cout << "drawing new theta for each particle " << endl;
@@ -3828,9 +3494,7 @@ namespace proj {
 #endif
                 
                 G::_nspecies = (unsigned) G::_species_names.size();
-#if defined (LAZY_COPYING)
                 createSpeciesMapTyped();
-#endif
 
                 // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
                 if (G::_outgroup != "none") {
@@ -3891,14 +3555,6 @@ namespace proj {
                 buildSpeciesMap(/*taxa_from_data*/true);
 #endif
             }
-                
-#if defined (UPGMA)
-            if (G::_upgma) {
-                if (!G::_gene_newicks_specified) {
-                    calcPairwiseDistanceMatrix();
-                }
-            }
-#endif
                 
             Particle p;
             initializeParticle(p); // initialize one particle and copy to all other particles
@@ -3969,8 +3625,7 @@ namespace proj {
                 // fill particle_indices with values starting from 0
                 iota(particle_indices.begin(), particle_indices.end(), 0);
                     
-    #if defined (LAZY_COPYING)
-                    // if using subgroups, reset pointers so particles within a group have same gene forest pointers
+                // if using subgroups, reset pointers so particles within a group have same gene forest pointers
                 if (G::_ngroups > 1) {
                     for (unsigned i=0; i<G::_ngroups; i++) {
                         unsigned start = i * G::_nparticles;
@@ -3984,120 +3639,10 @@ namespace proj {
                         }
                     }
                 }
-    #endif
-                    
-    #if defined (USING_MPI)
-                    mpiSetSchedule(); // TODO: need to set this earlier - make sure it works
-                    _starting_gene_newicks.resize(total_n_particles);
-                    _starting_species_newicks.resize(total_n_particles);
-                    _starting_species_partitions.resize(total_n_particles);
-    #endif
-                    
                     //run through each generation of particles
 
                     unsigned nsteps = (G::_ntaxa-1)*G::_nloci;
                     
-    #if defined (USING_MPI)
-                    for (unsigned g=0; g<nsteps; g++){
-                        unsigned gene_number = my_vec[0].getNextGene();
-                        
-                        unsigned psuffix = 1;
-                        if (g > 0) {
-                            // set particle random number seeds
-                            for (auto &p:my_vec) {
-                                p.setSeed(rng.randint(1,9999) + psuffix);
-                                psuffix += 2;
-                            }
-                        }
-                        
-                        for (unsigned s = _mpi_first_particle[my_rank]; s < _mpi_last_particle[my_rank]; ++s) {
-                            growGeneTrees(my_vec[s], s, gene_number, g);
-                        }
-                        
-                        //            bool filter = true;
-                        //
-                        //            if (G::_run_on_empty) {
-                        //                filter = false;
-                        //            }
-                        //
-                        //            if (filter) {
-                        //
-                        //                // parallelize filtering by subgroup
-                        //                filterParticlesThreading(my_vec, g, particle_indices);
-                        //
-                        //                // shuffle new particle order
-                        //                unsigned seed = rng.getSeed();
-                        //
-                        //                // only shuffle particle indices, not particles
-                        //                std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(seed));
-                        //            }
-    //                }
-                    
-                    if (my_rank == 0) {
-                        // Make a list of particles that we haven't heard from yet
-                        list<unsigned> outstanding;
-                        for (unsigned rank = 1; rank < ntasks; ++rank) {
-                            for (unsigned p = _mpi_first_particle[rank]; p < _mpi_last_particle[rank]; p++) {
-                                outstanding.push_back(p);
-                            }
-                        }
-                        
-                        // Receive newicks from particles being handled by other processors
-                        // until outstanding is empty
-                        while (!outstanding.empty()) {
-                            // Probe to get message status
-                            int message_length = 0;
-                            MPI_Status status;
-                            MPI_Probe(MPI_ANY_SOURCE,   // Source rank or MPI_ANY_SOURCE
-                                MPI_ANY_TAG,            // Message tag
-                                MPI_COMM_WORLD,         // Communicator
-                                &status                 // Status object
-                            );
-                        
-                            // Get length of message
-                            MPI_Get_count(&status, MPI_CHAR, &message_length);
-
-                            // Get particle number
-                            unsigned particle = (unsigned)status.MPI_TAG;
-
-                            // Get the message itself
-                            string newick;
-                            newick.resize(message_length);
-                            MPI_Recv(&newick[0],    // Initial address of receive buffer
-                                message_length,     // Maximum number of elements to receive
-                                MPI_CHAR,           // Datatype of each receive buffer entry
-                                status.MPI_SOURCE,     // Rank of source
-                                status.MPI_TAG,        // Message tag
-                                MPI_COMM_WORLD,     // Communicator
-                                MPI_STATUS_IGNORE   // Status object
-                            );
-                            
-                            // Store the newick and remove particle from outstanding
-                            newick.resize(message_length - 1);  // remove '\0' at end
-                            
-                            vector<string> parts;
-                            split(parts, newick, is_any_of("|"));
-                            string chosen_gene_newick = parts[1];
-                            
-                            _starting_gene_newicks[particle-1] = chosen_gene_newick;
-                            
-                            string chosen_species_newick = parts[2];
-                            _starting_species_newicks[particle-1] = chosen_species_newick;
-                            
-                            string chosen_species_partition = parts[3]; // TODO: can you pass around a map like this?
-                            _starting_species_partitions[particle-1] = chosen_species_partition;
-                            
-                            auto it = find(outstanding.begin(), outstanding.end(), particle);
-                            assert(it != outstanding.end());
-                            outstanding.erase(it);
-                        }
-                    }
-                }
-                
-            // Ensure no one starts on species tree until coordinator is ready
-            MPI_Barrier(MPI_COMM_WORLD);
-
-    #else
                 if (G::_verbose > 1) {
                     cout << "step " << "\t" << "ESS before filtering " << "\t" << "n_unique particles before MCMC" <<  "\t" << "n_unique particles after MCMC" << endl;
                 }
@@ -4192,12 +3737,8 @@ namespace proj {
                         else {
                             filterParticlesThreading(my_vec, g, particle_indices);
                         }
-    //#else
-    //                    filterParticlesThreading(my_vec, g, particle_indices);
-    //#endif
                         
                         string filenamea = "params" + to_string(G::_generation) + "a";
-    //                    writeParamsFileForBeastComparisonTestA(my_vec, filenamea);
                         
                         if (G::_generation == 0) {
                             string filename = "mcmc_moves_accepted.log";
@@ -4216,7 +3757,6 @@ namespace proj {
                         vector<double> log_likelihoods_before_mcmc;
                         for (auto &p:my_vec) {
                             log_likelihoods_before_mcmc.push_back(p.calcLogLikelihoodLocus(locus, false));
-    //                        cout << p.getLogLikelihood() << endl;
                         }
                         
                         double sum_log_likelihood_before_mcmc = std::accumulate(log_likelihoods_before_mcmc.begin(), log_likelihoods_before_mcmc.end(), 0);
@@ -4242,10 +3782,7 @@ namespace proj {
                             vector<double> log_likelihoods_after_mcmc;
                             for (auto &p:my_vec) {
                                 log_likelihoods_after_mcmc.push_back(p.calcLogLikelihoodLocus(locus, true));
-    //                            cout << p.getLogLikelihood() << endl;
                             }
-                            
-    //                        cout << endl;
                             
                             double sum_log_likelihood_after_mcmc = std::accumulate(log_likelihoods_after_mcmc.begin(), log_likelihoods_after_mcmc.end(), 0);
                             double avg_log_likelihood_after_mcmc = sum_log_likelihood_after_mcmc / G::_nparticles;
@@ -4270,7 +3807,6 @@ namespace proj {
                             }
                             
                             string filenameb = "params" + to_string(G::_generation) + "b";
-    //                        writeParamsFileForBeastComparisonTestB(my_vec, filenameb);
                         }
                         else {
                             std::ofstream mcmcfile;
@@ -4333,7 +3869,6 @@ namespace proj {
                 for (auto &p:my_vec) {
                     p.calcGeneTreeLengths();
                 }
-    #endif
                     
                     if (G::_save_gene_trees) {
                         saveGeneTrees(my_vec);

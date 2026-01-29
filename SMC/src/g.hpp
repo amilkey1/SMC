@@ -21,11 +21,9 @@ namespace proj {
         typedef unsigned long           species_t;
         static map<string, unsigned>    _taxon_to_species;
         
-#if defined (LAZY_COPYING)
         typedef pair<unsigned, unsigned>                        uint_pair_t;
         typedef tuple<double,G::species_t,G::species_t>         merge_t; // <speciation height, spp 1, spp 2>
         typedef vector<merge_t>                                 merge_vect_t;
-#endif
         
         // Program settings used in processCommandLineOptions
         static bool                 _use_gpu;
@@ -70,7 +68,6 @@ namespace proj {
         static string               _newick_path;
         static double               _lambda;
         static unsigned             _ngroups; // number of subpopulations for mixing SMC
-        static bool                 _upgma;
         static unsigned             _nloci;
         static unsigned             _nspecies;
         static unsigned             _ntaxa;
@@ -107,9 +104,7 @@ namespace proj {
         
         static vector<string>       _species_names;
         
-#if defined (LAZY_COPYING)
         static vector<G::species_t> _species_names_typed;
-#endif
         
         static bool                 _in_second_level;
         static unsigned             _generation;

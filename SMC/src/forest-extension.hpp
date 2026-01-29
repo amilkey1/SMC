@@ -1,7 +1,5 @@
 #pragma once
 
-#if defined(LAZY_COPYING)
-
 namespace proj {
 
     class ForestExtension {
@@ -357,11 +355,7 @@ namespace proj {
         return n_unique_species;
     }
 
-#if defined (LAZY_COPYING)
     inline vector<pair<double, unsigned long>> ForestExtension::calcForestRate(Lot::SharedPtr lot, unordered_map<G::species_t, double> theta_map) {
-#else
-    inline vector<pair<double, unsigned long>> ForestExtension::calcForestRate(Lot::SharedPtr lot, unordered_map<string, double> theta_map) {
-#endif
         vector<pair<double, unsigned long>> rates;
         pair<double, unsigned long> rate_and_name;
         
@@ -388,6 +382,5 @@ namespace proj {
         return rates;
     }
  }
-#endif
 
 

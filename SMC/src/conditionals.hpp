@@ -1,8 +1,3 @@
-//# define USING_MPI
-//#if defined(USING_MPI)
-//#   include <mpi.h>
-//#endif
-
 //#define NDEBUG // disable asserts for efficiency / memory improvement
 
 #define USE_TOTAL_RATE
@@ -26,10 +21,6 @@
 #define REUSE_PARTIALS
 
 //#define UNROLL_LOOPS
-
-#define LAZY_COPYING // TODO: only works with JC model
-
-//#define UPGMA // turn on UPGMA in conf file but turn this off to avoid creating any members associated with UPGMA
 
 //#define SPECIES_IN_CONF
 

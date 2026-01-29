@@ -25,26 +25,13 @@ using namespace std;
 #include "valgrind.h"
 
 int my_rank = 0;
-#if defined(USING_MPI)
-//int my_rank = 0;
-int ntasks = 0;
-
-void output(string msg) {
-    if (my_rank == 0) {
-        cout << msg;
-    }
-}
-#else
 void output(string msg) {
     cout << msg;
 }
-#endif
 
 #include "data.hpp"
 #include "forest.hpp"
-#if defined(LAZY_COPYING)
 #   include "forest-extension.hpp"
-#endif
 #include "species-forest.hpp"
 #include "particle.hpp"
 
@@ -88,7 +75,6 @@ bool        G::_save_gene_trees_separately = false;
 string      G::_newick_path = ".";
 double      G::_lambda = 10.0;
 unsigned    G::_ngroups = 1;
-bool        G::_upgma = true;
 double G::_infinity = numeric_limits<double>::infinity();
 vector<double> G::_base_frequencies;
 string      G::_string_base_frequencies;
@@ -137,9 +123,7 @@ unsigned G::_generation = 0;
 vector<string> G::_species_names;
 unsigned G::_partial_count = 0;
 
-#if defined (LAZY_COPYING)
 vector<G::species_t> G::_species_names_typed;
-#endif
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
                              // codon order is alphabetical: i.e. AAA, AAC, AAG, AAT, ACA, ..., TTT
@@ -163,12 +147,6 @@ GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
 };
 
 int main(int argc, const char * argv[]) {
-#if defined(USING_MPI)
-    MPI_Init(NULL, NULL);
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
-//    std::cerr << my_rank << "    " << ntasks << endl;
-#endif
     
     Proj proj;
     try {
@@ -187,9 +165,6 @@ int main(int argc, const char * argv[]) {
         std::cerr << "Exception of unknown type!\n";
     }
     
-#if defined(USING_MPI)
-    MPI_Finalize();
-#endif
     return 0;
 }
 

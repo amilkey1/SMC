@@ -36,7 +36,6 @@ class Particle {
         void                                    proposalSim();
         void                                    setData(Data::SharedPtr d, map<string, string> &taxon_map, bool partials) {
                                                     int index = 1;
-#if defined (LAZY_COPYING)
                                                     _prev_log_likelihoods.resize(G::_nloci);
                                                     _gene_forest_ptrs.resize(G::_nloci);
                                                     _gene_forest_extensions.resize(G::_nloci);
@@ -47,14 +46,6 @@ class Particle {
                                                         gfp->setData(d, index, taxon_map, partials);
                                                         index++;
                                                     }
-
-#else
-                                                    _gene_forests.resize(G::_nloci);
-                                                    for (auto &gf:_gene_forests) {
-                                                        gf.setData(d, index, taxon_map, partials);
-                                                        index++;
-                                                    }
-#endif
                                                 }
         void                                    setSimData(Data::SharedPtr d, map<string, string> &taxon_map, unsigned ntaxa) {
                                                     int index = 1;
@@ -92,40 +83,15 @@ class Particle {
         string                                  saveGeneNewick(unsigned i);
         string                                  saveChangedForest() {return _gene_forests[_gene_order[G::_generation-1]-1].makePartialNewick(8, true);}
         unsigned                                getNextGene(){return _gene_order[G::_generation];}
-#if defined (USING_MPI)
-        void                                    initSpeciesForest(string newick);
-        void                                    initGeneForest(string newick);
-        void                                    checkPartition();
-        void                                    initGeneForestSpeciesPartition(string species_partition);
-        string                                  saveForestSpeciesPartition();
-#endif
-    
-#if defined (UPGMA)
-        void                                    setGeneUPGMAMatrices();
-#endif
         void                                    createThetaMap();
         void                                    createThetaMapFixedTheta();
-#if defined (LAZY_COPYING)
         void                                    updateThetaMap(G::species_t new_species_name);
-#else
-        void                                    updateThetaMap(string new_species_name);
-#endif
-#if defined (LAZY_COPYING)
         void                                    updateThetaMapFixedTheta(G::species_t new_species_name);
-#else
-        void                                    updateThetaMapFixedTheta(string new_species_name);
-#endif
     
-#if defined (LAZY_COPYING)
         void                                    drawNewTheta(G::species_t new_species);
         void                                    resetSubgroupPointers(vector<Forest::SharedPtr> gene_forest_copies);
-#else
-        void                                    drawNewTheta(string new_species);
-#endif
     
-#if defined (LAZY_COPYING)
         void                                    proposeMCMCMove(bool last_round);
-#endif
     
         bool operator<(const Particle::SharedPtr & other) const {
             return _log_weight<other->_log_weight;
@@ -194,7 +160,6 @@ class Particle {
         void                                            setNodeHeights();
         void                                            setSortedThetaVector();
     
-#if defined(LAZY_COPYING)
             vector<Forest::SharedPtr> &                 getGeneForestPtrs();
             const vector<Forest::SharedPtr> &           getGeneForestPtrsConst() const;
             Forest::SharedPtr                           getGeneForestPtr(unsigned locus);
@@ -207,7 +172,6 @@ class Particle {
             void                                        rebuildCoalInfo();
             void                                        buildEnsembleCoalInfo();
             unsigned                                    getPartialCount();
-#endif
             double                                      calcBHVDistance();
             vector<double>                              calcBHVDistanceGeneTrees();
             double                                      calcBHVDistanceTrueTree(string true_newick);
@@ -234,39 +198,26 @@ class Particle {
         double                                  _prev_increment_prior;
         unsigned                                _total_particle_partials = 0;
     
-#if defined (LAZY_COPYING)
         vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>> _t;
         vector<vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>>> _t_by_gene;
         vector<pair<tuple<G::species_t, G::species_t, G::species_t>, double>> _prev_t_by_gene;
         vector<G::species_t>                    _sorted_species_names; // only use for simulations
         vector<Forest::coalinfo_t>              _ensemble_coalinfo;  // second level only
-#else
-        vector<pair<tuple<string, string, string>, double>> _t;
-        vector<vector<pair<tuple<string, string, string>, double>>> _t_by_gene;
-#endif
     
         vector<pair<tuple<string, string, string>, double>> _t_sim;
         vector<vector<pair<tuple<string, string, string>, double>>> _t_by_gene_sim;
     
         vector<unsigned>                        _gene_order;
     
-#if defined (LAZY_COPYING)
         unordered_map<G::species_t, double>     _theta_map;
-#else
-        unordered_map<string, double>           _theta_map;
-#endif
         double                                  _theta_mean;
         vector<double>                          _theta_vector;
 
         unsigned                                _group_number;
-#if defined(LAZY_COPYING)
             mutable vector<ForestExtension>     _gene_forest_extensions;
             vector<Forest::SharedPtr>           _gene_forest_ptrs;
-#endif
     
-#if defined (LAZY_COPYING)
         vector<double>                          _prev_log_likelihoods;
-#endif
         double                                  _prev_gene_increment;
         double                                  _prev_total_to_add;
         vector<G::species_t>                    _prev_species_assignments_before_coalescence;
@@ -293,15 +244,9 @@ class Particle {
 #endif
         cout << "\n";
         _species_forest.showForest();
-#if defined (LAZY_COPYING)
         for (auto &_forest:_gene_forest_ptrs) {
             _forest->showForest();
         }
-#else
-        for (auto &_forest:_gene_forests) {
-            _forest.showForest();
-        }
-#endif
     }
 
     inline void Particle::showSpeciesParticle() {
@@ -317,13 +262,8 @@ class Particle {
         _log_weight     = 0.0;
         _log_likelihood = 0.0;
         _species_forest.clear();
-#if defined(LAZY_COPYING)
         _gene_forest_ptrs.clear();
         _prev_log_likelihoods.clear();
-//        _prev_species_number_by_gene.clear();
-#else
-        _gene_forests.clear();
-#endif
         _log_coalescent_likelihood = 0.0;
         _num_deep_coalescences = 0.0;
         _max_deep_coal = 0.0;
@@ -385,18 +325,9 @@ class Particle {
     inline double Particle::calcLogLikelihood() {
         //calculate likelihood for each gene tree
         double log_likelihood = 0.0;
-#if defined (LAZY_COPYING)
         for (unsigned g = 0; g < G::_nloci; g++) {
             log_likelihood += _gene_forest_ptrs[g]->calcLogLikelihood();
         }
-#else
-        for (auto &f:_gene_forests) {
-            double gene_tree_log_likelihood = f.calcLogLikelihood();
-            assert(!isnan (log_likelihood));
-            //total log likelihood is sum of gene tree log likelihoods
-            log_likelihood += gene_tree_log_likelihood;
-        }
-#endif
         if (G::_generation == 0 && !G::_run_on_empty) {
             _log_weight = log_likelihood;
         }
@@ -408,7 +339,6 @@ class Particle {
         vector<double> gene_forest_likelihoods;
         
         //calculate likelihood for each gene tree
-#if defined (LAZY_COPYING)
         gene_forest_likelihoods.resize(_gene_forest_ptrs.size());
         for (unsigned i=0; i<_gene_forest_ptrs.size(); i++) {
             double gene_tree_log_likelihood  = 0.0;
@@ -418,17 +348,6 @@ class Particle {
             }
             gene_forest_likelihoods[i] = gene_tree_log_likelihood;
         }
-#else
-        gene_forest_likelihoods.resize(_gene_forests.size());
-        for (unsigned i=0; i<_gene_forests.size(); i++) {
-            double gene_tree_log_likelihood  = 0.0;
-            if (!G::_run_on_empty) {
-                gene_tree_log_likelihood = _gene_forests[i].calcLogLikelihood();
-                assert(!isnan (gene_tree_log_likelihood));
-            }
-            gene_forest_likelihoods[i] = gene_tree_log_likelihood;
-        }
-#endif
 
         return gene_forest_likelihoods;
     }
@@ -454,15 +373,9 @@ class Particle {
 
     inline vector<double> Particle::getGeneTreeHeights() {
         vector<double> gene_tree_heights;
-#if defined (LAZY_COPYING)
         for (int i=0; i<_gene_forest_ptrs.size(); i++) {
             gene_tree_heights.push_back(_gene_forest_ptrs[i]->_forest_height);
         }
-#else
-        for (int i=0; i<_gene_forests.size(); i++) {
-            gene_tree_heights.push_back(_gene_forests[i]._forest_height);
-        }
-#endif
         if (G::_start_mode == "sim") {
             for (int i=0; i<_gene_forests.size(); i++) {
                 gene_tree_heights.push_back(_gene_forests[i]._forest_height);
@@ -472,15 +385,9 @@ class Particle {
     }
 
     inline void Particle::calcGeneTreeLengths() {
-#if defined (LAZY_COPYING)
         for (unsigned f=0; f<_gene_forest_ptrs.size(); f++) {
             _gene_forest_ptrs[f]->calcTreeLength();
         }
-#else
-        for (unsigned f=0; f<_gene_forests.size(); f++) {
-            _gene_forests[f].calcTreeLength();
-        }
-#endif
     }
 
     inline void Particle::calcSpeciesTreeLength() {
@@ -489,47 +396,28 @@ class Particle {
 
     inline vector<double> Particle::getGeneTreeLengths() {
         vector<double> gene_tree_heights;
-#if defined (LAZY_COPYING)
         for (int i=0; i<_gene_forest_ptrs.size(); i++) {
             if (_gene_forest_ptrs[i]->_forest_length == 0) {
                 _gene_forest_ptrs[i]->calcTreeLength();
             }
             gene_tree_heights.push_back(_gene_forest_ptrs[i]->getTreeLength());
         }
-#else
-        for (int i=0; i<_gene_forests.size(); i++) {
-            if (_gene_forests[i]._forest_length == 0) {
-                _gene_forests[i].calcTreeLength();
-            }
-            gene_tree_heights.push_back(_gene_forests[i].getTreeLength());
-        }
-#endif
         return gene_tree_heights;
     }
 
     inline vector<double> Particle::getGeneTreeLogLikelihoods() {
         vector<double> gene_tree_log_likelihoods;
-#if defined (LAZY_COPYING)
         for (int i=0; i<_gene_forest_ptrs.size(); i++) {
             gene_tree_log_likelihoods.push_back(_gene_forest_ptrs[i]->_gene_tree_log_likelihood);
 //            if (!G::_run_on_empty) {
 //                assert (_gene_forest_ptrs[i]->_gene_tree_log_likelihood <= 0.0); // if there is all missing data for a gene, likelihood could be 0
 //            }
         }
-#else
-        for (int i=0; i<_gene_forests.size(); i++) {
-            gene_tree_log_likelihoods.push_back(_gene_forests[i]._gene_tree_log_likelihood);
-//            if (!G::_run_on_empty) {
-//                assert (_gene_forests[i]._gene_tree_log_likelihood <= 0.0);
-//            }
-        }
-#endif
         return gene_tree_log_likelihoods;
     }
 
     inline vector<double> Particle::getGeneTreePriors() {
         vector<double> gene_tree_priors;
-#if defined (LAZY_COPYING)
         for (int i=0; i<_gene_forest_ptrs.size(); i++) {
             double prior = 0.0;
             for (auto &p:_gene_forest_ptrs[i]->_increments_and_priors) {
@@ -538,31 +426,15 @@ class Particle {
             
             gene_tree_priors.push_back(prior);
         }
-#else
-        for (int i=0; i<_gene_forests.size(); i++) {
-            double prior = 0.0;
-            for (auto &p:_gene_forests[i]._increments_and_priors) {
-                prior += p.second;
-            }
-            
-            gene_tree_priors.push_back(prior);
-        }
-#endif
         return gene_tree_priors;
     }
 
     inline vector<double> Particle::getGeneTreeCoalescentLikelihoods() {
         // do not have separate coalescent likelihood for each gene tree
         vector<double> gene_tree_priors;
-#if defined (LAZY_COPYING)
         for (int i=0; i<_gene_forest_ptrs.size(); i++) {
             gene_tree_priors.push_back(-1);
         }
-#else
-        for (int i=0; i<_gene_forests.size(); i++) {
-            gene_tree_priors.push_back(-1);
-        }
-#endif
         return gene_tree_priors;
     }
 
@@ -602,7 +474,6 @@ class Particle {
     inline double Particle::getLogLikelihood() {
         //retrieve likelihood for each gene tree
         double log_likelihood = 0.0;
-#if defined (LAZY_COPYING)
         for (unsigned i=0; i<_gene_forest_ptrs.size(); i++) {
             double gene_tree_log_likelihood = _gene_forest_ptrs[i]->_gene_tree_log_likelihood;
             assert(!isnan (log_likelihood));
@@ -612,17 +483,6 @@ class Particle {
         if (G::_generation == 0 && !G::_run_on_empty) {
             _log_weight = log_likelihood;
         }
-#else
-        for (unsigned i=0; i<_gene_forests.size(); i++) {
-            double gene_tree_log_likelihood = _gene_forests[i]._gene_tree_log_likelihood;
-            assert(!isnan (log_likelihood));
-            //total log likelihood is sum of gene tree log likelihoods
-            log_likelihood += gene_tree_log_likelihood;
-        }
-        if (G::_generation == 0 && !G::_run_on_empty) {
-            _log_weight = log_likelihood;
-        }
-#endif
 
         return log_likelihood;
     }
@@ -632,9 +492,7 @@ class Particle {
         
         unsigned next_gene = _gene_order[G::_generation];
         
-#if defined(LAZY_COPYING)
 //        _prev_log_likelihoods[next_gene-1] = _gene_forest_ptrs[next_gene-1]->getLogLikelihood();
-#endif
 
         bool calc_weight = false;
         
@@ -642,42 +500,24 @@ class Particle {
             if (G::_generation == 0) {
                 buildEntireSpeciesTree();
                 // make a separate species tree information vector for each gene
-#if defined (LAZY_COPYING)
                 for (unsigned i=0; i<_gene_forest_extensions.size(); i++) {
                     _t_by_gene.push_back(_t);
                     _next_species_number_by_gene.push_back(0);
                 }
-#else
-                for (unsigned i=0; i<_gene_forests.size(); i++) {
-                    _t_by_gene.push_back(_t);
-                    _next_species_number_by_gene.push_back(0);
-                }
-#endif
             }
-#if !defined (USING_MPI)
-//            else if (G::_generation % G::_nloci == 0) { // after every locus has been filtered once, trim back the species tree as far as possible & rebuild it  // TODO: for now, don't rebuild tree for MPI
-//                _species_forest.showForest();
             else {
-                trimSpeciesTree(); // TODO: attempting to trim back species tree after every step
+                trimSpeciesTree();
                 if (_species_forest._lineages.size() > 1) {
                     rebuildSpeciesTree();
                 }
             }
-#endif
         }
         else {
             if (G::_generation == 0) {
-#if defined (LAZY_COPYING)
                 for (unsigned i=0; i<_gene_forest_extensions.size(); i++) {
                     _t_by_gene.push_back(_t);
                     _next_species_number_by_gene.push_back(0);
                 }
-#else
-                for (unsigned i=0; i<_gene_forests.size(); i++) {
-                    _t_by_gene.push_back(_t);
-                    _next_species_number_by_gene.push_back(0);
-                }
-#endif
             }
         }
         
@@ -691,24 +531,17 @@ class Particle {
         
         bool done = false;
         
-#if defined (LAZY_COPYING)
         // Create temporary gene forest extending existing forest
         // without touching existing forest (which may be used
         // by many particles)
         assert(_gene_forest_extensions.size() == G::_nloci);
         _gene_forest_extensions[next_gene-1].dock(_gene_forest_ptrs[next_gene-1], _gene_forest_ptrs[next_gene-1]->pullPartial(), _lot);
-#endif
                 
         _prev_total_to_add = 0.0;
         _prev_increment_prior = 0.0;
-//        _species_forest.showForest();
         
         while (!done) {
-#if defined (LAZY_COPYING)
             vector<pair<double, unsigned long>> rates_by_species = _gene_forest_extensions[next_gene-1].calcForestRate(_lot, _theta_map);
-#else
-            vector<pair<double, string>> rates_by_species = _gene_forests[next_gene-1].calcForestRate(_lot, _theta_map);
-#endif
             double total_rate = 0.0;
             double gene_increment = -1.0;
             if (rates_by_species.size() > 0) {
@@ -733,12 +566,8 @@ class Particle {
                 _prev_gene_increment = gene_increment;
                 _prev_total_to_add += gene_increment;
                 
-#if defined (LAZY_COPYING)
                 // tell gene forest extension about gene increment
                 _gene_forest_extensions[next_gene-1].addIncrement(gene_increment);
-#else
-                _gene_forests[next_gene-1].addIncrement(gene_increment);
-#endif
                 
                 vector<double> event_choice_rates;
                 for (auto &r:rates_by_species) {
@@ -746,17 +575,9 @@ class Particle {
                 }
                 
                 unsigned index = selectEventLinearScale(event_choice_rates);
-#if defined (LAZY_COPYING)
                 G::species_t species_name = rates_by_species[index].second;
-#else
-                string species_name = rates_by_species[index].second;
-#endif
                 
-#if defined (LAZY_COPYING)
                 _gene_forest_extensions[next_gene-1].coalesce(total_rate, species_name);
-#else
-                _gene_forests[next_gene-1].allowCoalescence(species_name, gene_increment, _lot);
-#endif
                 _total_particle_partials++;
                 
                     
@@ -775,7 +596,6 @@ class Particle {
                 
                     _prev_increment_prior -= (total_rate * species_increment);
                     
-#if defined (LAZY_COPYING)
                     // tell gene forest extension about the species increment
                     _prev_total_to_add += species_increment;
                     _gene_forest_extensions[next_gene-1].addIncrement(species_increment);
@@ -797,26 +617,14 @@ class Particle {
                         updateThetaMap(left_spp + right_spp);
                     }
 #endif
-                    
-#else
-                    _gene_forests[next_gene-1].addIncrement(species_increment);
-                    assert (_gene_forests[next_gene-1]._species_partition.size() > 1);
-                    _gene_forests[next_gene-1].updateSpeciesPartition(_t_by_gene[next_gene-1][next_species_index+1].first);
-#endif
 
                     assert (next_species_index < _t_by_gene[next_gene-1].size());
                     _t_by_gene[next_gene-1][next_species_index].second -= species_increment; // update species tree increments
                     assert (_t_by_gene[next_gene-1][next_species_index].second == 0.0);
                     
-#if defined (LAZY_COPYING)
                     if (_gene_forest_extensions[next_gene-1].getSpeciesPartitionSize() > 1) {
                         _next_species_number_by_gene[next_gene-1]++;
                 }
-#else
-                    if (_gene_forests[next_gene-1]._species_partition.size() > 1) {
-                        _next_species_number_by_gene[next_gene-1]++;
-                }
-#endif
             }
                 
         
@@ -860,12 +668,8 @@ class Particle {
 #endif
         
         if (!G::_run_on_empty) {
-#if defined (LAZY_COPYING)
             double log_weight = _gene_forest_extensions[next_gene-1].getLogWeight();
             _log_weight = log_weight + inv_gamma_modifier;
-#else
-            _log_weight = _gene_forests[next_gene-1]._log_weight + inv_gamma_modifier;
-#endif
         }
         else {
             _log_weight = 0.0;
@@ -941,11 +745,7 @@ class Particle {
                     _num_deep_coalescences += _gene_forests[next_gene-1].getDeepCoal(_t_by_gene_sim[next_gene - 1][next_species_index + 1].first);
                     _max_deep_coal += _gene_forests[next_gene-1].getMaxDeepCoal(_t_by_gene_sim[next_gene - 1][next_species_index + 1].first);
                     
-#if defined (LAZY_COPYING)
                     _gene_forests[next_gene-1].updateSpeciesPartitionSim(_t_by_gene_sim[next_gene-1][next_species_index+1].first, _sorted_species_names[_next_species_number_by_gene[next_gene-1]]);
-#else
-                    _gene_forests[next_gene-1].updateSpeciesPartition(_t_by_gene_sim[next_gene-1][next_species_index+1].first);
-#endif
                     assert (next_species_index < _t_by_gene_sim[next_gene-1].size());
                     _t_by_gene_sim[next_gene-1][next_species_index].second -= species_increment; // update species tree increments
                     assert (_t_by_gene_sim[next_gene-1][next_species_index].second == 0.0);
@@ -987,29 +787,7 @@ class Particle {
         }
         
         if (fix_theta) { // fix theta for all populations
-#if !defined (LAZY_COPYING)
-            // map should be 2*nspecies - 1 size
-            unsigned number = 0;
-            vector<string> species_names;
-            
-            for (auto &s:_gene_forests[0]._species_partition) {
-                species_names.push_back(s.first);
-                number++;
-            }
-            for (int i=0; i<G::_nspecies-1; i++) {
-                string name = boost::str(boost::format("node-%d")%number);
-                number++;
-                species_names.push_back(name);
-            }
-            
-            assert (species_names.size() == 2*G::_nspecies - 1);
-#endif
-            
-#if defined (LAZY_COPYING)
             for (auto &name:G::_species_names_typed) {
-#else
-            for (auto &name:species_names) {
-#endif
                 assert (G::_theta > 0.0);
                 _theta_map[name] = G::_theta;      // create a theta map with all the same theta for simulations, set theta_mean to theta
             }
@@ -1024,15 +802,9 @@ class Particle {
 
     inline void Particle::setSortedThetaVector() {
         // _theta_map is unsorted, so get species names in the correct order
-#if defined (LAZY_COPYING)
         for (auto &nd:_species_forest._nodes) {
             _theta_vector.push_back(_theta_map[nd._species]);
         }
-#else
-        for (unsigned s=0; s<G::_species_names.size(); s++) {
-            _theta_vector.push_back(_theta_map[G::_species_names[s]]);
-        }
-#endif
     }
     
     inline vector<double> Particle::getThetaVector() {
@@ -1082,11 +854,7 @@ class Particle {
     inline void Particle::createThetaMap() {
         double scale = (2.0 - 1.0) / _theta_mean;
         assert (scale > 0.0);
-#if defined (LAZY_COPYING)
         for (auto &name:G::_species_names_typed) {
-#else
-        for (auto &name:G::_species_names) {
-#endif
             double new_theta = 0.0;
             if (new_theta < G::_small_enough) {
                 new_theta = 1 / (_lot->gamma(2.0, scale));
@@ -1098,20 +866,12 @@ class Particle {
     }
 
     inline void Particle::createThetaMapFixedTheta() {
-#if defined (LAZY_COPYING)
         for (auto &name:G::_species_names_typed) {
-#else
-        for (auto &name:G::_species_names) {
-#endif
             _theta_map[name] = G::_theta;
         }
     }
 
-#if defined (LAZY_COPYING)
     inline void Particle::updateThetaMap(G::species_t new_species_name) {
-#else
-    inline void Particle::updateThetaMap(string new_species_name) {
-#endif
         
         double new_theta = G::_theta;
         if (G::_start_mode_type == G::StartModeType::START_MODE_SIM && G::_fix_theta_for_simulations) {
@@ -1135,30 +895,18 @@ class Particle {
             if (G::_fix_theta) {
                 new_theta = G::_theta;
             }
-#if defined (LAZY_COPYING)
             if (_theta_map.count(new_species_name) == 0) {
                 _theta_map[new_species_name] = new_theta; // only update theta map if the species does not already exist in the map
             }
-#else
-            _theta_map[new_species_name] = new_theta;
-#endif
         }
         }
     }
 
-#if defined (LAZY_COPYING)
         inline void Particle::updateThetaMapFixedTheta(G::species_t new_species_name) {
-#else
-    inline void Particle::updateThetaMapFixedTheta(string new_species_name) {
-#endif
         _theta_map[new_species_name] = G::_theta;
     }
 
-#if defined (LAZY_COPYING)
         inline void Particle::drawNewTheta(G::species_t new_species) {
-#else
-    inline void Particle::drawNewTheta(string new_species) {
-#endif
         // draw a new theta for the newest species population
         double scale = 1 / _theta_mean;
         double new_theta = 0.0;
@@ -1303,10 +1051,6 @@ class Particle {
 
     inline void Particle::processSpeciesNewick(string newick_string) {
         assert (newick_string != "");
-#if defined (LAZY_COPYING)
-#else
-       _t =  _species_forest.buildFromNewickMPI(newick_string, true, false, _lot);
-#endif
 //        _t = _species_forest.resetT();
         // TODO: need to set _t and _t_by_gene too
 //        vector<tuple<string, string, string>> species_order = _species_forest.buildFromNewickTopology(newick_string);
@@ -1343,15 +1087,12 @@ class Particle {
     }
 
     inline void Particle::processGeneNewicks(vector<string> newicks) {
-#if defined (LAZY_COPYING)
         for (int i=0; i<_gene_forest_ptrs.size(); i++) {
             _gene_forest_ptrs[i]->buildFromNewick(newicks[i], true, false); // newicks starts at 0
             _gene_forest_ptrs[i]->refreshPreorder();
             _gene_forest_ptrs[i]->setNodeHeights();
         }
         _theta_mean = G::_theta; // for now, set theta mean equal to whatever theta user specifies
-#else
-#endif
         for (int i=0; i<_gene_forests.size(); i++) {
             _gene_forests[i].buildFromNewick(newicks[i], true, false); // newicks starts at 0
             _gene_forests[i].refreshPreorder();
@@ -1380,7 +1121,6 @@ class Particle {
         bool trim = true;
         vector<double> gene_tree_heights;
         
-#if defined (LAZY_COPYING)
         for (unsigned i=0; i<_gene_forest_ptrs.size(); i++) {
             if (_gene_forest_ptrs[i]->checkNumberOfUniqueSpeciesInExistence() > 1) {
                 gene_tree_heights.push_back(_gene_forest_ptrs[i]->_forest_height);
@@ -1390,17 +1130,6 @@ class Particle {
                 break;
             }
         }
-#else
-        for (unsigned i=0; i<_gene_forests.size(); i++) {
-            if (_gene_forests[i]._species_partition.size() > 1) {
-                gene_tree_heights.push_back(_gene_forests[i]._forest_height);
-            }
-            else {
-                trim = false;
-                break;
-            }
-        }
-#endif
 
         if (trim) {
             double max_gene_tree_height = *max_element(gene_tree_heights.begin(), gene_tree_heights.end());
@@ -1437,14 +1166,6 @@ class Particle {
                     }
 
                     _species_forest._ninternals--;
-
-#if defined (DRAW_NEW_THETA)
-#if defined (LAZY_COPYING)
-//                    _theta_map[G::_species_names_typed[spp_count-1]] = -1.0;
-#else
-                    _theta_map[G::_species_names[spp_count-1]] = -1.0;
-#endif
-#endif
 
                     spp_count--;
                 }
@@ -1491,11 +1212,7 @@ class Particle {
                 g.back().second -= min_branch_length;
             }
             
-#if defined (LAZY_COPYING)
             tuple<G::species_t, G::species_t, G::species_t> species_joined = make_tuple(0,0,0);
-#else
-            tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-#endif
             
             double edge_increment = 0.0;
             while (edge_increment < min_branch_length) {
@@ -1519,14 +1236,12 @@ class Particle {
             while (_species_forest._lineages.size() > 1) {
                 if (_species_forest._lineages.size() > 1) {
                     species_joined = _species_forest.speciesTreeProposal(_lot);
-#if defined (LAZY_COPYING)
                     if (get<0>(species_joined) == 0) {
                         assert (get<1>(species_joined) == 0);
                     }
                     if (get<1>(species_joined) == 0) {
                         assert (get<0>(species_joined) == 0);
                     }
-#endif
                     double edge_len = 0.0;
                     if (_species_forest._lineages.size() > 1) {
                         edge_len = _species_forest.chooseSpeciesIncrementOnly(_lot, 0.0).first;
@@ -1540,11 +1255,7 @@ class Particle {
             }
             
             // update theta map
-#if defined (LAZY_COPYING)
             for (auto &s:G::_species_names_typed) {
-#else
-            for (auto &s:G::_species_names) {
-#endif
                 if (_theta_map[s] == -1.0) {
                     if (G::_fix_theta) {
                       updateThetaMapFixedTheta(s);
@@ -1557,11 +1268,7 @@ class Particle {
             
         }
         else {
-#if defined (LAZY_COPYING)
             tuple<G::species_t, G::species_t, G::species_t> species_joined = make_tuple(0,0,0);
-#else
-            tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-#endif
             
             // draw an increment and add to existing species lineages, don't join anything else at this stage
             double edge_increment = _species_forest.chooseSpeciesIncrementOnly(_lot, 0.0).first;
@@ -1576,14 +1283,12 @@ class Particle {
                 if (_species_forest._lineages.size() > 1) {
                     species_joined = _species_forest.speciesTreeProposal(_lot);
                     
-#if defined (LAZY_COPYING)
                     if (get<0>(species_joined) == 0) {
                         assert (get<1>(species_joined) == 0);
                     }
                     else if (get<1>(species_joined) == 0) {
                         assert (get<0>(species_joined) == 0);
                     }
-#endif
                     
                     double edge_len = 0.0;
                     if (_species_forest._lineages.size() > 1) {
@@ -1598,11 +1303,7 @@ class Particle {
             
 #if defined (DRAW_NEW_THETA)
             // update theta map
-#if defined (LAZY_COPYING)
             for (auto &s:G::_species_names_typed) {
-#else
-            for (auto &s:G::_species_names) {
-#endif
                 if (_theta_map[s] == -1.0) {
                     updateThetaMap(s);
                 }
@@ -1615,13 +1316,8 @@ class Particle {
     inline void Particle::buildEntireSpeciesTree() {
         double edge_len = _species_forest.chooseSpeciesIncrementOnly(_lot, 0.0).first;
         
-#if defined (LAZY_COPYING)
         tuple<G::species_t, G::species_t, G::species_t> species_joined = make_tuple(0,0,0);
         _t.push_back(make_pair(species_joined, edge_len));
-#else
-        tuple<string, string, string> species_joined = make_tuple("null", "null", "null");
-        _t.push_back(make_pair(species_joined, edge_len));
-#endif
 
         for (unsigned i=0; i < G::_nspecies-1; i++) {
             if (_species_forest._lineages.size() > 1) {
@@ -1646,10 +1342,8 @@ class Particle {
             if (_species_forest._lineages.size() > 1) {
                 species_joined = _species_forest.speciesTreeProposalSim(_lot);
                 G::species_t new_species_name = _species_forest._lineages.back()->_left_child->_species + _species_forest._lineages.back()->_left_child->_right_sib->_species;
-#if defined (LAZY_COPYING)
                 updateThetaMap(new_species_name);
                 _sorted_species_names.push_back(new_species_name);
-#endif
 
                 double edge_len = 0.0;
                 if (_species_forest._lineages.size() > 1) {
@@ -1700,14 +1394,8 @@ class Particle {
         // Just need coalescent events at this point in order to choose
         // limits for species tree increments
         
-#if defined(LAZY_COPYING)
         assert (_ensemble_coalinfo.size() > 0);
         coalinfo_vect = _ensemble_coalinfo;
-#else
-        for (unsigned f=0; f<_gene_forests.size(); f++) {
-            _gene_forests[f].saveCoalInfoGeneForest(coalinfo_vect);
-        }
-#endif
         
         // coalinfo_vect should already be sorted
         
@@ -1776,7 +1464,6 @@ class Particle {
         return num_species_tree_lineages;
     }
            
-#if defined(LAZY_COPYING)
     inline void Particle::buildEnsembleCoalInfo() {
         // Store a tuple (height, gene + 1, vector of species)
         // for each join in any gene tree in _ensemble_coalinfo.
@@ -1793,7 +1480,6 @@ class Particle {
         
         sort(_ensemble_coalinfo.begin(), _ensemble_coalinfo.end());
     }
-#endif
 
     double Particle::findHeightNextCoalescentEvent(double hstart, vector<Forest::coalinfo_t> & coalinfo_vect) {
         double min_height = G::_infinity;
@@ -2047,7 +1733,6 @@ class Particle {
     }
 
     inline void Particle::clearGeneForests() {
-#if defined (LAZY_COPYING)
         for (unsigned i=0; i<_gene_forest_ptrs.size(); i++) {
             _gene_forest_ptrs[i]->saveCoalInfoInitial();
             _gene_forest_ptrs[i]->setTreeHeight(); // TODO: only need to do these things once per pointer
@@ -2055,56 +1740,10 @@ class Particle {
 //            _gene_forest_ptrs[i]->_nodes.clear();
 //            _gene_forest_ptrs[i]->_lineages.clear(); // don't need clear these because they will not get copied in the copier
             _gene_forest_ptrs[i]->_preorder.clear();
-            
-#else
-        for (unsigned i=0; i<_gene_forests.size(); i++) {
-            _gene_forests[i].saveCoalInfoInitial();
-            _gene_forests[i].setTreeHeight();
-//            _gene_forests[i]._data = nullptr; // don't need to clear these because they will not get copied in the copier
-            _gene_forests[i]._nodes.clear();
-//            _gene_forests[i]._lineages.clear(); // don't need clear these because they will not get copied in the copier
-            _gene_forests[i]._preorder.clear();
-#endif
         }
             
-#if defined (LAZY_COPYING)
             buildEnsembleCoalInfo();
-#endif
         }
-
-#if defined (USING_MPI)
-    inline void Particle::initSpeciesForest(string newick) {
-        // TODO: need to rebuild _t and _t_by_gene first?
-//        cout << "INITIALIZING SPECIES NEWICK generation " << _generation << "   " << newick << endl;
-//        _species_forest.clear();
-        _species_forest.buildFromNewickMPI(newick, true, false, _lot);
-//        cout << "after initializing species forest, lineages are: " << endl;
-//        cout << "\t";
-//        for (auto &nd:_species_forest._lineages) {
-//            cout << nd->_name << " position " << nd->_position_in_lineages << endl;
-//        }
-//        _species_forest.showForest();
-    }
-#endif
-
-#if defined (USING_MPI)
-    inline void Particle::initGeneForest(string newick) {
-        unsigned gene_number = _gene_order[_generation-1]; // updating for the previous step
-//        _forests[gene_number].clear();
-//        cout << "BUILDING NEWICK  " << newick << endl;
-//        cout << "gene number is " << gene_number << endl;
-        _forests[gene_number].buildFromNewickMPI(newick, true, true, _lot);
-        
-//        for (auto &nd:_forests[gene_number]._nodes) {
-//            cout << nd._position_in_lineages << endl;
-//        }
-//        cout << "FOREST BUILT IS ";
-//        _forests[gene_number].showForest();
-        for (auto &s:_forests[gene_number]._species_partition) {
-            cout << "x";
-        }
-    }
-#endif
 
     inline void Particle::resetGeneOrder(unsigned step, vector<unsigned> gene_order) {
         unsigned count=0;
@@ -2119,13 +1758,6 @@ class Particle {
                 count++;
             }
         }
-//        unsigned count=0;
-//        if (step == 0) { // step 0 is different because this happens before any proposals have occurred
-//            for (unsigned s=step; s<G::_nloci; s++) {
-//                _gene_order[s] = gene_order[count];
-//                count++;
-//            }
-//        }
         else {
             for (unsigned s=step+1; s<step+G::_nloci+1; s++) {
                 _gene_order[s] = gene_order[count];
@@ -2134,53 +1766,12 @@ class Particle {
         }
     }
 
-#if defined (USING_MPI)
-    inline void Particle::checkPartition() {
-        for (auto &s:_forests[1]._species_partition) {
-            cout << "x";
-        }
-    }
-#endif
-
-#if defined (USING_MPI)
-    inline void Particle::initGeneForestSpeciesPartition(string species_partition) {
-        unsigned gene_number = _gene_order[G::_generation-1];
-        _forests[gene_number].resetSpeciesPartition(species_partition); // TODO: fill this in
-    }
-#endif
-
-#if defined (USING_MPI)
-    inline string Particle::saveForestSpeciesPartition() { // TODO: can't save by number because the order of nodes might change
-        unsigned gene_number = _gene_order[_generation-1];
-        map<string, vector<string>> partition = _forests[gene_number].saveSpeciesPartition();
-        string partition_for_message = "";
-        for (auto &m:partition) {
-            partition_for_message += " spp " + m.first + "";
-            for (auto &nd:m.second) {
-                partition_for_message += " nd " + nd;
-            }
-        }
-        return partition_for_message;
-    }
-#endif
-
-#if defined (UPGMA)
-    inline void Particle::setGeneUPGMAMatrices() {
-        for (unsigned i=0; i<_gene_forests.size(); i++) {
-            _gene_forests[i].setGeneUPGMAMatrices();
-        }
-    }
-#endif
-
-#if defined(LAZY_COPYING)
     inline void Particle::resetAllPrevLogLikelihood() {
         for (unsigned g = 0; g < G::_nloci; g++) {
             _prev_log_likelihoods[g] = _gene_forest_ptrs[g]->getLogLikelihood();
         }
     }
-#endif
 
-#if defined(LAZY_COPYING)
     inline void Particle::rebuildCoalInfo() {
         // Rebuild coal info vectors, stripping effect of previous species tree
         for (auto gfp : _gene_forest_ptrs) {
@@ -2193,9 +1784,7 @@ class Particle {
         }
         _species_forest.buildCoalInfoVect();
     }
-#endif
         
-#if defined (LAZY_COPYING)
         inline void Particle::proposeMCMCMove(bool last_round) {
             // _prev_t_by_gene represents species / gene forest before the coalescent event we are attemping to change
             // save a copy of it to reset _prev_t_by_gene for the next mcmc round
@@ -2219,9 +1808,6 @@ class Particle {
             double prev_proposed_gene_tree_height = prev_gene_tree_height + _prev_total_to_add;
             
             double prev_species_tree_height = 0.0;
-            
-//            _gene_forest_ptrs[locus_number-1]->showForest();
-//            _species_forest.showForest();
             
             for (unsigned i=0; i< _t.size(); i++) {
                 if (_prev_t_by_gene[i].second == 0) {
@@ -2502,9 +2088,7 @@ class Particle {
             
             // don't reset theta map - keep thetas the same until species tree is rebuilt
         }
-#endif
 
-#if defined(LAZY_COPYING)
     inline void Particle::finalizeLatestJoin(int locus, unsigned index, map<const void *, list<unsigned> > & nonzero_map) {
         // Makes join closest to leaf-level in _gene_forest_extensions[locus]
         // permanent, then undocks _gene_forest_extensions[locus]
@@ -2559,9 +2143,7 @@ class Particle {
         // Can now get rid of extension
         _gene_forest_extensions[locus].undock();
     }
-#endif
         
-#if defined(LAZY_COPYING)
     inline void Particle::finalizeLatestJoinMCMC(int locus, unsigned index) {
         // Makes join closest to leaf-level in _gene_forest_extensions[locus]
         // permanent, then undocks _gene_forest_extensions[locus]
@@ -2609,16 +2191,12 @@ class Particle {
         // Can now get rid of extension
         _gene_forest_extensions[locus].undock();
     }
-#endif
 
-
-#if defined(LAZY_COPYING)
     inline Forest::SharedPtr Particle::getGeneForestPtr(unsigned locus) {
         assert(locus < G::_nloci);
         assert(_gene_forest_ptrs[locus]);
         return _gene_forest_ptrs[locus];
     }
-#endif
         
     inline unsigned Particle::getPartialCount() {
         if (G::_plus_G) {
@@ -2628,19 +2206,14 @@ class Particle {
     }
         
     inline string Particle::saveGeneNewick(unsigned i) {
-#if defined (LAZY_COPYING)
         if (G::_start_mode_type == G::StartModeType::START_MODE_SIM) {
             return _gene_forests[i-1].makeNewick(8, true);
         }
         else {
             return _gene_forest_ptrs[i-1]->makeNewick(8, true);
         }
-#else
-        return _gene_forests[i-1].makeNewick(8, true);
-#endif
     }
         
-#if defined (LAZY_COPYING)
     inline void Particle::resetSubgroupPointers(vector<Forest::SharedPtr> gene_forest_copies) {
         for (unsigned l=0; l<G::_nloci; l++) {
             Forest::SharedPtr gfp = _gene_forest_ptrs[l];
@@ -2653,7 +2226,6 @@ class Particle {
             gfp = gfcpy;
         }
     }
-#endif
         
     inline double Particle::calcBHVDistanceTrueTreeGene(string true_newick) {
         // Build the reference tree
@@ -3470,7 +3042,6 @@ class Particle {
             _prev_species_assignments_before_coalescence = other._prev_species_assignments_before_coalescence;
         }
 
-#if defined (LAZY_COPYING)
         _prev_log_likelihoods = other._prev_log_likelihoods;
         
         if (!G::_mcmc) {
@@ -3492,13 +3063,9 @@ class Particle {
         
         _gene_forest_ptrs = other._gene_forest_ptrs;
         _ensemble_coalinfo = other._ensemble_coalinfo;
-#endif
         
         _log_weight     = other._log_weight;
         _species_forest = other._species_forest;
-#if !defined (LAZY_COPYING)
-        _gene_forests = other._gene_forests;
-#endif
         _psuffix = other._psuffix;
         _theta_mean = other._theta_mean;
         _theta_vector = other._theta_vector;
