@@ -930,7 +930,6 @@ class Forest {
                     
                 double pr_same = calcTransitionProbabilityJC(0, 0, child->_edge_length + edgelen_extension, step);
                 double pr_diff = calcTransitionProbabilityJC(0, 1, child->_edge_length + edgelen_extension, step);
-//                cout << "pr_same = " << pr_same << "    pr_diff = " << pr_diff << endl;
                 for (unsigned p = 0; p < npatterns; p++) {
 //                    unsigned pxnstates = p*G::_nstates;
                     unsigned start = step * G::_gamma_rate_cat.size() * _npatterns;
@@ -1127,10 +1126,10 @@ class Forest {
             }
             if (!G::_plus_G) {
                 weight = curr_loglike - prev_loglike;
+                _gene_tree_log_likelihood = curr_loglike;
             }
             else {
                 log_likelihoods.push_back(curr_loglike);
-//                cout << curr_loglike << endl;
                 prev_loglikelihoods.push_back(prev_loglike);
                 _gene_tree_log_likelihood = curr_loglike;
             }
@@ -1240,13 +1239,12 @@ class Forest {
              if (!G::_plus_G) {
                 weight = curr_loglike - prev_loglike;
                 _gene_tree_log_likelihood = curr_loglike;
-//                cout << curr_loglike << endl;
             }
             else {
-                 log_likelihoods.push_back(curr_loglike);
-//                            cout << curr_loglike << endl;
-                 prev_loglikelihoods.push_back(prev_loglike);
-                 }
+                log_likelihoods.push_back(curr_loglike);
+                prev_loglikelihoods.push_back(prev_loglike);
+                _gene_tree_log_likelihood = curr_loglike;
+            }
              }
              if (G::_plus_G) {
                    assert (log_likelihoods.size() == G::_gamma_rate_cat.size());
