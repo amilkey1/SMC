@@ -1055,8 +1055,8 @@ class Forest {
             else {
               assert (log_likelihoods_for_step.size() == 1);
               assert (prev_log_likelihoods_for_step.size() == 1);
-              double curr_sum = log_likelihoods_for_step[0];
-              double prev_sum = prev_log_likelihoods_for_step[0];
+              double curr_sum = log_likelihoods_for_step[0] * counts[pp];
+              double prev_sum = prev_log_likelihoods_for_step[0] * counts[pp];
               _gene_tree_log_likelihood += curr_sum;
                weight += curr_sum - prev_sum;
             }
@@ -1181,8 +1181,8 @@ class Forest {
        else {
           assert (log_likelihoods_for_step.size() == 1);
                assert (prev_log_likelihoods_for_step.size() == 1);
-               double curr_sum = log_likelihoods_for_step[0];
-                double prev_sum = prev_log_likelihoods_for_step[0];
+               double curr_sum = log_likelihoods_for_step[0] * counts[pp];
+                double prev_sum = prev_log_likelihoods_for_step[0] * counts[pp];
               _gene_tree_log_likelihood += curr_sum;
              weight += curr_sum - prev_sum;
           }
