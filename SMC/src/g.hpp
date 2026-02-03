@@ -90,7 +90,7 @@ namespace proj {
         static bool                 _sample_from_prior;
         static unsigned             _nloci_slow_rate;
         static bool                 _plus_G;
-        static double               _alpha;
+        static double               _gamma_rate_var;
         static vector<double>       _gamma_rate_cat;
         
         // other
