@@ -1099,20 +1099,24 @@ class Forest {
             n_likelihood_calculations = (unsigned) G::_gamma_rate_cat.size();
         }
         double weight = 0.0;
-        vector<double> log_likelihoods;
-        vector<double> prev_loglikelihoods;
-            
+         vector<vector<double>> log_likelihoods(G::_nloci);
+        vector<vector<double>> prev_loglikelihoods(G::_nloci);
+        vector<double> log_likelihoods_by_pattern(G::_nloci);
+                                                        
+        unsigned npartials_used = 0.0;
+        double log_n_rate_categ = log(G::_gamma_rate_cat.size());
+                                                       
+         _gene_tree_log_likelihood = 0.0;
+                                                  
+        for (unsigned p = 0; p < npatterns; p++) {
         for (unsigned step = 0; step < n_likelihood_calculations; step++) {
             
             for (const Node * child : {lchild, rchild})  {
                 assert(child->_partial);
                 auto & child_partial_array = child->_partial->_v;
-                for (unsigned p = 0; p < npatterns; p++) {
-//                    unsigned pxnstates = p*G::_nstates;
-                    //unsigned pp = first_pattern + p;
                                                         
-                    unsigned start = step * G::_gamma_rate_cat.size() * _npatterns;
-                    unsigned pxnstates = p*G::_nstates + start;
+                    unsigned start = npartials_used;
+                    unsigned pxnstates = start;
 
                     for (unsigned s = 0; s < G::_nstates; s++) {
                         double sum_over_child_states = 0.0;
@@ -1126,7 +1130,9 @@ class Forest {
                         parent_partial_array[pxnstates + s] *= sum_over_child_states;
                     }   // parent state loop
                 }   // pattern loop
+                npartials_used += G::_nstates; // this is the total number of partial steps the step took up
             }
+        }
 
             // Compute the ratio of after to before likelihoods
             //TODO: make more efficient
@@ -1135,45 +1141,54 @@ class Forest {
             auto & newnd_partial_array = new_nd->_partial->_v;
             auto & lchild_partial_array = lchild->_partial->_v;
             auto & rchild_partial_array = rchild->_partial->_v;
+                                                        
+            npartials_used = 0;
             for (unsigned p = 0; p < npatterns; p++) {
-//                unsigned pxnstates = p*G::_nstates;
-                unsigned start = step * G::_gamma_rate_cat.size() * _npatterns;
-                unsigned pxnstates = p*G::_nstates + start;
-                
-                unsigned pp = first_pattern + p;
-                //unsigned count = counts[pp];
-                double left_sitelike = 0.0;
-                double right_sitelike = 0.0;
-                double newnd_sitelike = 0.0;
+                   vector<double> prev_log_likelihoods_for_step(G::_gamma_rate_cat.size());
+                   vector<double> log_likelihoods_for_step(G::_gamma_rate_cat.size());
+                   unsigned pp = first_pattern + p; // TODO: or just first_pattern?
+
+                   for (unsigned step = 0; step < G::_gamma_rate_cat.size(); step++) {
+                        unsigned start = npartials_used;
+                        unsigned pxnstates = npartials_used;
+                                                                                      
+                                                                                                 
+                         double left_sitelike = 0.0;
+                         double right_sitelike = 0.0;
+                         double newnd_sitelike = 0.0;
                 for (unsigned s = 0; s < G::_nstates; s++) {
                     left_sitelike += G::_base_frequencies[s]*lchild_partial_array[pxnstates + s];
                     right_sitelike += G::_base_frequencies[s]*rchild_partial_array[pxnstates + s];
                     newnd_sitelike += G::_base_frequencies[s]*newnd_partial_array[pxnstates + s];
                 }
-                prev_loglike += log(left_sitelike)*counts[pp];
-                prev_loglike += log(right_sitelike)*counts[pp];
-                curr_loglike += log(newnd_sitelike)*counts[pp];
-            }
-             if (!G::_plus_G) {
-                weight = curr_loglike - prev_loglike;
-                _gene_tree_log_likelihood = curr_loglike;
-            }
-            else {
-                log_likelihoods.push_back(curr_loglike);
-                prev_loglikelihoods.push_back(prev_loglike);
-                _gene_tree_log_likelihood = curr_loglike;
-            }
-             }
-             if (G::_plus_G) {
-                   assert (log_likelihoods.size() == G::_gamma_rate_cat.size());
-                   assert (prev_loglikelihoods.size() == G::_gamma_rate_cat.size());
-                   double curr_sum = getRunningSumChoices(log_likelihoods);
-                   double prev_sum = getRunningSumChoices(prev_loglikelihoods);
-                   weight = curr_sum - prev_sum;
-                   _gene_tree_log_likelihood = curr_sum;
-             }
+         prev_log_likelihoods_for_step[step] += log(left_sitelike);
+         prev_log_likelihoods_for_step[step] += log(right_sitelike);
+         log_likelihoods_for_step[step] += log(newnd_sitelike);
+                                                                                                     
+         npartials_used += G::_nstates;
+
+         }
+                                                                                                     
+      // calculate log sum over all rate categories for the site
+      if (G::_plus_G) {
+          assert (log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
+          assert (prev_log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
+          double curr_sum = (getRunningSumChoices(log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
+          double prev_sum = (getRunningSumChoices(prev_log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
+            _gene_tree_log_likelihood += curr_sum;
+             weight += curr_sum - prev_sum;
+       }
+       else {
+          assert (log_likelihoods_for_step.size() == 1);
+               assert (prev_log_likelihoods_for_step.size() == 1);
+               double curr_sum = log_likelihoods_for_step[0];
+                double prev_sum = prev_log_likelihoods_for_step[0];
+              _gene_tree_log_likelihood += curr_sum;
+             weight += curr_sum - prev_sum;
+          }
+        }
           return weight;
-    }
+     }
 
     inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length) {
         double relative_rate = G::_double_relative_rates[_index-1];
