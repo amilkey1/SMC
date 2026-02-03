@@ -1239,7 +1239,7 @@ namespace proj {
         ("sample_from_prior", boost::program_options::value(&G::_sample_from_prior)->default_value(false), "sample species trees from prior")
         ("nloci_slow_rate", boost::program_options::value(&G::_nloci_slow_rate)->default_value(0), "for simulations - number of loci to simulate at slower rate")
         ("plus_G", boost::program_options::value(&G::_plus_G)->default_value(false), "+G rate het")
-        ("alpha", boost::program_options::value(&G::_gamma_rate_var)->default_value(1000), "alpha value for +G rate het")
+        ("gamma_rate_var", boost::program_options::value(&G::_gamma_rate_var)->default_value(1000), "alpha value for +G rate het")
 #if defined(SPECIES_IN_CONF)
         ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
 #endif
@@ -2495,10 +2495,9 @@ namespace proj {
             // alpha and beta are shape and scale, respectively
             // mean = alpha * beta = 1.0
             double rate_variance = G::_gamma_rate_var;
-            double alpha = 1.0/rate_variance;
+            double alpha = 1 / G::_gamma_rate_var;
             double beta = rate_variance;
-            
-            double num_categ = 4;
+            double num_categ = 4.0; // TODO: fix this
             double mean_rate_variable_sites = 1.0;
             double equal_prob = 1 / num_categ;
             
