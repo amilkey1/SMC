@@ -134,7 +134,6 @@ class Forest {
         PartialStore::partial_t         pullPartial();
         void                            buildCoalInfoVect();
         virtual pair<double, double>    getBoundaryExtension() const;
-        Node *                          getMostRecentAncestor();
         void                            refreshAllPreorders() const;
         void                            advanceAllLineagesBy(double increment);
         void                            addIncrAndJoin(double incr, const Split & lsplit, const Split & rsplit, ForestExtension & gfx);
@@ -826,144 +825,144 @@ class Forest {
         }
         
         double weight = 0.0;
-         vector<vector<double>> log_likelihoods(G::_nloci);
-         vector<vector<double>> prev_loglikelihoods(G::_nloci);
-         vector<double> log_likelihoods_by_pattern(G::_nloci);
+        vector<vector<double>> log_likelihoods(G::_nloci);
+        vector<vector<double>> prev_loglikelihoods(G::_nloci);
+        vector<double> log_likelihoods_by_pattern(G::_nloci);
          
-         unsigned npartials_used = 0.0;
-         double log_n_rate_categ = log(G::_gamma_rate_cat.size());
+        unsigned npartials_used = 0.0;
+        double log_n_rate_categ = log(G::_gamma_rate_cat.size());
         
         _gene_tree_log_likelihood = 0.0;
             
         for (unsigned p = 0; p < npatterns; p++) {
-        for (unsigned step = 0; step < n_likelihood_calculations; step++) {
-            for (const Node * child : {lchild, rchild})  {
-                assert(child->_partial);
-                auto & child_partial_array = child->_partial->_v;
+            for (unsigned step = 0; step < n_likelihood_calculations; step++) {
+                for (const Node * child : {lchild, rchild})  {
+                    assert(child->_partial);
+                    auto & child_partial_array = child->_partial->_v;
                     
-                double pr_same = calcTransitionProbabilityJC(0, 0, child->_edge_length + edgelen_extension, step);
-                double pr_diff = calcTransitionProbabilityJC(0, 1, child->_edge_length + edgelen_extension, step);
+                    double pr_same = calcTransitionProbabilityJC(0, 0, child->_edge_length + edgelen_extension, step);
+                    double pr_diff = calcTransitionProbabilityJC(0, 1, child->_edge_length + edgelen_extension, step);
 
-                unsigned start = npartials_used;
-                unsigned pxnstates = start;
-
-    #if defined (UNROLL_LOOPS)
-                    // unroll parent loop
-                    assert (G::_nstates == 4);
-                    unsigned s = 0;
-                    double sum_over_child_states = 0.0;
-                        
-                        // child state subloop 0
-                    unsigned s_child = 0;
-                    double child_partial = child_partial_array[pxnstates + s_child];
-
-                    sum_over_child_states += pr_same * child_partial;
-                        
-                        // child state subloop 1
-                    s_child = 1;
-                    child_partial = child_partial_array[pxnstates + s_child;
-
-                    sum_over_child_states += pr_diff * child_partial;
-
-                        
-                        // child state subloop 2
-                    s_child = 2;
-                    child_partial = child_partial_array[pxnstates + s_child];
-
-                    sum_over_child_states += pr_diff * child_partial;
-                        
-                        // child state subloop 3
-                    s_child = 3;
-                    child_partial = child_partial_array[pxnstates + s_child];
-
-                    sum_over_child_states += pr_diff * child_partial;
-
-                    parent_partial_array[pxnstates + s] *= sum_over_child_states;
+                    unsigned start = npartials_used;
+                    unsigned pxnstates = start;
                     
-                    s = 1;
-                    sum_over_child_states = 0.0;
+#if defined (UNROLL_LOOPS)
+                // unroll parent loop
+                assert (G::_nstates == 4);
+                unsigned s = 0;
+                double sum_over_child_states = 0.0;
+
                     // child state subloop 0
-                    s_child = 0;
-                    child_partial = child_partial_array[pxnstates + s_child];
+                unsigned s_child = 0;
+                double child_partial = child_partial_array[pxnstates + s_child];
 
-                    sum_over_child_states += pr_diff * child_partial;
-                        
-                        // child state subloop 1
-                    s_child = 1;
-                    child_partial = child_partial_array[pxnstates + s_child];
+                sum_over_child_states += pr_same * child_partial;
 
-                    sum_over_child_states += pr_same * child_partial;
-                        
-                        // child state subloop 2
-                    s_child = 2;
-                    child_partial = child_partial_array[pxnstates + s_child];
+                    // child state subloop 1
+                s_child = 1;
+                child_partial = child_partial_array[pxnstates + s_child];
 
-                    sum_over_child_states += pr_diff * child_partial;
-                        
-                        // child state subloop 3
-                    s_child = 3;
-                    child_partial = child_partial_array[pxnstates + s_child];
+                sum_over_child_states += pr_diff * child_partial;
 
-                    sum_over_child_states += pr_diff * child_partial;
 
-                    parent_partial_array[pxnstates + s] *= sum_over_child_states;
-                    
-                    s = 2;
-                    sum_over_child_states = 0.0;
-                    // child state subloop 0
-                    s_child = 0;
-                    child_partial = child_partial_array[pxnstates + s_child];
+                    // child state subloop 2
+                s_child = 2;
+                child_partial = child_partial_array[pxnstates + s_child];
 
-                    sum_over_child_states += pr_diff * child_partial;
-                        
-                        // child state subloop 1
-                    s_child = 1;
-                    child_partial = child_partial_array[pxnstates + s_child];
+                sum_over_child_states += pr_diff * child_partial;
 
-                    sum_over_child_states += pr_diff * child_partial;
-                        
-                        // child state subloop 2
-                    s_child = 2;
-                    child_partial = child_partial_array[pxnstates + s_child];
+                    // child state subloop 3
+                s_child = 3;
+                child_partial = child_partial_array[pxnstates + s_child];
 
-                    sum_over_child_states += pr_same * child_partial;
-                    
-                        // child state subloop 3
-                    s_child = 3;
-                    child_partial = child_partial_array[pxnstates + s_child];
+                sum_over_child_states += pr_diff * child_partial;
 
-                    sum_over_child_states += pr_diff * child_partial;
+                parent_partial_array[pxnstates + s] *= sum_over_child_states;
 
-                    parent_partial_array[pxnstates + s + step] *= sum_over_child_states;
-                    
-                    s = 3;
-                    sum_over_child_states = 0.0;
-                    // child state subloop 0
-                    s_child = 0;
-                    child_partial = child_partial_array[pxnstates + s_child];
+                s = 1;
+                sum_over_child_states = 0.0;
+                // child state subloop 0
+                s_child = 0;
+                child_partial = child_partial_array[pxnstates + s_child];
 
-                    sum_over_child_states += pr_diff * child_partial;
-                        
-                        // child state subloop 1
-                    s_child = 1;
-                    child_partial = child_partial_array[pxnstates + s_child];
+                sum_over_child_states += pr_diff * child_partial;
 
-                    sum_over_child_states += pr_diff * child_partial;
-                        
-                        // child state subloop 2
-                    s_child = 2;
-                    child_partial = child_partial_array[pxnstates + s_child];
+                    // child state subloop 1
+                s_child = 1;
+                child_partial = child_partial_array[pxnstates + s_child];
 
-                    sum_over_child_states += pr_diff * child_partial;
-                        
-                        // child state subloop 3
-                    s_child = 3;
-                    child_partial = child_partial_array[pxnstates + s_child];
+                sum_over_child_states += pr_same * child_partial;
 
-                    sum_over_child_states += pr_same * child_partial;
+                    // child state subloop 2
+                s_child = 2;
+                child_partial = child_partial_array[pxnstates + s_child];
 
-                    parent_partial_array[pxnstates + s] *= sum_over_child_states;
-    #else
+                sum_over_child_states += pr_diff * child_partial;
+
+                    // child state subloop 3
+                s_child = 3;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+
+                parent_partial_array[pxnstates + s] *= sum_over_child_states;
+
+                s = 2;
+                sum_over_child_states = 0.0;
+                // child state subloop 0
+                s_child = 0;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+
+                    // child state subloop 1
+                s_child = 1;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+
+                    // child state subloop 2
+                s_child = 2;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_same * child_partial;
+
+                    // child state subloop 3
+                s_child = 3;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+
+                parent_partial_array[pxnstates + s] *= sum_over_child_states;
+
+                s = 3;
+                sum_over_child_states = 0.0;
+                // child state subloop 0
+                s_child = 0;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+
+                    // child state subloop 1
+                s_child = 1;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+
+                    // child state subloop 2
+                s_child = 2;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_diff * child_partial;
+
+                    // child state subloop 3
+                s_child = 3;
+                child_partial = child_partial_array[pxnstates + s_child];
+
+                sum_over_child_states += pr_same * child_partial;
+
+                parent_partial_array[pxnstates + s] *= sum_over_child_states;
+#else
                     for (unsigned s = 0; s < G::_nstates; s++) {
                         double sum_over_child_states = 0.0;
                         for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
@@ -972,97 +971,94 @@ class Forest {
                                                     
                             sum_over_child_states += child_transition_prob * child_partial;
                         }   // child state loop
-                        
                         parent_partial_array[pxnstates + s] *= sum_over_child_states;
                     }   // parent state loop
-    #endif
+#endif
                 }   // pattern loop
                 npartials_used += G::_nstates; // this is the total number of partial steps the step took up
             }
-            }
+        }
 
-            // Compute the ratio of after to before likelihoods
-            //TODO: make more efficient
-            double prev_loglike = 0.0;
-            double curr_loglike = 0.0;
-            auto & newnd_partial_array = new_nd->_partial->_v;
-            auto & lchild_partial_array = lchild->_partial->_v;
-            auto & rchild_partial_array = rchild->_partial->_v;
+        // Compute the ratio of after to before likelihoods
+        //TODO: make more efficient
+        double prev_loglike = 0.0;
+        double curr_loglike = 0.0;
+        auto & newnd_partial_array = new_nd->_partial->_v;
+        auto & lchild_partial_array = lchild->_partial->_v;
+        auto & rchild_partial_array = rchild->_partial->_v;
                                                         
-            npartials_used = 0;
-            for (unsigned p = 0; p < npatterns; p++) {
-               vector<double> prev_log_likelihoods_for_step(G::_gamma_rate_cat.size());
-               vector<double> log_likelihoods_for_step(G::_gamma_rate_cat.size());
-               unsigned pp = first_pattern + p; // TODO: or just first_pattern?
+        npartials_used = 0;
+        for (unsigned p = 0; p < npatterns; p++) {
+            vector<double> prev_log_likelihoods_for_step(G::_gamma_rate_cat.size());
+            vector<double> log_likelihoods_for_step(G::_gamma_rate_cat.size());
+            unsigned pp = first_pattern + p;
 
-                for (unsigned step = 0; step < G::_gamma_rate_cat.size(); step++) {
-                unsigned start = npartials_used;
-                 unsigned pxnstates = npartials_used;
-                                             
-                                                        
+            for (unsigned step = 0; step < G::_gamma_rate_cat.size(); step++) {
+                unsigned pxnstates = npartials_used;
+                
                 double left_sitelike = 0.0;
                 double right_sitelike = 0.0;
                 double newnd_sitelike = 0.0;
-    #if defined (UNROLL_LOOPS)
-                // loop 0
-                unsigned s = 0;
-                left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
-                right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
-                newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
                 
-                // loop 1
-                s = 1;
-                left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
-                right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
-                newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
-                
-                // loop 2
-                s = 2;
-                left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
-                right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
-                newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
-                
-                // loop 3
-                s = 3;
-                left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
-                right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
-                newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
+#if defined (UNROLL_LOOPS)
+            // loop 0
+            unsigned s = 0;
+            left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
+            right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
+            newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
 
-    #else
+            // loop 1
+            s = 1;
+            left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
+            right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
+            newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
+
+            // loop 2
+            s = 2;
+            left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
+            right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
+            newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
+
+            // loop 3
+            s = 3;
+            left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
+            right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
+            newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
+
+#else
                 for (unsigned s = 0; s < G::_nstates; s++) {
                     left_sitelike += 0.25*lchild_partial_array[pxnstates + s];
                     right_sitelike += 0.25*rchild_partial_array[pxnstates + s];
                     newnd_sitelike += 0.25*newnd_partial_array[pxnstates + s];
                 }
-    #endif
-            prev_log_likelihoods_for_step[step] += log(left_sitelike);
-            prev_log_likelihoods_for_step[step] += log(right_sitelike);
-            log_likelihoods_for_step[step] += log(newnd_sitelike);
-                                                        
-            npartials_used += G::_nstates;
-
+#endif
+                prev_log_likelihoods_for_step[step] += log(left_sitelike);
+                prev_log_likelihoods_for_step[step] += log(right_sitelike);
+                log_likelihoods_for_step[step] += log(newnd_sitelike);
+                
+                npartials_used += G::_nstates;
             }
-                                                        
-           // calculate log sum over all rate categories for the site
-           if (G::_plus_G) {
-            assert (log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
-              assert (prev_log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
-              double curr_sum = (getRunningSumChoices(log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
-              double prev_sum = (getRunningSumChoices(prev_log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
-             _gene_tree_log_likelihood += curr_sum;
-               weight += curr_sum - prev_sum;
+                                                    
+            // calculate log sum over all rate categories for the site
+            if (G::_plus_G) {
+                assert (log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
+                assert (prev_log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
+                double curr_sum = (getRunningSumChoices(log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
+                double prev_sum = (getRunningSumChoices(prev_log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
+                _gene_tree_log_likelihood += curr_sum;
+                weight += curr_sum - prev_sum;
             }
             else {
-              assert (log_likelihoods_for_step.size() == 1);
-              assert (prev_log_likelihoods_for_step.size() == 1);
-              double curr_sum = log_likelihoods_for_step[0] * counts[pp];
-              double prev_sum = prev_log_likelihoods_for_step[0] * counts[pp];
-              _gene_tree_log_likelihood += curr_sum;
-               weight += curr_sum - prev_sum;
+                assert (log_likelihoods_for_step.size() == 1);
+                assert (prev_log_likelihoods_for_step.size() == 1);
+                double curr_sum = log_likelihoods_for_step[0] * counts[pp];
+                double prev_sum = prev_log_likelihoods_for_step[0] * counts[pp];
+                _gene_tree_log_likelihood += curr_sum;
+                weight += curr_sum - prev_sum;
             }
-          }
+        }
       return weight;
-      }
+  }
 
     inline double Forest::calcPartialArrayHKY(Node * new_nd, const Node * lchild, const Node * rchild) const {
         // Computes the partial array for new_nd and returns the difference in
@@ -1211,7 +1207,7 @@ class Forest {
         //  betat = v/[2*( (A + G)(C + T) + kappa*(AG + CT) )]
 //        double kappa = 1.0;
         double kappa = _kappa;
-        double betat = 0.5*relative_rate*edge_length/((pi[0] + pi[2])*(pi[1] + pi[3]) + kappa*(pi[0]*pi[2] + pi[1]*pi[3]));
+        double betat = 0.5*relative_rate * edge_length/((pi[0] + pi[2])*(pi[1] + pi[3]) + kappa*(pi[0]*pi[2] + pi[1]*pi[3]));
         
         if (is_transition) {
             double pi_j = pi[to];
@@ -2275,6 +2271,12 @@ class Forest {
             sequences[ndnum][i] = multinomialDraw(lot, basefreq);
         }
         
+        vector<double> site_rates(nsites);
+        for (unsigned i=0; i<nsites; i++) {
+            double u_cat = lot->randint(0, G::_gamma_rate_cat.size() - 1);
+            site_rates[i] = G::_gamma_rate_cat[u_cat];
+        }
+        
         nd = findNextPreorder(nd);
         while (nd) {
             ndnum = nd->_number;
@@ -2304,18 +2306,17 @@ class Forest {
             // Evolve nd's sequence given parent's sequence and edge length
             for (unsigned i = 0; i < nsites; i++) {
                 // Choose relative rate for this site
-                double site_relrate = 1.0;
-                if (Forest::_asrv_shape != G::_infinity)
-                    site_relrate = lot->gamma(Forest::_asrv_shape, 1.0/Forest::_asrv_shape);
+                double site_relrate = site_rates[i];
                 unsigned from_state = sequences[parnum][i];
                 double cum_prob = 0.0;
                 double u = lot->uniform();
+                                                        
                 for (unsigned to_state = 0; to_state < 4; to_state++) {
-                    cum_prob += calcSimTransitionProbability(from_state, to_state, basefreq, site_relrate*edge_relrate*nd->_edge_length);
-                    if (u < cum_prob) {
-                        sequences[ndnum][i] = to_state;
-                        break;
-                    }
+                        cum_prob += calcSimTransitionProbability(from_state, to_state, basefreq, site_relrate*edge_relrate*nd->_edge_length);
+                        if (u < cum_prob) {
+                            sequences[ndnum][i] = to_state;
+                            break;
+                        }
                 }
                 assert(sequences[ndnum][i] < 4);
             }
@@ -3369,20 +3370,6 @@ class Forest {
         return next;
     }
 
-    inline Node * Forest::getMostRecentAncestor() {
-        assert(_lineages.size() == 1); // assumes forest is a complete tree
-        assert(_preorders[0].size() > 0); // TODO: need to make sure _preorders has been created
-        Node * anc = nullptr;
-        for (auto nd : boost::adaptors::reverse(_preorders[0])) {
-            if (nd->_left_child) {
-                anc = nd;
-                break;
-            }
-        }
-        assert(anc);
-        return anc;
-    }
-
     inline void Forest::refreshAllPreorders() const {
         // For each subtree stored in _lineages, create a vector of node pointers in preorder sequence
         _preorders.clear();
@@ -3481,7 +3468,7 @@ class Forest {
                 species_in_existence.push_back(nd->_species);
             }
         return (unsigned) species_in_existence.size();
-        }
+    }
 
     inline void Forest::debugCheckBleedingEdge(string msg, double anc_height) const {
         // Find maximum height of all nodes in _lineages vector
@@ -3566,7 +3553,6 @@ class Forest {
             else {
                 // set bit corresponding to this leaf node's number
                 nd->_split.setBitAt(names_and_bits[nd->_name[0]]);
-//                nd->_split.setBitAt(nd->_number);
                 leaf_splits.insert(nd->_split);
             }
 

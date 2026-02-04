@@ -140,7 +140,6 @@ class Particle {
         vector<double>                                  getThetaVector();
         double                                          getPopMean();
         void                                            setPsuffix(unsigned psuffix) {_psuffix = psuffix;}
-        double                                          calcInitialCoalescentLikelihood();
         void                                            processGeneNewicks(vector<string> newicks);
         void                                            processSpeciesNewick(string newick_string);
         string                                          getTranslateBlock();
@@ -167,9 +166,6 @@ class Particle {
             void                                        finalizeLatestJoin(int locus, unsigned index, map<const void *, list<unsigned> > & nonzero_map);
             void                                        finalizeLatestJoinMCMC(int locus, unsigned index);
             void                                        resetGeneForests(bool compute_partials);
-            void                                        threadComputePartials(unsigned first, unsigned last);
-            void                                        resetAllPrevLogLikelihood();
-            void                                        rebuildCoalInfo();
             void                                        buildEnsembleCoalInfo();
             unsigned                                    getPartialCount();
             double                                      calcBHVDistance();
@@ -318,7 +314,8 @@ class Particle {
             return _gene_forest_ptrs[locus]->calcLogLikelihood();
         }
         else {
-            return _prev_log_likelihoods[locus] + _gene_forest_extensions[locus].getLogWeight();
+            return _gene_forest_ptrs[locus]->_gene_tree_log_likelihood;
+//            return _prev_log_likelihoods[locus] + _gene_forest_extensions[locus].getLogWeight();
         }
     }
 
@@ -1765,26 +1762,6 @@ class Particle {
             }
         }
     }
-
-    inline void Particle::resetAllPrevLogLikelihood() {
-        for (unsigned g = 0; g < G::_nloci; g++) {
-            _prev_log_likelihoods[g] = _gene_forest_ptrs[g]->getLogLikelihood();
-        }
-    }
-
-    inline void Particle::rebuildCoalInfo() {
-        // Rebuild coal info vectors, stripping effect of previous species tree
-        for (auto gfp : _gene_forest_ptrs) {
-            // Each gene forest's _coalinfo vector stores a tuple for each internal node:
-            // <1> height
-            // <2> gene_index + 1
-            // <3> left child species
-            // <4> right child species
-            gfp->buildCoalInfoVect();
-        }
-        _species_forest.buildCoalInfoVect();
-    }
-        
         inline void Particle::proposeMCMCMove(bool last_round) {
             // _prev_t_by_gene represents species / gene forest before the coalescent event we are attemping to change
             // save a copy of it to reset _prev_t_by_gene for the next mcmc round

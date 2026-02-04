@@ -2809,6 +2809,49 @@ namespace proj {
         unsigned psuffix = 1;
         sim_vec[0].setSeed(rng.randint(1,9999) + psuffix);
         psuffix += 2;
+        
+        if (G::_plus_G) {
+            // alpha and beta are shape and scale, respectively
+            // mean = alpha * beta = 1.0
+            double rate_variance = G::_gamma_rate_var;
+            double alpha = 1 / G::_gamma_rate_var;
+            double beta = rate_variance;
+            double num_categ = 4.0; // TODO: fix this
+            double mean_rate_variable_sites = 1.0;
+            double equal_prob = 1 / num_categ;
+            
+            boost::math::gamma_distribution<> my_gamma(alpha, beta);
+            boost::math::gamma_distribution<> my_gamma_plus(alpha + 1.0, beta);
+
+              double cum_upper        = 0.0;
+              double cum_upper_plus   = 0.0;
+              double upper            = 0.0;
+              double cum_prob         = 0.0;
+              for (unsigned i = 1; i <= num_categ; ++i) {
+                  double cum_lower_plus       = cum_upper_plus;
+                  double cum_lower            = cum_upper;
+                  cum_prob                    += equal_prob;
+
+                  if (i < num_categ) {
+                      upper                   = boost::math::quantile(my_gamma, cum_prob);
+                      cum_upper_plus          = boost::math::cdf(my_gamma_plus, upper);
+                      cum_upper               = boost::math::cdf(my_gamma, upper);
+                  }
+                  else {
+                      cum_upper_plus          = 1.0;
+                      cum_upper               = 1.0;
+                  }
+
+                  double numer                = cum_upper_plus - cum_lower_plus;
+                  double denom                = cum_upper - cum_lower;
+                  double r_mean               = (denom > 0.0 ? (alpha*beta*numer/denom) : 0.0);
+                  G::_gamma_rate_cat.push_back(r_mean * mean_rate_variable_sites);
+//                  G::_gamma_rate_cat.push_back(1.0);
+              }
+        }
+        else {
+            G::_gamma_rate_cat.push_back(1.0);
+        }
 
         G::_run_on_empty = true;
         G::_proposal = "prior-prior";
