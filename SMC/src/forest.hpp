@@ -337,7 +337,7 @@ class Forest {
                     unsigned npartials_used = 0;
                     for (unsigned p=0; p<_npatterns; p++) {
                         for (unsigned step = 0; step < G::_gamma_rate_cat.size(); step++) {
-                            unsigned pp = 0 + p;
+                            unsigned pp = _first_pattern + p;
                             unsigned pxnstates = npartials_used;
                                 for (unsigned s=0; s<G::_nstates; s++) {
                                     Data::state_t state = (Data::state_t)1 << s;
