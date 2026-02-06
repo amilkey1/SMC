@@ -1319,89 +1319,31 @@ class Forest {
         auto &counts = _data->getPatternCounts();
         _gene_tree_log_likelihood = 0.0;
 
-        if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
-#if defined (UNROLL_LOOPS)
-            for (auto &nd:_lineages) {
-                double log_like = 0.0;
-                for (unsigned p=0; p<_npatterns; p++) {
-                    double site_like = 0.0;
-                    unsigned pxnstates = p*G::_nstates;
-                    
-                    // loop 1
-                    unsigned s = 0;
-                    double partial = (nd->_partial->_v)[pxnstates+s];
-                    site_like += 0.25*partial;
-                    
-                    // loop 2
-                    s = 1;
-                    partial = (nd->_partial->_v)[pxnstates+s];
-                    site_like += 0.25*partial;
-                    
-                    // loop 3
-                    s = 2;
-                    partial = (nd->_partial->_v)[pxnstates+s];
-                    site_like += 0.25*partial;
-                    
-                    // loop 4
-                    s = 3;
-                    partial = (nd->_partial->_v)[pxnstates+s];
-                    site_like += 0.25*partial;
-                
-                    
-                    assert(site_like>0);
-                    log_like += log(site_like)*counts[_first_pattern+p];
-                }
-
-                _gene_tree_log_likelihood += log_like;
-                
-    //            debugLogLikelihood(nd, log_like);
-            }
-    #else
-            for (auto &nd:_lineages) {
-                double log_like = 0.0;
-                for (unsigned p=0; p<_npatterns; p++) {
+        double log_n_rate_categ = log(G::_gamma_rate_cat.size());
+        for (auto &nd:_lineages) {
+            unsigned npartials_used = 0;
+            double log_like = 0.0;
+            for (unsigned p=0; p<_npatterns; p++) {
+                vector<double> site_likes;
+                for (unsigned step = 0; step < G::_gamma_rate_cat.size(); step++) {
                     double site_like = 0.0;
                     for (unsigned s=0; s<G::_nstates; s++) {
-                        double partial = (nd->_partial->_v)[p*G::_nstates+s];
-                        site_like += 0.25*partial;
+                        double partial = (nd->_partial->_v)[npartials_used + s];
+                        site_like += G::_base_frequencies[s]*partial;
                     }
-                    assert(site_like>0);
-                    log_like += log(site_like)*counts[_first_pattern+p];
+                    site_likes.push_back(site_like);
+                    npartials_used += G::_nstates;
                 }
-
-                _gene_tree_log_likelihood += log_like;
-                
-    //            debugLogLikelihood(nd, log_like);
+                assert (site_likes.size() == G::_gamma_rate_cat.size());
+                double sum = getRunningSumChoices(site_likes) - log_n_rate_categ;
+                assert (sum > 0.0);
+                double log_gamma_site_like = log(sum) * counts[_first_pattern + p];
+                log_like += log_gamma_site_like;
             }
-    #endif
-        }
-        else {
-            double log_n_rate_categ = log(G::_gamma_rate_cat.size());
-            for (auto &nd:_lineages) {
-                unsigned npartials_used = 0;
-                double log_like = 0.0;
-                for (unsigned p=0; p<_npatterns; p++) {
-                    vector<double> site_likes;
-                    for (unsigned step = 0; step < G::_gamma_rate_cat.size(); step++) {
-                        double site_like = 0.0;
-                        for (unsigned s=0; s<G::_nstates; s++) {
-                            double partial = (nd->_partial->_v)[npartials_used + s];
-                            site_like += G::_base_frequencies[s]*partial;
-                        }
-                        site_likes.push_back(site_like);
-                        npartials_used += G::_nstates;
-                    }
-                    assert (site_likes.size() == G::_gamma_rate_cat.size());
-                    double sum = getRunningSumChoices(site_likes) - log_n_rate_categ;
-                    assert (sum > 0.0);
-                    double log_gamma_site_like = log(sum) * counts[_first_pattern + p];
-                    log_like += log_gamma_site_like;
-                }
 
-                _gene_tree_log_likelihood += log_like;
+            _gene_tree_log_likelihood += log_like;
 
-    //            debugLogLikelihood(nd, log_like);
-            }
+//            debugLogLikelihood(nd, log_like);
         }
         return _gene_tree_log_likelihood;
     }
