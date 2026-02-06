@@ -3757,6 +3757,7 @@ namespace proj {
 
                                 double ess = -1;
                                 ess = filterParticles(g, my_vec, particle_indices, start, end);
+                                cout << _log_marginal_likelihood << endl;
                                 
                                 vector<double> weights_after_filtering(G::_nparticles);
                                 

@@ -18,7 +18,7 @@
 
 #define SYSTEMATIC_FILTERING
 
-//#define UNROLL_LOOPS
+//#define UNROLL_LOOPS // TODO: do not use
 
 //#define SPECIES_IN_CONF
 

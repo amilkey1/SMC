@@ -842,6 +842,8 @@ class Forest {
                     
                     double pr_same = calcTransitionProbabilityJC(0, 0, child->_edge_length + edgelen_extension, step);
                     double pr_diff = calcTransitionProbabilityJC(0, 1, child->_edge_length + edgelen_extension, step);
+                    
+                    // TODO: can calculate both pr_same and pr_diff for lchild and rchild before loop
 
                     unsigned start = npartials_used;
                     unsigned pxnstates = start;
@@ -1374,20 +1376,30 @@ class Forest {
     #endif
         }
         else {
+            double log_n_rate_categ = log(G::_gamma_rate_cat.size());
             for (auto &nd:_lineages) {
+                unsigned npartials_used = 0;
                 double log_like = 0.0;
                 for (unsigned p=0; p<_npatterns; p++) {
-                    double site_like = 0.0;
-                    for (unsigned s=0; s<G::_nstates; s++) {
-                        double partial = (nd->_partial->_v)[p*G::_nstates+s];
-                        site_like += G::_base_frequencies[s]*partial;
+                    vector<double> site_likes;
+                    for (unsigned step = 0; step < G::_gamma_rate_cat.size(); step++) {
+                        double site_like = 0.0;
+                        for (unsigned s=0; s<G::_nstates; s++) {
+                            double partial = (nd->_partial->_v)[npartials_used + s];
+                            site_like += G::_base_frequencies[s]*partial;
+                        }
+                        site_likes.push_back(site_like);
+                        npartials_used += G::_nstates;
                     }
-                    assert(site_like>0);
-                    log_like += log(site_like)*counts[_first_pattern+p];
+                    assert (site_likes.size() == G::_gamma_rate_cat.size());
+                    double sum = getRunningSumChoices(site_likes) - log_n_rate_categ;
+                    assert (sum > 0.0);
+                    double log_gamma_site_like = log(sum) * counts[_first_pattern + p];
+                    log_like += log_gamma_site_like;
                 }
 
                 _gene_tree_log_likelihood += log_like;
-                
+
     //            debugLogLikelihood(nd, log_like);
             }
         }
