@@ -1239,6 +1239,8 @@ namespace proj {
         ("sample_from_prior", boost::program_options::value(&G::_sample_from_prior)->default_value(false), "sample species trees from prior")
         ("nloci_slow_rate", boost::program_options::value(&G::_nloci_slow_rate)->default_value(0), "for simulations - number of loci to simulate at slower rate")
         ("plus_G", boost::program_options::value(&G::_plus_G)->default_value(false), "+G rate het")
+        ("plus_I", boost::program_options::value(&G::_plus_I)->default_value(false), "+I rate het")
+        ("pinvar", boost::program_options::value(&G::_pinvar)->default_value(0.0), "pinvar")
         ("gamma_rate_var", boost::program_options::value(&G::_gamma_rate_var)->default_value(1000), "alpha value for +G rate het")
 #if defined(SPECIES_IN_CONF)
         ("species", boost::program_options::value(&species_definitions), "a string defining a species, e.g. 'A:x,y,z' says that taxa x, y, and z are in species A")
@@ -2492,6 +2494,10 @@ namespace proj {
         assert (G::_nthreads > 0);
         
         if (G::_plus_G) {
+            double pinvar = 0.0;
+            if (G::_plus_I) {
+                pinvar = G::_pinvar;
+            }
             // alpha and beta are shape and scale, respectively
             // mean = alpha * beta = 1.0
             double rate_variance = G::_gamma_rate_var;
@@ -2499,6 +2505,9 @@ namespace proj {
             double beta = rate_variance;
             double num_categ = 4.0; // TODO: fix this
             double mean_rate_variable_sites = 1.0;
+            if (G::_plus_I) {
+                mean_rate_variable_sites /= (1.0 - G::_pinvar);
+            }
             double equal_prob = 1 / num_categ;
             
             boost::math::gamma_distribution<> my_gamma(alpha, beta);
@@ -2535,7 +2544,11 @@ namespace proj {
               }
         }
         else {
-            G::_gamma_rate_cat.push_back(1.0);
+            double mean_rate_variable_sites = 1.0;
+            if (G::_plus_I) {
+                mean_rate_variable_sites /= (1.0 - G::_pinvar);
+            }
+            G::_gamma_rate_cat.push_back(mean_rate_variable_sites);
         }
         
         bool partials = true;
@@ -2815,6 +2828,10 @@ namespace proj {
         psuffix += 2;
         
         if (G::_plus_G) {
+            double pinvar = 0.0;
+            if (G::_plus_I) {
+                pinvar = G::_pinvar;
+            }
             // alpha and beta are shape and scale, respectively
             // mean = alpha * beta = 1.0
             double rate_variance = G::_gamma_rate_var;
@@ -2822,6 +2839,9 @@ namespace proj {
             double beta = rate_variance;
             double num_categ = 4.0; // TODO: fix this
             double mean_rate_variable_sites = 1.0;
+            if (G::_plus_I) {
+                mean_rate_variable_sites /= (1.0 - G::_pinvar);
+            }
             double equal_prob = 1 / num_categ;
             
             boost::math::gamma_distribution<> my_gamma(alpha, beta);
@@ -2849,12 +2869,20 @@ namespace proj {
                   double numer                = cum_upper_plus - cum_lower_plus;
                   double denom                = cum_upper - cum_lower;
                   double r_mean               = (denom > 0.0 ? (alpha*beta*numer/denom) : 0.0);
-                  G::_gamma_rate_cat.push_back(r_mean * mean_rate_variable_sites);
+                  double mean = r_mean * mean_rate_variable_sites;
+                  if ((mean - 0) < 0.001) {
+                      mean = 0.001;
+                  }
+                  G::_gamma_rate_cat.push_back(mean);
 //                  G::_gamma_rate_cat.push_back(1.0);
               }
         }
         else {
-            G::_gamma_rate_cat.push_back(1.0);
+            double mean_rate_variable_sites = 1.0;
+            if (G::_plus_I) {
+                mean_rate_variable_sites /= (1.0 - G::_pinvar);
+            }
+            G::_gamma_rate_cat.push_back(mean_rate_variable_sites);
         }
 
         G::_run_on_empty = true;

@@ -103,6 +103,8 @@ unsigned    G::_nloci_slow_rate = 0;
 bool        G::_plus_G = false;
 double      G::_gamma_rate_var = 1000;
 vector<double>  G::_gamma_rate_cat;
+bool        G::_plus_I = false;
+double      G::_pinvar = 0.0;
 
 vector<vector<double> > G::_dmatrix;
 vector<Split>           G::_dmatrix_rows;

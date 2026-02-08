@@ -92,6 +92,8 @@ namespace proj {
         static bool                 _plus_G;
         static double               _gamma_rate_var;
         static vector<double>       _gamma_rate_cat;
+        static bool                 _plus_I;
+        static double               _pinvar;
         
         // other
         static vector<string>           _taxon_names;

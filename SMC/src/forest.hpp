@@ -797,6 +797,9 @@ class Forest {
         
         // Get pattern counts
         auto counts = _data->getPatternCounts();
+        
+        // get monomorphic sites
+        auto monomorphic = _data->getMonomorphic();
 
         // Get the first and last pattern index for this gene's data
         Data::begin_end_pair_t be = _data->getSubsetBeginEnd(_index - 1);
@@ -834,13 +837,24 @@ class Forest {
         
         _gene_tree_log_likelihood = 0.0;
             
+        vector<double> L_invar;
+        if (G::_plus_I) {
+            for (unsigned p=0; p<npatterns; p++) {
+                if (monomorphic[p] > 0) {
+                    L_invar.push_back(0.25); // TODO: fix for HKY
+                }
+                else {
+                    L_invar.push_back(0);
+                }
+            }
+        }
         for (unsigned p = 0; p < npatterns; p++) {
             for (unsigned step = 0; step < n_likelihood_calculations; step++) {
                 for (const Node * child : {lchild, rchild})  {
                     assert(child->_partial);
                     auto & child_partial_array = child->_partial->_v;
                     
-                    double pr_same = calcTransitionProbabilityJC(0, 0, child->_edge_length + edgelen_extension, step);
+                    double pr_same = calcTransitionProbabilityJC(0, 0, child->_edge_length + edgelen_extension, step); // TODO: make more efficient for pinvar
                     double pr_diff = calcTransitionProbabilityJC(0, 1, child->_edge_length + edgelen_extension, step);
                     
                     // TODO: can calculate both pr_same and pr_diff for lchild and rchild before loop
@@ -979,7 +993,7 @@ class Forest {
                 }   // pattern loop
                 npartials_used += G::_nstates; // this is the total number of partial steps the step took up
             }
-        }
+            }
 
         // Compute the ratio of after to before likelihoods
         //TODO: make more efficient
@@ -1045,16 +1059,54 @@ class Forest {
             if (G::_plus_G) {
                 assert (log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
                 assert (prev_log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
-                double curr_sum = (getRunningSumChoices(log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
-                double prev_sum = (getRunningSumChoices(prev_log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
+                double curr_sum = getRunningSumChoices(log_likelihoods_for_step) - log_n_rate_categ;
+                double prev_sum = getRunningSumChoices(prev_log_likelihoods_for_step) - log_n_rate_categ;
+                
+                if (G::_plus_I) {
+                    if (L_invar[p] == 0) {
+                        curr_sum += log(1 - G::_pinvar);
+                        prev_sum += log(1 - G::_pinvar);
+                    }
+                    else {
+                        double a = log(1.0 - G::_pinvar) + curr_sum;
+                        double b = log(G::_pinvar) + log(0.25);
+                        double c = log(1.0 - G::_pinvar) + prev_sum;
+                        
+                        double max_val_a = (a > b) ? a : b;
+                        double max_val_c = (c > b) ? c : b;
+                        curr_sum = max_val_a + log(exp(a - max_val_a) + exp(b - max_val_a));
+                        prev_sum = max_val_c + log(exp(a - max_val_c) + exp(b - max_val_c));
+                    }
+                }
+                curr_sum *= counts[pp];
+                prev_sum *= counts[pp];
+                
                 _gene_tree_log_likelihood += curr_sum;
                 weight += curr_sum - prev_sum;
             }
             else {
                 assert (log_likelihoods_for_step.size() == 1);
                 assert (prev_log_likelihoods_for_step.size() == 1);
-                double curr_sum = log_likelihoods_for_step[0] * counts[pp];
-                double prev_sum = prev_log_likelihoods_for_step[0] * counts[pp];
+                double curr_sum = log_likelihoods_for_step[0];
+                double prev_sum = prev_log_likelihoods_for_step[0];
+                if (G::_plus_I) {
+                    if (L_invar[p] == 0) {
+                        curr_sum = log_likelihoods_for_step[0] + log(1 - G::_pinvar);
+                        prev_sum = prev_log_likelihoods_for_step[0] + log(1 - G::_pinvar);
+                    }
+                    else {
+                        double a = log(1.0 - G::_pinvar) + log_likelihoods_for_step[0];
+                        double b = log(G::_pinvar) + log(0.25);
+                        double c = log(1.0 - G::_pinvar) + prev_log_likelihoods_for_step[0];
+                        
+                        double max_val_a = (a > b) ? a : b;
+                        double max_val_c = (c > b) ? c : b;
+                        curr_sum = max_val_a + log(exp(a - max_val_a) + exp(b - max_val_a));
+                        prev_sum = max_val_c + log(exp(a - max_val_c) + exp(b - max_val_c));
+                    }
+                }
+                curr_sum *= counts[pp];
+                prev_sum *= counts[pp];
                 _gene_tree_log_likelihood += curr_sum;
                 weight += curr_sum - prev_sum;
             }
@@ -2177,10 +2229,6 @@ class Forest {
     }
 
     inline void Forest::simulateData(Lot::SharedPtr lot, unsigned starting_site, unsigned nsites) {
-//        if (G::_model != "JC") {
-//            throw XProj("must use JC model for data simulations");
-//        }
-        
         // Create vector of states for each node in the tree
         unsigned nnodes = (unsigned)_nodes.size();
         vector< vector<unsigned> > sequences(nnodes);
@@ -2227,8 +2275,15 @@ class Forest {
         
         vector<double> site_rates(nsites);
         for (unsigned i=0; i<nsites; i++) {
-            double u_cat = lot->randint(0, G::_gamma_rate_cat.size() - 1);
-            site_rates[i] = G::_gamma_rate_cat[u_cat];
+            // select if site is variable or not
+            if (lot->uniform() < G::_pinvar) {
+                // Invariant site: set rate to 0.0
+                site_rates[i] = 0.0;
+            } else {
+                // Variable site: draw from Gamma categorie
+                unsigned u_cat = lot->randint(0, G::_gamma_rate_cat.size() - 1);
+                site_rates[i] = G::_gamma_rate_cat[u_cat];
+            }
         }
         
         nd = findNextPreorder(nd);
