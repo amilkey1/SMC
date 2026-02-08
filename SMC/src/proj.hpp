@@ -2526,7 +2526,11 @@ namespace proj {
                   double numer                = cum_upper_plus - cum_lower_plus;
                   double denom                = cum_upper - cum_lower;
                   double r_mean               = (denom > 0.0 ? (alpha*beta*numer/denom) : 0.0);
-                  G::_gamma_rate_cat.push_back(r_mean * mean_rate_variable_sites);
+                  double mean = r_mean * mean_rate_variable_sites;
+                  if ((mean - 0) < 0.001) {
+                      mean = 0.001;
+                  }
+                  G::_gamma_rate_cat.push_back(mean);
 //                  G::_gamma_rate_cat.push_back(1.0);
               }
         }
