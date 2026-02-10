@@ -4166,6 +4166,16 @@ namespace proj {
                                 heightf << mean << endl;
                             }
                         }
+                        if (G::_hpd_first_level_species || G::_ruv_first_level_species) {
+                            // write mean gene tree heights to output file for validation
+                            for (unsigned l=0; l<G::_nloci; l++) {
+                                double sum = accumulate(_species_tree_heights_after_first_round.begin(), _species_tree_heights_after_first_round.end(), 0.0);
+                                double mean = sum / _species_tree_heights_after_first_round.size();
+                                
+                                ofstream heightf("average_species_tree_height_after_first_round" + to_string(l+1) + ".txt");
+                                heightf << mean << endl;
+                            }
+                        }
                     }
 
                     else {
