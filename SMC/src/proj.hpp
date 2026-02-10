@@ -134,8 +134,11 @@ namespace proj {
     
             vector<pair<double, bool>>  _ranks;
             vector<vector<pair<double, bool>>> _gene_tree_ranks;
+            vector<pair<double, bool>> _species_tree_ranks_after_first_round;
+            vector<double>              _species_tree_heights_after_first_round;
             vector<pair<double, double>> _hpd_values;
             vector<vector<pair<double, double>>> _hpd_values_genes;
+            vector<pair<double, double>>              _hpd_first_level_values;
             vector<double>              _species_tree_heights;
             vector<vector<double>>      _gene_tree_heights;
             vector<double>              _bhv_distances;
@@ -474,8 +477,9 @@ namespace proj {
             vector<double> gene_tree_heights;
             gene_tree_heights = p.getGeneTreeHeights();
             
+            double species_tree_height_after_first_round = p.getSpeciesTreeHeightAfterFirstRound();
+            
             if (G::_ruv || G::_hpd) {
-                
                 for (unsigned i=0; i<G::_nloci; i++) {
                     ofstream heightf;
                     string filename = "gene_tree_heights" + to_string(i+1) + ".txt";
@@ -489,6 +493,18 @@ namespace proj {
                     _gene_tree_ranks[l].push_back(make_pair(gene_tree_heights[l], false));
                     _gene_tree_heights[l].push_back(gene_tree_heights[l]);
                 }
+            }
+            
+            if (G::_ruv_first_level_species) {
+                _species_tree_ranks_after_first_round.push_back(make_pair(species_tree_height_after_first_round, false));
+                _species_tree_heights_after_first_round.push_back(species_tree_height_after_first_round);
+            }
+            
+            if (G::_hpd_first_level_species) {
+                ofstream heightf;
+                string filename = "species_tree_heights_after_first_round.txt";
+                heightf.open(filename, std::ios::app);
+                heightf << species_tree_height_after_first_round << endl;
             }
             
             if (G::_bhv_reference != "" || G::_bhv_reference_path != ".") {
@@ -521,6 +537,10 @@ namespace proj {
                 for (unsigned l=0; l<G::_nloci; l++) {
                     _hpd_values_genes[l].push_back(make_pair(log_posterior, gene_tree_heights[l]));
                 }
+            }
+            
+            if (G::_hpd_first_level_species) {
+                _hpd_first_level_values.push_back(make_pair(log_posterior, species_tree_height_after_first_round));
             }
             // no vector prior under Jones method
 
@@ -1231,6 +1251,8 @@ namespace proj {
         ("n_mcmc_rounds", boost::program_options::value(&G::_n_mcmc_rounds)->default_value(1), "number of rounds to use for mcmc analysis")
         ("ruv", boost::program_options::value(&G::_ruv)->default_value(false), "calculate ranks for ruv")
         ("hpd", boost::program_options::value(&G::_hpd)->default_value(false), "calculate hpd intervals for coverage")
+        ("ruv_first_level_species", boost::program_options::value(&G::_ruv_first_level_species)->default_value(false), "calculate species tree ranks for ruv after first round") // TODO: also turn on second_level = false
+        ("hpd_first_level_species", boost::program_options::value(&G::_hpd_first_level_species)->default_value(false), "calculate hpd intervals for coverage after first level species filtering")
         ("bhv_reference", boost::program_options::value(&G::_bhv_reference)->default_value(""), "newick string to use for BHV distance reference")
         ("bhv_reference_path", boost::program_options::value(&G::_bhv_reference_path)->default_value("."), "path to use for BHV distance reference; can specify either bhv_reference or bhv_reference_path; bhv_reference string will take priority")
         ("write_species_tree_file", boost::program_options::value(&G::_write_species_tree_file)->default_value(true), "set to false to not write species tree newicks to a file - only use this option to turn on for RUV calculations when lots of trees will be saved")
@@ -4014,6 +4036,32 @@ namespace proj {
                                 rankf << "rank: " << index_value << endl;
                             }
                         }
+                        if (G::_ruv_first_level_species) {
+                            assert (_species_tree_ranks_after_first_round.size() > 0);
+                            string sim_file_name;
+                            assert(G::_newick_path != "");
+                            sim_file_name = G::_newick_path + "/" + "true_species_tree_height.txt";
+                            string line;
+                            string height_as_string;
+                            ifstream infile(sim_file_name);
+                            while (getline(infile, line)) {
+                                height_as_string = line;
+                            }
+                            double true_species_tree_height = 0.0;
+                            assert (height_as_string != "");
+                            true_species_tree_height = std::stod(height_as_string);
+                            _species_tree_ranks_after_first_round.push_back(make_pair(true_species_tree_height, true));
+                            // sort ranks
+                            std::sort(_species_tree_ranks_after_first_round.begin(), _species_tree_ranks_after_first_round.end());
+                            
+                            // find rank of truth
+                            auto it = std::find_if(_species_tree_ranks_after_first_round.begin(), _species_tree_ranks_after_first_round.end(), [&](const pair<double, bool>& p) { return p.second == true;});
+                            unsigned index_value = (unsigned) std::distance(_species_tree_ranks_after_first_round.begin(), it);
+                            
+                            // write rank value to file
+                            ofstream rankf("rank_species_tree_height_after_first_round.txt");
+                            rankf << "rank: " << index_value << endl;
+                        }
                         if (G::_bhv_reference != "" || G::_bhv_reference_path != ".") {
                             assert (_bhv_distances_genes.size() > 0);
                             for (unsigned l=0; l<G::_nloci; l++) {
@@ -4077,6 +4125,36 @@ namespace proj {
                                  hpdf << min << "\t" << max << endl;
                             }
                          }
+                        
+                        if (G::_hpd_first_level_species) {
+                            ofstream hpdf("hpd_first_level_species.txt");
+                            hpdf << "min    " << "max " << endl;
+                            
+                            // sort hpd values largest to smallest
+                            std::sort(_hpd_first_level_values.begin(), _hpd_first_level_values.end());
+                            std::reverse(_hpd_first_level_values.begin(), _hpd_first_level_values.end());
+                            
+                            // take first 95% of values (round down to nearest integer)
+                            double total = size(_hpd_first_level_values);
+                            double ninety_five_index = floor(0.95*total);
+                            
+                            if (ninety_five_index == 0) {
+                                ninety_five_index = 1;
+                            }
+                            
+                            vector<double> hpd_values_in_range;
+                            
+                            for (unsigned h=0; h<ninety_five_index; h++) {
+                                hpd_values_in_range.push_back(_hpd_first_level_values[h].second);
+                            }
+                            
+                            auto max = *std::max_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                            auto min = *std::min_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                            assert (min < max || min == max);
+                            
+                            // write min and max to file
+                            hpdf << min << "\t" << max << endl;
+                        }
                         
                         if (G::_hpd || G::_ruv) {
                             // write mean gene tree heights to output file for validation

@@ -81,7 +81,9 @@ namespace proj {
         static unsigned             _nmcmc_moves_accepted;
         static unsigned             _n_mcmc_rounds;
         static bool                 _ruv;
+        static bool                 _ruv_first_level_species;
         static bool                 _hpd;
+        static bool                 _hpd_first_level_species;
         static string               _bhv_reference;
         static string               _bhv_reference_path;
         static bool                 _write_species_tree_file;

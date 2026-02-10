@@ -122,6 +122,7 @@ class Particle {
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
         double                                          getSpeciesTreeHeight();
         double                                          getSpeciesTreeLength();
+        double                                          getSpeciesTreeHeightAfterFirstRound(){return _species_forest._forest_height;}
         vector<double>                                  getGeneTreeHeights();
         vector<double>                                  getGeneTreeLengths();
         void                                            calcGeneTreeLengths();

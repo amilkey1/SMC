@@ -88,6 +88,8 @@ unsigned    G::_nmcmc_moves_accepted = 0;
 unsigned    G::_n_mcmc_rounds;
 bool        G::_ruv = true;
 bool        G::_hpd = true;
+bool        G::_ruv_first_level_species = false;
+bool        G::_hpd_first_level_species = false;
 
 map<string, unsigned>    G::_taxon_to_species;
 unsigned    G::_nstates = 4;

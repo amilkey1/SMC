@@ -841,7 +841,7 @@ class Forest {
         if (G::_plus_I) {
             for (unsigned p=0; p<npatterns; p++) {
                 if (monomorphic[p] > 0) {
-                    L_invar.push_back(0.25); // TODO: fix for HKY
+                    L_invar.push_back(0.25);
                 }
                 else {
                     L_invar.push_back(0);
