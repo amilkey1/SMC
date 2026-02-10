@@ -1075,7 +1075,7 @@ class Forest {
                         double max_val_a = (a > b) ? a : b;
                         double max_val_c = (c > b) ? c : b;
                         curr_sum = max_val_a + log(exp(a - max_val_a) + exp(b - max_val_a));
-                        prev_sum = max_val_c + log(exp(a - max_val_c) + exp(b - max_val_c));
+                        prev_sum = max_val_c + log(exp(c - max_val_c) + exp(b - max_val_c));
                     }
                 }
                 curr_sum *= counts[pp];
@@ -1102,7 +1102,7 @@ class Forest {
                         double max_val_a = (a > b) ? a : b;
                         double max_val_c = (c > b) ? c : b;
                         curr_sum = max_val_a + log(exp(a - max_val_a) + exp(b - max_val_a));
-                        prev_sum = max_val_c + log(exp(a - max_val_c) + exp(b - max_val_c));
+                        prev_sum = max_val_c + log(exp(c - max_val_c) + exp(b - max_val_c));
                     }
                 }
                 curr_sum *= counts[pp];
@@ -1273,7 +1273,7 @@ class Forest {
                              double max_val_a = (a > b) ? a : b;
                              double max_val_c = (c > b) ? c : b;
                              curr_sum = max_val_a + log(exp(a - max_val_a) + exp(b - max_val_a));
-                             prev_sum = max_val_c + log(exp(a - max_val_c) + exp(b - max_val_c));
+                             prev_sum = max_val_c + log(exp(c - max_val_c) + exp(b - max_val_c));
                          }
                      }
                      curr_sum *= counts[pp];
@@ -1301,7 +1301,7 @@ class Forest {
                              double max_val_a = (a > b) ? a : b;
                              double max_val_c = (c > b) ? c : b;
                              curr_sum = max_val_a + log(exp(a - max_val_a) + exp(b - max_val_a));
-                             prev_sum = max_val_c + log(exp(a - max_val_c) + exp(b - max_val_c));
+                             prev_sum = max_val_c + log(exp(c - max_val_c) + exp(b - max_val_c));
                          }
                      }
                      curr_sum *= counts[pp];
