@@ -479,14 +479,14 @@ namespace proj {
             
             double species_tree_height_after_first_round = p.getSpeciesTreeHeightAfterFirstRound();
             
-            if (G::_ruv || G::_hpd) {
-                for (unsigned i=0; i<G::_nloci; i++) {
-                    ofstream heightf;
-                    string filename = "gene_tree_heights" + to_string(i+1) + ".txt";
-                    heightf.open(filename, std::ios::app);
-                    heightf << gene_tree_heights[i] << endl;
-                }
-            }
+//            if (G::_ruv || G::_hpd) {
+//                for (unsigned i=0; i<G::_nloci; i++) {
+//                    ofstream heightf;
+//                    string filename = "gene_tree_heights" + to_string(i+1) + ".txt";
+//                    heightf.open(filename, std::ios::app);
+//                    heightf << gene_tree_heights[i] << endl;
+//                }
+//            }
             
             if (G::_ruv) {
                 for (unsigned l=0; l<G::_nloci; l++) {
@@ -500,12 +500,12 @@ namespace proj {
                 _species_tree_heights_after_first_round.push_back(species_tree_height_after_first_round);
             }
             
-            if (G::_hpd_first_level_species) {
-                ofstream heightf;
-                string filename = "species_tree_heights_after_first_round.txt";
-                heightf.open(filename, std::ios::app);
-                heightf << species_tree_height_after_first_round << endl;
-            }
+//            if (G::_hpd_first_level_species) {
+//                ofstream heightf;
+//                string filename = "species_tree_heights_after_first_round.txt";
+//                heightf.open(filename, std::ios::app);
+//                heightf << species_tree_height_after_first_round << endl;
+//            }
             
             if (G::_bhv_reference != "" || G::_bhv_reference_path != ".") {
                 if (G::_bhv_reference_path != ".") {
@@ -4081,7 +4081,7 @@ namespace proj {
                                 _bhv_distances_genes[l].push_back(true_bhv);
     //                             // sort distances
                                  std::sort(_bhv_distances_genes[l].begin(), _bhv_distances_genes[l].end());
-    //
+    
     //                             // find rank of truth
                                  auto it = std::find(_bhv_distances_genes[l].begin(), _bhv_distances_genes[l].end(), true_bhv);
                                  unsigned index_value = (unsigned) std::distance(_bhv_distances_genes[l].begin(), it);
@@ -4167,13 +4167,11 @@ namespace proj {
                         }
                         if (G::_hpd_first_level_species || G::_ruv_first_level_species) {
                             // write mean gene tree heights to output file for validation
-                            for (unsigned l=0; l<G::_nloci; l++) {
-                                double sum = accumulate(_species_tree_heights_after_first_round.begin(), _species_tree_heights_after_first_round.end(), 0.0);
-                                double mean = sum / _species_tree_heights_after_first_round.size();
-                                
-                                ofstream heightf("average_species_tree_height_after_first_round" + to_string(l+1) + ".txt");
-                                heightf << mean << endl;
-                            }
+                            double sum = accumulate(_species_tree_heights_after_first_round.begin(), _species_tree_heights_after_first_round.end(), 0.0);
+                            double mean = sum / _species_tree_heights_after_first_round.size();
+
+                            ofstream heightf("average_species_tree_height_after_first_round.txt");
+                            heightf << mean << endl;
                         }
                     }
 
