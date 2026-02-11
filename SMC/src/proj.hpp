@@ -3983,6 +3983,17 @@ namespace proj {
                     }
                     
                     if (!G::_second_level) {
+                        // remove 1 - thin % of particles
+                        double n_elements_to_remove = (1 - G::_thin) * my_vec.size();
+                        double n_elements_to_keep = my_vec.size() - n_elements_to_remove;
+                        
+                        // shuffle my_vec
+                        shuffle(my_vec.begin(), my_vec.end(), std::default_random_engine(_random_seed));
+                        
+                        // keep only n_elements_to_keep
+                        my_vec.resize(n_elements_to_keep);
+
+                        
                         for (unsigned i=0; i<G::_nloci; i++) {
                             ofstream heightf;
                             string filename = "gene_tree_heights" + to_string(i+1) + ".txt";

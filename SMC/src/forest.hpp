@@ -854,7 +854,7 @@ class Forest {
                     assert(child->_partial);
                     auto & child_partial_array = child->_partial->_v;
                     
-                    double pr_same = calcTransitionProbabilityJC(0, 0, child->_edge_length + edgelen_extension, step); // TODO: make more efficient for pinvar
+                    double pr_same = calcTransitionProbabilityJC(0, 0, child->_edge_length + edgelen_extension, step);
                     double pr_diff = calcTransitionProbabilityJC(0, 1, child->_edge_length + edgelen_extension, step);
                     
                     // TODO: can calculate both pr_same and pr_diff for lchild and rchild before loop
