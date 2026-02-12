@@ -114,6 +114,7 @@ class Particle {
         vector<pair<double, double>>                    getIncrementPriors(unsigned i);
         vector<pair<double, double>>                    getSpeciesTreeIncrementPriors();
         double                                          getCoalescentLikelihood(unsigned g);
+        double                                          getCoalescentLikelihoodSecondLevel();
         void                                            clear();
         void                                            drawTheta();
         void                                            fixTheta();
@@ -1026,8 +1027,13 @@ class Particle {
     }
 
     inline double Particle::getCoalescentLikelihood(unsigned g) {
+        // first level coalescent likelihood
         return _gene_forest_ptrs[g]->_log_coalescent_likelihood;
 //        return _log_coalescent_likelihood; // can't get coalescent likelihood separately for each gene tree // TODO: need to get coal like for first level
+    }
+
+    inline double Particle::getCoalescentLikelihoodSecondLevel() {
+        return _log_coalescent_likelihood;
     }
 
     inline void Particle::simulateData(vector<unsigned> sites_vector) {

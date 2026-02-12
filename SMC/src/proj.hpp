@@ -652,7 +652,7 @@ namespace proj {
             Particle p = v[_second_level_indices_to_keep[group_number][i]];
 //        for (auto &p:v) {
             double log_coalescent_likelihood = 0.0;
-            log_coalescent_likelihood += p.getCoalescentLikelihood(1);
+            log_coalescent_likelihood += p.getCoalescentLikelihoodSecondLevel();
 
             double vector_prior = 0.0;
 
