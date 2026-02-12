@@ -24,4 +24,4 @@
 
 //# define INFO_TEST
 
-# define BEST_GENE_TREES
+//# define BEST_GENE_TREES

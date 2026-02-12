@@ -523,7 +523,7 @@ namespace proj {
             double vector_prior = 0.0; // no vector prior with jones coalescent likelihood
 
             double log_coalescent_likelihood = 0.0;
-            for (unsigned g=1; g<G::_nloci+1; g++) {
+            for (unsigned g=0; g<G::_nloci; g++) {
                 log_coalescent_likelihood += p.getCoalescentLikelihood(g);
             }
 
