@@ -3044,6 +3044,29 @@ namespace proj {
             p.clearGeneForests();
         }
         
+# if defined BEST_GENE_TREES
+        vector<pair<unsigned, double>> particle_indices_and_posteriors;
+        // TODO: try saving only particles with highest posteriors
+        unsigned count = 0;
+        for (auto &p:particles) {
+            double log_coalescent_likelihood = 0.0;
+            for (unsigned g=1; g<G::_nloci+1; g++) {
+                log_coalescent_likelihood += p.getCoalescentLikelihood(g); // TODO: should this return 0 at this stage?
+            }
+            double log_likelihood = p.getLogLikelihood();;
+            double log_prior = p.getAllPriorsFirstRound();
+            
+            double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood;
+            particle_indices_and_posteriors.push_back(make_pair(count, log_posterior));
+            count++;
+        }
+        
+        // sort particle_indices_and_posteriors by posterior
+        std::sort(particle_indices_and_posteriors.begin(), particle_indices_and_posteriors.end(), [](const std::pair<unsigned, double>& a, const std::pair<unsigned, double>& b) {
+            return b.second < a.second; // Compare based on the second element
+        });
+#endif
+        
         _second_level_indices_to_keep.resize(ngroups);
         
         // TODO: trying multinomial resampling within each subgroup - this means thin will apply to each subgroup, not the entire thing
@@ -3051,6 +3074,15 @@ namespace proj {
         if (ngroups_within_subgroup == 0) {
             ngroups_within_subgroup = 1;
         }
+        
+# if defined (BEST_GENE_TREES)
+        // TODO: trying - just saving first (1 - thin)% of sorted particles
+        for (unsigned g = 0; g<G::_ngroups; g++) {
+            for (unsigned i = 0; i <ngroups_within_subgroup; i++) {
+                _particle_indices_to_thin.push_back(particle_indices_and_posteriors[i].first);
+            }
+        }
+#else
         for (unsigned g=0; g<G::_ngroups; g++) {
 //            for (unsigned i=0; i<ngroups; i++) {
             for (unsigned i=0; i<ngroups_within_subgroup; i++) {
@@ -3061,6 +3093,7 @@ namespace proj {
                 _particle_indices_to_thin.push_back(n); // TODO: if particle indices are shuffled, is this different?
             }
         }
+#endif
         
         assert (_second_level_indices_to_keep.size() == ngroups);
         

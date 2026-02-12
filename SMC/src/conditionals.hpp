@@ -23,3 +23,5 @@
 //#define SPECIES_IN_CONF
 
 //# define INFO_TEST
+
+# define BEST_GENE_TREES

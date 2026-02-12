@@ -602,11 +602,13 @@ class SpeciesForest {
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
             }
              
-#if !defined (HIERARCHICAL_FILTERING)
-            // lorad only works if all topologies the same - then don't include the prior on joins b/c it is fixed
-            double increment_prior = (log(rate)-_last_edge_length*rate);
-            _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior)); // do not include constrained factor in increment prior
-#endif
+//#if !defined (HIERARCHICAL_FILTERING)
+//            if (!G::_second_level) {
+                // lorad only works if all topologies the same - then don't include the prior on joins b/c it is fixed
+                double increment_prior = (log(rate)-_last_edge_length*rate);
+                _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior)); // do not include constrained factor in increment prior
+//            }
+//#endif
         }
         else {
             double rate = G::_lambda*_lineages.size();
@@ -618,12 +620,14 @@ class SpeciesForest {
                 nd->_edge_length += _last_edge_length; //add most recently chosen branch length to each species node
             }
 
-#if !defined (HIERARCHICAL_FILTERING)
-            double nChooseTwo = _lineages.size()*(_lineages.size() - 1);
-            double log_prob_join = log(2/nChooseTwo);
-            double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
-            _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior));
-#endif
+//#if !defined (HIERARCHICAL_FILTERING)
+//            if (!G::_second_level) {
+                double nChooseTwo = _lineages.size()*(_lineages.size() - 1);
+                double log_prob_join = log(2/nChooseTwo);
+                double increment_prior = (log(rate)-_last_edge_length*rate) + log_prob_join;
+                _increments_and_priors.push_back(make_pair(_last_edge_length, increment_prior));
+//            }
+//#endif
         }
         
         double constrained_factor = log(1 - exp(-1*nlineages*G::_lambda*max_depth));

@@ -1026,7 +1026,7 @@ class Particle {
     }
 
     inline double Particle::getCoalescentLikelihood(unsigned g) {
-        return _log_coalescent_likelihood; // can't get coalescent likelihood separately for each gene tree
+        return _log_coalescent_likelihood; // can't get coalescent likelihood separately for each gene tree // TODO: need to get coal like for first level
     }
 
     inline void Particle::simulateData(vector<unsigned> sites_vector) {
