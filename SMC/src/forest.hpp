@@ -174,6 +174,7 @@ class Forest {
         vector<pair<string, unsigned>>  _lineages_per_species;
         double                          _forest_height;
         double                          _forest_length;
+        double                          _log_coalescent_likelihood;
     
 #if defined (DEBUG_MODE)
         void                            showSpeciesJoined();
@@ -226,6 +227,7 @@ class Forest {
         _next_node_number = 0;
         
         _preorders.clear();
+        _log_coalescent_likelihood = 0.0;
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -1613,6 +1615,7 @@ class Forest {
             _comphet = other._comphet;
             _first_pattern      = other._first_pattern;
             _data               = other._data;
+            _log_coalescent_likelihood = other._log_coalescent_likelihood;
             
             _preorders.clear();
         }

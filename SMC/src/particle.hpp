@@ -575,7 +575,7 @@ class Particle {
                 unsigned index = selectEventLinearScale(event_choice_rates);
                 G::species_t species_name = rates_by_species[index].second;
                 
-                _gene_forest_extensions[next_gene-1].coalesce(total_rate, species_name);
+                _gene_forest_extensions[next_gene-1].coalesce(total_rate, species_name, _theta_map, true);
                 _total_particle_partials++;
                 
                     
@@ -1026,7 +1026,8 @@ class Particle {
     }
 
     inline double Particle::getCoalescentLikelihood(unsigned g) {
-        return _log_coalescent_likelihood; // can't get coalescent likelihood separately for each gene tree // TODO: need to get coal like for first level
+        return _gene_forest_ptrs[g]->_log_coalescent_likelihood;
+//        return _log_coalescent_likelihood; // can't get coalescent likelihood separately for each gene tree // TODO: need to get coal like for first level
     }
 
     inline void Particle::simulateData(vector<unsigned> sites_vector) {
@@ -1111,6 +1112,9 @@ class Particle {
 //        _t_by_gene.clear();
         _species_forest.refreshAllPreorders();
         _species_forest._log_joining_prob = 0.0;
+        for (auto &p:_gene_forest_ptrs) {
+            p->_log_coalescent_likelihood = 0.0;
+        }
     }
 
     inline void Particle::trimSpeciesTree() {
@@ -1912,7 +1916,8 @@ class Particle {
                     assert (rates_by_species.size() > 0);
                     G::species_t species_name = rates_by_species[index].second;
 
-                    new_gfx.coalesce(total_rate, species_name);
+                    new_gfx.coalesce(total_rate, species_name, _theta_map, false); // don't recalculate coal like
+                    
                     _total_particle_partials++;
 
                     if (species_increment > 0.0) { // otherwise, species tree is done and there is nothing left to update
@@ -2117,6 +2122,8 @@ class Particle {
         assert(incr > 0.0);
         
         gfp->addIncrAndJoin(incr, lsplit, rsplit, gfx);
+        
+        _gene_forest_ptrs[locus]->_log_coalescent_likelihood = gfx.getLogCoalescentLikelihood();
 
         // Can now get rid of extension
         _gene_forest_extensions[locus].undock();

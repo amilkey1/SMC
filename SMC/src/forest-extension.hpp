@@ -20,13 +20,14 @@ namespace proj {
             const Node *    getProposedAnc() const;
             const Node *    getProposedLChild() const;
             const Node *    getProposedRChild() const;
+            double          getLogCoalescentLikelihood() {return _log_coalescent_likelihood;}
             
             const G::merge_vect_t & getMergers() const;
             
             double          calcTotalRate(double theta);
             void            mergeSpecies(G::species_t left_spp, G::species_t right_spp);
             void            addIncrement(double increment);
-            void            coalesce(double total_rate, G::species_t species_name);
+            void            coalesce(double total_rate, G::species_t species_name, unordered_map<G::species_t, double> theta_map, bool calc_coal_like);
             void            debugCheckSpeciesVect() const;
             unsigned        getDeepCoal(tuple <G::species_t, G::species_t, G::species_t> species_joined);
             unsigned        getMaxDeepCoal(tuple <G::species_t, G::species_t, G::species_t> species_joined);
@@ -55,6 +56,7 @@ namespace proj {
             sppmap_t                      _species_partition;
             Lot::SharedPtr                _lot;
             vector<pair<G::species_t, unsigned>>  _lineages_per_species;
+            double                          _log_coalescent_likelihood;
     };
     
     inline ForestExtension::ForestExtension() {
@@ -240,7 +242,7 @@ namespace proj {
         return make_pair(t1, t2);
     }
 
-    inline void ForestExtension::coalesce(double total_rate, G::species_t species_name) {
+    inline void ForestExtension::coalesce(double total_rate, G::species_t species_name, unordered_map<G::species_t, double> theta_map, bool calc_coal_like) {
         _proposed_anc.setSpecies(species_name);
                     
         // Choose the two nodes to join
@@ -254,6 +256,45 @@ namespace proj {
         _proposed_anc._split.resize(G::_ntaxa);
         _proposed_anc._split += _proposed_lchild->_split;
         _proposed_anc._split += _proposed_rchild->_split;
+        
+        if (calc_coal_like) {
+            double lchild_stem_height = _proposed_lchild->_height + _proposed_lchild->_edge_length;
+            
+            // Calculate the edge length extension
+            double increment = _proposed_anc._height - lchild_stem_height;
+            
+            // increment extension may be slightly negative due to roundoff
+            assert(increment >= -G::_small_enough);
+            if (increment < 0.0) {
+                increment = 0.0;
+            }
+            
+            // TODO: after choosing species, calculate prior on increments
+            double population_coalescence_rate = 0.0;
+            for (auto &s:_species_partition) {
+                if (s.first == species_name) {
+        #if defined (DRAW_NEW_THETA)
+                        double population_theta = theta_map[s.first];
+                    population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
+        #else
+                    population_coalescence_rate = s.second.size()*(s.second.size()-1)/G::_theta;
+        #endif
+                    double nChooseTwo = (s.second.size())*(s.second.size()-1);
+                    double log_prob_join = log(2/nChooseTwo);
+                    
+                    _log_coalescent_likelihood += log(population_coalescence_rate) - (increment*population_coalescence_rate) + log_prob_join;
+                }
+                else {
+    #if defined (DRAW_NEW_THETA)
+                    double population_theta = theta_map[s.first];
+                population_coalescence_rate = s.second.size()*(s.second.size()-1)/population_theta;
+    #else
+                population_coalescence_rate = s.second.size()*(s.second.size()-1)/G::_theta;
+    #endif
+                    _log_coalescent_likelihood -= increment*population_coalescence_rate;
+                }
+            }
+        }
 
         if (G::_run_on_empty) {
             _log_weight = 0.0;

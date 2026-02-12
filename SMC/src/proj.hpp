@@ -3050,7 +3050,7 @@ namespace proj {
         unsigned count = 0;
         for (auto &p:particles) {
             double log_coalescent_likelihood = 0.0;
-            for (unsigned g=1; g<G::_nloci+1; g++) {
+            for (unsigned g=0; g<G::_nloci; g++) {
                 log_coalescent_likelihood += p.getCoalescentLikelihood(g); // TODO: should this return 0 at this stage?
             }
             double log_likelihood = p.getLogLikelihood();;
