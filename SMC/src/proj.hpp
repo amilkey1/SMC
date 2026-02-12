@@ -3077,9 +3077,11 @@ namespace proj {
         
 # if defined (BEST_GENE_TREES)
         // TODO: trying - just saving first (1 - thin)% of sorted particles
+        unsigned index = 0;
         for (unsigned g = 0; g<G::_ngroups; g++) {
             for (unsigned i = 0; i <ngroups_within_subgroup; i++) {
-                _particle_indices_to_thin.push_back(particle_indices_and_posteriors[i].first);
+                _particle_indices_to_thin.push_back(particle_indices_and_posteriors[index].first);
+                index++;
             }
         }
 #else
