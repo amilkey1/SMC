@@ -505,6 +505,39 @@ namespace proj {
         }
         const boost::format name_format( str(boost::format("    %%%ds ") % longest_taxon_name) );
         
+        if (ntax > 26) {
+            // alphabetize _taxon_names
+            // stable sort to maintain existing order of first letters
+            std::stable_sort(_taxon_names.begin(), _taxon_names.end(), [](const std::string& a, const std::string& b) {
+                size_t posA = a.find('^');
+                size_t posB = b.find('^');
+                
+                // Find position of '^' for both strings
+                std::string xA = a.substr(0, posA);
+                std::string yA = a.substr(posA + 1);
+                
+                std::string xB = b.substr(0, posB);
+                std::string yB = b.substr(posB + 1);
+
+                
+                // first sort by species name
+                  if (yA != yB) {
+                      return yA < yB;
+                  }
+                
+                // then sort by length of taxon name
+                // ex: 'z' comes before 'aa'
+                if (xA.length() != xB.length()) {
+                    return xA.length() < xB.length();
+                }
+
+              // then sort by taxon name
+              // ex: "a^A" comes before "b^A"
+                return xA < xB;
+            });
+
+        }
+        
         ofstream nexf(filename);
         
         nexf << "#NEXUS\n\n";
