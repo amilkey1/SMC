@@ -90,6 +90,7 @@ class Particle {
     
         void                                    drawNewTheta(G::species_t new_species);
         void                                    resetSubgroupPointers(vector<Forest::SharedPtr> gene_forest_copies);
+        void                                    resetSpeciesForestPointers(SpeciesForest species_forest_copy);
     
         void                                    proposeMCMCMove(bool last_round);
     
@@ -2216,6 +2217,14 @@ class Particle {
             // Let gpf point to the copy
             gfp = gfcpy;
         }
+    }
+
+    inline void Particle::resetSpeciesForestPointers(SpeciesForest species_forest_copy) {
+        SpeciesForest sfp = _species_forest;
+        SpeciesForest sfcpy = species_forest_copy;
+        
+        sfcpy = sfp;
+        _species_forest = species_forest_copy;
     }
         
     inline double Particle::calcBHVDistanceTrueTreeGene(string true_newick) {

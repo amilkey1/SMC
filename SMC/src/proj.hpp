@@ -1591,12 +1591,17 @@ namespace proj {
             unsigned size_before = (unsigned) current_gene_newicks.size();
             
             while (getline(infile, newick)) { // file newicks must start with the word "tree"
-                if (current_gene_newicks.size() < G::_nparticles) { // stop adding newicks once the number of particles has been reached // TODO: add option to randomize this?
+                if (current_gene_newicks.size() < G::_nparticles * G::_ngroups) { // stop adding newicks once the number of particles has been reached // TODO: add option to randomize this?
                 if (newick.find("tree") == 2) { // TODO: this only works if there are exactly 2 spaces before the newick - try starting at parenthesis
                         size_t pos = newick.find("("); //find location of parenthesis
                         newick.erase(0,pos); //delete everything prior to location found
                         current_gene_newicks.push_back(newick);
                     }
+                    else if (newick.find("tree") == 0) { // TODO: this only works if there are exactly 0 spaces before the newick - try starting at parenthesis
+                            size_t pos = newick.find("("); //find location of parenthesis
+                            newick.erase(0,pos); //delete everything prior to location found
+                            current_gene_newicks.push_back(newick);
+                        }
                 }
             }
             int size_after = (int) current_gene_newicks.size();
@@ -1641,6 +1646,15 @@ namespace proj {
         
         vector<Particle> my_vec;
         my_vec.resize(G::_nparticles * G::_ngroups, p);
+        
+        // reset pointers so particles have their own pointers
+        for (unsigned p=0; p<G::_nparticles * G::_ngroups; p++) {
+            vector<Forest::SharedPtr> gfcpies;
+            for (unsigned l=0; l<G::_nloci; l++) {
+                gfcpies.push_back(Forest::SharedPtr(new Forest()));
+            }
+            my_vec[p].resetSubgroupPointers(gfcpies);
+        }
 
         unsigned psuffix = 1;
         for (auto &p:my_vec) {
@@ -1660,10 +1674,6 @@ namespace proj {
             }
             assert (particle_newicks.size() == G::_nloci);
             p.processGeneNewicks(particle_newicks);
-//            p.resetSpecies();
-//            p.mapSpecies(_taxon_map, _species_names);
-            p.setNodeHeights();
-            // TODO: can do this with the original template particle?
             count++;
         }
 
@@ -3086,7 +3096,6 @@ namespace proj {
         }
 #else
         for (unsigned g=0; g<G::_ngroups; g++) {
-//            for (unsigned i=0; i<ngroups; i++) {
             for (unsigned i=0; i<ngroups_within_subgroup; i++) {
                 unsigned start = g*G::_nparticles;
                 unsigned end = start + (G::_nparticles) - 1;
@@ -3095,6 +3104,23 @@ namespace proj {
                 _particle_indices_to_thin.push_back(n); // TODO: if particle indices are shuffled, is this different?
             }
         }
+        
+        // TODO: trying taking a random sample, not multinomial resampling
+//            for (unsigned g=0; g<G::_ngroups; g++) {
+//                vector<int> rand_numbers;
+//                for (unsigned n=0; n<G::_nparticles-1; n++) {
+//                    rand_numbers.push_back(n);
+//                }
+//                std::shuffle(rand_numbers.begin(), rand_numbers.end(), std::default_random_engine(_random_seed));
+//                unsigned start = g*G::_nparticles;
+//                for (unsigned i=0; i<ngroups_within_subgroup; i++) {
+//                    _particle_indices_to_thin.push_back(rand_numbers[i] + start);
+////                    unsigned start = g*G::_nparticles;
+////                    unsigned end = start + (G::_nparticles) - 1;
+////                    unsigned n = rng.randint(start, end);
+////                    _particle_indices_to_thin.push_back(n); // TODO: if particle indices are shuffled, is this different?
+//                }
+//            }
 #endif
         
         assert (_second_level_indices_to_keep.size() == ngroups);
@@ -3563,10 +3589,10 @@ namespace proj {
                 throw XProj("cannot specify gene newicks and simulations");
             }
             try {
-                if (G::_thin < 1.0) {
-                    cout << "thin setting will be set to 1.0 for gene newick start " << endl;
-                    G::_thin = 1.0;
-                }
+//                if (G::_thin < 1.0) {
+//                    cout << "thin setting will be set to 1.0 for gene newick start " << endl;
+//                    G::_thin = 1.0;
+//                }
                 handleGeneNewicks();
             }
             catch (XProj & x) {
