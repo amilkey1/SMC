@@ -166,7 +166,7 @@ class Particle {
             const vector<Forest::SharedPtr> &           getGeneForestPtrsConst() const;
             Forest::SharedPtr                           getGeneForestPtr(unsigned locus);
             const Forest::SharedPtr                     getGeneForestPtrConst(unsigned locus) const;
-            void                                        finalizeLatestJoin(int locus, unsigned index, map<const void *, list<unsigned> > & nonzero_map);
+            void                                        finalizeLatestJoin(int locus, unsigned index, map<const void *, list<unsigned> > & nonzero_map, bool filter_again);
             void                                        finalizeLatestJoinMCMC(int locus, unsigned index);
             void                                        resetGeneForests(bool compute_partials);
             void                                        buildEnsembleCoalInfo();
@@ -860,6 +860,7 @@ class Particle {
                 new_theta = 1 / (_lot->gamma(2.0, scale));
                 assert (new_theta > 0.0);
                 _theta_map[name] = new_theta;
+                cout << new_theta << ", " << endl;
             }
         }
         
@@ -2079,7 +2080,7 @@ class Particle {
             // don't reset theta map - keep thetas the same until species tree is rebuilt
         }
 
-    inline void Particle::finalizeLatestJoin(int locus, unsigned index, map<const void *, list<unsigned> > & nonzero_map) {
+    inline void Particle::finalizeLatestJoin(int locus, unsigned index, map<const void *, list<unsigned> > & nonzero_map, bool filter_again) {
         // Makes join closest to leaf-level in _gene_forest_extensions[locus]
         // permanent, then undocks _gene_forest_extensions[locus]
         
@@ -2133,7 +2134,10 @@ class Particle {
         _gene_forest_ptrs[locus]->_log_coalescent_likelihood = gfx.getLogCoalescentLikelihood();
 
         // Can now get rid of extension
-        _gene_forest_extensions[locus].undock();
+        // TODO: testing this
+//        if (filter_again) {
+            _gene_forest_extensions[locus].undock();
+//        }
     }
         
     inline void Particle::finalizeLatestJoinMCMC(int locus, unsigned index) {

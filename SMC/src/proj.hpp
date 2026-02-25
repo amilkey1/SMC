@@ -83,6 +83,7 @@ namespace proj {
             string              readNewickFromFile(string file_name);
             void                buildNonzeroMap(vector<Particle> & particles, unsigned locus, map<const void *, list<unsigned> > & nonzero_map, const vector<unsigned> & nonzeros, vector<unsigned> particle_indices, unsigned start, unsigned end);
             double              filterParticles(unsigned step, vector<Particle> & particles, vector<unsigned> &particle_indices, unsigned start, unsigned end);
+            double              filterParticlesAgain(unsigned step, vector<Particle> & particles, vector<unsigned> particle_indices);
             void                filterParticlesThreading(vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices);
             void                filterParticlesRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned g, vector<unsigned> particle_indices);
             unsigned            multinomialDraw(const vector<double> & probs);
@@ -1878,6 +1879,127 @@ namespace proj {
         }
     }
 
+    inline double Proj::filterParticlesAgain(unsigned step, vector<Particle> & particles, vector<unsigned> particle_indices) {
+        // Copy log weights for all bundles to prob vector
+        
+        vector<double> probs(G::_nparticles*G::_ngroups, 0.0);
+        
+        for (unsigned p=0; p<particles.size(); p++) {
+            probs[p] = particles[p].getLogWeight();
+        }
+
+        assert (probs.size() == G::_nparticles*G::_ngroups);
+        // Normalize log_weights to create discrete probability distribution
+        double log_sum_weights = getRunningSum(probs);
+
+        transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
+
+//        // Compute component of the log marginal likelihood due to this step
+//        _log_marginal_likelihood += log_sum_weights - log(G::_nparticles);
+        
+    //        if (step < G::_nloci) {
+    //            _log_marginal_likelihood += _starting_log_likelihood;
+    //        }
+
+        double ess = 0.0;
+        if (G::_verbose > 1) {
+            // Compute effective sample size
+            ess = computeEffectiveSampleSize(probs);
+        }
+        
+        vector<unsigned> zeros;
+        zeros.reserve(G::_nparticles*G::_ngroups);
+        vector<unsigned> nonzeros;
+        nonzeros.reserve(G::_nparticles*G::_ngroups);
+        
+        // Zero vector of counts storing number of darts hitting each particle
+        vector<unsigned> counts (G::_nparticles*G::_ngroups, 0);
+        
+        double cump = probs[0];
+        double delta = rng.uniform() / (G::_nparticles*G::_ngroups);
+        unsigned c = (unsigned)(floor(1.0 + G::_nparticles*G::_ngroups*(cump - delta)));
+        if (c > 0) {
+            nonzeros.push_back(0);
+        }
+        else {
+            zeros.push_back(0);
+        }
+        counts[0] = c;
+        unsigned prev_cum_count = c;
+        for (unsigned i = 1; i < G::_nparticles*G::_ngroups; ++i) {
+            cump += probs[i];
+            double cum_count = floor(1.0 + G::_nparticles*G::_ngroups*(cump - delta));
+            if (cum_count > G::_nparticles*G::_ngroups) {
+                cum_count = G::_nparticles*G::_ngroups;
+            }
+            unsigned c = (unsigned)cum_count - prev_cum_count;
+            if (c > 0) {
+                nonzeros.push_back(i);
+            }
+            else {
+                zeros.push_back(i);
+            }
+            counts[i] = c;
+            prev_cum_count = cum_count;
+        }
+        
+        unsigned locus = particles[0].getNextGene() - 1; // subtract 1 because vector of gene forests starts at 0
+        assert (locus == particles[0].getNextGene() - 1);
+        // Create map (nonzero_map) in which the key for an element
+        // is the memory address of a gene forest and
+        // the value is a vector of indices of non-zero counts.
+        // This map is used to determine which of the nonzeros
+        // that need to be copied (last nonzero count for any
+        // memory address does not need to be copied and can be
+        // modified in place).
+        map<const void *, list<unsigned> > nonzero_map;
+        buildNonzeroMap(particles, locus, nonzero_map, nonzeros, particle_indices, 0, particles.size() - 1);
+        
+        // Example of following code that replaces dead
+        // particles with copies of surviving particles:
+        //             0  1  2  3  4  5  6  7  8  9
+        // _counts  = {0, 2, 0, 0, 0, 8, 0, 0, 0, 0}  size = 10
+        // zeros    = {0, 2, 3, 4, 6, 7, 8, 9}        size =  8
+        // nonzeros = {1, 5}                          size =  2
+        //
+        //  next_zero   next_nonzero   k   copy action taken
+        //  --------------------------------------------------------------
+        //      0             0        0   _particles[1] --> _particles[0]
+        //  --------------------------------------------------------------
+        //      1             1        0   _particles[5] --> _particles[2]
+        //      2             1        1   _particles[5] --> _particles[3]
+        //      3             1        2   _particles[5] --> _particles[4]
+        //      4             1        3   _particles[5] --> _particles[6]
+        //      5             1        4   _particles[5] --> _particles[7]
+        //      6             1        5   _particles[5] --> _particles[8]
+        //      7             1        6   _particles[5] --> _particles[9]
+        //  --------------------------------------------------------------
+        unsigned next_zero = 0;
+        unsigned next_nonzero = 0;
+            while (next_nonzero < nonzeros.size()) {
+                double index_survivor = nonzeros[next_nonzero];
+                unsigned index_survivor_in_particles = particle_indices[index_survivor];
+                
+                // TODO: need to figure out which one is the original particle that still has the gene forest extension
+                particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map, true);
+                unsigned ncopies = counts[index_survivor] - 1;
+                for (unsigned k = 0; k < ncopies; k++) {
+                    double index_nonsurvivor = zeros[next_zero++];
+                    
+                    // Replace non-survivor with copy of survivor
+                    unsigned survivor_index_in_particles = particle_indices[index_survivor];
+                    unsigned non_survivor_index_in_particles = particle_indices[index_nonsurvivor];
+                    
+                    particles[non_survivor_index_in_particles] = particles[survivor_index_in_particles];
+                }
+                
+                ++next_nonzero;
+            }
+        
+        return ess;
+
+    }
+
 
     inline double Proj::filterParticles(unsigned step, vector<Particle> & particles, vector<unsigned> &particle_indices, unsigned start, unsigned end) {
         // Copy log weights for all bundles to prob vector
@@ -1990,7 +2112,7 @@ namespace proj {
                 
                 if (!G::_mcmc) {
                     // for mcmc, wait to finalize joins
-                    particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map);
+                    particles[index_survivor_in_particles].finalizeLatestJoin(locus, index_survivor_in_particles, nonzero_map, false);
                 }
                 unsigned ncopies = counts[index_survivor] - 1;
                 for (unsigned k = 0; k < ncopies; k++) {
@@ -3147,6 +3269,7 @@ namespace proj {
                 }
             
                 second_level_particles.resize(G::_particle_increase, p);
+
                                 
                 for (unsigned s=0; s<G::_nspecies-1; s++) {  // skip last round of filtering because weights are always 0
                     // set particle random number seeds
@@ -3896,6 +4019,20 @@ namespace proj {
                             filterParticlesThreading(my_vec, g, particle_indices);
                         }
                         
+                        // TODO: testing this through filterParticlesAgain()
+                        
+//                        filterParticlesAgain(g, my_vec, particle_indices);
+                        
+//                        // reset pointers so particles have their own pointers
+//                        for (unsigned p=0; p<G::_nparticles * G::_ngroups; p++) {
+//                            vector<Forest::SharedPtr> gfcpies;
+//                            for (unsigned l=0; l<G::_nloci; l++) {
+//                                gfcpies.push_back(Forest::SharedPtr(new Forest()));
+//                            }
+//                            my_vec[p].resetSubgroupPointers(gfcpies);
+//                        }
+
+                        
                         string filenamea = "params" + to_string(G::_generation) + "a";
                         
                         if (G::_generation == 0) {
@@ -4354,7 +4491,7 @@ namespace proj {
                         
                         
                         heightf << "species_tree_height" << endl;
-                        
+                                                
                         secondLevel(my_vec);
     #endif
                     }
