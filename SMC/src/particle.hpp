@@ -860,7 +860,6 @@ class Particle {
                 new_theta = 1 / (_lot->gamma(2.0, scale));
                 assert (new_theta > 0.0);
                 _theta_map[name] = new_theta;
-                cout << new_theta << ", " << endl;
             }
         }
         
