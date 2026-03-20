@@ -6,7 +6,7 @@
 
 #define DRAW_NEW_THETA // TODO: FOR NOW, TURN THIS OFF IF MPI TURNED ON
 
-//#define DEBUG_MODE
+#define DEBUG_MODE
 
 //#define INV_GAMMA_PRIOR_TWO // turn this off if not defining DRAW_NEW_THETA // TODO: this will not work with lazy copying
 

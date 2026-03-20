@@ -828,7 +828,6 @@ class SpeciesForest {
 
 #if defined (DEBUG_MODE)
     inline void SpeciesForest::showSpeciesJoined() {
-        assert (_index==0);
         if (_species_joined.first != NULL) {
             cout << "joining species " << _species_joined.first->_name << " and " << _species_joined.second->_name << endl;
         }

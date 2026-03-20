@@ -1682,7 +1682,7 @@ namespace proj {
         string filename1 = "species_trees.trees";
         string filename2 = "unique_species_trees.trees";
         string filename3 = "params-beast-comparison.log";
-        if (filesystem::remove(filename1)) {
+        if (std::filesystem::remove(filename1)) {
             ofstream speciestrf(filename1);
             speciestrf << "#nexus\n\n";
             speciestrf << "begin trees;\n";
@@ -1698,7 +1698,7 @@ namespace proj {
                 cout << "created new file " << filename1 << "\n";
             }
         }
-        if (filesystem::remove(filename2)) {
+        if (std::filesystem::remove(filename2)) {
             ofstream uniquespeciestrf(filename2);
             uniquespeciestrf << "#nexus\n\n";
             uniquespeciestrf << "begin trees;\n";
@@ -1714,7 +1714,7 @@ namespace proj {
                 cout << "created new file " << filename2 << "\n";
             }
         }
-        if (filesystem::remove(filename3)) {
+        if (std::filesystem::remove(filename3)) {
             ofstream paramsf(filename3);
             if (G::_verbose > 0) {
                cout << "existing file " << filename3 << " removed and replaced\n";
@@ -1730,7 +1730,7 @@ namespace proj {
         cout << "\n";
         
         string altfname = "alt_species_trees.trees";
-        if (filesystem::remove(altfname)) {
+        if (std::filesystem::remove(altfname)) {
             if (G::_verbose > 0) {
                cout << "existing file " << altfname << " removed and replaced\n";
             }
@@ -2233,6 +2233,7 @@ namespace proj {
         
         for (unsigned p=0; p < nparticles; p++) {
             probs[p] = particles[p].getSpeciesLogWeight();
+//            particles[p].showSpeciesJoined();
         }
 
         // Normalize log_weights to create discrete probability distribution
@@ -3284,6 +3285,7 @@ namespace proj {
                     }
                     
                     filterSpeciesParticles(s, second_level_particles, id_number);
+//                    cout << "--------------------------------------------------------" << endl;
                     
                     G::_generation++;
                 
@@ -3365,7 +3367,7 @@ namespace proj {
             // remove existing params file and replace with copy
             char oldfname[] = "params-beast-comparison.log";
             char newfname[] = "params-beast-comparison-final.log";
-            filesystem::remove(oldfname);
+            std::filesystem::remove(oldfname);
             std::rename(newfname, oldfname);
         }
         else {
@@ -3414,7 +3416,7 @@ namespace proj {
             // remove existing params file and replace with copy
             char oldfname[] = "params-beast-comparison.log";
             char newfname[] = "params-beast-comparison-final.log";
-            filesystem::remove(oldfname);
+            std::filesystem::remove(oldfname);
             std::rename(newfname, oldfname);
         }
         
@@ -3488,7 +3490,7 @@ namespace proj {
             std::reverse(_hpd_values.begin(), _hpd_values.end());
             
             // take first 95% of values (round down to nearest integer)
-            double total = size(_hpd_values);
+            double total = std::size(_hpd_values);
             double ninety_five_index = floor(0.95*total);
             // TODO: double check this - should there be a log joining prob as part fo the species tree?
             if (ninety_five_index == 0) {
@@ -3741,7 +3743,7 @@ namespace proj {
             _first_line = true;
             if (G::_verbose > 0) {
                 cout << "Starting..." << endl;
-                cout << "Current working directory: " << filesystem::current_path() << endl;
+                cout << "Current working directory: " << std::filesystem::current_path() << endl;
                 cout << "Random seed: " << _random_seed << endl;
 #if defined (DRAW_NEW_THETA)
                 cout << "drawing new theta for each particle " << endl;
@@ -4037,7 +4039,7 @@ namespace proj {
                         
                         if (G::_generation == 0) {
                             string filename = "mcmc_moves_accepted.log";
-                            if (filesystem::remove(filename)) {
+                            if (std::filesystem::remove(filename)) {
                                 ofstream mcmcfile(filename);
                                 mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\t" << "average log likelihood before mcmc" << "\t" << "average log likelihood after mcmc" << "\t" << "sliding window" << "\n";
                             }
@@ -4195,7 +4197,7 @@ namespace proj {
                         for (unsigned i=0; i<G::_nloci; i++) {
                             ofstream heightf;
                             string filename = "gene_tree_heights" + to_string(i+1) + ".txt";
-                            if (filesystem::remove(filename)) {
+                            if (std::filesystem::remove(filename)) {
                                 ofstream heightf(filename);
                                 if (G::_verbose > 0) {
                                    cout << "existing file " << filename << " removed and replaced\n";
@@ -4312,7 +4314,7 @@ namespace proj {
                                  std::reverse(_hpd_values_genes[l].begin(), _hpd_values_genes[l].end());
                                  
                                  // take first 95% of values (round down to nearest integer)
-                                 double total = size(_hpd_values_genes[l]);
+                                 double total = std::size(_hpd_values_genes[l]);
                                  double ninety_five_index = floor(0.95*total);
                                  
                                  if (ninety_five_index == 0) {
@@ -4343,7 +4345,7 @@ namespace proj {
                             std::reverse(_hpd_first_level_values.begin(), _hpd_first_level_values.end());
                             
                             // take first 95% of values (round down to nearest integer)
-                            double total = size(_hpd_first_level_values);
+                            double total = std::size(_hpd_first_level_values);
                             double ninety_five_index = floor(0.95*total);
                             
                             if (ninety_five_index == 0) {
@@ -4394,7 +4396,7 @@ namespace proj {
                         string filename1 = "species_trees.trees";
                         string filename2 = "unique_species_trees.trees";
                         string filename3 = "params-beast-comparison.log";
-                        if (filesystem::remove(filename1)) {
+                        if (std::filesystem::remove(filename1)) {
                             ofstream speciestrf(filename1);
                             speciestrf << "#nexus\n\n";
                             speciestrf << "begin trees;\n";
@@ -4410,7 +4412,7 @@ namespace proj {
                                 cout << "created new file " << filename1 << "\n";
                             }
                         }
-                        if (filesystem::remove(filename2)) {
+                        if (std::filesystem::remove(filename2)) {
                             ofstream uniquespeciestrf(filename2);
                             uniquespeciestrf << "#nexus\n\n";
                             uniquespeciestrf << "begin trees;\n";
@@ -4427,7 +4429,7 @@ namespace proj {
                             }
                         }
                         
-                        if (filesystem::remove(filename3)) {
+                        if (std::filesystem::remove(filename3)) {
                             ofstream paramsf(filename3);
                             if (G::_verbose > 0) {
                                cout << "existing file " << filename3 << " removed and replaced\n";
@@ -4448,7 +4450,7 @@ namespace proj {
                         }
                         
                         ofstream heightf;
-                        if (filesystem::remove("species_heights.txt")) {
+                        if (std::filesystem::remove("species_heights.txt")) {
                             ofstream heightf("species_heights.txt");
                             if (G::_verbose > 0) {
                                cout << "existing file " << "species_heights.txt" << " removed and replaced\n";
@@ -4462,7 +4464,7 @@ namespace proj {
                         }
                         
                         string altfname = "alt_species_trees.trees";
-                        if (filesystem::remove(altfname)) {
+                        if (std::filesystem::remove(altfname)) {
                             
                             if (G::_verbose > 0) {
                                cout << "existing file " << altfname << " removed and replaced\n";

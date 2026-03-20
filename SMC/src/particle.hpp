@@ -1463,6 +1463,7 @@ class Particle {
         sort(coalinfo_vect.begin(), coalinfo_vect.end());
 
         // Compute coalescent likelihood and log weight
+        // TODO: trying not integrating out thetas
         calcLogCoalescentLikelihood(coalinfo_vect, /*integrate_out_thetas*/true, /*verbose*/false);
         _log_weight = _log_coalescent_likelihood - prev_log_coal_like + log_weight_factor;
         
