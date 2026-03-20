@@ -20,6 +20,11 @@
 #include <random>
 
 extern int my_rank;
+#if defined(USING_MPI)
+extern int ntasks;
+#endif
+
+extern int my_rank;
 
 extern void output(string msg);
 
@@ -50,7 +55,12 @@ namespace proj {
             void                saveAllSpeciesTrees(vector<Particle> &v) const;
             void                saveSpeciesTreesAfterFirstRound(vector<Particle> &v) const;
             void                saveSpeciesTreesHierarchical(vector<Particle> &v, string filename1, string filename2, unsigned group_number);
-            void                saveSpeciesTreesAltHierarchical(vector<Particle> &v, unsigned group_number);
+            void                saveSpeciesTreesAltHierarchical(vector<Particle> &v, unsigned group_number, string filename1);
+#if defined (USING_MPI)
+            void                saveSpeciesTreesHierarchicalMPI(vector<Particle> &v, string filename1, string filename2, unsigned group_number, vector<vector<double>> indices_to_keep);
+            void                saveSpeciesTreesAltHierarchicalMPI(vector<Particle> &v, unsigned group_number, string filename1, vector<vector<double>> indices_to_keep);
+            void writeParamsFileForBeastComparisonAfterSpeciesFilteringMPI(vector<Particle> &v, string filename, unsigned group_number, vector<vector<double>> indices_to_keep);
+#endif
             void                saveGeneTrees(vector<Particle> &v) const;
             void                writeLoradFile(vector<Particle> &v) const;
             void                writeLoradFileAfterSpeciesFiltering(vector<Particle> &v) const;
@@ -124,6 +134,16 @@ namespace proj {
             void                        buildSpeciesMap(bool taxa_from_data);
             void                        proposeSpeciesGroupsFaster(vector<Particle> &particle, unsigned ngroups, string filename1, string filename2, string filename3);
             void                        proposeSpeciesGroupRangeFaster(unsigned first, unsigned last, vector<Particle> &particles, unsigned ngroups, string filename1, string filename2, string filename3);
+        
+#if defined (USING_MPI)
+        void                        MPISetSchedule();
+        vector<unsigned>            _mpi_first_particle;
+        vector<unsigned>            _mpi_last_particle;
+        vector<string>              _starting_gene_newicks;
+        vector<string>              _starting_species_newicks;
+        vector<string>              _starting_species_partitions;
+
+#endif
         
             double                      _small_enough;
             bool                        _first_line;
@@ -755,6 +775,142 @@ namespace proj {
 //        }
     }
 
+    inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFilteringMPI(vector<Particle> &v, string filename, unsigned group_number, vector<vector<double>> indices_to_keep) {
+        // this function creates a params file that is comparable to output from starbeast3
+        std::ofstream logf;
+
+        logf.open(filename);
+
+        if (_first_line) {
+            _first_line = false;
+            logf << "\t" << "posterior ";
+            logf << "\t" << "likelihood ";
+            logf << "\t" << "prior ";
+            logf << "\t" << "vectorPrior "; // log joint prior on population sizes (vectorPrior)
+            logf << "\t" << "speciescoalescent ";
+            logf << "\t" << "Tree.t:Species.height ";
+            logf << "\t" << "Tree.t:Species.treeLength ";
+
+            for (int i=1; i<G::_nloci+1; i++) {
+                logf << "\t" << "Tree.t:gene" + to_string(i) + "height";
+                logf << "\t" << "Tree.t:gene" + to_string(i) + "treeLength";
+            }
+
+            logf << "\t" << "YuleModel.t:Species "; // this is the log probability of the species tree (multiply by log(3!) to get increment log prob)
+            logf << "\t" << "popMean "; // this is psi in the InverseGamma(2,psi) distribution of popSize
+
+            for (int i=0; i<(G::_nspecies*2-1); i++) {
+                logf << "\t" << "popSize." + to_string(i+1);
+            }
+
+            logf << "\t" << "speciationRate.t:Species ";
+
+            for (int i=1; i<G::_nloci+1; i++) {
+                logf << "\t" << "treeLikelihood:gene" + to_string(i);
+            }
+            for (int i=1; i<G::_nloci+1; i++) {
+                logf << "\t" << "treePrior:gene" + to_string(i);
+            }
+            logf << endl;
+        }
+
+        unsigned sample_size = round(double (G::_particle_increase) / double(G::_save_every) );
+        if (sample_size == 0) {
+            sample_size = G::_particle_increase;
+        }
+        
+        for (unsigned i=0; i<indices_to_keep[group_number].size(); i++) {
+            Particle p = v[indices_to_keep[group_number][i]];
+            double log_coalescent_likelihood = 0.0;
+            log_coalescent_likelihood += p.getCoalescentLikelihoodSecondLevel();
+
+            double vector_prior = 0.0;
+
+            double log_likelihood = 0.0;
+            vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
+            for (auto &g:gene_tree_log_likelihoods) {
+                log_likelihood += g;
+            }
+            double log_prior = p.getAllPriors();
+
+            double log_posterior = log_likelihood + log_prior + log_coalescent_likelihood + vector_prior;
+
+            logf << "\t" << log_posterior;
+
+            logf << "\t" << log_likelihood;
+
+            logf << "\t" << log_prior; // starbeast3 does not include coalescent likelihood in the prior
+
+            logf << "\t" << vector_prior;
+
+            logf << "\t" << log_coalescent_likelihood;
+
+            double species_tree_height = p.getSpeciesTreeHeight();
+            logf << "\t" << species_tree_height;
+
+            double species_tree_length = p.getSpeciesTreeLength();
+            logf << "\t" << species_tree_length;
+
+            vector<double> gene_tree_heights = p.getGeneTreeHeights();
+            vector<double> gene_tree_lengths = p.getGeneTreeLengths();
+            assert (gene_tree_heights.size() == gene_tree_lengths.size());
+            
+            for (int i=0; i<gene_tree_heights.size(); i++) {
+                logf << "\t" << gene_tree_heights[i];
+                logf << "\t" << gene_tree_lengths[i];
+            }
+
+            double yule_model = p.getSpeciesTreePrior();
+            logf << "\t" << yule_model;
+
+            logf << "\t" << p.getPopMean() / 4.0; // beast uses Ne * u = theta / 4
+
+            for (int i=0; i<(G::_nspecies*2-1); i++) {
+    #if defined (DRAW_NEW_THETA)
+                if (!G::_gene_newicks_specified) {
+                    vector<double> theta_vec = p.getThetaVector();
+                    logf << "\t" << theta_vec[i] / 4.0;
+                }
+                else {
+                    logf << "\t" << G::_theta / 4.0;
+                }
+    #else
+                logf << "\t" << G::_theta / 4.0; // all pop sizes are the same under this model, Ne*u = theta / 4?
+    #endif
+            }
+
+            logf << "\t" << G::_lambda;
+
+    //            vector<double> gene_tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
+            vector<double> gene_tree_priors = p.getGeneTreeCoalescentLikelihoods();
+
+
+            for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
+                logf << "\t" << gene_tree_log_likelihoods[i];
+            }
+
+            for (int i=0; i<gene_tree_log_likelihoods.size(); i++) {
+                logf << "\t" << gene_tree_priors[i];
+            }
+            
+            if (G::_calc_bhv_distances_to_true_tree) {
+                string fname = "bhvdists.txt";
+                ofstream speciestrbhvf(fname, std::ios::app);
+                double bhvdist = p.calcBHVDistance();
+                speciestrbhvf << bhvdist << endl;
+            }
+
+            logf << endl;
+            
+            ofstream heightf;
+            heightf.open("species_tree_heights.txt", std::ios::app);
+            heightf << p.getSpeciesTreeHeight() << endl;
+        }
+
+        logf.close();
+    }
+
+
     inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(vector<Particle> &v, string filename, unsigned group_number) {
         // this function creates a params file that is comparable to output from starbeast3
         std::ofstream logf;
@@ -971,9 +1127,7 @@ namespace proj {
         logf.close();
     }
 
-    inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v, unsigned group_number)  {
-        string filename1 = "alt_species_trees.trees";
-
+    inline void Proj::saveSpeciesTreesAltHierarchical(vector<Particle> &v, unsigned group_number, string filename1)  {
         assert (G::_start_mode_type != G::StartModeType::START_MODE_SIM);
 
         unsigned count = 0;
@@ -983,6 +1137,22 @@ namespace proj {
         treef.open(filename1, std::ios_base::app);
         for (unsigned i=0; i<_second_level_indices_to_keep[group_number].size(); i++) {
             Particle p = v[_second_level_indices_to_keep[group_number][i]];
+            treef << "  tree test = [&R] " << p.saveForestNewickAlt()  << ";\n";
+            count++;
+        }
+        treef.close();
+    }
+
+    inline void Proj::saveSpeciesTreesAltHierarchicalMPI(vector<Particle> &v, unsigned group_number, string filename1, vector<vector<double>> indices_to_keep)  {
+        assert (G::_start_mode_type != G::StartModeType::START_MODE_SIM);
+
+        unsigned count = 0;
+        // save all species trees
+        std::ofstream treef;
+
+        treef.open(filename1);
+        for (unsigned i=0; i<indices_to_keep[group_number].size(); i++) {
+            Particle p = v[indices_to_keep[group_number][i]];
             treef << "  tree test = [&R] " << p.saveForestNewickAlt()  << ";\n";
             count++;
         }
@@ -1053,6 +1223,51 @@ namespace proj {
                 treef.open(filename1, std::ios_base::app);
             for (unsigned i=0; i<_second_level_indices_to_keep[group_number].size(); i++) {
                 Particle p = v[_second_level_indices_to_keep[group_number][i]];
+                    treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
+                    count++;
+                }
+                treef.close();
+        }
+    }
+
+    inline void Proj::saveSpeciesTreesHierarchicalMPI(vector<Particle> &v, string filename1, string filename2, unsigned group_number, vector<vector<double>> indices_to_keep) {
+        // save only unique species trees
+        if (!G::_run_on_empty) {
+            vector<vector<pair<double, double>>> unique_increments_and_priors;
+
+            std::ofstream unique_treef;
+
+            unique_treef.open(filename2);
+
+            for (unsigned i=0; i<indices_to_keep[group_number].size(); i++) {
+                Particle p = v[indices_to_keep[group_number][i]];
+                vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
+
+                
+            if (G::_write_species_tree_file) {
+                bool found = false;
+                if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
+                    found = true;
+                }
+                if (!found) {
+                    unique_increments_and_priors.push_back(increments_and_priors);
+                    unique_treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
+                }
+            }
+            unique_treef.close();
+        }
+    }
+
+        assert (G::_start_mode_type != G::StartModeType::START_MODE_SIM);
+
+        if (G::_write_species_tree_file) {
+            unsigned count = 0;
+                // save all species trees
+                std::ofstream treef;
+
+                treef.open(filename1);
+            for (unsigned i=0; i<indices_to_keep[group_number].size(); i++) {
+                Particle p = v[indices_to_keep[group_number][i]];
                     treef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
                     count++;
                 }
@@ -2597,7 +2812,7 @@ namespace proj {
 
             mtx.lock();
             saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2, id_number);
-            saveSpeciesTreesAltHierarchical(second_level_particles, id_number);
+            saveSpeciesTreesAltHierarchical(second_level_particles, id_number, "alt_species_trees.trees");
             _count++;
 //            assert (i == group_number);
             if (G::_gene_newicks_specified) {
@@ -3248,6 +3463,208 @@ namespace proj {
         
         assert (_second_level_indices_to_keep.size() == ngroups);
         
+#if defined (USING_MPI)
+                MPISetSchedule();
+#endif
+        
+# if defined (USING_MPI)
+        cout << "starting proposals second level " << endl;
+        // s is group
+//        if (G::_nthreads == 1) {
+            for (unsigned s = _mpi_first_particle[my_rank]; s < _mpi_last_particle[my_rank]; s++) {
+                vector<vector<double>> indices_to_keep;
+                indices_to_keep.resize(ngroups);
+                unsigned group_number = _particle_indices_to_thin[s];
+                unsigned id_number = s; // use for random seeds and in second_level_indices_to_keep
+                
+                // grab index of a new particle
+                Particle p = particles[group_number];
+                
+                vector<Particle > second_level_particles;
+                
+                if (!G::_gene_newicks_specified) { // if starting from gene newicks, this is already built
+                    G::_generation = 0;
+                    p.resetSpecies();
+                    p.mapSpecies(_taxon_map);
+                }
+                
+                second_level_particles.resize(G::_particle_increase, p);
+                
+                for (unsigned s=0; s<G::_nspecies-1; s++) {  // skip last round of filtering because weights are always 0
+                    // set particle random number seeds
+                    psuffix = 1;
+                    for (auto &p:second_level_particles) {
+                        p.setSeed(_group_rng[id_number]->randint(1,9999) + psuffix);
+                        psuffix += 2;
+                    }
+                    
+                    for (auto &p:second_level_particles) {
+                        p.proposeSpeciationEvent();
+                    }
+                    
+                    filterSpeciesParticles(s, second_level_particles, id_number);
+                    
+                    G::_generation++;
+                    
+                }
+                
+                unsigned sample_size = round (double (G::_particle_increase) / double(G::_save_every));
+                if (sample_size == 0) {
+                    cout << "\n";
+                    cout << "current settings would save 0 species trees; saving every species tree\n";
+                    cout << "\n";
+                    sample_size = G::_particle_increase;
+                }
+                
+                unsigned group_seed = _group_rng[id_number]->getSeed();
+                
+                unsigned count = 0;
+                for (unsigned p = 0; p < G::_particle_increase; p++) {
+                    indices_to_keep[id_number].push_back(count);
+                    count++;
+                }
+                
+                std::shuffle(indices_to_keep[id_number].begin(), indices_to_keep[id_number].end(), std::default_random_engine(group_seed)); // shuffle particles using group seed
+                
+                // delete first (1-_thin) % of indices to keep
+                indices_to_keep[id_number].erase(next(indices_to_keep[id_number].begin(), 0), next(indices_to_keep[id_number].begin(), (G::_particle_increase-sample_size)));
+                assert (indices_to_keep[id_number].size() == sample_size);
+                
+                string file1 = "species_trees" + to_string(s) + ".trees";
+                string file2 = "unique_species_trees" + to_string(s) + ".trees";
+                string file3 = "params" + to_string(s) + ".log";
+                string file4 = "alt_species_trees" + to_string(s) + ".trees";
+                
+                saveSpeciesTreesHierarchicalMPI(second_level_particles, file1, file2, id_number, indices_to_keep);
+                saveSpeciesTreesAltHierarchicalMPI(second_level_particles, id_number, file4, indices_to_keep);
+                _first_line = false;
+                writeParamsFileForBeastComparisonAfterSpeciesFilteringMPI(second_level_particles, file3, id_number, indices_to_keep);
+            }
+        
+//        }
+//        else {
+//            proposeSpeciesGroupsFaster(particles, ngroups, filename1, filename2, filename3);
+//        }
+        // merge files for output
+        // ensure all processes have finished
+        MPI_Barrier(MPI_COMM_WORLD);
+        
+        // only rank 0 does the merge
+        if (my_rank == 0) {
+            ofstream treef("species_trees.trees");
+            treef << "#nexus\n\n";
+            treef << "begin trees;\n";
+            
+            for (unsigned s = 0; s < ngroups; s++) {
+                string fname1 = "species_trees" + to_string(s) + ".trees";
+                ifstream inFile(fname1);
+                treef << inFile.rdbuf();
+                remove(fname1.c_str());
+            }
+            treef << "end;\n";
+            treef.close();
+            
+            ofstream alttreef("alt_species_trees.trees");
+            alttreef << "#nexus\n\n";
+            alttreef << "begin trees;\n";
+            
+            for (unsigned s = 0; s < ngroups; s++) {
+                string fname1 = "alt_species_trees" + to_string(s) + ".trees";
+                ifstream inFile(fname1);
+                alttreef << inFile.rdbuf();
+                remove(fname1.c_str());
+            }
+            alttreef << "end;\n";
+            alttreef.close();
+            
+            ofstream uniquetreef("unique_species_trees.trees");
+            uniquetreef << "#nexus\n\n";
+            uniquetreef << "begin trees;\n";
+            
+            for (unsigned s = 0; s < ngroups; s++) {
+                string fname1 = "unique_species_trees" + to_string(s) + ".trees";
+                ifstream inFile(fname1);
+                uniquetreef << inFile.rdbuf();
+                remove(fname1.c_str());
+            }
+            uniquetreef << "end;\n";
+            uniquetreef.close();
+            
+            // write params file
+            
+            ofstream paramf("params-beast-comparison.log");
+            
+            paramf << "\t" << "posterior ";
+            paramf << "\t" << "likelihood ";
+            paramf << "\t" << "prior ";
+            paramf << "\t" << "vectorPrior "; // log joint prior on population sizes (vectorPrior)
+            paramf << "\t" << "speciescoalescent ";
+            paramf << "\t" << "Tree.t:Species.height ";
+            paramf << "\t" << "Tree.t:Species.treeLength ";
+            
+            for (int i=1; i<G::_nloci+1; i++) {
+                paramf << "\t" << "Tree.t:gene" + to_string(i) + "height";
+                paramf << "\t" << "Tree.t:gene" + to_string(i) + "treeLength";
+            }
+            
+            paramf << "\t" << "YuleModel.t:Species "; // this is the log probability of the species tree (multiply by log(3!) to get increment log prob)
+            paramf << "\t" << "popMean "; // this is psi in the InverseGamma(2,psi) distribution of popSize
+            
+            for (int i=0; i<(G::_nspecies*2-1); i++) {
+                paramf << "\t" << "popSize." + to_string(i+1);
+            }
+            
+            paramf << "\t" << "speciationRate.t:Species ";
+            
+            for (int i=1; i<G::_nloci+1; i++) {
+                paramf << "\t" << "treeLikelihood:gene" + to_string(i);
+            }
+            for (int i=1; i<G::_nloci+1; i++) {
+                paramf << "\t" << "treePrior:gene" + to_string(i) << endl;
+            }
+            
+            for (unsigned s = 0; s < ngroups; s++) {
+                string fname1 = "params" + to_string(s) + ".log";
+                cout << fname1 << endl;
+                ifstream inFile(fname1, ios::binary);
+                paramf << inFile.rdbuf();
+                remove(fname1.c_str());
+            }
+            
+            paramf.close();
+            
+            string line;
+            // For writing text file
+            // Creating ofstream & ifstream class object
+            ifstream in ("params-beast-comparison.log");
+            ofstream out("params-beast-comparison-final.log");
+            
+            unsigned line_count = 0;
+            
+            while (getline(in, line)) {
+                if (line.empty()) continue;
+                
+                if (line_count == 0) {
+                    // add header to first line
+                    out << "iter\t" << line << endl;
+                }
+                else {
+                    // increment iteration
+                    out << line_count << "\t" << line << endl;
+                }
+                line_count++;
+            }
+            
+            in.close();
+            out.close();
+            
+            // remove existing params file and replace with copy
+            char oldfname[] = "params-beast-comparison.log";
+            char newfname[] = "params-beast-comparison-final.log";
+//            std::filesystem::remove(oldfname);
+//            std::rename(newfname, oldfname);
+        }
+#else
         if (G::_nthreads == 1) {
             cout << "starting proposals second level" << endl;
             for (unsigned g=0; g<ngroups; g++) { // propose and filter for each particle saved from first round
@@ -3285,7 +3702,6 @@ namespace proj {
                     }
                     
                     filterSpeciesParticles(s, second_level_particles, id_number);
-//                    cout << "--------------------------------------------------------" << endl;
                     
                     G::_generation++;
                 
@@ -3316,7 +3732,7 @@ namespace proj {
 //                }
                 
                 saveSpeciesTreesHierarchical(second_level_particles, filename1, filename2, id_number);
-                saveSpeciesTreesAltHierarchical(second_level_particles, id_number);
+                saveSpeciesTreesAltHierarchical(second_level_particles, id_number, "alt_species_trees.trees");
                 writeParamsFileForBeastComparisonAfterSpeciesFiltering(second_level_particles, filename3, id_number);
             }
 //
@@ -3419,6 +3835,7 @@ namespace proj {
             std::filesystem::remove(oldfname);
             std::rename(newfname, oldfname);
         }
+#endif
         
         if (G::_ruv) {
             assert (_ranks.size() > 0);
@@ -3690,6 +4107,46 @@ namespace proj {
             G::_taxon_to_species[t] = i;
             G::_ntaxa++;
         }
+    }
+#endif
+
+#if defined(USING_MPI)
+    inline void Proj::MPISetSchedule() {
+       // Determine which particles will be handled by this processor: e.g.
+       // 20 = number of particles
+       //  3 = number of processors
+       //  6 = 20 / 3
+       //  2 = 20 % 3
+       //  rank 0 gets 6, rank 1 gets 7, rank 2 gets 7
+        cout << "in set schedule "<< endl;
+        unsigned total_n_particles = _second_level_indices_to_keep.size();
+        cout << "nparticles = " << total_n_particles << endl;
+        cout << "ntasks = " << ntasks << endl;
+       vector<unsigned> particles_per_task(ntasks, total_n_particles  / ntasks);
+        
+
+       unsigned particle_remainder = total_n_particles % ntasks;
+
+       // Each rank > 0 gets an extra job if there is any remainder
+       for (unsigned rank = 1; rank < ntasks; ++rank) {
+           if (particle_remainder > 0) {
+               particles_per_task[rank] += 1;
+               --particle_remainder;
+           }
+       }
+
+       _mpi_first_particle.resize(ntasks);
+       _mpi_last_particle.resize(ntasks);
+       unsigned particle_cum = 0;
+       output("\nParticle schedule:\n");
+       output(str(format("%12s %25s %25s\n") % "rank" % "first particle" % "last particle"));
+       for (unsigned rank = 0; rank < ntasks; ++rank) {
+           _mpi_first_particle[rank] = particle_cum;
+           _mpi_last_particle[rank]  = particle_cum + particles_per_task[rank];
+           particle_cum += particles_per_task[rank];
+           
+           output(str(format("%12d %25d %25d\n") % rank % (_mpi_first_particle[rank] + 1) % _mpi_last_particle[rank]));
+       }
     }
 #endif
 

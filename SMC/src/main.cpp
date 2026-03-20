@@ -25,9 +25,20 @@ using namespace std;
 #include "valgrind.h"
 
 int my_rank = 0;
+#if defined(USING_MPI)
+//int my_rank = 0;
+int ntasks = 0;
+
+void output(string msg) {
+    if (my_rank == 0) {
+        cout << msg;
+    }
+}
+#else
 void output(string msg) {
     cout << msg;
 }
+#endif
 
 #include "data.hpp"
 #include "forest.hpp"
@@ -151,6 +162,12 @@ GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = {
 };
 
 int main(int argc, const char * argv[]) {
+#if defined(USING_MPI)
+    MPI_Init(NULL, NULL);
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
+    std::cerr << my_rank << "    " << ntasks << endl;
+#endif
     
     Proj proj;
     try {
@@ -168,6 +185,10 @@ int main(int argc, const char * argv[]) {
     catch(...) {
         std::cerr << "Exception of unknown type!\n";
     }
+    
+#if defined(USING_MPI)
+    MPI_Finalize();
+#endif
     
     return 0;
 }
