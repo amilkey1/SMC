@@ -3470,14 +3470,17 @@ namespace proj {
         assert (_second_level_indices_to_keep.size() == ngroups);
         
 #if defined (USING_MPI)
-                MPISetSchedule();
+        cout << "Rank " << my_rank << " reached the sync point" << endl << flush;
+        MPISetSchedule();
 #endif
         
 # if defined (USING_MPI)
         cout << "starting proposals second level " << endl;
+        cout << "done with mpi set schedule" << endl;
         // s is group
 //        if (G::_nthreads == 1) {
             for (unsigned s = _mpi_first_particle[my_rank]; s < _mpi_last_particle[my_rank]; s++) {
+                // TODO: need to initialize if keeping everything on rank 0 for first level
                 vector<vector<double>> indices_to_keep;
                 indices_to_keep.resize(ngroups);
                 unsigned group_number = _particle_indices_to_thin[s];
@@ -3506,6 +3509,7 @@ namespace proj {
                     
                     for (auto &p:second_level_particles) {
                         p.proposeSpeciationEvent();
+                        p.showSpeciesTree();
                     }
                     
                     filterSpeciesParticles(s, second_level_particles, id_number);
@@ -3626,8 +3630,9 @@ namespace proj {
                 paramf << "\t" << "treeLikelihood:gene" + to_string(i);
             }
             for (int i=1; i<G::_nloci+1; i++) {
-                paramf << "\t" << "treePrior:gene" + to_string(i) << endl;
+                paramf << "\t" << "treePrior:gene" + to_string(i);
             }
+            cout << endl;
             
             for (unsigned s = 0; s < ngroups; s++) {
                 string fname1 = "params" + to_string(s) + ".log";
@@ -3667,8 +3672,8 @@ namespace proj {
             // remove existing params file and replace with copy
             char oldfname[] = "params-beast-comparison.log";
             char newfname[] = "params-beast-comparison-final.log";
-//            std::filesystem::remove(oldfname);
-//            std::rename(newfname, oldfname);
+            std::filesystem::remove(oldfname);
+            std::rename(newfname, oldfname);
         }
 #else
         if (G::_nthreads == 1) {
@@ -4124,13 +4129,9 @@ namespace proj {
        //  6 = 20 / 3
        //  2 = 20 % 3
        //  rank 0 gets 6, rank 1 gets 7, rank 2 gets 7
-        cout << "in set schedule "<< endl;
         unsigned total_n_particles = _second_level_indices_to_keep.size();
-        cout << "nparticles = " << total_n_particles << endl;
-        cout << "ntasks = " << ntasks << endl;
        vector<unsigned> particles_per_task(ntasks, total_n_particles  / ntasks);
         
-
        unsigned particle_remainder = total_n_particles % ntasks;
 
        // Each rank > 0 gets an extra job if there is any remainder
@@ -4156,7 +4157,9 @@ namespace proj {
     }
 #endif
 
-    inline void Proj::run() {
+inline void Proj::run() {
+    vector<Particle> my_vec;
+//    if (my_rank == 0) {
         G::_in_second_level = false;
         
         if (G::_calc_bhv_distances_to_true_tree) {
@@ -4177,10 +4180,10 @@ namespace proj {
                 throw XProj("cannot specify gene newicks and simulations");
             }
             try {
-//                if (G::_thin < 1.0) {
-//                    cout << "thin setting will be set to 1.0 for gene newick start " << endl;
-//                    G::_thin = 1.0;
-//                }
+                //                if (G::_thin < 1.0) {
+                //                    cout << "thin setting will be set to 1.0 for gene newick start " << endl;
+                //                    G::_thin = 1.0;
+                //                }
                 handleGeneNewicks();
             }
             catch (XProj & x) {
@@ -4215,12 +4218,12 @@ namespace proj {
 #endif
                 cout << "Number of threads: " << G::_nthreads << endl;
             }
-
+            
             if (G::_run_on_empty) { // if running with no data, choose taxa to join at random
                 G::_proposal = "prior-prior";
                 G::_prior_prior = true;
             }
-
+            
             try {
                 if (G::_verbose > 0) {
                     cout << "\n*** Reading and storing the data in the file " << G::_data_file_name << endl;
@@ -4230,364 +4233,352 @@ namespace proj {
                 _data = Data::SharedPtr(new Data());
                 _data->setPartition(_partition);
                 _data->getDataFromFile(G::_data_file_name);
-
+                
                 if (G::_verbose > 0) {
                     summarizeData(_data);
                 }
                 
 #if defined (SPECIES_IN_CONF)
-//                createSpeciesMap(false);
+                //                createSpeciesMap(false);
 #else
                 createSpeciesMap(true);
 #endif
                 
                 G::_nspecies = (unsigned) G::_species_names.size();
                 createSpeciesMapTyped();
-
+                
                 // if user specified an outgroup in conf file, check that the outgroup matches one of the species names
                 if (G::_outgroup != "none") {
                     checkOutgroupName();
                 }
-
-#if defined(SPECIES_IN_CONF)
-            if (G::_nspecies > 0) {
-                // Species specified in the conf file
-                // Check that taxon names are the same as those
-                // in the data file
-                _data->checkTaxonNames(G::_taxon_names);
                 
+#if defined(SPECIES_IN_CONF)
+                if (G::_nspecies > 0) {
+                    // Species specified in the conf file
+                    // Check that taxon names are the same as those
+                    // in the data file
+                    _data->checkTaxonNames(G::_taxon_names);
+                    
+                    // set some global variables
+                    G::_ntaxa = _data->getNumTaxa();
+                    _data->copyTaxonNames(G::_taxon_names);
+                    assert (G::_species_names.size() > 0);
+                    
+                    assert (G::_ntaxa > 0);
+                    assert (G::_nspecies > 0);
+                }
+                else {
+                    // Copy taxon names to global variable _taxon_names
+                    G::_ntaxa = _data->getNumTaxa();
+                    _data->copyTaxonNames(G::_taxon_names);
+                    
+                    G::_nspecies = (unsigned) G::_species_names.size();
+                    assert (G::_nspecies > 0);
+                }
+#else
                 // set some global variables
                 G::_ntaxa = _data->getNumTaxa();
-                _data->copyTaxonNames(G::_taxon_names);
                 assert (G::_species_names.size() > 0);
-                
-                assert (G::_ntaxa > 0);
-                assert (G::_nspecies > 0);
-            }
-            else {
-                // Copy taxon names to global variable _taxon_names
-                G::_ntaxa = _data->getNumTaxa();
-                _data->copyTaxonNames(G::_taxon_names);
-                
-                G::_nspecies = (unsigned) G::_species_names.size();
-                assert (G::_nspecies > 0);
-            }
-#else
-            // set some global variables
-            G::_ntaxa = _data->getNumTaxa();
-            assert (G::_species_names.size() > 0);
 #endif
-            G::_nloci = _data->getNumSubsets();
+                G::_nloci = _data->getNumSubsets();
                 
-            assert (G::_nloci > 0);
-            ps.setNLoci(G::_nloci);
-            for (unsigned locus = 1; locus < G::_nloci+1; locus++) {
-                // Set length of partials for gene g
-                unsigned ncat = 1;
-                if (G::_plus_G) {
-                    ncat = 4; // TODO: don't hard code this
+                assert (G::_nloci > 0);
+                ps.setNLoci(G::_nloci);
+                for (unsigned locus = 1; locus < G::_nloci+1; locus++) {
+                    // Set length of partials for gene g
+                    unsigned ncat = 1;
+                    if (G::_plus_G) {
+                        ncat = 4; // TODO: don't hard code this
+                    }
+                    ps.setNElements(G::_nstates*_data->getNumPatternsInSubset(locus-1) * ncat, locus);
                 }
-                ps.setNElements(G::_nstates*_data->getNumPatternsInSubset(locus-1) * ncat, locus);
-            }
                 
-            // set random number seed
-            rng.setSeed(_random_seed);
-
-            if (!G::_gene_newicks_specified) {
+                // set random number seed
+                rng.setSeed(_random_seed);
+                
+                if (!G::_gene_newicks_specified) {
 #if defined (SPECIES_IN_CONF)
-//                    buildSpeciesMap(/*taxa_from_data*/false);
-
+                    //                    buildSpeciesMap(/*taxa_from_data*/false);
+                    
 #else
-                buildSpeciesMap(/*taxa_from_data*/true);
+                    buildSpeciesMap(/*taxa_from_data*/true);
 #endif
-            }
-                
-            Particle p;
-            initializeParticle(p); // initialize one particle and copy to all other particles
-            
-            // reset marginal likelihood
-            _log_marginal_likelihood = 0.0;
-            
-            _starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
-            
-            for (unsigned g=0; g<G::_ngroups; g++) { // TODO: unsure if this is correct
-                for (unsigned i=0; i<G::_nloci; i++) {
-                    _log_marginal_likelihood += _starting_log_likelihoods[i];
                 }
-            }
-            
-            vector<Particle> my_vec;
-            my_vec.resize(G::_nparticles * G::_ngroups, p);
                 
-            if (G::_sample_from_prior) {
-                for (auto &p:my_vec) {
-                    unsigned psuffix = 1;
+                Particle p;
+                initializeParticle(p); // initialize one particle and copy to all other particles
+                
+                // reset marginal likelihood
+                _log_marginal_likelihood = 0.0;
+                
+                _starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
+                
+                for (unsigned g=0; g<G::_ngroups; g++) { // TODO: unsure if this is correct
+                    for (unsigned i=0; i<G::_nloci; i++) {
+                        _log_marginal_likelihood += _starting_log_likelihoods[i];
+                    }
+                }
+                
+                //                    vector<Particle> my_vec;
+                my_vec.resize(G::_nparticles * G::_ngroups, p);
+                
+                if (G::_sample_from_prior) {
+                    for (auto &p:my_vec) {
+                        unsigned psuffix = 1;
                         p.setSeed(rng.randint(1,9999) + psuffix);
                         psuffix += 2;
                     }
                     for (auto &p:my_vec) {
                         p.buildEntireSpeciesTree();
                     }
-                saveSpeciesTreesAfterFirstRound(my_vec);
-                
-            }
-
-            else {
-                unsigned psuffix = 1;
-                for (auto &p:my_vec) {
-                    p.setSeed(rng.randint(1,9999) + psuffix);
-                    psuffix += 2;
+                    saveSpeciesTreesAfterFirstRound(my_vec);
+                    
                 }
                 
-                if (G::_species_newick_specified) {
-                    string species_newick = handleSpeciesNewick();
-                    unsigned count = 0;
+                else {
+                    unsigned psuffix = 1;
                     for (auto &p:my_vec) {
-                        p.processSpeciesNewick(species_newick);
-                        count++;
+                        p.setSeed(rng.randint(1,9999) + psuffix);
+                        psuffix += 2;
                     }
-                }
-                
-                // set group rng
-                _group_rng.resize(G::_ngroups);
-                psuffix = 1;
-                for (auto &g:_group_rng) {
-                    g.reset(new Lot());
-                    g->setSeed(rng.randint(1,9999)+psuffix);
-                    psuffix += 2;
-                }
-
-    #if defined (DRAW_NEW_THETA)
-                updateSpeciesNames();
-                for (auto &p:my_vec) {
-                    p.drawTheta();
-                }
-    #endif
                     
-                // particle_indices holds the subgroup each particle is in
-                unsigned total_n_particles = G::_nparticles * G::_ngroups;
-                vector<unsigned> particle_indices(total_n_particles);
-
-                // fill particle_indices with values starting from 0
-                iota(particle_indices.begin(), particle_indices.end(), 0);
-                    
-                // if using subgroups, reset pointers so particles within a group have same gene forest pointers
-                if (G::_ngroups > 1) {
-                    for (unsigned i=0; i<G::_ngroups; i++) {
-                        unsigned start = i * G::_nparticles;
-                        unsigned end = start + (G::_nparticles) - 1;
-                        vector<Forest::SharedPtr> gfcpies;
-                        for (unsigned l=0; l<G::_nloci; l++) {
-                            gfcpies.push_back(Forest::SharedPtr(new Forest()));
-                        }
-                        for (unsigned p=start; p<end+1; p++) {
-                            my_vec[p].resetSubgroupPointers(gfcpies);
+                    if (G::_species_newick_specified) {
+                        string species_newick = handleSpeciesNewick();
+                        unsigned count = 0;
+                        for (auto &p:my_vec) {
+                            p.processSpeciesNewick(species_newick);
+                            count++;
                         }
                     }
-                }
+                    
+                    // set group rng
+                    _group_rng.resize(G::_ngroups);
+                    psuffix = 1;
+                    for (auto &g:_group_rng) {
+                        g.reset(new Lot());
+                        g->setSeed(rng.randint(1,9999)+psuffix);
+                        psuffix += 2;
+                    }
+                    
+#if defined (DRAW_NEW_THETA)
+                    updateSpeciesNames();
+                    for (auto &p:my_vec) {
+                        p.drawTheta();
+                    }
+#endif
+                    
+                    // particle_indices holds the subgroup each particle is in
+                    unsigned total_n_particles = G::_nparticles * G::_ngroups;
+                    vector<unsigned> particle_indices(total_n_particles);
+                    
+                    // fill particle_indices with values starting from 0
+                    iota(particle_indices.begin(), particle_indices.end(), 0);
+                    
+                    // if using subgroups, reset pointers so particles within a group have same gene forest pointers
+                    if (G::_ngroups > 1) {
+                        for (unsigned i=0; i<G::_ngroups; i++) {
+                            unsigned start = i * G::_nparticles;
+                            unsigned end = start + (G::_nparticles) - 1;
+                            vector<Forest::SharedPtr> gfcpies;
+                            for (unsigned l=0; l<G::_nloci; l++) {
+                                gfcpies.push_back(Forest::SharedPtr(new Forest()));
+                            }
+                            for (unsigned p=start; p<end+1; p++) {
+                                my_vec[p].resetSubgroupPointers(gfcpies);
+                            }
+                        }
+                    }
                     //run through each generation of particles
-
+                    
                     unsigned nsteps = (G::_ntaxa-1)*G::_nloci;
                     
-                if (G::_verbose > 1) {
-                    cout << "step " << "\t" << "ESS before filtering " << "\t" << "n_unique particles before MCMC" <<  "\t" << "n_unique particles after MCMC" << endl;
-                }
-                    
-                for (unsigned g=0; g<nsteps; g++) {
-                    if (g == 0) {
-                        // reset gene order
-                        unsigned list_size = G::_nloci;
-                        vector<vector<unsigned>> new_gene_order;
-                        new_gene_order.resize(G::_ngroups);
-                        for (auto n:new_gene_order) {
-                            n.resize(G::_nloci);
-                        }
-
-                        for (unsigned n=0; n<G::_ngroups; n++) {
-                            unsigned count = 1;
-                            vector<pair<double, unsigned>> randomize;
-                            for (unsigned l=0; l<list_size; l++) {
-                                if (count == 1) {
-                                    randomize.clear();
-                                }
-                                randomize.push_back(make_pair(rng.uniform(), count));
-                                count++;
-                                if (count > G::_nloci) {
-                                    sort(randomize.begin(), randomize.end());
-                                    for (auto &r:randomize) {
-                                        new_gene_order[n].push_back(r.second);
-                                    }
-                                    count = 1;
-                                }
-                            }
-                        }
-
-                        // set gene order for first G::_nloci set of steps
-                        unsigned ngroup = 0;
-                        unsigned group_count = 0;
-                        for (unsigned p=0; p<G::_nparticles*G::_ngroups; p++) {
-                            my_vec[p].resetGeneOrder(g, new_gene_order[ngroup]);
-                            if ((group_count+1)%G::_nparticles == 0) {
-                                ngroup++;
-                            }
-                            group_count++;
-                        }
-                    }
-                    if (G::_verbose == 1) {
-                        cout << "starting step " << g << " of " << nsteps-1 << endl;
-                    }
-
-                    unsigned psuffix = 1;
-                    if (g > 0) {
-                        // set particle random number seeds
-                        for (auto &p:my_vec) {
-                            p.setSeed(rng.randint(1,9999) + psuffix);
-                            psuffix += 2;
-                        }
+                    if (G::_verbose > 1) {
+                        cout << "step " << "\t" << "ESS before filtering " << "\t" << "n_unique particles before MCMC" <<  "\t" << "n_unique particles after MCMC" << endl;
                     }
                     
-                    //taxon joining and reweighting step
-                    proposeParticles(my_vec);
-                    bool filter = true;
-                    
-                    if (filter) {
-                            
-                        // TODO: can parallelize filtering by subgroup
-                            if (G::_nthreads == 1) {
-                            for (unsigned i=0; i<G::_ngroups; i++) {
-                                unsigned start = i * G::_nparticles;
-                                unsigned end = start + (G::_nparticles) - 1;
-
-                                double ess = -1;
-                                ess = filterParticles(g, my_vec, particle_indices, start, end);
-                                
-                                vector<double> weights_after_filtering(G::_nparticles);
-                                
-                                for (unsigned p=0; p<G::_nparticles; p++) {
-                                    weights_after_filtering[p] = my_vec[p].getLogWeight();
-                                }
-                                
-                                std::sort(weights_after_filtering.begin(), weights_after_filtering.end());
-                                
-                                double n_unique_particles_after_filtering = std::unique(weights_after_filtering.begin(), weights_after_filtering.end()) - weights_after_filtering.begin();
-                                
-                                
-                                if (G::_verbose > 1) {
-                                    cout << G::_generation  << "\t" << ess << "\t" << "\t" << "\t" << n_unique_particles_after_filtering << "\t";
-                                    if (!G::_mcmc) {
-                                        cout << endl;
-                                    }
-                                }
-                            }
-                        }
-                        else {
-                            filterParticlesThreading(my_vec, g, particle_indices);
-                        }
-                        
-                        // TODO: testing this through filterParticlesAgain()
-                        
-//                        filterParticlesAgain(g, my_vec, particle_indices);
-                        
-//                        // reset pointers so particles have their own pointers
-//                        for (unsigned p=0; p<G::_nparticles * G::_ngroups; p++) {
-//                            vector<Forest::SharedPtr> gfcpies;
-//                            for (unsigned l=0; l<G::_nloci; l++) {
-//                                gfcpies.push_back(Forest::SharedPtr(new Forest()));
-//                            }
-//                            my_vec[p].resetSubgroupPointers(gfcpies);
-//                        }
-
-                        
-                        string filenamea = "params" + to_string(G::_generation) + "a";
-                        
-                        if (G::_generation == 0) {
-                            string filename = "mcmc_moves_accepted.log";
-                            if (std::filesystem::remove(filename)) {
-                                ofstream mcmcfile(filename);
-                                mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\t" << "average log likelihood before mcmc" << "\t" << "average log likelihood after mcmc" << "\t" << "sliding window" << "\n";
-                            }
-                            else {
-                                ofstream mcmcfile(filename);
-                                mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\t" << "average log likelihood before mcmc" << "\t" << "average log likelihood after mcmc" << "sliding window" <<"\n";
-                            }
-                        }
-                                 
-                        unsigned locus = my_vec[0].getNextGene() - 1;
-                        
-                        vector<double> log_likelihoods_before_mcmc;
-                        for (auto &p:my_vec) {
-                            log_likelihoods_before_mcmc.push_back(p.calcLogLikelihoodLocus(locus, false));
-                        }
-                        
-                        double sum_log_likelihood_before_mcmc = std::accumulate(log_likelihoods_before_mcmc.begin(), log_likelihoods_before_mcmc.end(), 0);
-                        double avg_log_likelihood_before_mcmc = sum_log_likelihood_before_mcmc / G::_nparticles;
-                        
-                        if (G::_mcmc) {
-                            G::_nmcmc_moves_accepted = 0;
-                            for (unsigned m=0; m<G::_n_mcmc_rounds; m++) {
-                                bool last_round = false;
-                                if (m == G::_n_mcmc_rounds - 1) {
-                                    last_round = true;
-                                }
-                                mcmcMoves(my_vec, last_round);
-                            }
-                            
-                            // TODO: no groups
-                            unsigned locus = my_vec[0].getNextGene() - 1; // subtract 1 because vector of gene forests starts at 0
-                            for (unsigned p=0; p<G::_nparticles; p++) {
-                                // finalize join for every particle now
-                                my_vec[p].finalizeLatestJoinMCMC(locus, p);
-                            }
-
-                            vector<double> log_likelihoods_after_mcmc;
-                            for (auto &p:my_vec) {
-                                log_likelihoods_after_mcmc.push_back(p.calcLogLikelihoodLocus(locus, true));
-                            }
-                            
-                            double sum_log_likelihood_after_mcmc = std::accumulate(log_likelihoods_after_mcmc.begin(), log_likelihoods_after_mcmc.end(), 0);
-                            double avg_log_likelihood_after_mcmc = sum_log_likelihood_after_mcmc / G::_nparticles;
-                            
-                            std::ofstream mcmcfile;
-
-                            mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
-                            double proportion_accepted = (double) G::_nmcmc_moves_accepted / (G::_nparticles * G::_n_mcmc_rounds);
-                            mcmcfile << G::_generation << "\t" << "\t" << G::_nmcmc_moves_accepted << "\t" << "\t" << proportion_accepted << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << avg_log_likelihood_after_mcmc << "\t" << "\t" << "\t" << G::_sliding_window << "\n";
-                            
-                            vector<double> weights_after_mcmc(G::_nparticles);
-                            
-                            for (unsigned p=0; p<G::_nparticles; p++) {
-                                weights_after_mcmc[p] = my_vec[p].getLogWeight();
-                            }
-                            
-                            std::sort(weights_after_mcmc.begin(), weights_after_mcmc.end());
-                            double n_unique_particles_after_mcmc = std::unique(weights_after_mcmc.begin(), weights_after_mcmc.end()) - weights_after_mcmc.begin();
-                                    
-                            if (G::_verbose > 1) {
-                                cout << "\t" << "\t" << "\t" << n_unique_particles_after_mcmc << "\n";
-                            }
-                            
-                            string filenameb = "params" + to_string(G::_generation) + "b";
-                        }
-                        else {
-                            std::ofstream mcmcfile;
-
-                            mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
-
-                            
-                            mcmcfile << G::_generation << "\t" << "\t" << "N/A" << "\t" << "N/A" << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << "N/A" << "\t" << "N/A" << "\n";
-                        }
-                    }
-                                            
-                        // only shuffle groups after all particles have coalesced each locus once, then reset gene order
-                        if ((g+1)%G::_nloci == 0 && g != nsteps-1) {
-                                // reset gene order
+                    for (unsigned g=0; g<nsteps; g++) {
+                        if (g == 0) {
+                            // reset gene order
                             unsigned list_size = G::_nloci;
                             vector<vector<unsigned>> new_gene_order;
                             new_gene_order.resize(G::_ngroups);
                             for (auto n:new_gene_order) {
                                 n.resize(G::_nloci);
                             }
-
+                            
+                            for (unsigned n=0; n<G::_ngroups; n++) {
+                                unsigned count = 1;
+                                vector<pair<double, unsigned>> randomize;
+                                for (unsigned l=0; l<list_size; l++) {
+                                    if (count == 1) {
+                                        randomize.clear();
+                                    }
+                                    randomize.push_back(make_pair(rng.uniform(), count));
+                                    count++;
+                                    if (count > G::_nloci) {
+                                        sort(randomize.begin(), randomize.end());
+                                        for (auto &r:randomize) {
+                                            new_gene_order[n].push_back(r.second);
+                                        }
+                                        count = 1;
+                                    }
+                                }
+                            }
+                            
+                            // set gene order for first G::_nloci set of steps
+                            unsigned ngroup = 0;
+                            unsigned group_count = 0;
+                            for (unsigned p=0; p<G::_nparticles*G::_ngroups; p++) {
+                                my_vec[p].resetGeneOrder(g, new_gene_order[ngroup]);
+                                if ((group_count+1)%G::_nparticles == 0) {
+                                    ngroup++;
+                                }
+                                group_count++;
+                            }
+                        }
+                        if (G::_verbose == 1) {
+                            cout << "starting step " << g << " of " << nsteps-1 << endl;
+                        }
+                        
+                        unsigned psuffix = 1;
+                        if (g > 0) {
+                            // set particle random number seeds
+                            for (auto &p:my_vec) {
+                                p.setSeed(rng.randint(1,9999) + psuffix);
+                                psuffix += 2;
+                            }
+                        }
+                        
+                        //taxon joining and reweighting step
+                        proposeParticles(my_vec);
+                        bool filter = true;
+                        
+                        if (filter) {
+                            
+                            // TODO: can parallelize filtering by subgroup
+                            if (G::_nthreads == 1) {
+                                for (unsigned i=0; i<G::_ngroups; i++) {
+                                    unsigned start = i * G::_nparticles;
+                                    unsigned end = start + (G::_nparticles) - 1;
+                                    
+                                    double ess = -1;
+                                    ess = filterParticles(g, my_vec, particle_indices, start, end);
+                                    
+                                    vector<double> weights_after_filtering(G::_nparticles);
+                                    
+                                    for (unsigned p=0; p<G::_nparticles; p++) {
+                                        weights_after_filtering[p] = my_vec[p].getLogWeight();
+                                    }
+                                    
+                                    std::sort(weights_after_filtering.begin(), weights_after_filtering.end());
+                                    
+                                    double n_unique_particles_after_filtering = std::unique(weights_after_filtering.begin(), weights_after_filtering.end()) - weights_after_filtering.begin();
+                                    
+                                    
+                                    if (G::_verbose > 1) {
+                                        cout << G::_generation  << "\t" << ess << "\t" << "\t" << "\t" << n_unique_particles_after_filtering << "\t";
+                                        if (!G::_mcmc) {
+                                            cout << endl;
+                                        }
+                                    }
+                                }
+                            }
+                            else {
+                                filterParticlesThreading(my_vec, g, particle_indices);
+                            }
+                            
+                            
+                            
+                            string filenamea = "params" + to_string(G::_generation) + "a";
+                            
+                            if (G::_generation == 0) {
+                                string filename = "mcmc_moves_accepted.log";
+                                if (std::filesystem::remove(filename)) {
+                                    ofstream mcmcfile(filename);
+                                    mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\t" << "average log likelihood before mcmc" << "\t" << "average log likelihood after mcmc" << "\t" << "sliding window" << "\n";
+                                }
+                                else {
+                                    ofstream mcmcfile(filename);
+                                    mcmcfile << "generation" << "\t" << "number of mcmc moves accepted" << "\t" << "proportion of mcmc moves accepted" << "\t" << "average log likelihood before mcmc" << "\t" << "average log likelihood after mcmc" << "sliding window" <<"\n";
+                                }
+                            }
+                            
+                            unsigned locus = my_vec[0].getNextGene() - 1;
+                            
+                            vector<double> log_likelihoods_before_mcmc;
+                            for (auto &p:my_vec) {
+                                log_likelihoods_before_mcmc.push_back(p.calcLogLikelihoodLocus(locus, false));
+                            }
+                            
+                            double sum_log_likelihood_before_mcmc = std::accumulate(log_likelihoods_before_mcmc.begin(), log_likelihoods_before_mcmc.end(), 0);
+                            double avg_log_likelihood_before_mcmc = sum_log_likelihood_before_mcmc / G::_nparticles;
+                            
+                            if (G::_mcmc) {
+                                G::_nmcmc_moves_accepted = 0;
+                                for (unsigned m=0; m<G::_n_mcmc_rounds; m++) {
+                                    bool last_round = false;
+                                    if (m == G::_n_mcmc_rounds - 1) {
+                                        last_round = true;
+                                    }
+                                    mcmcMoves(my_vec, last_round);
+                                }
+                                
+                                // TODO: no groups
+                                unsigned locus = my_vec[0].getNextGene() - 1; // subtract 1 because vector of gene forests starts at 0
+                                for (unsigned p=0; p<G::_nparticles; p++) {
+                                    // finalize join for every particle now
+                                    my_vec[p].finalizeLatestJoinMCMC(locus, p);
+                                }
+                                
+                                vector<double> log_likelihoods_after_mcmc;
+                                for (auto &p:my_vec) {
+                                    log_likelihoods_after_mcmc.push_back(p.calcLogLikelihoodLocus(locus, true));
+                                }
+                                
+                                double sum_log_likelihood_after_mcmc = std::accumulate(log_likelihoods_after_mcmc.begin(), log_likelihoods_after_mcmc.end(), 0);
+                                double avg_log_likelihood_after_mcmc = sum_log_likelihood_after_mcmc / G::_nparticles;
+                                
+                                std::ofstream mcmcfile;
+                                
+                                mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
+                                double proportion_accepted = (double) G::_nmcmc_moves_accepted / (G::_nparticles * G::_n_mcmc_rounds);
+                                mcmcfile << G::_generation << "\t" << "\t" << G::_nmcmc_moves_accepted << "\t" << "\t" << proportion_accepted << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << avg_log_likelihood_after_mcmc << "\t" << "\t" << "\t" << G::_sliding_window << "\n";
+                                
+                                vector<double> weights_after_mcmc(G::_nparticles);
+                                
+                                for (unsigned p=0; p<G::_nparticles; p++) {
+                                    weights_after_mcmc[p] = my_vec[p].getLogWeight();
+                                }
+                                
+                                std::sort(weights_after_mcmc.begin(), weights_after_mcmc.end());
+                                double n_unique_particles_after_mcmc = std::unique(weights_after_mcmc.begin(), weights_after_mcmc.end()) - weights_after_mcmc.begin();
+                                
+                                if (G::_verbose > 1) {
+                                    cout << "\t" << "\t" << "\t" << n_unique_particles_after_mcmc << "\n";
+                                }
+                                
+                                string filenameb = "params" + to_string(G::_generation) + "b";
+                            }
+                            else {
+                                std::ofstream mcmcfile;
+                                
+                                mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
+                                
+                                
+                                mcmcfile << G::_generation << "\t" << "\t" << "N/A" << "\t" << "N/A" << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << "N/A" << "\t" << "N/A" << "\n";
+                            }
+                        }
+                        
+                        // only shuffle groups after all particles have coalesced each locus once, then reset gene order
+                        if ((g+1)%G::_nloci == 0 && g != nsteps-1) {
+                            // reset gene order
+                            unsigned list_size = G::_nloci;
+                            vector<vector<unsigned>> new_gene_order;
+                            new_gene_order.resize(G::_ngroups);
+                            for (auto n:new_gene_order) {
+                                n.resize(G::_nloci);
+                            }
+                            
                             for (unsigned n=0; n<G::_ngroups; n++) {
                                 unsigned count = 1;
                                 vector<pair<double, unsigned>> randomize;
@@ -4618,17 +4609,17 @@ namespace proj {
                                 group_count++;
                             }
                         }
-                    G::_generation++;
+                        G::_generation++;
+                        
+#if defined (VALGRIND)
+                        VALGRIND_PRINTF("~~> post 1st-level step %d at time %d\n", g, (unsigned)clock()); // g = step
+                        VALGRIND_MONITOR_COMMAND(str(format("detailed_snapshot stepsnaps-%d.txt") % g).c_str());
+#endif
+                    } // g loop
                     
-    #if defined (VALGRIND)
-                    VALGRIND_PRINTF("~~> post 1st-level step %d at time %d\n", g, (unsigned)clock()); // g = step
-                    VALGRIND_MONITOR_COMMAND(str(format("detailed_snapshot stepsnaps-%d.txt") % g).c_str());
-    #endif
-                } // g loop
-                    
-                for (auto &p:my_vec) {
-                    p.calcGeneTreeLengths();
-                }
+                    for (auto &p:my_vec) {
+                        p.calcGeneTreeLengths();
+                    }
                     
                     if (G::_save_gene_trees) {
                         saveGeneTrees(my_vec);
@@ -4639,7 +4630,7 @@ namespace proj {
                         cout << "\n";
                     }
                     
-                     writePartialCountFile(my_vec);
+                    writePartialCountFile(my_vec);
                     
                     for (auto &p:my_vec) {
                         p.setSortedThetaVector();
@@ -4655,7 +4646,7 @@ namespace proj {
                         
                         // keep only n_elements_to_keep
                         my_vec.resize(n_elements_to_keep);
-
+                        
                         
                         for (unsigned i=0; i<G::_nloci; i++) {
                             ofstream heightf;
@@ -4663,7 +4654,7 @@ namespace proj {
                             if (std::filesystem::remove(filename)) {
                                 ofstream heightf(filename);
                                 if (G::_verbose > 0) {
-                                   cout << "existing file " << filename << " removed and replaced\n";
+                                    cout << "existing file " << filename << " removed and replaced\n";
                                 }
                             }
                             else {
@@ -4675,7 +4666,7 @@ namespace proj {
                         }
                         
                         writeParamsFileForBeastComparison(my_vec);
-                    
+                        
                         if (G::_write_species_tree_file) {
                             saveAllSpeciesTrees(my_vec);
                         }
@@ -4746,58 +4737,58 @@ namespace proj {
                                 else {
                                     sim_file_name = G::_newick_path + "/" + "gene" + to_string(l+1) + ".trees";
                                 }
-                                 
-                                 Particle p;
-                                 string true_newick = readNewickFromFile(sim_file_name);
-                                 
-                                 double true_bhv = p.calcBHVDistanceTrueTreeGene(true_newick);
-                                 
+                                
+                                Particle p;
+                                string true_newick = readNewickFromFile(sim_file_name);
+                                
+                                double true_bhv = p.calcBHVDistanceTrueTreeGene(true_newick);
+                                
                                 _bhv_distances_genes[l].push_back(true_bhv);
-    //                             // sort distances
-                                 std::sort(_bhv_distances_genes[l].begin(), _bhv_distances_genes[l].end());
-    
-    //                             // find rank of truth
-                                 auto it = std::find(_bhv_distances_genes[l].begin(), _bhv_distances_genes[l].end(), true_bhv);
-                                 unsigned index_value = (unsigned) std::distance(_bhv_distances_genes[l].begin(), it);
-
-                                 // write rank value to file
-                                 ofstream rankf("rank_bhv" + to_string(l+1) + ".txt");
-                                 rankf << "rank: " << index_value << endl;
-                             }
+                                //                             // sort distances
+                                std::sort(_bhv_distances_genes[l].begin(), _bhv_distances_genes[l].end());
+                                
+                                //                             // find rank of truth
+                                auto it = std::find(_bhv_distances_genes[l].begin(), _bhv_distances_genes[l].end(), true_bhv);
+                                unsigned index_value = (unsigned) std::distance(_bhv_distances_genes[l].begin(), it);
+                                
+                                // write rank value to file
+                                ofstream rankf("rank_bhv" + to_string(l+1) + ".txt");
+                                rankf << "rank: " << index_value << endl;
+                            }
                         }
                         
                         if (G::_hpd) {
                             assert (_hpd_values_genes.size() > 0);
                             for (unsigned l=0; l<G::_nloci; l++) {
-                                 ofstream hpdf("hpd" + to_string(l+1) + ".txt");
-                                 hpdf << "min    " << "max " << endl;
-                                 
-                                 // sort hpd values largest to smallest
-                                 std::sort(_hpd_values_genes[l].begin(), _hpd_values_genes[l].end());
-                                 std::reverse(_hpd_values_genes[l].begin(), _hpd_values_genes[l].end());
-                                 
-                                 // take first 95% of values (round down to nearest integer)
-                                 double total = std::size(_hpd_values_genes[l]);
-                                 double ninety_five_index = floor(0.95*total);
-                                 
-                                 if (ninety_five_index == 0) {
-                                     ninety_five_index = 1;
-                                 }
-                                 
-                                 vector<double> hpd_values_in_range;
-                                 
-                                 for (unsigned h=0; h<ninety_five_index; h++) {
-                                     hpd_values_in_range.push_back(_hpd_values_genes[l][h].second);
-                                 }
-                                 
-                                 auto max = *std::max_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
-                                 auto min = *std::min_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
-                                 assert (min < max || min == max);
-                                 
-                                 // write min and max to file
-                                 hpdf << min << "\t" << max << endl;
+                                ofstream hpdf("hpd" + to_string(l+1) + ".txt");
+                                hpdf << "min    " << "max " << endl;
+                                
+                                // sort hpd values largest to smallest
+                                std::sort(_hpd_values_genes[l].begin(), _hpd_values_genes[l].end());
+                                std::reverse(_hpd_values_genes[l].begin(), _hpd_values_genes[l].end());
+                                
+                                // take first 95% of values (round down to nearest integer)
+                                double total = std::size(_hpd_values_genes[l]);
+                                double ninety_five_index = floor(0.95*total);
+                                
+                                if (ninety_five_index == 0) {
+                                    ninety_five_index = 1;
+                                }
+                                
+                                vector<double> hpd_values_in_range;
+                                
+                                for (unsigned h=0; h<ninety_five_index; h++) {
+                                    hpd_values_in_range.push_back(_hpd_values_genes[l][h].second);
+                                }
+                                
+                                auto max = *std::max_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                                auto min = *std::min_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                                assert (min < max || min == max);
+                                
+                                // write min and max to file
+                                hpdf << min << "\t" << max << endl;
                             }
-                         }
+                        }
                         
                         if (G::_hpd_first_level_species) {
                             ofstream hpdf("hpd_first_level_species.txt");
@@ -4843,14 +4834,14 @@ namespace proj {
                             // write mean gene tree heights to output file for validation
                             double sum = accumulate(_species_tree_heights_after_first_round.begin(), _species_tree_heights_after_first_round.end(), 0.0);
                             double mean = sum / _species_tree_heights_after_first_round.size();
-
+                            
                             ofstream heightf("average_species_tree_height_after_first_round.txt");
                             heightf << mean << endl;
                         }
                     }
-
+                    
                     else {
-    #if defined (HIERARCHICAL_FILTERING)
+#if defined (HIERARCHICAL_FILTERING)
                         saveSpeciesTreesAfterFirstRound(my_vec);
                         
                         G::_in_second_level = true;
@@ -4895,7 +4886,7 @@ namespace proj {
                         if (std::filesystem::remove(filename3)) {
                             ofstream paramsf(filename3);
                             if (G::_verbose > 0) {
-                               cout << "existing file " << filename3 << " removed and replaced\n";
+                                cout << "existing file " << filename3 << " removed and replaced\n";
                             }
                         }
                         else {
@@ -4905,7 +4896,7 @@ namespace proj {
                             }
                         }
                         cout << "\n";
-
+                        
                         unsigned ngroups = round(G::_nparticles * G::_ngroups * G::_thin);
                         if (ngroups == 0) {
                             ngroups = 1;
@@ -4916,7 +4907,7 @@ namespace proj {
                         if (std::filesystem::remove("species_heights.txt")) {
                             ofstream heightf("species_heights.txt");
                             if (G::_verbose > 0) {
-                               cout << "existing file " << "species_heights.txt" << " removed and replaced\n";
+                                cout << "existing file " << "species_heights.txt" << " removed and replaced\n";
                             }
                         }
                         else {
@@ -4930,11 +4921,11 @@ namespace proj {
                         if (std::filesystem::remove(altfname)) {
                             
                             if (G::_verbose > 0) {
-                               cout << "existing file " << altfname << " removed and replaced\n";
+                                cout << "existing file " << altfname << " removed and replaced\n";
                             }
                             
                             ofstream alttrf(altfname);
-
+                            
                             alttrf << "#nexus\n\n";
                             alttrf << "Begin trees;" << endl;
                             string translate_block = my_vec[0].getTranslateBlock();
@@ -4942,7 +4933,7 @@ namespace proj {
                         }
                         else {
                             ofstream alttrf(altfname);
-
+                            
                             alttrf << "#nexus\n\n";
                             alttrf << "Begin trees;" << endl;
                             string translate_block = my_vec[0].getTranslateBlock();
@@ -4956,18 +4947,24 @@ namespace proj {
                         
                         
                         heightf << "species_tree_height" << endl;
-                                                
-                        secondLevel(my_vec);
-    #endif
+                        
+                        //                            secondLevel(my_vec);
+#endif
                     }
                 }
             }
-
-        catch (XProj & x) {
-            std::cerr << "Proj encountered a problem:\n  " << x.what() << std::endl;
-        }
-        }
-
-        std::cout << "\nFinished!" << std::endl;
+            catch (XProj & x) {
+                std::cerr << "Proj encountered a problem:\n  " << x.what() << std::endl;
+            }
+//        }
+    }
+# if defined (HIERARCHICAL_FILTERING)
+#if defined (USING_MPI)
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+            secondLevel(my_vec);
+#endif
+            
+            std::cout << "\nFinished!" << std::endl;
     }
 }
