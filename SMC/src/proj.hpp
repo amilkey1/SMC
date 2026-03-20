@@ -775,6 +775,7 @@ namespace proj {
 //        }
     }
 
+# if defined (USING_MPI)
     inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFilteringMPI(vector<Particle> &v, string filename, unsigned group_number, vector<vector<double>> indices_to_keep) {
         // this function creates a params file that is comparable to output from starbeast3
         std::ofstream logf;
@@ -909,6 +910,7 @@ namespace proj {
 
         logf.close();
     }
+#endif
 
 
     inline void Proj::writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(vector<Particle> &v, string filename, unsigned group_number) {
@@ -1143,6 +1145,7 @@ namespace proj {
         treef.close();
     }
 
+# if defined (USING_MPI)
     inline void Proj::saveSpeciesTreesAltHierarchicalMPI(vector<Particle> &v, unsigned group_number, string filename1, vector<vector<double>> indices_to_keep)  {
         assert (G::_start_mode_type != G::StartModeType::START_MODE_SIM);
 
@@ -1158,6 +1161,7 @@ namespace proj {
         }
         treef.close();
     }
+#endif
 
     inline void Proj::saveSpeciesTreesHierarchical(vector<Particle> &v, string filename1, string filename2, unsigned group_number) {
         // save only unique species trees
@@ -1230,6 +1234,7 @@ namespace proj {
         }
     }
 
+# if defined (USING_MPI)
     inline void Proj::saveSpeciesTreesHierarchicalMPI(vector<Particle> &v, string filename1, string filename2, unsigned group_number, vector<vector<double>> indices_to_keep) {
         // save only unique species trees
         if (!G::_run_on_empty) {
@@ -1274,6 +1279,7 @@ namespace proj {
                 treef.close();
         }
     }
+#endif
 
     inline void Proj::saveSpeciesTreesAfterFirstRound(vector<Particle> &v) const {
         if (G::_sample_from_prior) {
