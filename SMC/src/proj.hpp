@@ -3515,6 +3515,8 @@ namespace proj {
 #endif
 
     inline void Proj::secondLevel(vector<Particle> &particles) {
+        // TODO: clear all particles except thin%, then modify group number to fit the new structure
+        // TODO: this will save memory because it will avoid having extra particles in memory
         if (G::_save_memory_second_level) {
             G::_nthreads = floor(G::_nthreads / 4);
         }
@@ -3621,6 +3623,28 @@ namespace proj {
 #endif
         
         assert (_second_level_indices_to_keep.size() == ngroups);
+        
+        cout << sizeof(particles) << endl;
+//        // clear all particles not in _particle_indices_to_thin
+        vector<Particle> kept_particles;
+        for (unsigned s=0; s<_particle_indices_to_thin.size(); s++) {
+            unsigned index = _particle_indices_to_thin[s];
+            kept_particles.push_back(particles[index]);
+        }
+        particles.swap(kept_particles);
+        particles.shrink_to_fit();
+        kept_particles.clear();
+        
+        for (unsigned count=0; count<_particle_indices_to_thin.size(); count++) {
+            _particle_indices_to_thin[count] = count;
+        }
+        
+        cout << "x";
+//        for (unsigned p=0; p<particles.size(); p++) {
+//            if(std::find(_particle_indices_to_thin.begin(), _particle_indices_to_thin.end(), p) == _particle_indices_to_thin.end()) {
+//                particles[p].clear();
+//            }
+//        }
         
 #if defined (USING_MPI)
         cout << "Rank " << my_rank << " reached the sync point" << endl << flush;
@@ -3862,8 +3886,7 @@ namespace proj {
         }
 #else
         if (G::_nthreads == 1) {
-            Particle p;
-            p.mapSpecies(_taxon_map);
+            cout << sizeof(particles) << endl;
             cout << "starting proposals second level" << endl;
             for (unsigned g=0; g<ngroups; g++) { // propose and filter for each particle saved from first round
 

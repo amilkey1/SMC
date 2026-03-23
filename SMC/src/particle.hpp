@@ -284,6 +284,8 @@ class Particle {
         _prev_next_species_number_by_gene = 0;
         _prev_increment_prior = 0;
         _prev_species_assignments_before_coalescence.clear();
+        _theta_map.clear();
+        _gene_forest_extensions.clear();
     }
 
     inline void Particle::showSpeciesTree() {
