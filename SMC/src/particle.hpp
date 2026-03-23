@@ -76,6 +76,7 @@ class Particle {
         const SpeciesForest &                   getSpeciesForest() const {return _species_forest;}
         vector<double>                          getThetaMap();
         double                                  getThetaMean(){return _theta_mean;}
+        void                                    setThetaMean(double theta_mean){_theta_mean = theta_mean;}
         string                                  saveForestNewick() {
             return _species_forest.makeNewick(8, true);}
         string                                  saveForestNewickAlt() {return _species_forest.makeAltNewick(8, false);}
@@ -93,6 +94,11 @@ class Particle {
         void                                    resetSpeciesForestPointers(SpeciesForest species_forest_copy);
     
         void                                    proposeMCMCMove(bool last_round);
+    
+//#if defined (USING_MPI)
+    vector<Forest::coalinfo_t>                          getCoalEnsemble(){return _ensemble_coalinfo;}
+    void                                        setCoalEnsemble(vector<Forest::coalinfo_t> ensemble_coal_info){_ensemble_coalinfo = ensemble_coal_info;}
+//#endif
     
         bool operator<(const Particle::SharedPtr & other) const {
             return _log_weight<other->_log_weight;

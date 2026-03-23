@@ -57,6 +57,7 @@ string      G::_outgroup = "none";
 bool        G::_run_on_empty = false;
 bool        G::_run_on_empty_first_level_only = false;
 bool        G::_save_memory = false;
+bool        G::_save_memory_second_level = false;
 unsigned    G::_nparticles = 100;
 unsigned    G::_nthreads = 1;
 bool        G::_use_gpu = true;

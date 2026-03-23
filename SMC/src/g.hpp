@@ -39,6 +39,7 @@ namespace proj {
         static bool                 _run_on_empty;
         static bool                 _run_on_empty_first_level_only;
         static bool                 _save_memory;
+        static bool                 _save_memory_second_level;
         static unsigned             _nparticles;
         static vector<double>       _base_frequencies;
         static string               _string_base_frequencies;
