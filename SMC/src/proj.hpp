@@ -1369,13 +1369,22 @@ namespace proj {
 
     inline void Proj::saveGeneTrees(vector<Particle> &v) const {
         if (G::_start_mode_type == G::StartModeType::START_MODE_SMC) {
+            unsigned nsave = G::_thin * v.size(); // number of trees to save
+            // ex. save 20% of 100 particles = save 20 particles
+            // 100 / 20 = 5 - save 1 / 5 particles
+            unsigned save_every = v.size() / nsave;
+            
             for (unsigned i=1; i<G::_nloci+1; i++) {
                 string fname = "gene" + to_string(i) + ".trees";
                 ofstream treef(fname);
                 treef << "#nexus\n\n";
                 treef << "begin trees;\n";
+                unsigned count = 0;
                 for (auto &p:v) {
-                    treef << "tree gene" << i << " = [&R] " << p.saveGeneNewick(i)  << ";\n";
+                    if (count % save_every == 0) {
+                        treef << "tree gene" << i << " = [&R] " << p.saveGeneNewick(i)  << ";\n";
+                    }
+                    count++;
                 }
                 treef << "end;\n";
             }
