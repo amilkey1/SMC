@@ -72,6 +72,7 @@ namespace proj {
             void                writeParamsFileForBeastComparisonTestB(vector<Particle> &v, string filename) const;
             void                writeParamsFileForBeastComparisonAfterSpeciesFiltering(vector<Particle> &v, string filename, unsigned group_number);
             void                writeParamsFileForBeastComparisonAfterSpeciesFilteringSpeciesOnly(vector<Particle> &v, string filename, unsigned group_number);
+            void                writeLogMarginalLikelihoodFile() const;
             void                writePartialCountFile(vector<Particle> &particles);
             void                createSpeciesMap(bool data);
             void                createSpeciesMapTyped();
@@ -114,7 +115,8 @@ namespace proj {
 
             Partition::SharedPtr        _partition;
             Data::SharedPtr             _data;
-            double                      _log_marginal_likelihood = 0.0;
+            vector<double>              _log_marginal_likelihoods;
+            double                      _average_log_marginal_likelihood;
             double                      _log_species_tree_marginal_likelihood = 0.0;
             unsigned                    _random_seed;
             unsigned long               _partials_needed;
@@ -2123,13 +2125,6 @@ namespace proj {
 
         transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
 
-//        // Compute component of the log marginal likelihood due to this step
-//        _log_marginal_likelihood += log_sum_weights - log(G::_nparticles);
-        
-    //        if (step < G::_nloci) {
-    //            _log_marginal_likelihood += _starting_log_likelihood;
-    //        }
-
         double ess = 0.0;
         if (G::_verbose > 1) {
             // Compute effective sample size
@@ -2249,11 +2244,8 @@ namespace proj {
         transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
 
         // Compute component of the log marginal likelihood due to this step
-        _log_marginal_likelihood += log_sum_weights - log(G::_nparticles);
-        
-//        if (step < G::_nloci) {
-//            _log_marginal_likelihood += _starting_log_likelihood;
-//        }
+        unsigned group = start / G::_nparticles;
+        _log_marginal_likelihoods[group] += log_sum_weights - log(G::_nparticles);
 
         double ess = 0.0;
         if (G::_verbose > 1) {
@@ -2750,7 +2742,7 @@ namespace proj {
         }
         sum_h/=my_vec.size();
         cout << "mean height equals " << sum_h << endl;
-        cout << "log marginal likelihood = " << _log_marginal_likelihood << endl;
+        cout << "log marginal likelihood = " << _average_log_marginal_likelihood << endl;
 
 #if defined (DRAW_NEW_THETA)
         cout << "different theta for each population in each particle " << endl;
@@ -3633,7 +3625,6 @@ namespace proj {
         
         assert (_second_level_indices_to_keep.size() == ngroups);
         
-        cout << sizeof(particles) << endl;
 //        // clear all particles not in _particle_indices_to_thin
         vector<Particle> kept_particles;
         for (unsigned s=0; s<_particle_indices_to_thin.size(); s++) {
@@ -3648,7 +3639,6 @@ namespace proj {
             _particle_indices_to_thin[count] = count;
         }
         
-        cout << "x";
 //        for (unsigned p=0; p<particles.size(); p++) {
 //            if(std::find(_particle_indices_to_thin.begin(), _particle_indices_to_thin.end(), p) == _particle_indices_to_thin.end()) {
 //                particles[p].clear();
@@ -3895,7 +3885,6 @@ namespace proj {
         }
 #else
         if (G::_nthreads == 1) {
-            cout << sizeof(particles) << endl;
             cout << "starting proposals second level" << endl;
             for (unsigned g=0; g<ngroups; g++) { // propose and filter for each particle saved from first round
 
@@ -4256,6 +4245,12 @@ namespace proj {
         }
     }
 
+    inline void Proj::writeLogMarginalLikelihoodFile() const {
+        // this function writes the log marginal likelihood to a file
+        ofstream logf ("marginal_likelihood.txt");
+        logf << "log marginal likelihood: " << _average_log_marginal_likelihood << "\n";
+    }
+
 #if defined (DRAW_NEW_THETA)
     inline void Proj::updateSpeciesNames() {
         unsigned number = G::_nspecies;
@@ -4527,17 +4522,16 @@ inline void Proj::run() {
                 initializeParticle(p); // initialize one particle and copy to all other particles
                 
                 // reset marginal likelihood
-                _log_marginal_likelihood = 0.0;
+                _log_marginal_likelihoods.resize(G::_ngroups, 0.0);
                 
                 _starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
                 
-                for (unsigned g=0; g<G::_ngroups; g++) { // TODO: unsure if this is correct
+                for (unsigned g=0; g<G::_ngroups; g++) {
                     for (unsigned i=0; i<G::_nloci; i++) {
-                        _log_marginal_likelihood += _starting_log_likelihoods[i];
+                        _log_marginal_likelihoods[g] += _starting_log_likelihoods[i];
                     }
                 }
                 
-                //                    vector<Particle> my_vec;
                 my_vec.resize(G::_nparticles * G::_ngroups, p);
                 
                 if (G::_sample_from_prior) {
@@ -4836,6 +4830,10 @@ inline void Proj::run() {
 #endif
                         } // g loop
                         
+                        _average_log_marginal_likelihood = G::calcLogSum(_log_marginal_likelihoods) - log(G::_ngroups);
+                        
+                        writeLogMarginalLikelihoodFile();
+
                         for (auto &p:my_vec) {
                             p.calcGeneTreeLengths();
                         }
@@ -4845,7 +4843,7 @@ inline void Proj::run() {
                         }
                         if (G::_verbose > 0) {
                             cout << "\n";
-                            cout << "marginal likelihood after combined filtering: " << _log_marginal_likelihood << endl;
+                            cout << "marginal likelihood after combined filtering: " << _average_log_marginal_likelihood << endl;
                             cout << "\n";
                         }
                         

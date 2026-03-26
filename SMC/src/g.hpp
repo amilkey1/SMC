@@ -117,6 +117,7 @@ namespace proj {
         // functions
         string inventName(unsigned k, bool lower_case);
         static unsigned multinomialDraw(Lot::SharedPtr lot, const vector<double> & probs);
+        static double   calcLogSum(const vector<double> & log_values);
         
     };
 
@@ -185,6 +186,17 @@ namespace proj {
         assert(d >= 0);
         assert(d < probs.size());
         return (unsigned)d;
+    }
+
+    inline double G::calcLogSum(const vector<double> & log_values) {
+        double max_logv = *max_element(log_values.begin(), log_values.end());
+        
+        double factored_sum = 0.0;
+        for (auto & logv : log_values) {
+            factored_sum += exp(logv - max_logv);
+        }
+        double log_sum_values = max_logv + log(factored_sum);
+        return log_sum_values;
     }
 
 
