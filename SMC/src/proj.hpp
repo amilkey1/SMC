@@ -5180,7 +5180,9 @@ inline void Proj::run() {
 #if defined (USING_MPI)
     MPI_Barrier(MPI_COMM_WORLD);
 #endif
-            secondLevel(my_vec);
+    if (!G::_gene_newicks_specified) {
+        secondLevel(my_vec);
+    }
 #endif
             
             std::cout << "\nFinished!" << std::endl;
