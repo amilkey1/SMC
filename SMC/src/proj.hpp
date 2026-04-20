@@ -5180,7 +5180,7 @@ inline void Proj::run() {
 #if defined (USING_MPI)
     MPI_Barrier(MPI_COMM_WORLD);
 #endif
-    if (!G::_gene_newicks_specified && !G::_sample_from_prior) {
+    if (!G::_gene_newicks_specified && !G::_sample_from_prior && G::_start_mode != "sim") {
         secondLevel(my_vec);
     }
 #endif
