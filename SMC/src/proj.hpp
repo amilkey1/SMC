@@ -449,7 +449,7 @@ namespace proj {
 
     inline void Proj::writeParamsFileForBeastComparison(vector<Particle> &v) {
         // this function creates a params file that is comparable to output from starbeast3
-        ofstream logf("params-beast-comparison.log");
+        ofstream logf("params.log");
         logf << "iter ";
         logf << "\t" << "posterior ";
         logf << "\t" << "likelihood ";
@@ -1699,19 +1699,19 @@ namespace proj {
             for (unsigned n=0; n<100; n++) {
                 if (n < 10) {
 //                    G::_double_relative_rates[n] *= 0.0000842; // 0.001 unnormalized rate
-                    G::_double_relative_rates[n] *= 0.0001;
+                    G::_double_relative_rates[n] *= 0.001;
                 }
                 else if (n < 20) {
 //                    G::_double_relative_rates[n] *= 0.000842; // 0.01 rate
-                    G::_double_relative_rates[n] *= 0.001;
+                    G::_double_relative_rates[n] *= 0.01;
                 }
                 else if (n < 30) {
 //                    G::_double_relative_rates[n] *= 0.00842; // 0.1
-                    G::_double_relative_rates[n] *= 0.01;
+                    G::_double_relative_rates[n] *= 0.1;
                 }
                 else if (n < 40) {
 //                    G::_double_relative_rates[n] *= 0.0421; // 0.5
-                    G::_double_relative_rates[n] *= 0.1;
+                    G::_double_relative_rates[n] *= 0.5;
                 }
                 else if (n < 60) {
 //                    G::_double_relative_rates[n] *= 0.0842; // 1.0
@@ -1719,19 +1719,19 @@ namespace proj {
                 }
                 else if (n < 70) {
 //                    G::_double_relative_rates[n] *= 0.09262; // 1.1
-                    G::_double_relative_rates[n] *= 1.1;
+                    G::_double_relative_rates[n] *= 5;
                 }
                 else if (n < 80) {
 //                    G::_double_relative_rates[n] *= 0.421; // 5.0
-                    G::_double_relative_rates[n] *= 1.5;
+                    G::_double_relative_rates[n] *= 25;
                 }
                 else if (n < 90) {
 //                    G::_double_relative_rates[n] *= 0.842; // 10.0
-                    G::_double_relative_rates[n] *= 2.0;
+                    G::_double_relative_rates[n] *= 75;
                 }
                 else {
 //                    G::_double_relative_rates[n] *= 8.42; // 100.0
-                    G::_double_relative_rates[n] *= 3.3;
+                    G::_double_relative_rates[n] *= 100;
                 }
             }
 #else
@@ -1912,7 +1912,7 @@ namespace proj {
         cout << "\n";
         string filename1 = "species_trees.trees";
         string filename2 = "unique_species_trees.trees";
-        string filename3 = "params-beast-comparison.log";
+        string filename3 = "params.log";
         if (std::filesystem::remove(filename1)) {
             ofstream speciestrf(filename1);
             speciestrf << "#nexus\n\n";
@@ -3528,7 +3528,7 @@ namespace proj {
         cout << "\n";
         string filename1 = "species_trees.trees";
         string filename2 = "unique_species_trees.trees";
-        string filename3 = "params-beast-comparison.log";
+        string filename3 = "params.log";
         string altfname = "alt_species_trees.trees";
 
         cout << "\n";
@@ -3810,7 +3810,7 @@ namespace proj {
             
             // write params file
             
-            ofstream paramf("params-beast-comparison.log");
+            ofstream paramf("params.log");
             
             paramf << "\t" << "posterior ";
             paramf << "\t" << "likelihood ";
@@ -3855,8 +3855,8 @@ namespace proj {
             string line;
             // For writing text file
             // Creating ofstream & ifstream class object
-            ifstream in ("params-beast-comparison.log");
-            ofstream out("params-beast-comparison-final.log");
+            ifstream in ("params.log");
+            ofstream out("params-final.log");
             
             unsigned line_count = 0;
             
@@ -3878,8 +3878,8 @@ namespace proj {
             out.close();
             
             // remove existing params file and replace with copy
-            char oldfname[] = "params-beast-comparison.log";
-            char newfname[] = "params-beast-comparison-final.log";
+            char oldfname[] = "params.log";
+            char newfname[] = "params-final.log";
             std::filesystem::remove(oldfname);
             std::rename(newfname, oldfname);
         }
@@ -3973,8 +3973,8 @@ namespace proj {
             string line;
             // For writing text file
             // Creating ofstream & ifstream class object
-            ifstream in ("params-beast-comparison.log");
-            ofstream f("params-beast-comparison-final.log");
+            ifstream in ("params.log");
+            ofstream f("params-final.log");
             
             unsigned line_count = 0;
 
@@ -4000,8 +4000,8 @@ namespace proj {
             }
 
             // remove existing params file and replace with copy
-            char oldfname[] = "params-beast-comparison.log";
-            char newfname[] = "params-beast-comparison-final.log";
+            char oldfname[] = "params.log";
+            char newfname[] = "params-final.log";
             std::filesystem::remove(oldfname);
             std::rename(newfname, oldfname);
         }
@@ -4022,8 +4022,8 @@ namespace proj {
             string line;
             // For writing text file
             // Creating ofstream & ifstream class object
-            ifstream in ("params-beast-comparison.log");
-            ofstream f("params-beast-comparison-final.log");
+            ifstream in ("params.log");
+            ofstream f("params-final.log");
 
             unsigned line_count = 0;
 
@@ -4049,8 +4049,8 @@ namespace proj {
             }
 
             // remove existing params file and replace with copy
-            char oldfname[] = "params-beast-comparison.log";
-            char newfname[] = "params-beast-comparison-final.log";
+            char oldfname[] = "params.log";
+            char newfname[] = "params-final.log";
             std::filesystem::remove(oldfname);
             std::rename(newfname, oldfname);
         }
@@ -5066,7 +5066,7 @@ inline void Proj::run() {
                             cout << "\n";
                             string filename1 = "species_trees.trees";
                             string filename2 = "unique_species_trees.trees";
-                            string filename3 = "params-beast-comparison.log";
+                            string filename3 = "params.log";
                             if (std::filesystem::remove(filename1)) {
                                 ofstream speciestrf(filename1);
                                 speciestrf << "#nexus\n\n";
