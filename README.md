@@ -8,7 +8,7 @@ This program uses a sequential Monte Carlo approach to sample the posterior dist
 * Global parameters (i.e. speciation rate, mean population size, base frequencies, locus substitution rates) cannot be estimated and need to be estimated in other programs.
 * `SMC` cannot currently handle missing taxa due to degeneracy (missing taxa may fix at random locations). These loci should be removed from the data.
 * If memory is an issue in the second level, reduce the number of threads for the second level (can save gene trees from the first level and restart analyses reading in thsoe gene trees if needed).
-* Note `SMC` accuracy is known to be lower than MCMC accuracy.
+* Note `SMC` accuracy is known to be lower than MCMC accuracy (it is a cruder approximation of the posterior).
 
 The file proj.conf is used to specify program settings:
 
