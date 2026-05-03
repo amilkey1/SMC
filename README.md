@@ -1,6 +1,15 @@
 # sequential multispecies coalescent
 This program uses a sequential Monte Carlo approach to sample the posterior distribution of trees under the multispecies coalescent model.
 
+# Recommendations for use
+* `SMC` may be sensitive to low information loci (may struggle to resolve the tree). If support values are low, remove low information loci.
+* `SMC` may scale better with larger numbers of loci than species. For larger numbers of species, consider breaking the problem into smaller datasets.
+* The `params.log` file cannot be interpreted in the same way MCMC log files may be. (i.e. high ESS does not mean convergence, and low ESS does not mean lack of convergence) The best way to assess convergence right now is multiple, independent runs. Also note the likelihood is expected to be lower than comparable MCMC analyses.
+* Global parameters (i.e. speciation rate, mean population size, base frequencies, locus substitution rates) cannot be estimated and need to be estimated in other programs.
+* `SMC` cannot currently handle missing taxa due to degeneracy (missing taxa may fix at random locations). These loci should be removed from the data.
+* If memory is an issue in the second level, reduce the number of threads for the second level (can save gene trees from the first level and restart analyses reading in thsoe gene trees if needed).
+* Note `SMC` accuracy is known to be lower than MCMC accuracy.
+
 The file proj.conf is used to specify program settings:
 
 ## The following settings apply to any start mode.
