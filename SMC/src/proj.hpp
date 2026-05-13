@@ -4779,7 +4779,6 @@ inline void Proj::run() {
                                         mcmcMoves(my_vec, last_round);
                                     }
                                     
-                                    // TODO: no groups
                                     for (unsigned i=0; i<G::_ngroups; i++) {
                                         unsigned start = i * G::_nparticles;
                                         unsigned end = start + (G::_nparticles) - 1;
@@ -4791,12 +4790,6 @@ inline void Proj::run() {
                                         
                                     }
                                     
-//                                    unsigned locus = my_vec[0].getNextGene() - 1; // subtract 1 because vector of gene forests starts at 0
-//                                    for (unsigned p=0; p<G::_nparticles; p++) {
-//                                        // finalize join for every particle now
-//                                        my_vec[p].finalizeLatestJoinMCMC(locus, p);
-//                                    }
-                                    
                                     vector<double> log_likelihoods_after_mcmc;
                                     for (auto &p:my_vec) {
                                         log_likelihoods_after_mcmc.push_back(p.calcLogLikelihoodLocus(locus, true));
@@ -4805,34 +4798,34 @@ inline void Proj::run() {
                                     double sum_log_likelihood_after_mcmc = std::accumulate(log_likelihoods_after_mcmc.begin(), log_likelihoods_after_mcmc.end(), 0);
                                     double avg_log_likelihood_after_mcmc = sum_log_likelihood_after_mcmc / G::_nparticles;
                                     
-                                    std::ofstream mcmcfile;
+//                                    std::ofstream mcmcfile;
                                     
-                                    mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
-                                    double proportion_accepted = (double) G::_nmcmc_moves_accepted / (G::_nparticles * G::_n_mcmc_rounds);
-                                    mcmcfile << G::_generation << "\t" << "\t" << G::_nmcmc_moves_accepted << "\t" << "\t" << proportion_accepted << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << avg_log_likelihood_after_mcmc << "\t" << "\t" << "\t" << G::_sliding_window << "\n";
+//                                    mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
+//                                    double proportion_accepted = (double) G::_nmcmc_moves_accepted / (G::_nparticles * G::_n_mcmc_rounds);
+//                                    mcmcfile << G::_generation << "\t" << "\t" << G::_nmcmc_moves_accepted << "\t" << "\t" << proportion_accepted << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << avg_log_likelihood_after_mcmc << "\t" << "\t" << "\t" << G::_sliding_window << "\n";
+//                                    
+//                                    vector<double> weights_after_mcmc(G::_nparticles);
                                     
-                                    vector<double> weights_after_mcmc(G::_nparticles);
+//                                    for (unsigned p=0; p<G::_nparticles; p++) {
+//                                        weights_after_mcmc[p] = my_vec[p].getLogWeight();
+//                                    }
                                     
-                                    for (unsigned p=0; p<G::_nparticles; p++) {
-                                        weights_after_mcmc[p] = my_vec[p].getLogWeight();
-                                    }
+//                                    std::sort(weights_after_mcmc.begin(), weights_after_mcmc.end());
+//                                    double n_unique_particles_after_mcmc = std::unique(weights_after_mcmc.begin(), weights_after_mcmc.end()) - weights_after_mcmc.begin();
                                     
-                                    std::sort(weights_after_mcmc.begin(), weights_after_mcmc.end());
-                                    double n_unique_particles_after_mcmc = std::unique(weights_after_mcmc.begin(), weights_after_mcmc.end()) - weights_after_mcmc.begin();
+//                                    if (G::_verbose > 1) {
+//                                        cout << "\t" << "\t" << "\t" << n_unique_particles_after_mcmc << "\n";
+//                                    }
                                     
-                                    if (G::_verbose > 1) {
-                                        cout << "\t" << "\t" << "\t" << n_unique_particles_after_mcmc << "\n";
-                                    }
-                                    
-                                    string filenameb = "params" + to_string(G::_generation) + "b";
+//                                    string filenameb = "params" + to_string(G::_generation) + "b";
                                 }
                                 else {
-                                    std::ofstream mcmcfile;
+//                                    std::ofstream mcmcfile;
                                     
-                                    mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
+//                                    mcmcfile.open("mcmc_moves_accepted.log", std::ios_base::app); // append instead of overwrite
                                     
                                     
-                                    mcmcfile << G::_generation << "\t" << "\t" << "N/A" << "\t" << "N/A" << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << "N/A" << "\t" << "N/A" << "\n";
+//                                    mcmcfile << G::_generation << "\t" << "\t" << "N/A" << "\t" << "N/A" << "\t" << "\t" << "\t" << avg_log_likelihood_before_mcmc << "\t" << "\t" << "\t" << "N/A" << "\t" << "N/A" << "\n";
                                 }
                             }
                             
