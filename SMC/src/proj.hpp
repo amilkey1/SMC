@@ -4641,6 +4641,17 @@ inline void Proj::run() {
                                 // set gene order for first G::_nloci set of steps
                                 unsigned ngroup = 0;
                                 unsigned group_count = 0;
+                                
+#if defined (MIGRATE_PARTICLES)
+                                // gene order must be the same for all particles
+                                for (unsigned p=0; p<G::_nparticles*G::_ngroups; p++) {
+                                    my_vec[p].resetGeneOrder(g, new_gene_order[0]);
+                                    if ((group_count+1)%G::_nparticles == 0) {
+                                        ngroup++;
+                                    }
+                                    group_count++;
+                                }
+#else
                                 for (unsigned p=0; p<G::_nparticles*G::_ngroups; p++) {
                                     my_vec[p].resetGeneOrder(g, new_gene_order[ngroup]);
                                     if ((group_count+1)%G::_nparticles == 0) {
@@ -4648,6 +4659,7 @@ inline void Proj::run() {
                                     }
                                     group_count++;
                                 }
+#endif
                             }
                             if (G::_verbose == 1) {
                                 cout << "starting step " << g << " of " << nsteps-1 << endl;
@@ -4700,6 +4712,37 @@ inline void Proj::run() {
                                     filterParticlesThreading(my_vec, g, particle_indices);
                                 }
                                 
+# if defined (MIGRATE_PARTICLES)
+                                // 1. Create a list of original positions [0, 1, 2, ... n]
+//                                std::vector<size_t> p(my_vec.size());
+//                                std::iota(p.begin(), p.end(), 0);
+//
+//                                // 2. Shuffle those positions using your seed
+//                                std::default_random_engine engine(_random_seed);
+//                                std::shuffle(p.begin(), p.end(), engine);
+//
+//                                // 3. Create a temporary container
+//                                // This uses the move constructor, which works even if operator= is deleted
+//                                std::vector<Particle> temp_vec;
+//                                temp_vec.reserve(my_vec.size());
+//
+//                                std::vector<unsigned> temp_indices;
+//                                temp_indices.reserve(particle_indices.size());
+//
+//                                // 4. Move the objects into the new order
+//                                for (size_t i : p) {
+//                                    temp_vec.push_back(std::move(my_vec[i]));
+//                                    temp_indices.push_back(std::move(particle_indices[i]));
+//                                }
+//
+//                                // 5. Replace the old vectors
+//                                my_vec = std::move(temp_vec);
+//                                particle_indices = std::move(temp_indices);
+                                
+                                std::shuffle(particle_indices.begin(), particle_indices.end(), std::default_random_engine(_random_seed)); // shuffle particles between groups
+
+#endif
+                                
                                 
                                 
                                 string filenamea = "params" + to_string(G::_generation) + "a";
@@ -4737,11 +4780,22 @@ inline void Proj::run() {
                                     }
                                     
                                     // TODO: no groups
-                                    unsigned locus = my_vec[0].getNextGene() - 1; // subtract 1 because vector of gene forests starts at 0
-                                    for (unsigned p=0; p<G::_nparticles; p++) {
-                                        // finalize join for every particle now
-                                        my_vec[p].finalizeLatestJoinMCMC(locus, p);
+                                    for (unsigned i=0; i<G::_ngroups; i++) {
+                                        unsigned start = i * G::_nparticles;
+                                        unsigned end = start + (G::_nparticles) - 1;
+                                        for (unsigned p=start; p<end+1; p++) {
+                                            unsigned locus = my_vec[p].getNextGene() - 1; // subtract 1 because vector of gene forests starts at 0
+                                            // finalize join for every particle now
+                                            my_vec[p].finalizeLatestJoinMCMC(locus, p);
+                                        }
+                                        
                                     }
+                                    
+//                                    unsigned locus = my_vec[0].getNextGene() - 1; // subtract 1 because vector of gene forests starts at 0
+//                                    for (unsigned p=0; p<G::_nparticles; p++) {
+//                                        // finalize join for every particle now
+//                                        my_vec[p].finalizeLatestJoinMCMC(locus, p);
+//                                    }
                                     
                                     vector<double> log_likelihoods_after_mcmc;
                                     for (auto &p:my_vec) {
@@ -4813,6 +4867,17 @@ inline void Proj::run() {
                                 
                                 unsigned ngroup = 0;
                                 unsigned group_count = 0;
+                                
+# if defined (MIGRATE_PARTICLES)
+                                for (unsigned p=0; p<G::_nparticles*G::_ngroups; p++) {
+                                    unsigned particle_number = particle_indices[p];
+                                    my_vec[particle_number].resetGeneOrder(g, new_gene_order[0]);
+                                    if ((group_count+1)%G::_nparticles == 0) {
+                                        ngroup++;
+                                    }
+                                    group_count++;
+                                }
+#else
                                 for (unsigned p=0; p<G::_nparticles*G::_ngroups; p++) {
                                     unsigned particle_number = particle_indices[p];
                                     my_vec[particle_number].resetGeneOrder(g, new_gene_order[ngroup]);
@@ -4821,6 +4886,7 @@ inline void Proj::run() {
                                     }
                                     group_count++;
                                 }
+#endif
                             }
                             G::_generation++;
                             
