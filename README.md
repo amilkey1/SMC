@@ -42,7 +42,6 @@ The file proj.conf is used to specify program settings:
 `relative_rates`: relative substitution rate for each locus. Relative rates must average to 1.0. Ex. `relative_rates = 0.5, 1.5` for 2 loci\
 `run_on_empty`: set to true to sample from the prior\
 `save_memory`: set to true to throw away partials in likelihood calculations after they are used. This option may take longer but may use less memory.
-`mcmc`: set to true to propose MCMC moves between filtering steps. Will increase number of likelihood calculations required but may improve variation. (may not work right now)
 
 ### The following settings apply only if reading in gene newicks and only performing second-level SMC. Default is to perform first- and second-level SMC.
 `gene_newicks`: set to true if specifying gene files to be read in\
